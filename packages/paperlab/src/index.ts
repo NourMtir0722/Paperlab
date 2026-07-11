@@ -91,6 +91,20 @@ export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'
 export { receiptTotals, barcodeBars, type ReceiptContent } from './content/receipt'
 
 export { parsePreset, serializePreset, mergeConfig } from './config/serialize'
+export { diffConfig, buildJsxSnippet } from './config/diff'
+export {
+  buildAgentPayload,
+  describeConfig,
+  AGENT_PAYLOAD_VERSION,
+} from './config/agent-payload'
+export {
+  usePrefersReducedMotion,
+  supportsWebGL,
+  contentText,
+  PaperMirror,
+  PaperFallback,
+} from './a11y'
+export { quantizeTime, quantizeProgress, ON_TWOS_FPS } from './motion/onTwos'
 export { getPreset, listPresets } from './config/presets'
 export { stocks, getStock, type Stock } from './core/stock'
 export { createSheetGeometry, resolveSegments } from './core/sheet'

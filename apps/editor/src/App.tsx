@@ -1,17 +1,11 @@
 import { useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { ContactShadows, OrbitControls, Stats } from '@react-three/drei'
-import {
-  PaperFieldMesh,
-  PaperMesh,
-  getPreset,
-  listPresets,
-  serializePreset,
-  type PaperHandle,
-} from 'paperlab'
+import { PaperFieldMesh, PaperMesh, getPreset, listPresets, type PaperHandle } from 'paperlab'
 import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
 import { Transport } from './Transport'
+import { ExportMenu } from './ExportMenu'
 import { useEditor } from './store'
 
 /** Demo pool for the Field Composer; the count slider cycles through them. */
@@ -71,16 +65,7 @@ export function App() {
           </button>
         )}
         <div className="spacer" />
-        <button
-          className="export"
-          onClick={() => {
-            const snapshot = paperRef.current?.snapshot()
-            navigator.clipboard.writeText(serializePreset(snapshot ?? config))
-          }}
-          title="Copies the .paper JSON for now — Copy for AI lands in M5"
-        >
-          Export code
-        </button>
+        <ExportMenu config={config} paperRef={paperRef} />
       </header>
 
       <aside className="left">

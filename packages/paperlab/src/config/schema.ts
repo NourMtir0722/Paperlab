@@ -44,6 +44,8 @@ export const imageContentSchema = z.object({
   type: z.literal('image'),
   src: z.string(),
   fit: z.enum(['cover', 'contain']).default('cover'),
+  /** Read by the hidden DOM mirror and the no-WebGL fallback. */
+  alt: z.string().optional(),
 })
 
 export const textContentSchema = z.object({

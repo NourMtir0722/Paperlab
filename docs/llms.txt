@@ -1,0 +1,35 @@
+# Paperlab
+
+> Physical, realistic paper as a React component. A sheet is a real 3D mesh — content is a texture on geometry that genuinely bends, so text and images curl with perfect continuity. Preset-driven, serializable, agent-first.
+
+Install: `npm i paperlab three @react-three/fiber gsap` (React ≥ 19, three ≥ 0.160)
+
+## Core API
+
+- `<Paper />` — one sheet, owns its own <Canvas>, fills its parent (parent needs a height!). Props: preset (name or object), sheet {width,height,thickness}, stock ('printer'|'thermal'|'kraft'|'newsprint'|'vellum'|'photo-gloss'), content ({type:'image',src,alt} | {type:'text',text,...} | {type:'receipt',store,items,...}), behavior, surface {grain,deckle,creaseLines,aging}, physics, interactive, autoplay, reducedMotion.
+- `<PaperMesh />` — the same, canvas-less, for existing React Three Fiber scenes.
+- `<PaperField />` — many sheets, one instanced draw call. Props: images | papers, preset, layout ('ring'|'deck'|'cascade'|'helix'|'wall'|'tunnel'|'scatter'), layoutOptions, motion {driver:'autoplay'|'drag'|'none', speed}, entrance {type:'rise'|'scatter'|'none', stagger}.
+- Ref API: play(), pause(), set('progress', v), getProgress(), snapshot(), toJSON().
+
+## Behaviors (behavior={{ type, ...params }})
+
+peel {progress, corner, radius} · unroll {progress, tightness, sway} · flip {progress, spine, radius} · letter-fold {progress, crease} · hang {wind, sag} · fly {flutter, curve} · fall {flutter, curl}
+
+## Physics
+
+Idle (compose with behaviors): 'float' 'tumble' 'dangle' 'taped' 'breeze'. Cloth (exclusive with behavior — schema-enforced): physics={{type:'cloth', pins:'top-edge'|'top-corners'|'corner'|'none', wind, stiffness, gravity}}. Interactive cloth is grabbable.
+
+## Presets
+
+Built-ins: receipt-unroll, letter-fold, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
+
+## Pitfalls
+
+1. Blank canvas = parent has no height (the classic R3F bug — <Paper> fills its parent).
+2. cloth + behavior together throws by design: cloth owns the vertices.
+3. prefers-reduced-motion freezes behaviors at their pose and disables physics/entrances automatically.
+4. No WebGL → automatic flat DOM fallback; a hidden DOM mirror of the content always renders (use it for E2E assertions).
+
+## Verify after integrating
+
+Run the dev server; the exported describeConfig(config) returns the one-line visual you should see (e.g. 'a store receipt for "acme.dev" on thermal paper stock (1×2.6), unrolling from a paper roll at the bottom, torn (deckled) bottom edge').
