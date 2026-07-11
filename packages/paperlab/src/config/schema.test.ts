@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { paperConfigSchema } from './schema'
 import { mergeConfig, parsePreset, serializePreset } from './serialize'
-import { getPreset, listPresets } from './presets'
+import {
+  getPreset,
+  isBuiltinPreset,
+  listPresets,
+  registerPreset,
+  unregisterPreset,
+} from './presets'
 
 describe('paper config schema', () => {
   it('fills every default from an empty object', () => {
@@ -68,5 +74,23 @@ describe('built-in presets', () => {
 
   it('throws a helpful error for unknown presets', () => {
     expect(() => getPreset('nope')).toThrow(/Unknown preset/)
+  })
+})
+
+describe('user preset registry', () => {
+  it('registers, resolves, lists and unregisters user presets', () => {
+    registerPreset('my-note', { stock: 'kraft', content: { type: 'text', text: 'hi' } })
+    expect(getPreset('my-note').stock).toBe('kraft')
+    expect(listPresets()).toContain('my-note')
+    expect(isBuiltinPreset('my-note')).toBe(false)
+    expect(isBuiltinPreset('receipt-unroll')).toBe(true)
+    unregisterPreset('my-note')
+    expect(() => getPreset('my-note')).toThrow(/Unknown preset/)
+  })
+
+  it('reserves built-in names and rejects invalid configs', () => {
+    expect(() => registerPreset('receipt-unroll', {})).toThrow(/built-in/)
+    expect(() => registerPreset('bad', { stock: 'papyrus' as never })).toThrow()
+    expect(listPresets()).not.toContain('bad')
   })
 })

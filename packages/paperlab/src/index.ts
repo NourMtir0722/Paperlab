@@ -117,7 +117,13 @@ export {
   PaperFallback,
 } from './a11y'
 export { quantizeTime, quantizeProgress, ON_TWOS_FPS } from './motion/onTwos'
-export { getPreset, listPresets } from './config/presets'
+export {
+  getPreset,
+  listPresets,
+  registerPreset,
+  unregisterPreset,
+  isBuiltinPreset,
+} from './config/presets'
 export { stocks, getStock, type Stock } from './core/stock'
 export { createSheetGeometry, resolveSegments } from './core/sheet'
 export { resolveMode, type PaperMode, type PaperModeRequest } from './core/modes'

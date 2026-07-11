@@ -2,14 +2,24 @@ import { create } from 'zustand'
 import {
   behaviorConfigSchema,
   clothConfigSchema,
+  diffConfig,
   getPreset,
+  isBuiltinPreset,
   mergeConfig,
   paperConfigSchema,
+  parsePreset,
   type ClothConfig,
   type PaperConfig,
   type PaperConfigInput,
   type SurfaceConfig,
 } from 'paperlab'
+import {
+  loadUserPresets,
+  persistUserPresets,
+  syncRegistry,
+  type StoredPreset,
+  type UserPresetMap,
+} from './userPresets'
 
 export interface FieldState {
   layout: string
@@ -35,6 +45,13 @@ interface EditorState {
   setAllSlots(name: string): void
   editFieldPaper(name: string): void
   backToField(): void
+  userPresets: UserPresetMap
+  /** Save (or overwrite) a user preset; rejects built-in names. */
+  savePreset(name: string, config: PaperConfig, thumbnail?: string): string | null
+  duplicatePreset(source: string): void
+  deletePreset(name: string): void
+  renamePreset(oldName: string, newName: string): string | null
+  importPreset(json: string): string | null
   /** Bumped when the canvas changes params behind the inspector's back (handle drags, transport commits) — remounts the inspector. */
   inspectorEpoch: number
   setPreset(name: string): void
@@ -47,7 +64,12 @@ interface EditorState {
   patchCloth(patch: Partial<ClothConfig>): void
 }
 
+// Boot: hydrate the library's runtime registry from localStorage.
+const bootUserPresets = loadUserPresets()
+syncRegistry(bootUserPresets)
+
 export const useEditor = create<EditorState>((set, get) => ({
+  userPresets: bootUserPresets,
   presetName: 'receipt-unroll',
   config: getPreset('receipt-unroll'),
   inspectorEpoch: 0,
@@ -145,4 +167,95 @@ export const useEditor = create<EditorState>((set, get) => ({
         }),
       }
     }),
+
+  savePreset: (name, config, thumbnail) => {
+    const trimmed = name.trim()
+    if (!trimmed) return 'Preset needs a name.'
+    if (isBuiltinPreset(trimmed)) return `"${trimmed}" is a built-in — pick another name.`
+    const named = paperConfigSchema.parse({ ...config, meta: { ...config.meta, name: trimmed } })
+    const stored: StoredPreset = {
+      config: diffConfig(named),
+      thumbnail,
+      savedAt: new Date().toISOString(),
+    }
+    set((s) => {
+      const userPresets = { ...s.userPresets, [trimmed]: stored }
+      persistUserPresets(userPresets)
+      syncRegistry(userPresets)
+      return { userPresets, presetName: trimmed, config: named, inspectorEpoch: s.inspectorEpoch + 1 }
+    })
+    return null
+  },
+
+  duplicatePreset: (source) => {
+    const base = getPreset(source)
+    let name = `${source} copy`
+    let n = 2
+    while (isBuiltinPreset(name) || get().userPresets[name]) name = `${source} copy ${n++}`
+    get().savePreset(name, base)
+  },
+
+  deletePreset: (name) =>
+    set((s) => {
+      const userPresets = { ...s.userPresets }
+      delete userPresets[name]
+      persistUserPresets(userPresets)
+      syncRegistry(userPresets, [name])
+      return {
+        userPresets,
+        // Field slots referencing the deleted preset fall back.
+        field: {
+          ...s.field,
+          slots: s.field.slots.map((slot) => (slot === name ? 'photo-print' : slot)),
+        },
+        inspectorEpoch: s.inspectorEpoch + 1,
+      }
+    }),
+
+  renamePreset: (oldName, newName) => {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === oldName) return null
+    if (isBuiltinPreset(trimmed) || get().userPresets[trimmed]) {
+      return `"${trimmed}" is already taken.`
+    }
+    set((s) => {
+      const stored = s.userPresets[oldName]
+      if (!stored) return s
+      const userPresets = { ...s.userPresets }
+      delete userPresets[oldName]
+      const config = parsePreset(stored.config)
+      userPresets[trimmed] = {
+        ...stored,
+        config: diffConfig(
+          paperConfigSchema.parse({ ...config, meta: { ...config.meta, name: trimmed } }),
+        ),
+      }
+      persistUserPresets(userPresets)
+      syncRegistry(userPresets, [oldName])
+      return {
+        userPresets,
+        presetName: s.presetName === oldName ? trimmed : s.presetName,
+        field: {
+          ...s.field,
+          slots: s.field.slots.map((slot) => (slot === oldName ? trimmed : slot)),
+        },
+        inspectorEpoch: s.inspectorEpoch + 1,
+      }
+    })
+    return null
+  },
+
+  importPreset: (json) => {
+    try {
+      const config = parsePreset(json)
+      let name = config.meta.name === 'untitled' ? 'imported' : config.meta.name
+      let n = 2
+      while (isBuiltinPreset(name) || get().userPresets[name]) {
+        name = `${config.meta.name} ${n++}`
+      }
+      return get().savePreset(name, config)
+    } catch (error) {
+      return `Not a valid .paper file: ${error instanceof Error ? error.message.slice(0, 120) : error}`
+    }
+  },
 }))
