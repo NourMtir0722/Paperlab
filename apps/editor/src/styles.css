@@ -131,9 +131,45 @@ body {
   background: #26272b;
 }
 
-.presets button.paper-item {
+.slots {
+  list-style: none;
+  padding: 0;
+}
+
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.slot-index {
+  color: #55554f;
+  font-size: 11px;
+  width: 18px;
+  text-align: right;
+}
+
+.slot-row select {
+  flex: 1;
+  background: #26272b;
+  color: #c9c7c2;
+  border: 1px solid #2a2b2f;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.slot-edit {
+  background: transparent;
+  border: 0;
   color: #8b8a86;
-  cursor: default;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.slot-edit:hover {
+  color: #fff;
 }
 
 button.export {

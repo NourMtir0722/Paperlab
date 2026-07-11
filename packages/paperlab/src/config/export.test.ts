@@ -65,7 +65,7 @@ describe('buildAgentPayload', () => {
     const order = [
       `agent-payload v${AGENT_PAYLOAD_VERSION}`,
       'npm i paperlab three @react-three/fiber gsap',
-      "import { Paper } from 'paperlab'",
+      "import { Paper, type PaperConfigInput } from 'paperlab'",
       'const preset =',
       'fills its parent container',
       'Verify: run the dev server',

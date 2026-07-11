@@ -11,6 +11,7 @@ import { useEditor } from './store'
 export function FieldInspector() {
   const field = useEditor((s) => s.field)
   const patchField = useEditor((s) => s.patchField)
+  const setAllSlots = useEditor((s) => s.setAllSlots)
   const store = useCreateStore()
 
   const layout = getLayout(field.layout)
@@ -59,10 +60,11 @@ export function FieldInspector() {
         },
       }),
       Paper: folder({
-        preset: {
-          value: field.presetName,
+        setAll: {
+          label: 'set all to',
+          value: field.slots[0] ?? 'photo-print',
           options: listPresets(),
-          onChange: (v: string, _, ctx) => ctx.initial || patchField({ presetName: v }),
+          onChange: (v: string, _, ctx) => ctx.initial || setAllSlots(v),
         },
       }),
     },
