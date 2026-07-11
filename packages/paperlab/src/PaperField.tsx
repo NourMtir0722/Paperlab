@@ -268,13 +268,15 @@ function FieldGroup({ group, shared }: { group: FieldGroupData; shared: SharedMo
     uniforms.uBackDarken = {
       value: 1 - Math.min(0.45, 0.12 + config.sheet.thickness * 0.9) * stock.opacity,
     }
+    uniforms.uStockColor = { value: new THREE.Color(stock.color) }
+    uniforms.uShowThrough = { value: config.surface.showThrough ?? stock.showThrough }
     return {
       vertexShader: buildFieldVertexShader(composed),
       fragmentShader: buildFieldFragmentShader(),
       uniforms,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structureKey, JSON.stringify(config.sheet), stock.id])
+  }, [structureKey, JSON.stringify(config.sheet), stock.id, config.surface.showThrough])
 
   useEffect(() => {
     if (!atlas) return

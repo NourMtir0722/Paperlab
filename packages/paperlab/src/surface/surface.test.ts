@@ -14,7 +14,7 @@ describe('composeSurface', () => {
   it('composes only the enabled effects into one program', () => {
     const surface = surfaceSchema.parse({ grain: 0.4, aging: 0.2 })
     const out = composeSurface(surface, getStock('photo-gloss'), 0.2)
-    expect(out.structureKey).toBe('ga')
+    expect(out.structureKey).toBe('ga:')
     expect(out.fragmentShader).toContain('plGrain')
     expect(out.fragmentShader).toContain('plAging')
     expect(out.fragmentShader).not.toContain('plDeckle')
@@ -44,6 +44,39 @@ describe('composeSurface', () => {
     expect(thick.uniforms.uBackDarken!.value as number).toBeLessThan(
       thin.uniforms.uBackDarken!.value as number,
     )
+  })
+
+  it('backside branch: stock base + reversed show-through ghost, never the mirrored front', () => {
+    const out = composeSurface(surfaceSchema.parse({}), getStock('thermal'), 0.2, {
+      hasFrontMap: true,
+      hasBackMap: false,
+    })
+    expect(out.structureKey).toBe('ga:F')
+    expect(out.fragmentShader).toContain('gl_FrontFacing')
+    expect(out.fragmentShader).toContain('texture2D(uFrontMap, vPaperUv)')
+    expect(out.fragmentShader).toContain('mix(vec3(1.0), front, uShowThrough)')
+    expect(out.uniforms.uShowThrough!.value).toBeCloseTo(0.06) // thermal stock default
+    expect(out.uniforms.uFrontMap).toBeDefined()
+    expect(out.uniforms.uBackMap).toBeUndefined()
+  })
+
+  it('content.back samples mirrored in x so it reads right when flipped', () => {
+    const out = composeSurface(surfaceSchema.parse({}), printer, 0.2, {
+      hasFrontMap: true,
+      hasBackMap: true,
+    })
+    expect(out.structureKey).toBe('g:FB')
+    expect(out.fragmentShader).toContain('texture2D(uBackMap, vec2(1.0 - vPaperUv.x, vPaperUv.y))')
+  })
+
+  it('showThrough: stock defaults, surface override wins, vellum is translucent-high', () => {
+    const printerOut = composeSurface(surfaceSchema.parse({}), printer, 0.2)
+    expect(printerOut.uniforms.uShowThrough!.value).toBe(0)
+    const overridden = composeSurface(surfaceSchema.parse({ showThrough: 0.4 }), printer, 0.2)
+    expect(overridden.uniforms.uShowThrough!.value).toBe(0.4)
+    const vellum = composeSurface(surfaceSchema.parse({}), getStock('vellum'), 0.2)
+    expect(vellum.uniforms.uShowThrough!.value).toBeGreaterThanOrEqual(0.5)
+    expect(vellum.uniforms.uOpacity!.value).toBeLessThan(1)
   })
 
   it('pads crease positions to the fixed uniform array size', () => {

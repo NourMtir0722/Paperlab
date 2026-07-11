@@ -42,6 +42,25 @@ describe('paper config schema', () => {
     const config = paperConfigSchema.parse({ content: { type: 'text', text: 'hi' } })
     expect(config.content).toMatchObject({ align: 'left', lineHeight: 1.45 })
   })
+
+  it('content.back: letter front, kraft-image back (spec §4.6)', () => {
+    const config = paperConfigSchema.parse({
+      content: {
+        type: 'text',
+        text: 'front side',
+        back: { type: 'image', src: '/kraft.jpg' },
+      },
+    })
+    expect(config.content.back).toMatchObject({ type: 'image', src: '/kraft.jpg', fit: 'cover' })
+    // The back slot is single-level — no back-of-back.
+    expect(() =>
+      paperConfigSchema.parse({
+        content: { type: 'text', text: 'x', back: { type: 'text', text: 'y', back: { type: 'blank' } } },
+      }),
+    ).not.toThrow() // unknown keys are stripped, not fatal
+    const reparsed = paperConfigSchema.parse(JSON.parse(JSON.stringify(config)))
+    expect(reparsed).toEqual(config)
+  })
 })
 
 describe('mergeConfig', () => {
