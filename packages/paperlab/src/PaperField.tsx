@@ -19,6 +19,8 @@ import { getLayout, type PaperPose } from './field/layouts'
 import { useContentAtlas } from './content/atlas'
 import CustomShaderMaterial from 'three-custom-shader-material'
 
+import { usePrefersReducedMotion } from './a11y'
+
 export interface PaperFieldMeshProps {
   /** Per-paper content; length sets the instance count. */
   papers?: { content?: ContentConfig }[]
@@ -30,6 +32,8 @@ export interface PaperFieldMeshProps {
   layoutOptions?: Record<string, unknown>
   motion?: { driver?: 'autoplay' | 'drag' | 'none'; speed?: number }
   entrance?: { type?: 'rise' | 'scatter' | 'none'; stagger?: number; duration?: number }
+  /** Override prefers-reduced-motion (default: follow the system setting). */
+  reducedMotion?: boolean
 }
 
 export interface PaperFieldProps extends PaperFieldMeshProps {
@@ -52,6 +56,9 @@ export const PaperFieldMesh = forwardRef<THREE.InstancedMesh, PaperFieldMeshProp
     const config = resolveConfig({ preset: props.preset })
     const stock = getStock(config.stock)
     const behavior = config.behavior ? getBehavior(config.behavior.type) : null
+    // Reduced motion: no entrance choreography, no driver motion, behavior
+    // frozen at its configured progress, wave time frozen.
+    const reduced = usePrefersReducedMotion(props.reducedMotion)
 
     const papers = useMemo<{ content?: ContentConfig }[]>(
       () =>
@@ -139,7 +146,7 @@ export const PaperFieldMesh = forwardRef<THREE.InstancedMesh, PaperFieldMeshProp
 
     // Behavior progress loops on GSAP — the field is always alive.
     useEffect(() => {
-      if (!behavior) return
+      if (!behavior || reduced) return
       const state = { p: progressRef.current }
       const tween = gsap.to(state, {
         p: 1,
@@ -161,7 +168,7 @@ export const PaperFieldMesh = forwardRef<THREE.InstancedMesh, PaperFieldMeshProp
     const phaseRef = useRef(0)
     const dragVelRef = useRef(0)
     const gl = useThree((s) => s.gl)
-    const driver = props.motion?.driver ?? 'autoplay'
+    const driver = reduced ? 'none' : (props.motion?.driver ?? 'autoplay')
     const speed = props.motion?.speed ?? 0.5
 
     useEffect(() => {
@@ -193,7 +200,7 @@ export const PaperFieldMesh = forwardRef<THREE.InstancedMesh, PaperFieldMeshProp
 
     // Entrance + layout morph state.
     const mountTime = useRef(-1)
-    const entranceType = props.entrance?.type ?? 'rise'
+    const entranceType = reduced ? 'none' : (props.entrance?.type ?? 'rise')
     const stagger = props.entrance?.stagger ?? 0.06
     const entranceDuration = props.entrance?.duration ?? 0.9
     const morph = useRef<{ from: { id: string; options: unknown } | null; t: number }>({
@@ -219,7 +226,7 @@ export const PaperFieldMesh = forwardRef<THREE.InstancedMesh, PaperFieldMeshProp
       const elapsed = clock.elapsedTime - mountTime.current
 
       // Deformer + time uniforms.
-      shader.uniforms.uPlTime!.value = clock.elapsedTime
+      shader.uniforms.uPlTime!.value = reduced ? 0 : clock.elapsedTime
       if (behavior) {
         const values = stackUniformValues(buildStackAt(progressRef.current), config.sheet)
         for (const [name, value] of Object.entries(values)) {

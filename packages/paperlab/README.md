@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| ![A thermal receipt unrolling from a paper roll](docs/media/receipt-unroll.png) | ![A photo print with its corner peeling up](docs/media/hero-peel.png) |
-| ![A cloth-simulated sheet grabbed and pulled](docs/media/cloth-grab.png) | ![A ring gallery of photo prints](docs/media/field-ring.png) |
+| ![A thermal receipt unrolling from a paper roll](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/receipt-unroll.png) | ![A photo print with its corner peeling up](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/hero-peel.png) |
+| ![A cloth-simulated sheet grabbed and pulled](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/cloth-grab.png) | ![A ring gallery of photo prints](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/field-ring.png) |
 
 ## Quick start
 
@@ -49,7 +49,7 @@ import { PaperField } from 'paperlab'
 - **Physics** — curated idle motion (`float`, `tumble`, `breeze`…) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull.
 - **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU (parity-tested against the CPU path), arranged by pure layout functions: `ring`, `deck`, `cascade`, `helix`, `wall`, `tunnel`, `scatter`.
 - **Presets** — everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
-- **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into Claude Code (or any coding agent): install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md).
+- **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into Claude Code (or any coding agent): install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md).
 - **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose, a hidden DOM mirror carries the content for screen readers, and a flat DOM fallback renders when WebGL isn't available.
 
 ## The editor
@@ -64,9 +64,9 @@ A Figma-shaped editor: presets on the left, sculpt on canvas (drag the blue hand
 
 | | |
 |---|---|
-| [`packages/paperlab`](packages/paperlab/) | the npm library |
-| [`apps/editor`](apps/editor/) | the editor |
-| [`docs/llms.txt`](docs/llms.txt) | the agent-readable API reference |
+| [`packages/paperlab`](https://github.com/NourMtir0722/Paperlab) | the npm library |
+| [`apps/editor`](https://github.com/NourMtir0722/Paperlab) | the editor |
+| [`docs/llms.txt`](https://github.com/NourMtir0722/Paperlab/blob/main/docs/llms.txt) | the agent-readable API reference |
 
 ```sh
 pnpm test           # 95 unit tests — deformer math, schema, cloth, layouts, exports
@@ -74,6 +74,6 @@ pnpm test:parity    # GPU golden-vector gate: every deformer's GLSL twin vs its 
 pnpm build
 ```
 
-Contributions climb a ladder from presets (JSON only) to dual-implementation deformers — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions climb a ladder from presets (JSON only) to dual-implementation deformers — see [CONTRIBUTING.md](https://github.com/NourMtir0722/Paperlab/blob/main/CONTRIBUTING.md).
 
 MIT © Noor Mtir

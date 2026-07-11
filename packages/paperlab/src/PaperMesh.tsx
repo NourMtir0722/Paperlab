@@ -28,6 +28,8 @@ import type { Behavior } from './behaviors/types'
 import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
 import { ClothSim } from './physics/cloth'
 import { PaperMaterial } from './surface/PaperMaterial'
+import { usePrefersReducedMotion } from './a11y'
+import { quantizeProgress, quantizeTime } from './motion/onTwos'
 
 export interface PaperMeshProps {
   /** Built-in preset name, or a (partial) preset object. Props below override it. */
@@ -43,6 +45,8 @@ export interface PaperMeshProps {
   interactive?: boolean
   /** Start the behavior's transport loop on mount. */
   autoplay?: boolean
+  /** Override prefers-reduced-motion (default: follow the system setting). */
+  reducedMotion?: boolean
   position?: [number, number, number]
   rotation?: [number, number, number]
   /** Fires every animation tick with the behavior's progress (0..1). */
@@ -100,9 +104,12 @@ const quatScratch = new THREE.Quaternion()
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
   const config = resolveConfig(props)
   const behavior: Behavior | null = config.behavior ? getBehavior(config.behavior.type) : null
-  const isCloth = typeof config.physics === 'object'
+  // Reduced motion: behaviors freeze at their resting pose, physics is off,
+  // idle motion is off. The sheet still renders fully sculpted.
+  const reduced = usePrefersReducedMotion(props.reducedMotion)
+  const isCloth = !reduced && typeof config.physics === 'object'
   const idle =
-    typeof config.physics === 'string' && config.physics !== 'none'
+    !reduced && typeof config.physics === 'string' && config.physics !== 'none'
       ? getIdlePreset(config.physics as IdleName)
       : null
 
@@ -197,9 +204,12 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         if (behavior.loopMode === 'restart') state.p = 0
       },
       onUpdate: () => {
-        overridesRef.current[param] = state.p
+        const p = configRef.current.onTwos
+          ? quantizeProgress(state.p, behavior.duration)
+          : state.p
+        overridesRef.current[param] = p
         dirtyRef.current = true
-        props.onProgress?.(state.p)
+        props.onProgress?.(p)
       },
     })
   }
@@ -210,7 +220,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   }
 
   useEffect(() => {
-    if (props.autoplay) play()
+    if (props.autoplay && !reduced) play()
     return () => {
       tweenRef.current?.kill()
       tweenRef.current = null
@@ -254,13 +264,15 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
 
   useFrame(({ clock }, delta) => {
     const cfg = configRef.current
+    // Reduced motion freezes time-driven deformers at their resting phase.
+    const now = reduced ? 0 : cfg.onTwos ? quantizeTime(clock.elapsedTime) : clock.elapsedTime
 
     // Whole-sheet idle motion (float, tumble, dangle) — transform, not vertices.
     if (idle?.transform && groupRef.current) {
       const pose = idlePose.current
       pose.position[0] = pose.position[1] = pose.position[2] = 0
       pose.rotation[0] = pose.rotation[1] = pose.rotation[2] = 0
-      idle.transform(clock.elapsedTime, pose)
+      idle.transform(now, pose)
       const base = props.position ?? [0, 0, 0]
       const baseRot = props.rotation ?? [0, 0, 0]
       groupRef.current.position.set(
@@ -295,18 +307,18 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     }
 
     // Shape path: the deformer stack.
-    const stack = buildStack(cfg, overridesRef.current, behavior, clock.elapsedTime)
+    const stack = buildStack(cfg, overridesRef.current, behavior, now)
     if (!stack) return
-    const animated = stackIsAnimated(stack)
-    const hasLoop = Boolean(cfg.behavior && behavior?.loop)
+    const animated = !reduced && stackIsAnimated(stack)
+    const hasLoop = !reduced && Boolean(cfg.behavior && behavior?.loop)
     if (!dirtyRef.current && !hasLoop && !animated) return
     dirtyRef.current = false
 
-    const ctx = { t: clock.elapsedTime, sheet: cfg.sheet }
+    const ctx = { t: now, sheet: cfg.sheet }
     applyDeformerStack(geometry, basePositions, stack, ctx)
 
     if (props.interactive && behavior?.handles) {
-      const o = effectiveOptions(clock.elapsedTime)
+      const o = effectiveOptions(now)
       behavior.handles.forEach((h, i) => {
         const mesh = handleRefs.current[i]
         if (!mesh || !o) return

@@ -150,6 +150,45 @@ button.export:hover {
   background: #6089ff;
 }
 
+.export-menu {
+  position: relative;
+}
+
+.export-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  background: #222327;
+  border: 1px solid #3a3b40;
+  border-radius: 8px;
+  min-width: 250px;
+  overflow: hidden;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+}
+
+.export-dropdown button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e6e4df;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.export-dropdown button:hover {
+  background: #2e3a5c;
+}
+
+.export-dropdown button span {
+  color: #8b8a86;
+  font-size: 11px;
+}
+
 .left {
   grid-area: left;
   background: #1a1b1e;

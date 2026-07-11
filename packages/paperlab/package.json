@@ -16,7 +16,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
@@ -46,5 +48,30 @@
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
+  },
+  "author": "Noor Mtir",
+  "homepage": "https://github.com/NourMtir0722/Paperlab#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NourMtir0722/Paperlab.git",
+    "directory": "packages/paperlab"
+  },
+  "bugs": "https://github.com/NourMtir0722/Paperlab/issues",
+  "keywords": [
+    "react",
+    "three",
+    "threejs",
+    "react-three-fiber",
+    "paper",
+    "3d",
+    "animation",
+    "gallery",
+    "webgl",
+    "receipt",
+    "page-curl",
+    "cloth"
+  ],
+  "engines": {
+    "node": ">=18"
   }
 }
