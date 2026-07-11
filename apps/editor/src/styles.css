@@ -1,0 +1,167 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  background: #0f1012;
+  color: #e6e4df;
+  overflow: hidden;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  grid-template-columns: 220px 1fr 300px;
+  grid-template-areas:
+    'topbar topbar topbar'
+    'left viewport right';
+  height: 100%;
+}
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: #1a1b1e;
+  border-bottom: 1px solid #2a2b2f;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.filename {
+  color: #8b8a86;
+}
+
+.mode-switch {
+  display: flex;
+  background: #26272b;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.mode-switch button {
+  border: 0;
+  background: transparent;
+  color: #8b8a86;
+  padding: 4px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.mode-switch button.active {
+  background: #3a3b40;
+  color: #fff;
+}
+
+.mode-switch button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.spacer {
+  flex: 1;
+}
+
+button.export {
+  background: #4f7cff;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.export:hover {
+  background: #6089ff;
+}
+
+.left {
+  grid-area: left;
+  background: #1a1b1e;
+  border-right: 1px solid #2a2b2f;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.left h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b8a86;
+  margin: 14px 0 8px;
+}
+
+.left h2:first-child {
+  margin-top: 0;
+}
+
+.presets,
+.layers {
+  list-style: none;
+  padding: 0;
+}
+
+.presets button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #c9c7c2;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.presets button:hover {
+  background: #26272b;
+}
+
+.presets button.active {
+  background: #2e3a5c;
+  color: #fff;
+}
+
+.layers li {
+  padding: 6px 10px;
+  color: #c9c7c2;
+  border-radius: 6px;
+}
+
+.layers li.dim {
+  color: #55554f;
+}
+
+.viewport {
+  grid-area: viewport;
+  position: relative;
+}
+
+/* drei <Stats> injects a fixed top-left panel; park it bottom-left instead. */
+.stats {
+  top: auto !important;
+  left: 228px !important;
+  bottom: 8px !important;
+}
+
+.right {
+  grid-area: right;
+  background: #1a1b1e;
+  border-left: 1px solid #2a2b2f;
+  overflow-y: auto;
+}
