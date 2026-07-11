@@ -130,16 +130,36 @@ const builtins: Record<string, PaperConfigInput> = {
   },
 }
 
+/** User presets registered at runtime (the editor persists these to localStorage). */
+const userPresets = new Map<string, PaperConfigInput>()
+
 export function getPreset(name: string): PaperConfig {
-  const raw = builtins[name]
+  const raw = builtins[name] ?? userPresets.get(name)
   if (!raw) {
     throw new Error(
-      `[paperlab] Unknown preset "${name}". Built-ins: ${Object.keys(builtins).join(', ')}`,
+      `[paperlab] Unknown preset "${name}". Registered: ${listPresets().join(', ')}`,
     )
   }
   return paperConfigSchema.parse(raw)
 }
 
+/** Register a user preset (validated). Built-in names are reserved. */
+export function registerPreset(name: string, input: PaperConfigInput): void {
+  if (name in builtins) {
+    throw new Error(`[paperlab] "${name}" is a built-in preset — pick another name.`)
+  }
+  paperConfigSchema.parse(input) // fail fast on invalid configs
+  userPresets.set(name, input)
+}
+
+export function unregisterPreset(name: string): void {
+  userPresets.delete(name)
+}
+
+export function isBuiltinPreset(name: string): boolean {
+  return name in builtins
+}
+
 export function listPresets(): string[] {
-  return Object.keys(builtins)
+  return [...Object.keys(builtins), ...userPresets.keys()]
 }

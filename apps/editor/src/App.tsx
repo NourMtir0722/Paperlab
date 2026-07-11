@@ -15,6 +15,8 @@ import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
 import { Transport } from './Transport'
 import { ExportMenu } from './ExportMenu'
+import { PresetPanel } from './PresetPanel'
+import { captureThumbnail } from './userPresets'
 import { useEditor } from './store'
 
 /** Demo pool for the Field Composer; the count slider cycles through them. */
@@ -42,6 +44,7 @@ export function App() {
   const setSlotPreset = useEditor((s) => s.setSlotPreset)
   const editFieldPaper = useEditor((s) => s.editFieldPaper)
   const backToField = useEditor((s) => s.backToField)
+  const savePreset = useEditor((s) => s.savePreset)
 
   const paperRef = useRef<PaperHandle>(null)
   const scrubRef = useRef<HTMLInputElement>(null)
@@ -97,25 +100,27 @@ export function App() {
           </button>
         )}
         <div className="spacer" />
+        {mode === 'paper' && (
+          <button
+            className="save-preset"
+            onClick={() => {
+              const name = prompt('Save preset as', config.meta.name === 'untitled' ? '' : config.meta.name)
+              if (!name) return
+              const snapshot = paperRef.current?.snapshot() ?? config
+              const error = savePreset(name, snapshot, captureThumbnail())
+              if (error) alert(error)
+            }}
+          >
+            Save preset
+          </button>
+        )}
         <ExportMenu mode={mode} config={config} paperRef={paperRef} fieldInput={fieldExportInput} />
       </header>
 
       <aside className="left">
         {mode === 'paper' ? (
           <>
-            <h2>Presets</h2>
-            <ul className="presets">
-              {listPresets().map((name) => (
-                <li key={name}>
-                  <button
-                    className={name === presetName ? 'active' : ''}
-                    onClick={() => setPreset(name)}
-                  >
-                    {name}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <PresetPanel />
             <h2>Layers</h2>
             <ul className="layers">
               <li>Sheet</li>
@@ -162,6 +167,7 @@ export function App() {
               : { position: [0, 0.9, 6.4], fov: 45 }
           }
           dpr={[1, 2]}
+          gl={{ preserveDrawingBuffer: true }}
         >
           <color attach="background" args={['#17181b']} />
           <ambientLight intensity={0.65} />
