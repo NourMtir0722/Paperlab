@@ -1,4 +1,10 @@
 export { Paper, type PaperProps } from './Paper'
+export {
+  PaperField,
+  PaperFieldMesh,
+  type PaperFieldProps,
+  type PaperFieldMeshProps,
+} from './PaperField'
 export { PaperMesh, resolveConfig, type PaperMeshProps, type PaperHandle } from './PaperMesh'
 
 export {
@@ -48,6 +54,36 @@ export { fly, flyOptionsSchema, type FlyOptions } from './behaviors/fly'
 export { fall, fallOptionsSchema, type FallOptions } from './behaviors/fall'
 
 export { idlePresets, getIdlePreset, idleNames, type IdleName, type IdlePreset } from './physics/idle'
+
+export {
+  buildDisplacementGLSL,
+  buildFieldVertexShader,
+  buildFieldFragmentShader,
+  stackUniformValues,
+  type ComposedDisplacement,
+} from './field/compose'
+export {
+  getLayout,
+  listLayouts,
+  registerLayout,
+  ring,
+  deck,
+  cascade,
+  helix,
+  wall,
+  tunnel,
+  scatter,
+  type Layout,
+  type PaperPose,
+} from './field/layouts'
+export { useContentAtlas, atlasGrid, type ContentAtlas } from './content/atlas'
+export {
+  runParityHarness,
+  parityCases,
+  PARITY_EPSILON,
+  type ParityCase,
+  type ParityResult,
+} from './field/parity'
 export { ClothSim, type ClothParams, type PinMode } from './physics/cloth'
 
 export { composeSurface, type ComposedSurface } from './surface/compose'

@@ -63,4 +63,39 @@ export const fold: Deformer<FoldOptions> = {
     out.y += dirY * (newD - d)
     out.z = newZ
   },
+  glsl: {
+    chunk: /* glsl */ `
+void FN(inout vec3 p, vec2 uv, float t) {
+  if (abs(U_foldAngle) < 1e-6) return;
+  vec2 dir = vec2(cos(U_angle), sin(U_angle));
+  float d = dot(p.xy, dir);
+  float s = d - U_offset;
+  if (s <= 0.0) return;
+  float R = U_radius / U_foldAngle;
+  float newD;
+  float newZ;
+  if (s <= U_radius) {
+    float theta = (s / U_radius) * U_foldAngle;
+    float sn = sin(theta);
+    float cs = cos(theta);
+    newD = U_offset + (R - p.z) * sn;
+    newZ = R * (1.0 - cs) + p.z * cs;
+  } else {
+    float rest = s - U_radius;
+    float sn = sin(U_foldAngle);
+    float cs = cos(U_foldAngle);
+    newD = U_offset + R * sn + rest * cs - p.z * sn;
+    newZ = R * (1.0 - cs) + rest * sn + p.z * cs;
+  }
+  p.xy += dir * (newD - d);
+  p.z = newZ;
+}
+`,
+    uniforms: (o) => ({
+      angle: o.angle * DEG,
+      offset: o.offset,
+      foldAngle: o.foldAngle * DEG,
+      radius: o.radius,
+    }),
+  },
 }

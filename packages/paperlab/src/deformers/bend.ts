@@ -41,4 +41,22 @@ export const bend: Deformer<BendOptions> = {
     out.y += dirY * (newD - d)
     out.z = newZ
   },
+  glsl: {
+    chunk: /* glsl */ `
+void FN(inout vec3 p, vec2 uv, float t) {
+  if (abs(U_curvature) < 1e-5) return;
+  vec2 dir = vec2(cos(U_angle), sin(U_angle));
+  float d = dot(p.xy, dir);
+  float r = 1.0 / U_curvature;
+  float theta = d / r;
+  float sn = sin(theta);
+  float cs = cos(theta);
+  float newD = (r - p.z) * sn;
+  float newZ = r * (1.0 - cs) + p.z * cs;
+  p.xy += dir * (newD - d);
+  p.z = newZ;
+}
+`,
+    uniforms: (o) => ({ curvature: o.curvature, angle: o.angle * DEG }),
+  },
 }

@@ -6,9 +6,11 @@
     "build": "turbo run build",
     "dev": "turbo run dev --filter=@paperlab/editor",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "test:parity": "node tools/parity.mjs"
   },
   "devDependencies": {
+    "playwright": "1.61.1",
     "turbo": "^2.3.0"
   }
 }

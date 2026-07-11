@@ -49,4 +49,28 @@ export const roll: Deformer<RollOptions> = {
     out.y += dirY * (newD - d)
     out.z = newZ
   },
+  glsl: {
+    chunk: /* glsl */ `
+void FN(inout vec3 p, vec2 uv, float t) {
+  vec2 dir = vec2(cos(U_angle), sin(U_angle));
+  float d = dot(p.xy, dir);
+  float s = d - U_boundary;
+  if (s <= 0.0) return;
+  float theta = s / U_radius;
+  float r = U_radius + U_spiral * theta;
+  float sn = sin(theta);
+  float cs = cos(theta);
+  float newD = U_boundary + (r - p.z) * sn;
+  float newZ = r * (1.0 - cs) + p.z * cs;
+  p.xy += dir * (newD - d);
+  p.z = newZ;
+}
+`,
+    uniforms: (o) => ({
+      angle: o.angle * DEG,
+      boundary: o.boundary,
+      radius: o.radius,
+      spiral: o.spiral,
+    }),
+  },
 }

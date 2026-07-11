@@ -71,4 +71,36 @@ export const curl: Deformer<CurlOptions> = {
     out.y += dirY * (newE - e)
     out.z = newZ
   },
+  glsl: {
+    chunk: /* glsl */ `
+void FN(inout vec3 p, vec2 uv, float t) {
+  vec2 c = U_cornerSign * uSheet * 0.5;
+  float diag = length(uSheet);
+  vec2 base = U_cornerSign * uSheet / diag;
+  float cosK = cos(U_skew);
+  float sinK = sin(U_skew);
+  vec2 dir = vec2(base.x * cosK - base.y * sinK, base.x * sinK + base.y * cosK);
+  float travel = U_amount * diag * 0.5;
+  float e = dot(p.xy - c, dir);
+  float s = e + travel;
+  if (s <= 0.0) return;
+  float theta = s / U_radius;
+  float sn = sin(theta);
+  float cs = cos(theta);
+  float newE = (e - s) + (U_radius - p.z) * sn;
+  float newZ = U_radius * (1.0 - cs) + p.z * cs;
+  p.xy += dir * (newE - e);
+  p.z = newZ;
+}
+`,
+    uniforms: (o) => {
+      const [sx, sy] = CORNER_SIGNS[o.corner]
+      return {
+        cornerSign: [sx, sy],
+        amount: o.amount,
+        radius: o.radius,
+        skew: o.skew * DEG,
+      }
+    },
+  },
 }

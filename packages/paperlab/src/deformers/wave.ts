@@ -42,4 +42,27 @@ export const wave: Deformer<WaveOptions> = {
     else if (o.pinnedEdge === 'right') env = 1 - uv.x
     out.z += o.amplitude * env * (Math.sin(phase) + 0.35 * Math.sin(phase * 2.7 + 1.3))
   },
+  glsl: {
+    chunk: /* glsl */ `
+void FN(inout vec3 p, vec2 uv, float t) {
+  if (U_amplitude == 0.0) return;
+  vec2 dir = vec2(cos(U_angle), sin(U_angle));
+  float d = dot(p.xy, dir);
+  float phase = (d / U_wavelength - U_speed * t) * 6.283185307179586;
+  float env = 1.0;
+  if (U_pin == 1.0) env = 1.0 - uv.y;
+  else if (U_pin == 2.0) env = uv.y;
+  else if (U_pin == 3.0) env = uv.x;
+  else if (U_pin == 4.0) env = 1.0 - uv.x;
+  p.z += U_amplitude * env * (sin(phase) + 0.35 * sin(phase * 2.7 + 1.3));
+}
+`,
+    uniforms: (o) => ({
+      amplitude: o.amplitude,
+      wavelength: o.wavelength,
+      speed: o.speed,
+      angle: o.angle * DEG,
+      pin: { none: 0, top: 1, bottom: 2, left: 3, right: 4 }[o.pinnedEdge],
+    }),
+  },
 }
