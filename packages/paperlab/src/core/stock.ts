@@ -15,6 +15,10 @@ export interface Stock {
   opacity: number
   /** Ink multiply tint for content drawn on this stock (thermal prints grey-black). */
   inkColor: string
+  /** Thermal-printer banding intensity baked into the grain effect. */
+  banding: number
+  /** Surface effects this stock ships with; explicit surface config overrides per key. */
+  defaultSurface: { grain?: number; aging?: number }
 }
 
 export const stocks: Record<StockName, Stock> = {
@@ -25,6 +29,8 @@ export const stocks: Record<StockName, Stock> = {
     roughness: 0.88,
     opacity: 1,
     inkColor: '#222222',
+    banding: 0,
+    defaultSurface: { grain: 0.12 },
   },
   thermal: {
     id: 'thermal',
@@ -33,6 +39,8 @@ export const stocks: Record<StockName, Stock> = {
     roughness: 0.62,
     opacity: 1,
     inkColor: '#3a3a3a',
+    banding: 0.35,
+    defaultSurface: { aging: 0.1 },
   },
   kraft: {
     id: 'kraft',
@@ -41,6 +49,8 @@ export const stocks: Record<StockName, Stock> = {
     roughness: 0.96,
     opacity: 1,
     inkColor: '#33261a',
+    banding: 0,
+    defaultSurface: { grain: 0.5 },
   },
   newsprint: {
     id: 'newsprint',
@@ -49,6 +59,8 @@ export const stocks: Record<StockName, Stock> = {
     roughness: 0.95,
     opacity: 1,
     inkColor: '#3d3a34',
+    banding: 0,
+    defaultSurface: { grain: 0.7, aging: 0.15 },
   },
   vellum: {
     id: 'vellum',
@@ -57,6 +69,8 @@ export const stocks: Record<StockName, Stock> = {
     roughness: 0.42,
     opacity: 0.62,
     inkColor: '#4a453d',
+    banding: 0,
+    defaultSurface: {},
   },
   'photo-gloss': {
     id: 'photo-gloss',
@@ -65,6 +79,8 @@ export const stocks: Record<StockName, Stock> = {
     roughness: 0.22,
     opacity: 1,
     inkColor: '#111111',
+    banding: 0,
+    defaultSurface: {},
   },
 }
 

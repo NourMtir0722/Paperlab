@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { useEffect, useState } from 'react'
 import type { ContentConfig, SheetConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
+import { paintReceipt } from './receipt'
 
 /**
  * All content is composited onto a canvas and applied as a texture — content
@@ -95,6 +96,7 @@ export function renderContentToCanvas(
   paintBackground(ctx, w, h, stock)
   if (content.type === 'image' && image) paintImage(ctx, w, h, image, content.fit)
   if (content.type === 'text') paintText(ctx, w, h, content, stock)
+  if (content.type === 'receipt') paintReceipt(ctx, w, h, content, stock)
   return canvas
 }
 
@@ -133,7 +135,7 @@ export function useContentTexture(
       img.crossOrigin = 'anonymous'
       img.onload = () => commit(renderContentToCanvas(content, sheet, stock, img))
       img.src = content.src
-    } else if (content.type === 'text') {
+    } else if (content.type === 'text' || content.type === 'receipt') {
       // Fonts may still be loading on first paint; render after they settle.
       document.fonts.ready.then(() => commit(renderContentToCanvas(content, sheet, stock)))
     } else {

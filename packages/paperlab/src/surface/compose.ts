@@ -1,0 +1,219 @@
+import * as THREE from 'three'
+import type { PaperEdge, SurfaceConfig } from '../config/schema'
+import type { Stock } from '../core/stock'
+
+/**
+ * Surface effects are fragment-side chunks composed into ONE shader program
+ * per effect set (grain + deckle + aging = one program). Uniforms are
+ * namespaced per effect; shared helpers (noise) are included once.
+ */
+
+export interface ComposedSurface {
+  /** Distinguishes shader *structures* — same key ⇒ same program, only uniforms change. */
+  structureKey: string
+  vertexShader: string
+  fragmentShader: string
+  uniforms: Record<string, { value: unknown }>
+  /** Deckle discards via alphaTest (not blending) so shadows stay correct. */
+  alphaTest: number
+}
+
+const VERTEX = /* glsl */ `
+varying vec2 vPaperUv;
+void main() {
+  vPaperUv = uv;
+}
+`
+
+const HELPERS = /* glsl */ `
+varying vec2 vPaperUv;
+uniform float uBackDarken;
+
+float plHash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float plNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(plHash(i), plHash(i + vec2(1.0, 0.0)), u.x),
+    mix(plHash(i + vec2(0.0, 1.0)), plHash(i + vec2(1.0, 1.0)), u.x),
+    u.y
+  );
+}
+
+float plFbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    v += a * plNoise(p);
+    p *= 2.03;
+    a *= 0.5;
+  }
+  return v;
+}
+`
+
+const edgeFlags = (edges: PaperEdge[]): THREE.Vector4 =>
+  new THREE.Vector4(
+    edges.includes('top') ? 1 : 0,
+    edges.includes('right') ? 1 : 0,
+    edges.includes('bottom') ? 1 : 0,
+    edges.includes('left') ? 1 : 0,
+  )
+
+const GRAIN_CHUNK = /* glsl */ `
+uniform float uGrainAmount;
+uniform float uGrainBanding;
+
+void plGrain(inout vec4 color, inout float rough) {
+  float fiber = plFbm(vPaperUv * 240.0);
+  float fleck = plNoise(vPaperUv * 900.0);
+  float g = mix(0.5, fiber * 0.75 + fleck * 0.25, uGrainAmount);
+  color.rgb *= 0.92 + g * 0.16;
+  rough = clamp(rough + (g - 0.5) * uGrainAmount * 0.35, 0.0, 1.0);
+  // Thermal-printer banding: faint horizontal density stripes.
+  if (uGrainBanding > 0.0) {
+    float band = sin(vPaperUv.y * 700.0) * 0.5 + 0.5;
+    color.rgb *= 1.0 - uGrainBanding * 0.05 * band;
+  }
+}
+`
+
+const DECKLE_CHUNK = /* glsl */ `
+uniform vec4 uDeckleEdges; // top, right, bottom, left
+uniform float uDeckleRoughness;
+
+void plDeckle(inout vec4 color) {
+  // Distance to each selected edge, gnawed by low-frequency noise.
+  float depth = 0.012 + uDeckleRoughness * 0.05;
+  float tear = 1.0;
+  float fiberBand = 0.0;
+  vec4 dists = vec4(1.0 - vPaperUv.y, 1.0 - vPaperUv.x, vPaperUv.y, vPaperUv.x);
+  vec4 alongs = vec4(vPaperUv.x, vPaperUv.y, vPaperUv.x, vPaperUv.y);
+  for (int e = 0; e < 4; e++) {
+    if (uDeckleEdges[e] < 0.5) continue;
+    float n = plFbm(vec2(alongs[e] * 26.0, float(e) * 7.31)) - 0.5;
+    float boundary = depth * (0.55 + n * 1.6);
+    float d = dists[e] - boundary;
+    tear = min(tear, step(0.0, d));
+    // Lightened fiber band just inside the tear.
+    fiberBand = max(fiberBand, smoothstep(depth * 1.4, 0.0, d) * step(0.0, d));
+  }
+  color.a *= tear;
+  color.rgb = mix(color.rgb, vec3(1.0), fiberBand * 0.35);
+}
+`
+
+const CREASE_CHUNK = /* glsl */ `
+uniform float uCreaseAngle;
+uniform float uCreaseStrength;
+uniform float uCreasePositions[4];
+uniform int uCreaseCount;
+
+void plCrease(inout vec4 color, inout float rough) {
+  vec2 dir = vec2(cos(uCreaseAngle), sin(uCreaseAngle));
+  // Coordinate across the crease lines (0..1 over the sheet).
+  float t = dot(vPaperUv - 0.5, vec2(-dir.y, dir.x)) + 0.5;
+  for (int i = 0; i < 4; i++) {
+    if (i >= uCreaseCount) break;
+    float d = abs(t - uCreasePositions[i]);
+    float shadow = smoothstep(0.014, 0.0, d);
+    float sheen = smoothstep(0.02, 0.006, d) - smoothstep(0.006, 0.0, d);
+    color.rgb *= 1.0 - shadow * uCreaseStrength * 0.28;
+    color.rgb += sheen * uCreaseStrength * 0.05;
+    rough = clamp(rough + shadow * uCreaseStrength * 0.2, 0.0, 1.0);
+  }
+}
+`
+
+const AGING_CHUNK = /* glsl */ `
+uniform float uAgingAmount;
+
+void plAging(inout vec4 color) {
+  // Yellowing deepens toward the edges, like light exposure.
+  float edge = max(abs(vPaperUv.x - 0.5), abs(vPaperUv.y - 0.5)) * 2.0;
+  vec3 yellowed = color.rgb * vec3(1.0, 0.94, 0.78);
+  color.rgb = mix(color.rgb, yellowed, uAgingAmount * (0.45 + edge * 0.55));
+  // Foxing: sparse rusty blotches.
+  float fox = plFbm(vPaperUv * 14.0 + 3.7);
+  float spots = smoothstep(0.62, 0.78, fox) * uAgingAmount;
+  color.rgb = mix(color.rgb, vec3(0.62, 0.45, 0.26), spots * 0.5);
+}
+`
+
+/** Compose the enabled effects (+ underside darkening) into one program. */
+export function composeSurface(
+  surface: SurfaceConfig,
+  stock: Stock,
+  thickness: number,
+): ComposedSurface {
+  const grain = surface.grain ?? stock.defaultSurface.grain
+  const aging = surface.aging ?? stock.defaultSurface.aging
+  const deckle = surface.deckle
+  const creases = surface.creaseLines
+  const banding = stock.banding
+
+  const chunks: string[] = []
+  const calls: string[] = []
+  const uniforms: Record<string, { value: unknown }> = {
+    // Backside darkening: thicker/opaque stock lets less light through.
+    uBackDarken: { value: 1 - Math.min(0.45, 0.12 + thickness * 0.9) * stock.opacity },
+  }
+
+  if (grain !== undefined || banding > 0) {
+    chunks.push(GRAIN_CHUNK)
+    calls.push('plGrain(csm_DiffuseColor, csm_Roughness);')
+    uniforms.uGrainAmount = { value: grain ?? 0 }
+    uniforms.uGrainBanding = { value: banding }
+  }
+  if (deckle) {
+    chunks.push(DECKLE_CHUNK)
+    calls.push('plDeckle(csm_DiffuseColor);')
+    uniforms.uDeckleEdges = { value: edgeFlags(deckle.edges) }
+    uniforms.uDeckleRoughness = { value: deckle.roughness }
+  }
+  if (creases) {
+    chunks.push(CREASE_CHUNK)
+    calls.push('plCrease(csm_DiffuseColor, csm_Roughness);')
+    uniforms.uCreaseAngle = { value: (creases.angle * Math.PI) / 180 }
+    uniforms.uCreaseStrength = { value: creases.strength }
+    uniforms.uCreasePositions = { value: padPositions(creases.positions) }
+    uniforms.uCreaseCount = { value: Math.min(creases.positions.length, 4) }
+  }
+  if (aging !== undefined) {
+    chunks.push(AGING_CHUNK)
+    calls.push('plAging(csm_DiffuseColor);')
+    uniforms.uAgingAmount = { value: aging }
+  }
+
+  const fragmentShader = /* glsl */ `
+${HELPERS}
+${chunks.join('\n')}
+void main() {
+  ${calls.join('\n  ')}
+  if (!gl_FrontFacing) csm_DiffuseColor.rgb *= uBackDarken;
+}
+`
+
+  return {
+    structureKey: [
+      grain !== undefined || banding > 0 ? 'g' : '',
+      deckle ? 'd' : '',
+      creases ? 'c' : '',
+      aging !== undefined ? 'a' : '',
+    ].join(''),
+    vertexShader: VERTEX,
+    fragmentShader,
+    uniforms,
+    alphaTest: deckle ? 0.5 : 0,
+  }
+}
+
+function padPositions(positions: number[]): number[] {
+  const out = positions.slice(0, 4)
+  while (out.length < 4) out.push(-1)
+  return out
+}

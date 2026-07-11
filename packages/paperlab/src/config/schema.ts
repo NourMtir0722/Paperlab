@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { peelOptionsSchema } from '../behaviors/peel'
 import { unrollOptionsSchema } from '../behaviors/unroll'
 import { flipOptionsSchema } from '../behaviors/flip'
+import { letterFoldOptionsSchema } from '../behaviors/letter-fold'
 
 /**
  * The zod schema is the single source of truth: it validates the public API,
@@ -56,13 +57,68 @@ export const textContentSchema = z.object({
   lineHeight: z.number().min(0.8).max(3).default(1.45),
 })
 
+export const receiptContentSchema = z.object({
+  type: z.literal('receipt'),
+  store: z.string().default('PAPERLAB'),
+  address: z.string().default('124 PAPER ST'),
+  items: z
+    .array(z.object({ name: z.string(), price: z.number() }))
+    .default([
+      { name: 'CURL, TRUE', price: 12 },
+      { name: 'ROLL, TIGHT', price: 8.5 },
+      { name: 'SHEET, ONE', price: 0.99 },
+    ]),
+  taxRate: z.number().min(0).max(1).default(0.08),
+  barcode: z.boolean().default(true),
+  /** Fixed so presets render deterministically; omit for "now". */
+  timestamp: z.string().optional(),
+  footer: z.string().default('KEEP FOR YOUR RECORDS'),
+})
+
 export const contentSchema = z.discriminatedUnion('type', [
   blankContentSchema,
   imageContentSchema,
   textContentSchema,
+  receiptContentSchema,
 ])
 
 export type ContentConfig = z.infer<typeof contentSchema>
+
+// ── Surface ──────────────────────────────────────────────────────────────────
+
+export const paperEdges = ['top', 'right', 'bottom', 'left'] as const
+
+/**
+ * Fragment-side effects, composed in registration order into one shader
+ * program. Stocks contribute defaults (thermal → banding + yellowing);
+ * explicit surface config overrides per effect.
+ */
+export const surfaceSchema = z.object({
+  /** Paper fiber noise, 0..1. */
+  grain: z.number().min(0).max(1).optional(),
+  /** Torn-edge alpha with a lightened fiber band. */
+  deckle: z
+    .object({
+      edges: z.array(z.enum(paperEdges)).default(['bottom']),
+      roughness: z.number().min(0).max(1).default(0.5),
+    })
+    .optional(),
+  /** Visual AO/highlight companion to the fold deformer. */
+  creaseLines: z
+    .object({
+      /** Crease line direction, degrees (0 = horizontal lines). */
+      angle: z.number().min(-360).max(360).default(0),
+      /** Positions across the sheet, 0..1 fractions. */
+      positions: z.array(z.number().min(0).max(1)).default([1 / 3, 2 / 3]),
+      strength: z.number().min(0).max(1).default(0.5),
+    })
+    .optional(),
+  /** Yellowing + foxing spots, 0..1. */
+  aging: z.number().min(0).max(1).optional(),
+})
+
+export type SurfaceConfig = z.infer<typeof surfaceSchema>
+export type PaperEdge = (typeof paperEdges)[number]
 
 // ── Behavior & deformers ─────────────────────────────────────────────────────
 
@@ -70,6 +126,7 @@ export const behaviorConfigSchema = z.discriminatedUnion('type', [
   peelOptionsSchema.extend({ type: z.literal('peel') }),
   unrollOptionsSchema.extend({ type: z.literal('unroll') }),
   flipOptionsSchema.extend({ type: z.literal('flip') }),
+  letterFoldOptionsSchema.extend({ type: z.literal('letter-fold') }),
 ])
 
 export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>
@@ -100,6 +157,7 @@ export const paperConfigSchema = z.object({
   /** A behavior OR a raw deformer stack — if both are present, `deformers` wins (it's the fork). */
   behavior: behaviorConfigSchema.optional(),
   deformers: z.array(deformerInstanceSchema).optional(),
+  surface: surfaceSchema.default({}),
   physics: z.literal('none').default('none'),
   onTwos: z.boolean().default(false),
 })

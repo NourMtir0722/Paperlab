@@ -8,8 +8,8 @@ import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
 const sheet = { width: 1, height: 2.6 }
 
 describe('behavior registry', () => {
-  it('has the M1 behaviors', () => {
-    expect(listBehaviors()).toEqual(['peel', 'unroll', 'flip'])
+  it('has the built-in behaviors', () => {
+    expect(listBehaviors()).toEqual(['peel', 'unroll', 'flip', 'letter-fold'])
   })
 
   it('throws helpfully on unknown behaviors', () => {

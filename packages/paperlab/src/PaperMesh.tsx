@@ -19,6 +19,7 @@ import { getStock } from './core/stock'
 import { getPreset } from './config/presets'
 import { useContentTexture } from './content/texture'
 import { applyDeformerStack, displacePoint, stackMinSegments } from './deformers/compose'
+import { PaperMaterial } from './surface/PaperMaterial'
 import type { DeformerInstance } from './deformers/types'
 import { getBehavior } from './behaviors/registry'
 import type { Behavior } from './behaviors/types'
@@ -176,14 +177,6 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     tweenRef.current?.pause()
   }
 
-  // Content textures arrive async (image decode, fonts.ready). A material
-  // compiled before its map exists needs a recompile flag or it silently
-  // renders untextured — the shader was built without USE_MAP.
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null)
-  useEffect(() => {
-    if (materialRef.current) materialRef.current.needsUpdate = true
-  }, [texture])
-
   useEffect(() => {
     if (props.autoplay) play()
     return () => {
@@ -276,15 +269,11 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   return (
     <group ref={groupRef} position={props.position} rotation={props.rotation}>
       <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow frustumCulled={false}>
-        <meshStandardMaterial
-          ref={materialRef}
-          map={texture ?? undefined}
-          color={texture ? '#ffffff' : stock.color}
-          roughness={stock.roughness}
-          metalness={0}
-          transparent={stock.opacity < 1}
-          opacity={stock.opacity}
-          side={THREE.DoubleSide}
+        <PaperMaterial
+          stock={stock}
+          texture={texture}
+          surface={config.surface}
+          thickness={config.sheet.thickness}
         />
       </mesh>
       {props.interactive &&

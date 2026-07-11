@@ -2,6 +2,7 @@ import type { Deformer } from './types'
 import { roll } from './roll'
 import { curl } from './curl'
 import { bend } from './bend'
+import { fold } from './fold'
 
 const registry = new Map<string, Deformer<any>>()
 
@@ -27,3 +28,4 @@ export function listDeformers(): string[] {
 registerDeformer(roll)
 registerDeformer(curl)
 registerDeformer(bend)
+registerDeformer(fold)

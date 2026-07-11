@@ -2,6 +2,7 @@ import type { Behavior } from './types'
 import { peel } from './peel'
 import { unroll } from './unroll'
 import { flip } from './flip'
+import { letterFold } from './letter-fold'
 
 const registry = new Map<string, Behavior<any>>()
 
@@ -27,3 +28,4 @@ export function listBehaviors(): string[] {
 registerBehavior(peel)
 registerBehavior(unroll)
 registerBehavior(flip)
+registerBehavior(letterFold)

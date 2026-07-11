@@ -6,6 +6,7 @@ import {
   paperConfigSchema,
   type PaperConfig,
   type PaperConfigInput,
+  type SurfaceConfig,
 } from 'paperlab'
 
 interface EditorState {
@@ -16,6 +17,8 @@ interface EditorState {
   setPreset(name: string): void
   patchConfig(patch: PaperConfigInput, opts?: { external?: boolean }): void
   setBehaviorType(type: string | null): void
+  /** Shallow-merge surface effects; `undefined` removes an effect (mergeConfig can't). */
+  setSurface(patch: Partial<SurfaceConfig>): void
 }
 
 export const useEditor = create<EditorState>((set, get) => ({
@@ -36,4 +39,21 @@ export const useEditor = create<EditorState>((set, get) => ({
       },
       inspectorEpoch: s.inspectorEpoch + 1,
     })),
+  setSurface: (patch) =>
+    set((s) => {
+      const surface: Record<string, unknown> = { ...s.config.surface }
+      // Toggling an effect on/off changes the control structure — leva needs
+      // a remount (epoch bump). Value edits don't.
+      let structureChanged = false
+      for (const [key, value] of Object.entries(patch)) {
+        const existed = surface[key] !== undefined
+        if (value === undefined) delete surface[key]
+        else surface[key] = value
+        if (existed !== (value !== undefined)) structureChanged = true
+      }
+      return {
+        config: paperConfigSchema.parse({ ...s.config, surface }),
+        inspectorEpoch: structureChanged ? s.inspectorEpoch + 1 : s.inspectorEpoch,
+      }
+    }),
 }))

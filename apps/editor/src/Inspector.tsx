@@ -1,10 +1,14 @@
 import { LevaPanel, folder, useControls, useCreateStore } from 'leva'
 import {
   getBehavior,
+  getStock,
   listBehaviors,
+  paperEdges,
   stockNames,
   type ContentConfig,
+  type PaperEdge,
   type StockName,
+  type SurfaceConfig,
 } from 'paperlab'
 import { schemaControls } from './zodLeva'
 import { useEditor } from './store'
@@ -20,6 +24,7 @@ export function Inspector() {
   const config = useEditor((s) => s.config)
   const patchConfig = useEditor((s) => s.patchConfig)
   const setBehaviorType = useEditor((s) => s.setBehaviorType)
+  const setSurface = useEditor((s) => s.setSurface)
   // Own store per mount — leva's global store would keep stale values across
   // preset switches (the Inspector is remounted by key to reset controls).
   const store = useCreateStore()
@@ -68,9 +73,90 @@ export function Inspector() {
       },
     }),
     Content: folder(contentControls(config.content, patchConfig)),
+    Surface: folder(surfaceControls(config.surface, config.stock, setSurface)),
   }, { store })
 
   return <LevaPanel store={store} fill flat titleBar={false} />
+}
+
+function surfaceControls(
+  surface: SurfaceConfig,
+  stockName: StockName,
+  setSurface: (patch: Partial<SurfaceConfig>) => void,
+): LevaSchema {
+  const stock = getStock(stockName)
+  const changed =
+    (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
+      ctx.initial || fn(v as never)
+
+  return {
+    grain: {
+      value: surface.grain ?? stock.defaultSurface.grain ?? 0,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      onChange: changed((v: number) => setSurface({ grain: v })),
+    },
+    aging: {
+      value: surface.aging ?? stock.defaultSurface.aging ?? 0,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      onChange: changed((v: number) => setSurface({ aging: v })),
+    },
+    deckle: {
+      value: Boolean(surface.deckle),
+      onChange: changed((v: boolean) =>
+        setSurface({ deckle: v ? { edges: ['bottom'], roughness: 0.5 } : undefined }),
+      ),
+    },
+    ...(surface.deckle
+      ? {
+          deckleEdge: {
+            label: 'edges',
+            value: surface.deckle.edges.join('+'),
+            options: [...paperEdges, 'top+bottom', 'all'].map(String),
+            onChange: changed((v: string) => {
+              const edges =
+                v === 'all' ? [...paperEdges] : (v.split('+') as PaperEdge[])
+              setSurface({ deckle: { ...surface.deckle!, edges } })
+            }),
+          },
+          deckleRoughness: {
+            label: 'tear',
+            value: surface.deckle.roughness,
+            min: 0,
+            max: 1,
+            step: 0.01,
+            onChange: changed((v: number) =>
+              setSurface({ deckle: { ...surface.deckle!, roughness: v } }),
+            ),
+          },
+        }
+      : {}),
+    creases: {
+      value: Boolean(surface.creaseLines),
+      onChange: changed((v: boolean) =>
+        setSurface({
+          creaseLines: v ? { angle: 0, positions: [1 / 3, 2 / 3], strength: 0.5 } : undefined,
+        }),
+      ),
+    },
+    ...(surface.creaseLines
+      ? {
+          creaseStrength: {
+            label: 'strength',
+            value: surface.creaseLines.strength,
+            min: 0,
+            max: 1,
+            step: 0.01,
+            onChange: changed((v: number) =>
+              setSurface({ creaseLines: { ...surface.creaseLines!, strength: v } }),
+            ),
+          },
+        }
+      : {}),
+  }
 }
 
 function contentControls(
