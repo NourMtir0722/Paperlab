@@ -193,6 +193,18 @@ export const physicsSchema = z.union([
 
 export type PhysicsConfig = z.infer<typeof physicsSchema>
 
+// ── Scene ────────────────────────────────────────────────────────────────────
+
+export const lightingNames = ['studio', 'window', 'leaves', 'goldenhour', 'noir'] as const
+
+/** Scene-level presentation, serialized with the paper. */
+export const sceneSchema = z.object({
+  lighting: z.enum(lightingNames).default('studio'),
+})
+
+export type SceneConfig = z.infer<typeof sceneSchema>
+export type LightingName = (typeof lightingNames)[number]
+
 // ── Paper config ─────────────────────────────────────────────────────────────
 
 export const metaSchema = z.object({
@@ -213,6 +225,7 @@ export const paperConfigSchema = z
     deformers: z.array(deformerInstanceSchema).optional(),
     surface: surfaceSchema.default({}),
     physics: physicsSchema.default('none'),
+    scene: sceneSchema.default({}),
     onTwos: z.boolean().default(false),
   })
   .superRefine((config, ctx) => {

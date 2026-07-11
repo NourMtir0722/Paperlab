@@ -1,8 +1,9 @@
 import { useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { ContactShadows, OrbitControls, Stats } from '@react-three/drei'
+import { OrbitControls, Stats } from '@react-three/drei'
 import {
   PaperFieldMesh,
+  PaperLighting,
   PaperMesh,
   getPreset,
   listPresets,
@@ -170,13 +171,14 @@ export function App() {
           gl={{ preserveDrawingBuffer: true }}
         >
           <color attach="background" args={['#17181b']} />
-          <ambientLight intensity={0.65} />
-          <directionalLight
-            position={[2.5, 4, 3]}
-            intensity={1.6}
-            castShadow
-            shadow-mapSize={[1024, 1024]}
-            shadow-normalBias={0.05}
+          <PaperLighting
+            preset={
+              mode === 'paper'
+                ? config.scene.lighting
+                : resolvePresetByName(field.slots[0] ?? 'photo-print').scene.lighting
+            }
+            floor={mode === 'paper' ? -1.5 : -2.4}
+            scale={mode === 'paper' ? 10 : 14}
           />
           {mode === 'paper' ? (
             <>
@@ -193,7 +195,6 @@ export function App() {
                   patchConfig({ behavior: patch as never }, { external: true })
                 }
               />
-              <ContactShadows position={[0, -1.5, 0]} opacity={0.3} scale={10} blur={2.4} far={3} />
             </>
           ) : (
             <PaperFieldMesh

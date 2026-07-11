@@ -2,6 +2,7 @@ import { LevaPanel, folder, useControls, useCreateStore } from 'leva'
 import {
   getBehavior,
   getStock,
+  lightingNames,
   listBehaviors,
   paperEdges,
   physicsNames,
@@ -80,6 +81,14 @@ export function Inspector() {
     Content: folder(contentControls(config.content, patchConfig)),
     Surface: folder(surfaceControls(config.surface, config.stock, setSurface)),
     Physics: folder(physicsControls(config.physics, setPhysics, patchCloth)),
+    Scene: folder({
+      lighting: {
+        value: config.scene.lighting,
+        options: [...lightingNames],
+        onChange: (v: string, _, ctx) =>
+          ctx.initial || patchConfig({ scene: { lighting: v as never } }),
+      },
+    }),
   }, { store })
 
   return <LevaPanel store={store} fill flat titleBar={false} />

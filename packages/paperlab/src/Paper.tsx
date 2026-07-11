@@ -1,8 +1,8 @@
 import { Canvas } from '@react-three/fiber'
-import { ContactShadows } from '@react-three/drei'
 import { forwardRef, useMemo } from 'react'
 import { PaperMesh, resolveConfig, type PaperHandle, type PaperMeshProps } from './PaperMesh'
 import { PaperFallback, PaperMirror, supportsWebGL } from './a11y'
+import { PaperLighting } from './scene/PaperLighting'
 
 export interface PaperProps extends PaperMeshProps {
   /** Extra children rendered inside the canvas (lights are provided). */
@@ -31,16 +31,13 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       {webgl ? (
         <Canvas shadows camera={{ position: [0, 0.35, 2.4], fov: 40 }} dpr={[1, 2]}>
-          <ambientLight intensity={0.65} />
-          <directionalLight
-            position={[2.5, 4, 3]}
-            intensity={1.6}
-            castShadow
-            shadow-mapSize={[1024, 1024]}
-            shadow-normalBias={0.05}
+          <PaperLighting
+            preset={config.scene.lighting}
+            floor={-1.05}
+            scale={8}
+            reducedMotion={meshProps.reducedMotion}
           />
           <PaperMesh ref={ref} {...meshProps} />
-          <ContactShadows position={[0, -1.05, 0]} opacity={0.35} scale={8} blur={2.4} far={3} />
           {children}
         </Canvas>
       ) : (
