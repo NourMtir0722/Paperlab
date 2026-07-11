@@ -28,6 +28,7 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
           intensity={1.6}
           castShadow
           shadow-mapSize={[1024, 1024]}
+          shadow-normalBias={0.05}
         />
         <PaperMesh ref={ref} {...meshProps} />
         <ContactShadows position={[0, -1.05, 0]} opacity={0.35} scale={8} blur={2.4} far={3} />

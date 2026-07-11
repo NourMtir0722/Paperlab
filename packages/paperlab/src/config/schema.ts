@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { peelOptionsSchema } from '../behaviors/peel'
+import { unrollOptionsSchema } from '../behaviors/unroll'
+import { flipOptionsSchema } from '../behaviors/flip'
 
 /**
  * The zod schema is the single source of truth: it validates the public API,
@@ -61,7 +64,26 @@ export const contentSchema = z.discriminatedUnion('type', [
 
 export type ContentConfig = z.infer<typeof contentSchema>
 
-// ── Paper config (schema v0: no behavior/surface yet) ───────────────────────
+// ── Behavior & deformers ─────────────────────────────────────────────────────
+
+export const behaviorConfigSchema = z.discriminatedUnion('type', [
+  peelOptionsSchema.extend({ type: z.literal('peel') }),
+  unrollOptionsSchema.extend({ type: z.literal('unroll') }),
+  flipOptionsSchema.extend({ type: z.literal('flip') }),
+])
+
+export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>
+
+/** Advanced escape hatch: a raw deformer stack (editing one forks the behavior). */
+export const deformerInstanceSchema = z.object({
+  type: z.string(),
+  options: z.record(z.unknown()).default({}),
+  enabled: z.boolean().default(true),
+})
+
+export type DeformerInstanceConfig = z.infer<typeof deformerInstanceSchema>
+
+// ── Paper config ─────────────────────────────────────────────────────────────
 
 export const metaSchema = z.object({
   name: z.string().default('untitled'),
@@ -75,6 +97,9 @@ export const paperConfigSchema = z.object({
   sheet: sheetSchema.default({}),
   stock: stockSchema.default('printer'),
   content: contentSchema.default({ type: 'blank' }),
+  /** A behavior OR a raw deformer stack — if both are present, `deformers` wins (it's the fork). */
+  behavior: behaviorConfigSchema.optional(),
+  deformers: z.array(deformerInstanceSchema).optional(),
   physics: z.literal('none').default('none'),
   onTwos: z.boolean().default(false),
 })

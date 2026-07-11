@@ -6,13 +6,30 @@ export {
   sheetSchema,
   stockSchema,
   contentSchema,
+  behaviorConfigSchema,
+  deformerInstanceSchema,
   stockNames,
   type PaperConfig,
   type PaperConfigInput,
   type SheetConfig,
   type StockName,
   type ContentConfig,
+  type BehaviorConfig,
+  type DeformerInstanceConfig,
 } from './config/schema'
+
+export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
+export { registerDeformer, getDeformer, listDeformers } from './deformers/registry'
+export { applyDeformerStack, displacePoint, stackMinSegments } from './deformers/compose'
+export { roll, rollOptionsSchema, type RollOptions } from './deformers/roll'
+export { curl, curlOptionsSchema, cornerNames, type CurlOptions } from './deformers/curl'
+export { bend, bendOptionsSchema, type BendOptions } from './deformers/bend'
+
+export type { Behavior, HandleSpec } from './behaviors/types'
+export { registerBehavior, getBehavior, listBehaviors } from './behaviors/registry'
+export { peel, peelOptionsSchema, type PeelOptions } from './behaviors/peel'
+export { unroll, unrollOptionsSchema, type UnrollOptions } from './behaviors/unroll'
+export { flip, flipOptionsSchema, type FlipOptions } from './behaviors/flip'
 
 export { parsePreset, serializePreset, mergeConfig } from './config/serialize'
 export { getPreset, listPresets } from './config/presets'
