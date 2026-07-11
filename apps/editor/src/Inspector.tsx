@@ -4,9 +4,12 @@ import {
   getStock,
   listBehaviors,
   paperEdges,
+  physicsNames,
   stockNames,
+  type ClothConfig,
   type ContentConfig,
   type PaperEdge,
+  type PhysicsConfig,
   type StockName,
   type SurfaceConfig,
 } from 'paperlab'
@@ -25,6 +28,8 @@ export function Inspector() {
   const patchConfig = useEditor((s) => s.patchConfig)
   const setBehaviorType = useEditor((s) => s.setBehaviorType)
   const setSurface = useEditor((s) => s.setSurface)
+  const setPhysics = useEditor((s) => s.setPhysics)
+  const patchCloth = useEditor((s) => s.patchCloth)
   // Own store per mount — leva's global store would keep stale values across
   // preset switches (the Inspector is remounted by key to reset controls).
   const store = useCreateStore()
@@ -74,9 +79,60 @@ export function Inspector() {
     }),
     Content: folder(contentControls(config.content, patchConfig)),
     Surface: folder(surfaceControls(config.surface, config.stock, setSurface)),
+    Physics: folder(physicsControls(config.physics, setPhysics, patchCloth)),
   }, { store })
 
   return <LevaPanel store={store} fill flat titleBar={false} />
+}
+
+function physicsControls(
+  physics: PhysicsConfig,
+  setPhysics: (name: string) => void,
+  patchCloth: (patch: Partial<ClothConfig>) => void,
+): LevaSchema {
+  const isCloth = typeof physics === 'object'
+  const changed =
+    (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
+      ctx.initial || fn(v as never)
+
+  const controls: LevaSchema = {
+    simulation: {
+      value: isCloth ? 'cloth' : physics,
+      options: [...physicsNames, 'cloth'],
+      onChange: changed((v: string) => setPhysics(v)),
+    },
+  }
+  if (isCloth) {
+    Object.assign(controls, {
+      pins: {
+        value: physics.pins,
+        options: ['top-edge', 'top-corners', 'corner', 'none'],
+        onChange: changed((v: ClothConfig['pins']) => patchCloth({ pins: v })),
+      },
+      wind: {
+        value: physics.wind,
+        min: 0,
+        max: 1,
+        step: 0.01,
+        onChange: changed((v: number) => patchCloth({ wind: v })),
+      },
+      stiffness: {
+        value: physics.stiffness,
+        min: 0,
+        max: 1,
+        step: 0.01,
+        onChange: changed((v: number) => patchCloth({ stiffness: v })),
+      },
+      gravity: {
+        value: physics.gravity,
+        min: 0,
+        max: 2,
+        step: 0.01,
+        onChange: changed((v: number) => patchCloth({ gravity: v })),
+      },
+    })
+  }
+  return controls
 }
 
 function surfaceControls(

@@ -28,6 +28,8 @@ export interface Deformer<O = Record<string, unknown>> {
   /** GPU path — arrives with field mode (M4). */
   glsl?: { chunk: string; uniforms(o: O): Record<string, unknown> }
   geometry?: { minSegments?: number }
+  /** Time-driven: stacks containing this deformer re-deform every frame. */
+  animated?: boolean
 }
 
 /** One entry of a paper's deformer stack, as stored in a preset. */

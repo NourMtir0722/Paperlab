@@ -3,6 +3,9 @@ import { peel } from './peel'
 import { unroll } from './unroll'
 import { flip } from './flip'
 import { letterFold } from './letter-fold'
+import { hang } from './hang'
+import { fly } from './fly'
+import { fall } from './fall'
 
 const registry = new Map<string, Behavior<any>>()
 
@@ -29,3 +32,6 @@ registerBehavior(peel)
 registerBehavior(unroll)
 registerBehavior(flip)
 registerBehavior(letterFold)
+registerBehavior(hang)
+registerBehavior(fly)
+registerBehavior(fall)

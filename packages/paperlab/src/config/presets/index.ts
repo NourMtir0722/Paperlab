@@ -69,6 +69,42 @@ const builtins: Record<string, PaperConfigInput> = {
     },
     behavior: { type: 'flip', progress: 0.3, spine: 'left', radius: 0.3 },
   },
+  'hanging-poster': {
+    meta: { name: 'Hanging poster', tags: ['hang', 'image', 'wind'] },
+    sheet: { width: 1.1, height: 1.55 },
+    stock: 'printer',
+    content: {
+      type: 'image',
+      src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80',
+      fit: 'cover',
+    },
+    behavior: { type: 'hang', wind: 0.45, sag: 0.3 },
+  },
+  'pinned-sheet': {
+    meta: { name: 'Pinned sheet', tags: ['cloth', 'wind', 'interactive'] },
+    sheet: { width: 1.2, height: 1.5 },
+    stock: 'printer',
+    content: {
+      type: 'text',
+      text: 'Grab me.\n\n(cloth: pinned at the top edge,\nwind from the left)',
+      size: 40,
+    },
+    physics: { type: 'cloth', pins: 'top-edge', wind: 0.45, stiffness: 0.8, gravity: 1, floor: -1.4 },
+  },
+  'flying-note': {
+    meta: { name: 'Flying note', tags: ['fly', 'tumble', 'text'] },
+    sheet: { width: 1, height: 0.7 },
+    stock: 'printer',
+    content: {
+      type: 'text',
+      text: 'meet me where\nthe paper lands',
+      size: 52,
+      align: 'center',
+      padding: 0.16,
+    },
+    behavior: { type: 'fly', flutter: 0.55, curve: 0.45 },
+    physics: 'tumble',
+  },
   'blank-sheet': {
     meta: { name: 'Blank sheet', tags: ['starter'] },
     stock: 'printer',

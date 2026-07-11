@@ -3,6 +3,7 @@ import { roll } from './roll'
 import { curl } from './curl'
 import { bend } from './bend'
 import { fold } from './fold'
+import { wave } from './wave'
 
 const registry = new Map<string, Deformer<any>>()
 
@@ -29,3 +30,9 @@ registerDeformer(roll)
 registerDeformer(curl)
 registerDeformer(bend)
 registerDeformer(fold)
+registerDeformer(wave)
+
+/** True if any enabled instance re-deforms every frame (wave etc.). */
+export function stackIsAnimated(stack: { type: string; enabled?: boolean }[]): boolean {
+  return stack.some((i) => i.enabled !== false && registry.get(i.type)?.animated)
+}

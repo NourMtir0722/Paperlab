@@ -17,6 +17,7 @@ interface TransportProps {
  */
 export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
   const hasBehavior = useEditor((s) => Boolean(s.config.behavior))
+  const isCloth = useEditor((s) => typeof s.config.physics === 'object')
   const patchConfig = useEditor((s) => s.patchConfig)
   const [playing, setPlaying] = useState(true)
   const scrubbingRef = useRef(false)
@@ -79,7 +80,11 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
         }}
       />
       <span className="transport-hint">
-        {hasBehavior ? 'space to play/pause · drag the blue handle on the paper' : 'no behavior'}
+        {isCloth
+          ? 'cloth simulation — grab the sheet and pull'
+          : hasBehavior
+            ? 'space to play/pause · drag the blue handle on the paper'
+            : 'no behavior'}
       </span>
     </footer>
   )

@@ -5,24 +5,29 @@ import type { ThreeEvent } from '@react-three/fiber'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import type {
   BehaviorConfig,
+  ClothConfig,
   ContentConfig,
   DeformerInstanceConfig,
   PaperConfig,
   PaperConfigInput,
+  PhysicsConfig,
   SheetConfig,
   StockName,
 } from './config/schema'
 import { paperConfigSchema } from './config/schema'
 import { mergeConfig, parsePreset, serializePreset } from './config/serialize'
-import { createSheetGeometry } from './core/sheet'
+import { createSheetGeometry, resolveSegments } from './core/sheet'
 import { getStock } from './core/stock'
 import { getPreset } from './config/presets'
 import { useContentTexture } from './content/texture'
 import { applyDeformerStack, displacePoint, stackMinSegments } from './deformers/compose'
-import { PaperMaterial } from './surface/PaperMaterial'
+import { stackIsAnimated } from './deformers/registry'
 import type { DeformerInstance } from './deformers/types'
 import { getBehavior } from './behaviors/registry'
 import type { Behavior } from './behaviors/types'
+import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
+import { ClothSim } from './physics/cloth'
+import { PaperMaterial } from './surface/PaperMaterial'
 
 export interface PaperMeshProps {
   /** Built-in preset name, or a (partial) preset object. Props below override it. */
@@ -32,8 +37,9 @@ export interface PaperMeshProps {
   content?: ContentConfig
   behavior?: BehaviorConfig
   deformers?: DeformerInstanceConfig[]
+  physics?: PhysicsConfig | 'cloth'
   onTwos?: boolean
-  /** Show draggable behavior handles (corner grabs etc.). */
+  /** Show draggable behavior handles; cloth sheets become grabbable. */
   interactive?: boolean
   /** Start the behavior's transport loop on mount. */
   autoplay?: boolean
@@ -49,7 +55,7 @@ export interface PaperHandle {
   play(): void
   pause(): void
   readonly playing: boolean
-  /** Live-override a behavior param, e.g. `set('progress', 0.5)`. */
+  /** Live-override a behavior param. 'progress' always maps to the behavior's progress param. */
   set(param: string, value: unknown): void
   getProgress(): number
   /** Current full state (including live overrides) as a preset. */
@@ -71,69 +77,95 @@ export function resolveConfig(props: PaperMeshProps): PaperConfig {
   if (props.content) overrides.content = props.content
   if (props.behavior) overrides.behavior = props.behavior
   if (props.deformers) overrides.deformers = props.deformers
+  if (props.physics) overrides.physics = props.physics
   if (props.onTwos !== undefined) overrides.onTwos = props.onTwos
   return paperConfigSchema.parse(mergeConfig(base as PaperConfigInput, overrides))
 }
+
+/** Cloth grids cap their resolution — 5k verlet particles is the budget ceiling. */
+const CLOTH_MAX_SEGMENTS = 28
 
 const dragPlane = new THREE.Plane()
 const dragPoint = new THREE.Vector3()
 const planeNormal = new THREE.Vector3()
 const anchorScratch = new THREE.Vector3()
+const worldScratch = new THREE.Vector3()
+const quatScratch = new THREE.Quaternion()
 
 /**
- * The atom: one sheet of paper, hero-mode CPU path. The deformer stack runs
- * in JS, writing geometry positions (correct raycasting, shadows, handles).
- * GSAP owns animated values; useFrame owns geometry writes — never both.
+ * The atom: one sheet of paper, hero-mode CPU path. The deformer stack (or
+ * the cloth sim — never both) writes geometry positions each frame. GSAP
+ * owns animated values; useFrame owns geometry writes.
  */
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
   const config = resolveConfig(props)
   const behavior: Behavior | null = config.behavior ? getBehavior(config.behavior.type) : null
+  const isCloth = typeof config.physics === 'object'
+  const idle =
+    typeof config.physics === 'string' && config.physics !== 'none'
+      ? getIdlePreset(config.physics as IdleName)
+      : null
 
   const meshRef = useRef<THREE.Mesh>(null)
   const groupRef = useRef<THREE.Group>(null)
   const handleRefs = useRef<(THREE.Mesh | null)[]>([])
 
-  // Live param overrides (transport progress, handle drags) — merged over
-  // config.behavior each frame, never persisted into React state.
   const overridesRef = useRef<Record<string, unknown>>({})
   const dirtyRef = useRef(true)
   const playingRef = useRef(false)
   const tweenRef = useRef<gsap.core.Tween | null>(null)
   const draggingRef = useRef<string | null>(null)
 
-  // Latest config, readable from stable callbacks/imperative methods.
   const configRef = useRef(config)
   configRef.current = config
 
-  // Whatever makeDefault camera controls the scene has — paused during handle drags.
   const controls = useThree((s) => s.controls) as { enabled?: boolean } | null
+  const camera = useThree((s) => s.camera)
 
   const behaviorKey = JSON.stringify(config.behavior ?? null)
   const deformersKey = JSON.stringify(config.deformers ?? null)
   const sheetKey = JSON.stringify(config.sheet)
+  const physicsKey = JSON.stringify(config.physics)
 
-  // Config edits invalidate live overrides (except while dragging/playing,
-  // where the override IS the newest value and gets rewritten next tick).
   useEffect(() => {
     if (!draggingRef.current && !playingRef.current) overridesRef.current = {}
     dirtyRef.current = true
-  }, [behaviorKey, deformersKey, sheetKey])
+  }, [behaviorKey, deformersKey, sheetKey, physicsKey])
 
   const minSegments = useMemo(() => {
     const probe = buildStack(configRef.current, {})
     return probe ? stackMinSegments(probe) : 2
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [behaviorKey, deformersKey])
+  }, [behaviorKey, deformersKey, physicsKey])
 
-  const geometry = useMemo(
-    () => createSheetGeometry(config.sheet, minSegments),
+  const geometry = useMemo(() => {
+    if (!isCloth) return createSheetGeometry(config.sheet, minSegments)
+    // Cloth: explicit capped grid so sim particles == mesh vertices.
+    const [sx, sy] = resolveSegments(config.sheet, 2)
+    const capped = Math.min(Math.max(sx, sy), CLOTH_MAX_SEGMENTS)
+    return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, capped, capped)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sheetKey, minSegments],
-  )
+  }, [sheetKey, minSegments, isCloth])
+
   const basePositions = useMemo(
     () => Float32Array.from(geometry.attributes.position!.array as Float32Array),
     [geometry],
   )
+
+  const sim = useMemo(() => {
+    if (!isCloth) return null
+    const cloth = configRef.current.physics as ClothConfig
+    const cols = (geometry.parameters as { widthSegments: number }).widthSegments + 1
+    const rows = (geometry.parameters as { heightSegments: number }).heightSegments + 1
+    return new ClothSim(cols, rows, config.sheet.width, config.sheet.height, cloth.pins, {
+      stiffness: cloth.stiffness,
+      gravity: cloth.gravity,
+      wind: cloth.wind,
+      floor: cloth.floor,
+    })
+    // Rebuild only on geometry or pin layout change — sliders update in place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometry, isCloth, isCloth ? (config.physics as ClothConfig).pins : ''])
 
   const stock = getStock(config.stock)
   const texture = useContentTexture(config.content, config.sheet, stock)
@@ -202,9 +234,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       return playingRef.current
     },
     set(param: string, value: unknown) {
-      overridesRef.current[param] = value
+      const key = param === 'progress' && behavior ? behavior.progressParam : param
+      overridesRef.current[key] = value
       dirtyRef.current = true
-      if (behavior && param === behavior.progressParam) props.onProgress?.(value as number)
+      if (behavior && key === behavior.progressParam) props.onProgress?.(value as number)
     },
     getProgress() {
       if (!behavior) return 0
@@ -217,18 +250,61 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     },
   }))
 
-  useFrame(({ clock }) => {
-    const cfg = configRef.current
-    const hasLoop = Boolean(cfg.behavior && behavior?.loop)
-    if (!dirtyRef.current && !hasLoop) return
-    dirtyRef.current = false
+  const idlePose = useRef<IdlePose>({ position: [0, 0, 0], rotation: [0, 0, 0] })
 
+  useFrame(({ clock }, delta) => {
+    const cfg = configRef.current
+
+    // Whole-sheet idle motion (float, tumble, dangle) — transform, not vertices.
+    if (idle?.transform && groupRef.current) {
+      const pose = idlePose.current
+      pose.position[0] = pose.position[1] = pose.position[2] = 0
+      pose.rotation[0] = pose.rotation[1] = pose.rotation[2] = 0
+      idle.transform(clock.elapsedTime, pose)
+      const base = props.position ?? [0, 0, 0]
+      const baseRot = props.rotation ?? [0, 0, 0]
+      groupRef.current.position.set(
+        base[0] + pose.position[0],
+        base[1] + pose.position[1],
+        base[2] + pose.position[2],
+      )
+      groupRef.current.rotation.set(
+        baseRot[0] + pose.rotation[0],
+        baseRot[1] + pose.rotation[1],
+        baseRot[2] + pose.rotation[2],
+      )
+    }
+
+    // Simulation path: cloth owns the vertices.
+    if (isCloth && sim) {
+      const cloth = cfg.physics as ClothConfig
+      sim.setParams({
+        wind: cloth.wind,
+        gravity: cloth.gravity,
+        stiffness: cloth.stiffness,
+        floor: cloth.floor,
+      })
+      sim.step(delta)
+      if (!sim.asleep) {
+        const position = geometry.attributes.position as THREE.BufferAttribute
+        ;(position.array as Float32Array).set(sim.positions)
+        position.needsUpdate = true
+        geometry.computeVertexNormals()
+      }
+      return
+    }
+
+    // Shape path: the deformer stack.
     const stack = buildStack(cfg, overridesRef.current, behavior, clock.elapsedTime)
     if (!stack) return
+    const animated = stackIsAnimated(stack)
+    const hasLoop = Boolean(cfg.behavior && behavior?.loop)
+    if (!dirtyRef.current && !hasLoop && !animated) return
+    dirtyRef.current = false
+
     const ctx = { t: clock.elapsedTime, sheet: cfg.sheet }
     applyDeformerStack(geometry, basePositions, stack, ctx)
 
-    // Keep handle grab points riding the deformed surface.
     if (props.interactive && behavior?.handles) {
       const o = effectiveOptions(clock.elapsedTime)
       behavior.handles.forEach((h, i) => {
@@ -245,8 +321,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const localDragPoint = (e: ThreeEvent<PointerEvent>): { x: number; y: number } | null => {
     const group = groupRef.current
     if (!group) return null
-    // Drag against the paper's flat plane (local z=0) in world space.
-    planeNormal.set(0, 0, 1).applyQuaternion(group.getWorldQuaternion(new THREE.Quaternion()))
+    planeNormal.set(0, 0, 1).applyQuaternion(group.getWorldQuaternion(quatScratch))
     dragPlane.setFromNormalAndCoplanarPoint(planeNormal, group.getWorldPosition(dragPoint))
     const hit = e.ray.intersectPlane(dragPlane, dragPoint)
     if (!hit) return null
@@ -266,9 +341,48 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     if (typeof p === 'number') props.onProgress?.(p)
   }
 
+  // Cloth grab: pick the nearest particle, then drag it on a camera-facing
+  // plane through the grab point — full 3D pull, not just in-plane.
+  const grabAnchor = useRef(new THREE.Vector3())
+  const clothDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!isCloth || !sim || !props.interactive || !groupRef.current) return
+    e.stopPropagation()
+    if (controls) controls.enabled = false
+    grabAnchor.current.copy(e.point) // world-space anchor for the drag plane
+    const local = groupRef.current.worldToLocal(worldScratch.copy(e.point))
+    sim.grabNearest(local.x, local.y, local.z)
+    draggingRef.current = 'cloth'
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+  }
+  const clothMove = (e: ThreeEvent<PointerEvent>) => {
+    if (draggingRef.current !== 'cloth' || !sim || !groupRef.current) return
+    camera.getWorldDirection(planeNormal)
+    dragPlane.setFromNormalAndCoplanarPoint(planeNormal, grabAnchor.current)
+    const hit = e.ray.intersectPlane(dragPlane, dragPoint)
+    if (!hit) return
+    groupRef.current.worldToLocal(hit)
+    sim.moveGrab(hit.x, hit.y, hit.z)
+  }
+  const clothUp = (e: ThreeEvent<PointerEvent>) => {
+    if (draggingRef.current !== 'cloth' || !sim) return
+    draggingRef.current = null
+    if (controls) controls.enabled = true
+    sim.release()
+    ;(e.target as Element).releasePointerCapture(e.pointerId)
+  }
+
   return (
     <group ref={groupRef} position={props.position} rotation={props.rotation}>
-      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow frustumCulled={false}>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        castShadow
+        receiveShadow
+        frustumCulled={false}
+        onPointerDown={isCloth ? clothDown : undefined}
+        onPointerMove={isCloth ? clothMove : undefined}
+        onPointerUp={isCloth ? clothUp : undefined}
+      >
         <PaperMaterial
           stock={stock}
           texture={texture}
@@ -277,6 +391,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         />
       </mesh>
       {props.interactive &&
+        !isCloth &&
         behavior?.handles?.map((h, i) => (
           <mesh
             key={h.id}
@@ -314,11 +429,25 @@ function buildStack(
   behavior?: Behavior | null,
   t = 0,
 ): DeformerInstance[] | null {
-  // Raw deformer stack wins — it's the Advanced fork of a behavior.
-  if (config.deformers) return config.deformers as DeformerInstance[]
-  if (!config.behavior) return null
-  const b = behavior ?? getBehavior(config.behavior.type)
-  let options: Record<string, unknown> = { ...config.behavior, ...overrides }
-  if (b.loop) options = { ...options, ...b.loop(options, t) }
-  return b.stack(options, config.sheet)
+  // Cloth owns the vertices — no deformer stack.
+  if (typeof config.physics === 'object') return null
+  const idle =
+    typeof config.physics === 'string' && config.physics !== 'none'
+      ? getIdlePreset(config.physics as IdleName)
+      : null
+  const idleStack = idle?.stack?.() ?? []
+
+  let shapeStack: DeformerInstance[] = []
+  if (config.deformers) {
+    // Raw deformer stack wins — it's the Advanced fork of a behavior.
+    shapeStack = config.deformers as DeformerInstance[]
+  } else if (config.behavior) {
+    const b = behavior ?? getBehavior(config.behavior.type)
+    let options: Record<string, unknown> = { ...config.behavior, ...overrides }
+    if (b.loop) options = { ...options, ...b.loop(options, t) }
+    shapeStack = b.stack(options, config.sheet)
+  }
+
+  const combined = [...shapeStack, ...idleStack]
+  return combined.length > 0 ? combined : null
 }

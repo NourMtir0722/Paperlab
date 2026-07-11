@@ -3,6 +3,9 @@ import { peelOptionsSchema } from '../behaviors/peel'
 import { unrollOptionsSchema } from '../behaviors/unroll'
 import { flipOptionsSchema } from '../behaviors/flip'
 import { letterFoldOptionsSchema } from '../behaviors/letter-fold'
+import { hangOptionsSchema } from '../behaviors/hang'
+import { flyOptionsSchema } from '../behaviors/fly'
+import { fallOptionsSchema } from '../behaviors/fall'
 
 /**
  * The zod schema is the single source of truth: it validates the public API,
@@ -127,6 +130,9 @@ export const behaviorConfigSchema = z.discriminatedUnion('type', [
   unrollOptionsSchema.extend({ type: z.literal('unroll') }),
   flipOptionsSchema.extend({ type: z.literal('flip') }),
   letterFoldOptionsSchema.extend({ type: z.literal('letter-fold') }),
+  hangOptionsSchema.extend({ type: z.literal('hang') }),
+  flyOptionsSchema.extend({ type: z.literal('fly') }),
+  fallOptionsSchema.extend({ type: z.literal('fall') }),
 ])
 
 export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>
@@ -140,6 +146,32 @@ export const deformerInstanceSchema = z.object({
 
 export type DeformerInstanceConfig = z.infer<typeof deformerInstanceSchema>
 
+// ── Physics ──────────────────────────────────────────────────────────────────
+
+/** Kept in sync with `idleNames` in physics/idle.ts (asserted by test). */
+export const physicsNames = ['none', 'float', 'tumble', 'dangle', 'taped', 'breeze'] as const
+
+export const clothConfigSchema = z.object({
+  type: z.literal('cloth'),
+  pins: z.enum(['top-edge', 'top-corners', 'corner', 'none']).default('top-edge'),
+  wind: z.number().min(0).max(1).default(0.3),
+  /** Bend stiffness: 1 = crisp paper, 0 = silk. */
+  stiffness: z.number().min(0).max(1).default(0.8),
+  gravity: z.number().min(0).max(2).default(1),
+  /** Local-space ground plane the sheet settles onto. */
+  floor: z.number().min(-5).max(0).default(-1.4),
+})
+
+export type ClothConfig = z.infer<typeof clothConfigSchema>
+
+export const physicsSchema = z.union([
+  z.enum(physicsNames),
+  z.literal('cloth').transform(() => clothConfigSchema.parse({ type: 'cloth' })),
+  clothConfigSchema,
+])
+
+export type PhysicsConfig = z.infer<typeof physicsSchema>
+
 // ── Paper config ─────────────────────────────────────────────────────────────
 
 export const metaSchema = z.object({
@@ -149,18 +181,31 @@ export const metaSchema = z.object({
   tags: z.array(z.string()).default([]),
 })
 
-export const paperConfigSchema = z.object({
-  meta: metaSchema.default({}),
-  sheet: sheetSchema.default({}),
-  stock: stockSchema.default('printer'),
-  content: contentSchema.default({ type: 'blank' }),
-  /** A behavior OR a raw deformer stack — if both are present, `deformers` wins (it's the fork). */
-  behavior: behaviorConfigSchema.optional(),
-  deformers: z.array(deformerInstanceSchema).optional(),
-  surface: surfaceSchema.default({}),
-  physics: z.literal('none').default('none'),
-  onTwos: z.boolean().default(false),
-})
+export const paperConfigSchema = z
+  .object({
+    meta: metaSchema.default({}),
+    sheet: sheetSchema.default({}),
+    stock: stockSchema.default('printer'),
+    content: contentSchema.default({ type: 'blank' }),
+    /** A behavior OR a raw deformer stack — if both are present, `deformers` wins (it's the fork). */
+    behavior: behaviorConfigSchema.optional(),
+    deformers: z.array(deformerInstanceSchema).optional(),
+    surface: surfaceSchema.default({}),
+    physics: physicsSchema.default('none'),
+    onTwos: z.boolean().default(false),
+  })
+  .superRefine((config, ctx) => {
+    // Cloth owns vertex positions: Shape (behavior/deformers) and Simulation
+    // (cloth) are alternatives, not layers. Idle presets compose fine.
+    if (typeof config.physics === 'object' && (config.behavior || config.deformers)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['physics'],
+        message:
+          'cloth physics and behavior/deformers are exclusive — cloth owns the vertices (pick Shape OR Simulation)',
+      })
+    }
+  })
 
 export type PaperConfig = z.infer<typeof paperConfigSchema>
 export type PaperConfigInput = z.input<typeof paperConfigSchema>

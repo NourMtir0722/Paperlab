@@ -56,7 +56,7 @@ export function App() {
           <li>Sheet</li>
           <li>Content</li>
           <li>Behavior</li>
-          <li className="dim">Physics — M3</li>
+          <li>Physics</li>
         </ul>
       </aside>
 

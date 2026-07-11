@@ -9,7 +9,15 @@ const sheet = { width: 1, height: 2.6 }
 
 describe('behavior registry', () => {
   it('has the built-in behaviors', () => {
-    expect(listBehaviors()).toEqual(['peel', 'unroll', 'flip', 'letter-fold'])
+    expect(listBehaviors()).toEqual([
+      'peel',
+      'unroll',
+      'flip',
+      'letter-fold',
+      'hang',
+      'fly',
+      'fall',
+    ])
   })
 
   it('throws helpfully on unknown behaviors', () => {

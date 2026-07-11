@@ -10,6 +10,9 @@ export {
   deformerInstanceSchema,
   surfaceSchema,
   receiptContentSchema,
+  physicsSchema,
+  clothConfigSchema,
+  physicsNames,
   stockNames,
   paperEdges,
   type PaperConfig,
@@ -21,6 +24,8 @@ export {
   type DeformerInstanceConfig,
   type SurfaceConfig,
   type PaperEdge,
+  type PhysicsConfig,
+  type ClothConfig,
 } from './config/schema'
 
 export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
@@ -30,6 +35,7 @@ export { roll, rollOptionsSchema, type RollOptions } from './deformers/roll'
 export { curl, curlOptionsSchema, cornerNames, type CurlOptions } from './deformers/curl'
 export { bend, bendOptionsSchema, type BendOptions } from './deformers/bend'
 export { fold, foldOptionsSchema, type FoldOptions } from './deformers/fold'
+export { wave, waveOptionsSchema, type WaveOptions } from './deformers/wave'
 
 export type { Behavior, HandleSpec } from './behaviors/types'
 export { registerBehavior, getBehavior, listBehaviors } from './behaviors/registry'
@@ -37,6 +43,12 @@ export { peel, peelOptionsSchema, type PeelOptions } from './behaviors/peel'
 export { unroll, unrollOptionsSchema, type UnrollOptions } from './behaviors/unroll'
 export { flip, flipOptionsSchema, type FlipOptions } from './behaviors/flip'
 export { letterFold, letterFoldOptionsSchema, type LetterFoldOptions } from './behaviors/letter-fold'
+export { hang, hangOptionsSchema, type HangOptions } from './behaviors/hang'
+export { fly, flyOptionsSchema, type FlyOptions } from './behaviors/fly'
+export { fall, fallOptionsSchema, type FallOptions } from './behaviors/fall'
+
+export { idlePresets, getIdlePreset, idleNames, type IdleName, type IdlePreset } from './physics/idle'
+export { ClothSim, type ClothParams, type PinMode } from './physics/cloth'
 
 export { composeSurface, type ComposedSurface } from './surface/compose'
 export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'

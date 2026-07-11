@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import {
   behaviorConfigSchema,
+  clothConfigSchema,
   getPreset,
   mergeConfig,
   paperConfigSchema,
+  type ClothConfig,
   type PaperConfig,
   type PaperConfigInput,
   type SurfaceConfig,
@@ -19,6 +21,9 @@ interface EditorState {
   setBehaviorType(type: string | null): void
   /** Shallow-merge surface effects; `undefined` removes an effect (mergeConfig can't). */
   setSurface(patch: Partial<SurfaceConfig>): void
+  /** Select 'none' | idle name | 'cloth'. Cloth clears the behavior — they're exclusive. */
+  setPhysics(name: string): void
+  patchCloth(patch: Partial<ClothConfig>): void
 }
 
 export const useEditor = create<EditorState>((set, get) => ({
@@ -54,6 +59,28 @@ export const useEditor = create<EditorState>((set, get) => ({
       return {
         config: paperConfigSchema.parse({ ...s.config, surface }),
         inspectorEpoch: structureChanged ? s.inspectorEpoch + 1 : s.inspectorEpoch,
+      }
+    }),
+  setPhysics: (name) =>
+    set((s) => ({
+      config: paperConfigSchema.parse({
+        ...s.config,
+        physics: name === 'cloth' ? clothConfigSchema.parse({ type: 'cloth' }) : name,
+        // Cloth owns the vertices — Shape and Simulation are a segmented
+        // choice, not two toggles.
+        behavior: name === 'cloth' ? undefined : s.config.behavior,
+        deformers: name === 'cloth' ? undefined : s.config.deformers,
+      }),
+      inspectorEpoch: s.inspectorEpoch + 1,
+    })),
+  patchCloth: (patch) =>
+    set((s) => {
+      if (typeof s.config.physics !== 'object') return s
+      return {
+        config: paperConfigSchema.parse({
+          ...s.config,
+          physics: { ...s.config.physics, ...patch },
+        }),
       }
     }),
 }))
