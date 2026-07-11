@@ -1,7 +1,16 @@
 import { useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { ContactShadows, OrbitControls, Stats } from '@react-three/drei'
-import { PaperFieldMesh, PaperMesh, getPreset, listPresets, type PaperHandle } from 'paperlab'
+import {
+  PaperFieldMesh,
+  PaperMesh,
+  getPreset,
+  listPresets,
+  type ContentConfig,
+  type FieldExportInput,
+  type PaperConfig,
+  type PaperHandle,
+} from 'paperlab'
 import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
 import { Transport } from './Transport'
@@ -30,6 +39,7 @@ export function App() {
   const setPreset = useEditor((s) => s.setPreset)
   const patchConfig = useEditor((s) => s.patchConfig)
   const setMode = useEditor((s) => s.setMode)
+  const setSlotPreset = useEditor((s) => s.setSlotPreset)
   const editFieldPaper = useEditor((s) => s.editFieldPaper)
   const backToField = useEditor((s) => s.backToField)
 
@@ -37,12 +47,34 @@ export function App() {
   const scrubRef = useRef<HTMLInputElement>(null)
 
   // Presets are components: the field renders the live edit of its preset.
-  const fieldPresetConfig =
-    presetName === field.presetName ? config : getPreset(field.presetName)
-  const fieldImages = Array.from(
-    { length: field.count },
-    (_, i) => FIELD_IMAGES[i % FIELD_IMAGES.length]!,
-  )
+  const resolvePresetByName = (name: string): PaperConfig =>
+    name === presetName ? config : getPreset(name)
+  const slotContent = (i: number): ContentConfig => ({
+    type: 'image',
+    src: FIELD_IMAGES[i % FIELD_IMAGES.length]!,
+    fit: 'cover',
+  })
+  const fieldPapers = field.slots.map((name, i) => {
+    const preset = resolvePresetByName(name)
+    return {
+      preset,
+      // Image slots pull from the demo pool; typed content keeps its preset's.
+      ...(preset.content.type === 'image' || preset.content.type === 'blank'
+        ? { content: slotContent(i) }
+        : {}),
+    }
+  })
+  const fieldExportInput = (): FieldExportInput => ({
+    layout: field.layout,
+    layoutOptions: field.layoutOptions,
+    motion: { driver: field.driver, speed: field.speed },
+    entrance: { type: field.entrance },
+    papers: field.slots.map((name, i) => ({
+      presetName: name,
+      preset: resolvePresetByName(name),
+      content: fieldPapers[i]!.content,
+    })),
+  })
 
   return (
     <div className="app">
@@ -65,7 +97,7 @@ export function App() {
           </button>
         )}
         <div className="spacer" />
-        <ExportMenu config={config} paperRef={paperRef} />
+        <ExportMenu mode={mode} config={config} paperRef={paperRef} fieldInput={fieldExportInput} />
       </header>
 
       <aside className="left">
@@ -95,15 +127,24 @@ export function App() {
         ) : (
           <>
             <h2>Papers</h2>
-            <ul className="presets">
-              <li>
-                <button className="active" onClick={editFieldPaper}>
-                  {field.presetName} — edit paper →
-                </button>
-              </li>
-              {fieldImages.map((_, i) => (
-                <li key={i}>
-                  <button className="paper-item">Paper {i + 1}</button>
+            <ul className="slots">
+              {field.slots.map((name, i) => (
+                <li key={i} className="slot-row">
+                  <span className="slot-index">{i + 1}</span>
+                  <select value={name} onChange={(e) => setSlotPreset(i, e.target.value)}>
+                    {listPresets().map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="slot-edit"
+                    title={`Edit ${name}`}
+                    onClick={() => editFieldPaper(name)}
+                  >
+                    ✎
+                  </button>
                 </li>
               ))}
             </ul>
@@ -150,9 +191,8 @@ export function App() {
             </>
           ) : (
             <PaperFieldMesh
-              key={`${field.layout}:${field.count}:${field.presetName}:${field.entrance}`}
-              images={fieldImages}
-              preset={fieldPresetConfig}
+              key={`${field.layout}:${field.count}:${field.slots.join(',')}:${field.entrance}`}
+              papers={fieldPapers}
               layout={field.layout}
               layoutOptions={field.layoutOptions}
               motion={{ driver: field.driver, speed: field.speed }}

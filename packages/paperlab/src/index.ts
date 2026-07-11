@@ -2,8 +2,11 @@ export { Paper, type PaperProps } from './Paper'
 export {
   PaperField,
   PaperFieldMesh,
+  groupFieldPapers,
   type PaperFieldProps,
   type PaperFieldMeshProps,
+  type FieldPaperSlot,
+  type FieldGroupData,
 } from './PaperField'
 export { PaperMesh, resolveConfig, type PaperMeshProps, type PaperHandle } from './PaperMesh'
 
@@ -97,6 +100,15 @@ export {
   describeConfig,
   AGENT_PAYLOAD_VERSION,
 } from './config/agent-payload'
+export {
+  buildFieldAgentPayload,
+  buildFieldComponentSource,
+  describeFieldConfig,
+  diffFieldProps,
+  distinctFieldPresets,
+  type FieldExportInput,
+  type FieldExportPaper,
+} from './config/field-export'
 export {
   usePrefersReducedMotion,
   supportsWebGL,

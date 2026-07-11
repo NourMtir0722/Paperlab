@@ -9,7 +9,8 @@ import { diffConfig } from './diff'
  * contract → a verification step the agent can self-check → pre-empted
  * failure modes.
  */
-export const AGENT_PAYLOAD_VERSION = 1
+/** v2: field exports (multi-preset galleries with inlined preset consts). */
+export const AGENT_PAYLOAD_VERSION = 2
 
 const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> = {
   peel: (o) => `its ${String(o.corner ?? 'bottom-right').replace('-', ' ')} corner peeling up`,
@@ -80,9 +81,9 @@ export function buildAgentPayload(config: PaperConfig): string {
    component convention). It is self-contained and owns its own <Canvas>:
 
 \`\`\`tsx
-import { Paper } from 'paperlab'
+import { Paper, type PaperConfigInput } from 'paperlab'
 
-const preset = ${preset.replace(/\n/g, '\n')} as const
+const preset = ${preset.replace(/\n/g, '\n')} satisfies PaperConfigInput
 
 export function ${name}() {
   return <Paper preset={preset} />

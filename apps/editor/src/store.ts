@@ -18,8 +18,8 @@ export interface FieldState {
   driver: 'autoplay' | 'drag' | 'none'
   speed: number
   entrance: 'rise' | 'scatter' | 'none'
-  /** The preset every field instance references — presets are components. */
-  presetName: string
+  /** Preset name per slot — each field slot references a preset (components). */
+  slots: string[]
 }
 
 interface EditorState {
@@ -31,7 +31,9 @@ interface EditorState {
   cameFromField: boolean
   setMode(mode: 'paper' | 'field'): void
   patchField(patch: Partial<FieldState>): void
-  editFieldPaper(): void
+  setSlotPreset(index: number, name: string): void
+  setAllSlots(name: string): void
+  editFieldPaper(name: string): void
   backToField(): void
   /** Bumped when the canvas changes params behind the inspector's back (handle drags, transport commits) — remounts the inspector. */
   inspectorEpoch: number
@@ -57,22 +59,35 @@ export const useEditor = create<EditorState>((set, get) => ({
     driver: 'autoplay',
     speed: 0.5,
     entrance: 'rise',
-    presetName: 'photo-print',
+    slots: Array.from({ length: 14 }, () => 'photo-print'),
   },
   cameFromField: false,
   setMode: (mode) => set((s) => ({ mode, inspectorEpoch: s.inspectorEpoch + 1 })),
   patchField: (patch) =>
+    set((s) => {
+      const field = { ...s.field, ...patch }
+      // The count slider resizes the slot list; new slots copy the last one.
+      if (patch.count !== undefined && patch.count !== s.field.slots.length) {
+        const fill = s.field.slots[s.field.slots.length - 1] ?? 'photo-print'
+        field.slots = Array.from({ length: patch.count }, (_, i) => s.field.slots[i] ?? fill)
+      }
+      return {
+        field,
+        inspectorEpoch: patch.layout !== undefined ? s.inspectorEpoch + 1 : s.inspectorEpoch,
+      }
+    }),
+  setSlotPreset: (index, name) =>
     set((s) => ({
-      field: { ...s.field, ...patch },
-      inspectorEpoch:
-        patch.layout !== undefined ? s.inspectorEpoch + 1 : s.inspectorEpoch,
+      field: { ...s.field, slots: s.field.slots.map((v, i) => (i === index ? name : v)) },
     })),
-  editFieldPaper: () =>
+  setAllSlots: (name) =>
+    set((s) => ({ field: { ...s.field, slots: s.field.slots.map(() => name) } })),
+  editFieldPaper: (name) =>
     set((s) => ({
       mode: 'paper',
       cameFromField: true,
-      presetName: s.field.presetName,
-      config: s.presetName === s.field.presetName ? s.config : getPreset(s.field.presetName),
+      presetName: name,
+      config: s.presetName === name ? s.config : getPreset(name),
       inspectorEpoch: s.inspectorEpoch + 1,
     })),
   backToField: () =>
