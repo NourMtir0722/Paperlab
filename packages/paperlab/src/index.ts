@@ -23,6 +23,8 @@ export {
   physicsSchema,
   clothConfigSchema,
   physicsNames,
+  sceneSchema,
+  lightingNames,
   stockNames,
   paperEdges,
   type PaperConfig,
@@ -37,7 +39,16 @@ export {
   type PaperEdge,
   type PhysicsConfig,
   type ClothConfig,
+  type SceneConfig,
+  type LightingName,
 } from './config/schema'
+
+export {
+  lightingPresets,
+  getLightingPreset,
+  type LightingPreset,
+} from './scene/lighting'
+export { PaperLighting, makeGoboTexture, type PaperLightingProps } from './scene/PaperLighting'
 
 export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
 export { registerDeformer, getDeformer, listDeformers } from './deformers/registry'
