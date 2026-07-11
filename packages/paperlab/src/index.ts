@@ -15,6 +15,7 @@ export {
   sheetSchema,
   stockSchema,
   contentSchema,
+  backContentSchema,
   behaviorConfigSchema,
   deformerInstanceSchema,
   surfaceSchema,
@@ -29,6 +30,7 @@ export {
   type SheetConfig,
   type StockName,
   type ContentConfig,
+  type BackContentConfig,
   type BehaviorConfig,
   type DeformerInstanceConfig,
   type SurfaceConfig,
@@ -89,7 +91,7 @@ export {
 } from './field/parity'
 export { ClothSim, type ClothParams, type PinMode } from './physics/cloth'
 
-export { composeSurface, type ComposedSurface } from './surface/compose'
+export { composeSurface, type ComposedSurface, type SurfaceMaps } from './surface/compose'
 export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'
 export { receiptTotals, barcodeBars, type ReceiptContent } from './content/receipt'
 

@@ -36,11 +36,11 @@ export type StockName = z.infer<typeof stockSchema>
 
 // ── Content ──────────────────────────────────────────────────────────────────
 
-export const blankContentSchema = z.object({
+const blankContentBase = z.object({
   type: z.literal('blank'),
 })
 
-export const imageContentSchema = z.object({
+const imageContentBase = z.object({
   type: z.literal('image'),
   src: z.string(),
   fit: z.enum(['cover', 'contain']).default('cover'),
@@ -48,7 +48,7 @@ export const imageContentSchema = z.object({
   alt: z.string().optional(),
 })
 
-export const textContentSchema = z.object({
+const textContentBase = z.object({
   type: z.literal('text'),
   text: z.string().default('Dear reader,'),
   font: z.string().default('Georgia, "Times New Roman", serif'),
@@ -62,7 +62,7 @@ export const textContentSchema = z.object({
   lineHeight: z.number().min(0.8).max(3).default(1.45),
 })
 
-export const receiptContentSchema = z.object({
+const receiptContentBase = z.object({
   type: z.literal('receipt'),
   store: z.string().default('PAPERLAB'),
   address: z.string().default('124 PAPER ST'),
@@ -79,6 +79,23 @@ export const receiptContentSchema = z.object({
   timestamp: z.string().optional(),
   footer: z.string().default('KEEP FOR YOUR RECORDS'),
 })
+
+/** What can print on the reverse side (letter front / blank back, printed front / kraft back). */
+export const backContentSchema = z.discriminatedUnion('type', [
+  blankContentBase,
+  imageContentBase,
+  textContentBase,
+  receiptContentBase,
+])
+
+export type BackContentConfig = z.infer<typeof backContentSchema>
+
+const withBack = { back: backContentSchema.optional() }
+
+export const blankContentSchema = blankContentBase.extend(withBack)
+export const imageContentSchema = imageContentBase.extend(withBack)
+export const textContentSchema = textContentBase.extend(withBack)
+export const receiptContentSchema = receiptContentBase.extend(withBack)
 
 export const contentSchema = z.discriminatedUnion('type', [
   blankContentSchema,
@@ -120,6 +137,8 @@ export const surfaceSchema = z.object({
     .optional(),
   /** Yellowing + foxing spots, 0..1. */
   aging: z.number().min(0).max(1).optional(),
+  /** Reversed front-content ghost on the backside, 0..1. Stock defaults apply. */
+  showThrough: z.number().min(0).max(1).optional(),
 })
 
 export type SurfaceConfig = z.infer<typeof surfaceSchema>

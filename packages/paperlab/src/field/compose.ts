@@ -114,20 +114,31 @@ void main() {
 `
 }
 
-/** Field fragment shader: per-instance tile from the shared content atlas. */
+/**
+ * Field fragment shader: per-instance tile from the shared content atlas on
+ * the FRONT face; the BACK face renders the stock with an optional reversed
+ * show-through ghost (per-paper back textures are a hero-mode feature).
+ */
 export function buildFieldFragmentShader(): string {
   return /* glsl */ `
 uniform sampler2D uAtlas;
 uniform vec2 uAtlasGrid;
 uniform float uBackDarken;
+uniform vec3 uStockColor;
+uniform float uShowThrough;
 varying vec2 vPaperUv;
 varying float vAtlas;
 void main() {
   float col = mod(vAtlas, uAtlasGrid.x);
   float row = floor(vAtlas / uAtlasGrid.x);
   vec2 tiled = (vPaperUv + vec2(col, uAtlasGrid.y - 1.0 - row)) / uAtlasGrid;
-  csm_DiffuseColor = texture2D(uAtlas, tiled);
-  if (!gl_FrontFacing) csm_DiffuseColor.rgb *= uBackDarken;
+  vec4 front = texture2D(uAtlas, tiled);
+  if (gl_FrontFacing) {
+    csm_DiffuseColor = front;
+  } else {
+    csm_DiffuseColor = vec4(uStockColor * mix(vec3(1.0), front.rgb, uShowThrough), 1.0);
+    csm_DiffuseColor.rgb *= uBackDarken;
+  }
 }
 `
 }

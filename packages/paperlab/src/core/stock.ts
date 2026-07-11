@@ -19,6 +19,8 @@ export interface Stock {
   banding: number
   /** Surface effects this stock ships with; explicit surface config overrides per key. */
   defaultSurface: { grain?: number; aging?: number }
+  /** Reversed front-content ghost on the backside (thin stocks let ink show). */
+  showThrough: number
 }
 
 export const stocks: Record<StockName, Stock> = {
@@ -31,6 +33,7 @@ export const stocks: Record<StockName, Stock> = {
     inkColor: '#222222',
     banding: 0,
     defaultSurface: { grain: 0.12 },
+    showThrough: 0,
   },
   thermal: {
     id: 'thermal',
@@ -41,6 +44,7 @@ export const stocks: Record<StockName, Stock> = {
     inkColor: '#3a3a3a',
     banding: 0.35,
     defaultSurface: { aging: 0.1 },
+    showThrough: 0.06,
   },
   kraft: {
     id: 'kraft',
@@ -51,6 +55,7 @@ export const stocks: Record<StockName, Stock> = {
     inkColor: '#33261a',
     banding: 0,
     defaultSurface: { grain: 0.5 },
+    showThrough: 0,
   },
   newsprint: {
     id: 'newsprint',
@@ -61,6 +66,7 @@ export const stocks: Record<StockName, Stock> = {
     inkColor: '#3d3a34',
     banding: 0,
     defaultSurface: { grain: 0.7, aging: 0.15 },
+    showThrough: 0.06,
   },
   vellum: {
     id: 'vellum',
@@ -71,6 +77,7 @@ export const stocks: Record<StockName, Stock> = {
     inkColor: '#4a453d',
     banding: 0,
     defaultSurface: {},
+    showThrough: 0.55,
   },
   'photo-gloss': {
     id: 'photo-gloss',
@@ -81,6 +88,7 @@ export const stocks: Record<StockName, Stock> = {
     inkColor: '#111111',
     banding: 0,
     defaultSurface: {},
+    showThrough: 0,
   },
 }
 

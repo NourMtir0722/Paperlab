@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { useEffect, useState } from 'react'
-import type { ContentConfig, SheetConfig } from '../config/schema'
+import type { BackContentConfig, ContentConfig, SheetConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { paintReceipt } from './receipt'
 
@@ -83,7 +83,7 @@ function paintText(
  * HTMLImageElement passed in (the hook below handles loading).
  */
 export function renderContentToCanvas(
-  content: ContentConfig,
+  content: ContentConfig | BackContentConfig,
   sheet: SheetConfig,
   stock: Stock,
   image?: HTMLImageElement,
@@ -113,16 +113,21 @@ function makeTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
  * never per-frame. Waits for image decode / document.fonts.ready.
  */
 export function useContentTexture(
-  content: ContentConfig,
+  content: ContentConfig | BackContentConfig | undefined,
   sheet: SheetConfig,
   stock: Stock,
 ): THREE.CanvasTexture | null {
   const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null)
-  const key = JSON.stringify({ content, w: sheet.width, h: sheet.height, stock: stock.id })
+  const key = JSON.stringify({ content: content ?? null, w: sheet.width, h: sheet.height, stock: stock.id })
 
   useEffect(() => {
     let disposed = false
     let tex: THREE.CanvasTexture | null = null
+
+    if (!content) {
+      setTexture(null)
+      return
+    }
 
     const commit = (canvas: HTMLCanvasElement) => {
       if (disposed) return

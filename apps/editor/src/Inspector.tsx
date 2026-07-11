@@ -160,6 +160,14 @@ function surfaceControls(
       step: 0.01,
       onChange: changed((v: number) => setSurface({ aging: v })),
     },
+    showThrough: {
+      label: 'show-through',
+      value: surface.showThrough ?? stock.showThrough,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      onChange: changed((v: number) => setSurface({ showThrough: v })),
+    },
     deckle: {
       value: Boolean(surface.deckle),
       onChange: changed((v: boolean) =>

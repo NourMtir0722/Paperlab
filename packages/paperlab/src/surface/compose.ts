@@ -18,6 +18,12 @@ export interface ComposedSurface {
   alphaTest: number
 }
 
+/** Which content textures exist — part of the shader structure. */
+export interface SurfaceMaps {
+  hasFrontMap: boolean
+  hasBackMap: boolean
+}
+
 const VERTEX = /* glsl */ `
 varying vec2 vPaperUv;
 void main() {
@@ -144,24 +150,37 @@ void plAging(inout vec4 color) {
 }
 `
 
-/** Compose the enabled effects (+ underside darkening) into one program. */
+/**
+ * Compose the enabled effects into one program. The shader owns the base
+ * color entirely: the FRONT face samples the content texture, the BACK face
+ * renders the stock (or content.back) with an optional reversed show-through
+ * ghost — a single DoubleSide map would mirror the front content onto the
+ * back, which real paper doesn't do.
+ */
 export function composeSurface(
   surface: SurfaceConfig,
   stock: Stock,
   thickness: number,
+  maps: SurfaceMaps = { hasFrontMap: false, hasBackMap: false },
 ): ComposedSurface {
   const grain = surface.grain ?? stock.defaultSurface.grain
   const aging = surface.aging ?? stock.defaultSurface.aging
   const deckle = surface.deckle
   const creases = surface.creaseLines
   const banding = stock.banding
+  const showThrough = surface.showThrough ?? stock.showThrough
 
   const chunks: string[] = []
   const calls: string[] = []
   const uniforms: Record<string, { value: unknown }> = {
     // Backside darkening: thicker/opaque stock lets less light through.
     uBackDarken: { value: 1 - Math.min(0.45, 0.12 + thickness * 0.9) * stock.opacity },
+    uStockColor: { value: new THREE.Color(stock.color) },
+    uOpacity: { value: stock.opacity },
+    uShowThrough: { value: showThrough },
   }
+  if (maps.hasFrontMap) uniforms.uFrontMap = { value: null }
+  if (maps.hasBackMap) uniforms.uBackMap = { value: null }
 
   if (grain !== undefined || banding > 0) {
     chunks.push(GRAIN_CHUNK)
@@ -189,22 +208,41 @@ export function composeSurface(
     uniforms.uAgingAmount = { value: aging }
   }
 
+  const frontExpr = maps.hasFrontMap ? 'texture2D(uFrontMap, vPaperUv).rgb' : 'uStockColor'
+  // The back reads correctly when the sheet is flipped → mirror x.
+  const backBaseExpr = maps.hasBackMap
+    ? 'texture2D(uBackMap, vec2(1.0 - vPaperUv.x, vPaperUv.y)).rgb'
+    : 'uStockColor'
+
   const fragmentShader = /* glsl */ `
 ${HELPERS}
+uniform vec3 uStockColor;
+uniform float uOpacity;
+uniform float uShowThrough;
+${maps.hasFrontMap ? 'uniform sampler2D uFrontMap;' : ''}
+${maps.hasBackMap ? 'uniform sampler2D uBackMap;' : ''}
 ${chunks.join('\n')}
 void main() {
+  vec3 front = ${frontExpr};
+  if (gl_FrontFacing) {
+    csm_DiffuseColor = vec4(front, uOpacity);
+  } else {
+    vec3 backBase = ${backBaseExpr};
+    csm_DiffuseColor = vec4(backBase * mix(vec3(1.0), front, uShowThrough), uOpacity);
+  }
   ${calls.join('\n  ')}
   if (!gl_FrontFacing) csm_DiffuseColor.rgb *= uBackDarken;
 }
 `
 
   return {
-    structureKey: [
-      grain !== undefined || banding > 0 ? 'g' : '',
-      deckle ? 'd' : '',
-      creases ? 'c' : '',
-      aging !== undefined ? 'a' : '',
-    ].join(''),
+    structureKey:
+      [
+        grain !== undefined || banding > 0 ? 'g' : '',
+        deckle ? 'd' : '',
+        creases ? 'c' : '',
+        aging !== undefined ? 'a' : '',
+      ].join('') + `:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}`,
     vertexShader: VERTEX,
     fragmentShader,
     uniforms,

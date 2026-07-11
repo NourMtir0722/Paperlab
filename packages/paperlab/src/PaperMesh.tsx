@@ -176,6 +176,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
 
   const stock = getStock(config.stock)
   const texture = useContentTexture(config.content, config.sheet, stock)
+  const backTexture = useContentTexture(config.content.back, config.sheet, stock)
 
   const effectiveOptions = (t: number): Record<string, unknown> | null => {
     const cfg = configRef.current
@@ -398,6 +399,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         <PaperMaterial
           stock={stock}
           texture={texture}
+          backTexture={backTexture}
           surface={config.surface}
           thickness={config.sheet.thickness}
         />
