@@ -4,6 +4,7 @@ export {
   PaperFieldMesh,
   groupFieldPapers,
   resolveFieldSlotConfig,
+  fieldKeyboardStep,
   DropZone,
   DropZoneRegistry,
   zoneAccepts,
@@ -15,6 +16,8 @@ export {
   type DropZoneProps,
   type PlacedPaper,
   type FieldA11yController,
+  type KeyboardCarry,
+  type KeyboardStepResult,
 } from './PaperField'
 export { PaperMesh, resolveConfig, type PaperMeshProps, type PaperHandle } from './PaperMesh'
 

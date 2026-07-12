@@ -1231,10 +1231,68 @@ const mirrorHidden: React.CSSProperties = {
   border: 0,
 }
 
+/** Carry state of the hidden keyboard mirror: which paper is aloft, which zone is focused. */
+export interface KeyboardCarry {
+  slot: number
+  zoneIndex: number
+}
+
+/** A keyboard step's decision: the next carry state and whether it consumed the key. */
+export interface KeyboardStepResult {
+  carry: KeyboardCarry | null
+  handled: boolean
+}
+
+/**
+ * The M6 §6 keyboard flow as a pure step (so it's testable without a DOM):
+ * given the current carry state, the focused paper `slot`, and the pressed
+ * `key`, it drives the field `controller` (pick → move between zones → place /
+ * cancel) and returns the next carry state. All side effects go through
+ * `controller`; the caller applies `carry` to its state and calls
+ * `preventDefault()` when `handled` is true.
+ */
+export function fieldKeyboardStep(
+  carry: KeyboardCarry | null,
+  slot: number,
+  key: string,
+  controller: FieldA11yController,
+): KeyboardStepResult {
+  if (!carry) {
+    // Not carrying: Enter/Space on a focused paper picks it up.
+    if (key === 'Enter' || key === ' ') {
+      return { carry: controller.pick(slot) ? { slot, zoneIndex: 0 } : null, handled: true }
+    }
+    return { carry, handled: false }
+  }
+  // Carrying: only the paper actually aloft responds.
+  if (carry.slot !== slot) return { carry, handled: false }
+  const zoneCount = Math.max(controller.zoneIds().length, 1)
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    return { carry: { ...carry, zoneIndex: (carry.zoneIndex + 1) % zoneCount }, handled: true }
+  }
+  if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    return {
+      carry: { ...carry, zoneIndex: (carry.zoneIndex - 1 + zoneCount) % zoneCount },
+      handled: true,
+    }
+  }
+  if (key === 'Enter' || key === ' ') {
+    const zone = controller.zoneIds()[carry.zoneIndex]
+    if (zone) controller.placeAtZone(slot, zone)
+    return { carry: null, handled: true }
+  }
+  if (key === 'Escape') {
+    controller.cancel(slot)
+    return { carry: null, handled: true }
+  }
+  return { carry, handled: false }
+}
+
 /**
  * The hidden DOM mirror of an interactive field: each paper is a button.
  * Keyboard flow — focus a paper, Enter picks it, arrow keys move between
- * zones, Enter places, Escape returns it to its slot (spec M6 §6).
+ * zones, Enter places, Escape returns it to its slot (spec M6 §6). The key
+ * handling lives in the pure {@link fieldKeyboardStep} so it can be tested.
  */
 function FieldKeyboardMirror({
   papers,
@@ -1257,34 +1315,9 @@ function FieldKeyboardMirror({
   const onKeyDown = (i: number) => (e: React.KeyboardEvent) => {
     const ctl = controller.current
     if (!ctl) return
-    if (!carrying) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        if (ctl.pick(i)) setCarrying({ slot: i, zoneIndex: 0 })
-      }
-      return
-    }
-    if (carrying.slot !== i) return
-    const zones = ctl.zoneIds()
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault()
-      setCarrying({ ...carrying, zoneIndex: (carrying.zoneIndex + 1) % Math.max(zones.length, 1) })
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault()
-      setCarrying({
-        ...carrying,
-        zoneIndex: (carrying.zoneIndex - 1 + Math.max(zones.length, 1)) % Math.max(zones.length, 1),
-      })
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      const zone = zones[carrying.zoneIndex]
-      if (zone) ctl.placeAtZone(i, zone)
-      setCarrying(null)
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      ctl.cancel(i)
-      setCarrying(null)
-    }
+    const { carry, handled } = fieldKeyboardStep(carrying, i, e.key, ctl)
+    if (handled) e.preventDefault()
+    if (carry !== carrying) setCarrying(carry)
   }
 
   return (
