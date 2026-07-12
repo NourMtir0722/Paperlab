@@ -69,7 +69,7 @@ A Figma-shaped editor: presets on the left, sculpt on canvas (drag the blue hand
 | [`docs/llms.txt`](docs/llms.txt) | the agent-readable API reference |
 
 ```sh
-pnpm test           # 95 unit tests — deformer math, schema, cloth, layouts, exports
+pnpm test           # unit suite — deformer math, schema, cloth, layouts, exports
 pnpm test:parity    # GPU golden-vector gate: every deformer's GLSL twin vs its JS twin
 pnpm build
 ```

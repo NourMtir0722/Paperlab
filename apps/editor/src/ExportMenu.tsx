@@ -44,12 +44,15 @@ export function ExportMenu({
 
   const copy = (label: string, text: string) => {
     navigator.clipboard.writeText(text)
+    // Confirm in place — the menu stays open and the copied row flips to a
+    // "Copied ✓" badge, rather than the whole menu collapsing out from under
+    // the pointer.
     setCopied(label)
-    setTimeout(() => {
-      setCopied(null)
-      setOpen(false)
-    }, 900)
+    setTimeout(() => setCopied((c) => (c === label ? null : c)), 1600)
   }
+
+  const badge = (label: string) =>
+    copied === label ? <span className="copied-badge">Copied ✓</span> : null
 
   const fieldJson = () => {
     const input = fieldInput()
@@ -69,41 +72,57 @@ export function ExportMenu({
   return (
     <div className="export-menu" ref={rootRef}>
       <button className="export" onClick={() => setOpen((v) => !v)}>
-        {copied ? `${copied} copied ✓` : 'Export code'}
+        Export code
       </button>
-      {open && !copied && (
+      {open && (
         <div className="export-dropdown">
           {mode === 'paper' ? (
             <>
-              <button onClick={() => copy('AI brief', buildAgentPayload(currentPaper()))}>
+              <button
+                className="export-primary"
+                onClick={() => copy('AI brief', buildAgentPayload(currentPaper()))}
+              >
                 <strong>Copy for AI</strong>
                 <span>paste into Claude Code &amp; say where it goes</span>
+                {badge('AI brief')}
               </button>
-              <button onClick={() => copy('JSX', buildJsxSnippet(currentPaper()))}>
-                <strong>Copy JSX</strong>
-                <span>&lt;Paper /&gt; with non-default props</span>
-              </button>
-              <button
-                onClick={() => copy('.paper JSON', JSON.stringify(diffConfig(currentPaper()), null, 2))}
-              >
-                <strong>Copy .paper JSON</strong>
-                <span>the diffed preset file</span>
-              </button>
+              <div className="export-secondary">
+                <button onClick={() => copy('JSX', buildJsxSnippet(currentPaper()))}>
+                  <strong>Copy JSX</strong>
+                  <span>&lt;Paper /&gt; with non-default props</span>
+                  {badge('JSX')}
+                </button>
+                <button
+                  onClick={() => copy('.paper JSON', JSON.stringify(diffConfig(currentPaper()), null, 2))}
+                >
+                  <strong>Copy .paper JSON</strong>
+                  <span>the diffed preset file</span>
+                  {badge('.paper JSON')}
+                </button>
+              </div>
             </>
           ) : (
             <>
-              <button onClick={() => copy('AI brief', buildFieldAgentPayload(fieldInput()))}>
+              <button
+                className="export-primary"
+                onClick={() => copy('AI brief', buildFieldAgentPayload(fieldInput()))}
+              >
                 <strong>Copy for AI</strong>
                 <span>gallery brief — all presets inlined</span>
+                {badge('AI brief')}
               </button>
-              <button onClick={() => copy('JSX', buildFieldComponentSource(fieldInput()))}>
-                <strong>Copy component</strong>
-                <span>&lt;PaperField /&gt; with inlined preset consts</span>
-              </button>
-              <button onClick={() => copy('.field JSON', fieldJson())}>
-                <strong>Copy .field JSON</strong>
-                <span>layout + motion + diffed papers</span>
-              </button>
+              <div className="export-secondary">
+                <button onClick={() => copy('JSX', buildFieldComponentSource(fieldInput()))}>
+                  <strong>Copy component</strong>
+                  <span>&lt;PaperField /&gt; with inlined preset consts</span>
+                  {badge('JSX')}
+                </button>
+                <button onClick={() => copy('.field JSON', fieldJson())}>
+                  <strong>Copy .field JSON</strong>
+                  <span>layout + motion + diffed papers</span>
+                  {badge('.field JSON')}
+                </button>
+              </div>
             </>
           )}
         </div>

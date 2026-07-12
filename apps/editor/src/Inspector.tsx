@@ -60,40 +60,51 @@ export function Inspector() {
       },
       ...behaviorFields,
     }),
-    Sheet: folder({
-      width: {
-        value: config.sheet.width,
-        min: 0.2,
-        max: 4,
-        step: 0.05,
-        onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { width: v } }),
+    // Behavior stays open (the primary sculpt); the rest collapse so the bar
+    // reads as a summary you expand into, not a wall of controls.
+    Sheet: folder(
+      {
+        width: {
+          value: config.sheet.width,
+          min: 0.2,
+          max: 4,
+          step: 0.05,
+          onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { width: v } }),
+        },
+        height: {
+          value: config.sheet.height,
+          min: 0.2,
+          max: 4,
+          step: 0.05,
+          onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { height: v } }),
+        },
       },
-      height: {
-        value: config.sheet.height,
-        min: 0.2,
-        max: 4,
-        step: 0.05,
-        onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { height: v } }),
+      { collapsed: true },
+    ),
+    Stock: folder(
+      {
+        stock: {
+          value: config.stock,
+          options: [...stockNames],
+          onChange: (v: StockName, _, ctx) => ctx.initial || patchConfig({ stock: v }),
+        },
       },
-    }),
-    Stock: folder({
-      stock: {
-        value: config.stock,
-        options: [...stockNames],
-        onChange: (v: StockName, _, ctx) => ctx.initial || patchConfig({ stock: v }),
+      { collapsed: true },
+    ),
+    Content: folder(contentControls(config.content, patchConfig), { collapsed: true }),
+    Surface: folder(surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
+    Physics: folder(physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
+    Scene: folder(
+      {
+        lighting: {
+          value: config.scene.lighting,
+          options: [...lightingNames],
+          onChange: (v: string, _, ctx) =>
+            ctx.initial || patchConfig({ scene: { lighting: v as never } }),
+        },
       },
-    }),
-    Content: folder(contentControls(config.content, patchConfig)),
-    Surface: folder(surfaceControls(config.surface, config.stock, setSurface)),
-    Physics: folder(physicsControls(config.physics, setPhysics, patchCloth)),
-    Scene: folder({
-      lighting: {
-        value: config.scene.lighting,
-        options: [...lightingNames],
-        onChange: (v: string, _, ctx) =>
-          ctx.initial || patchConfig({ scene: { lighting: v as never } }),
-      },
-    }),
+      { collapsed: true },
+    ),
   }, { store })
 
   return <LevaPanel store={store} fill flat titleBar={false} />
