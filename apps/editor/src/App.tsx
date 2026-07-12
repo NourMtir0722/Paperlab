@@ -124,7 +124,11 @@ export function App() {
             onClick={() => {
               const name = prompt('Save preset as', config.meta.name === 'untitled' ? '' : config.meta.name)
               if (!name) return
-              const snapshot = paperRef.current?.snapshot() ?? config
+              // While a state chip / preview is live the canvas paper holds a
+              // derived view — saving from it would bake that state into the
+              // base and lose the machine. The preset is the store's base.
+              const snapshot =
+                editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
               const error = savePreset(name, snapshot, captureThumbnail())
               if (error) alert(error)
             }}
