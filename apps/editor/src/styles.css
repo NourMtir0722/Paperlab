@@ -241,6 +241,28 @@ h2 .row-action {
   font-size: 12px;
 }
 
+.preset-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preset-select {
+  flex: 1;
+  background: #26272b;
+  color: #e6e4df;
+  border: 1px solid #2a2b2f;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.preset-select:focus {
+  outline: none;
+  border-color: #4f7cff;
+}
+
 .slot-edit {
   background: transparent;
   border: 0;
@@ -306,6 +328,40 @@ button.export:hover {
   font-size: 11px;
 }
 
+/* "Copy for AI" is the hero path — promote it over the secondary two. */
+.export-dropdown .export-primary {
+  position: relative;
+  background: #2e3a5c;
+  border-bottom: 1px solid #3a3b40;
+}
+
+.export-dropdown .export-primary strong {
+  color: #cdd8ff;
+}
+
+.export-dropdown .export-primary:hover {
+  background: #37436a;
+}
+
+.export-dropdown .export-secondary button {
+  position: relative;
+}
+
+.export-dropdown .export-secondary strong {
+  font-weight: 500;
+  color: #c9c7c2;
+}
+
+.copied-badge {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: #9fe4cd !important;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .left {
   grid-area: left;
   background: #1a1b1e;
@@ -326,8 +382,7 @@ button.export:hover {
   margin-top: 0;
 }
 
-.presets,
-.layers {
+.presets {
   list-style: none;
   padding: 0;
 }
@@ -351,16 +406,6 @@ button.export:hover {
 .presets button.active {
   background: #2e3a5c;
   color: #fff;
-}
-
-.layers li {
-  padding: 6px 10px;
-  color: #c9c7c2;
-  border-radius: 6px;
-}
-
-.layers li.dim {
-  color: #55554f;
 }
 
 .viewport {
@@ -525,4 +570,277 @@ button.export:hover {
 .slot-row.selected {
   background: #2e3a5c;
   border-radius: 6px;
+}
+
+/* --- In-app dialogs (replace native prompt/confirm) --- */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 7, 9, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: #222327;
+  border: 1px solid #3a3b40;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+
+.dialog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2f0ec;
+}
+
+.dialog-message {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #a9a8a4;
+  line-height: 1.5;
+}
+
+.dialog-input {
+  width: 100%;
+  margin-top: 14px;
+  padding: 8px 10px;
+  background: #17181b;
+  border: 1px solid #3a3b40;
+  border-radius: 6px;
+  color: #e6e4df;
+  font-size: 13px;
+}
+
+.dialog-input:focus {
+  outline: none;
+  border-color: #4f7cff;
+}
+
+.dialog-input.invalid {
+  border-color: #ff6b6b;
+}
+
+.dialog-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #ff6b6b;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.dialog-btn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #3a3b40;
+  background: #26272b;
+  color: #e6e4df;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dialog-btn:hover {
+  background: #33343a;
+}
+
+.dialog-btn.primary {
+  background: #4f7cff;
+  border-color: #4f7cff;
+  color: #fff;
+  font-weight: 600;
+}
+
+.dialog-btn.primary:hover {
+  background: #6089ff;
+}
+
+.dialog-btn.primary.danger {
+  background: #d84a4a;
+  border-color: #d84a4a;
+}
+
+.dialog-btn.primary.danger:hover {
+  background: #e35c5c;
+}
+
+/* --- Toasts --- */
+.toaster {
+  position: fixed;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  border: 1px solid #3a3b40;
+  border-radius: 8px;
+  background: #26272b;
+  color: #e6e4df;
+  padding: 9px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: toast-in 0.16s ease-out;
+}
+
+.toast.error {
+  border-color: #ff6b6b;
+  color: #ffb0b0;
+}
+
+.toast.success {
+  border-color: #5cc4a0;
+  color: #9fe4cd;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* --- Paper-editor onboarding guide --- */
+.viewport-guide {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 20;
+  width: 260px;
+  background: rgba(30, 31, 35, 0.92);
+  border: 1px solid #3a3b40;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  animation: toast-in 0.18s ease-out;
+}
+
+.guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.guide-head strong {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #f2f0ec;
+}
+
+.guide-close {
+  background: transparent;
+  border: 0;
+  color: #8b8a86;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.guide-close:hover {
+  color: #fff;
+}
+
+.guide-steps {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #c9c7c2;
+}
+
+.guide-steps b {
+  color: #e6e4df;
+  font-weight: 600;
+}
+
+.guide-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #4f7cff;
+  box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.25);
+}
+
+.guide-dot.cloth {
+  background: #5cc4a0;
+  box-shadow: 0 0 0 3px rgba(92, 196, 160, 0.25);
+}
+
+.guide-key {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid #3a3b40;
+  border-radius: 4px;
+  background: #26272b;
+  color: #e6e4df;
+  font-size: 11px;
+}
+
+.guide-got-it {
+  margin-top: 12px;
+  width: 100%;
+  padding: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: #4f7cff;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.guide-got-it:hover {
+  background: #6089ff;
+}
+
+.guide-toggle {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 20;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #3a3b40;
+  background: rgba(30, 31, 35, 0.85);
+  color: #c9c7c2;
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.guide-toggle:hover {
+  color: #fff;
+  border-color: #4f7cff;
 }

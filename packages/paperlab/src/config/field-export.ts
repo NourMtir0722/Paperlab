@@ -185,7 +185,9 @@ export function buildFieldComponentSource(input: FieldExportInput): string {
         id="${zone.id}"${accept}
         bounds={${JSON.stringify(zone.bounds)}}${highlight}
         onPlace={(paper, zone) => {
-          // A paper settled on "${zone.id}" — stamp a postmark, advance the flow, …
+          // First-run smoke test — you should see this in the console on drop:
+          console.log(paper.presetName, '→', zone.id)
+          // Then replace it: stamp a postmark, advance the flow, persist the placement, …
         }}
       />`
     })

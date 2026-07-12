@@ -109,6 +109,8 @@ describe('field export', () => {
     expect(src).toContain('id="envelope"')
     expect(src).toContain('accept={["postage-*"]}')
     expect(src).toContain('onPlace={(paper, zone) => {')
+    // The stub is a working smoke test, not a dead comment — a first drop logs.
+    expect(src).toContain("console.log(paper.presetName, '→', zone.id)")
 
     const line = describeFieldConfig(stampSheet)
     expect(line).toContain('a 2×5 sheet of papers on a shared backing')

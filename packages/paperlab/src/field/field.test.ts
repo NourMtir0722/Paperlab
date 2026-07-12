@@ -37,11 +37,13 @@ describe('layouts', () => {
     }
   })
 
-  it('ring: sheets sit on the radius facing the center', () => {
+  it('ring: sheets sit on the radius facing outward (front toward the viewer)', () => {
     const ring = getLayout('ring')
     const pose = ring.pose(0, 8, { radius: 3, tiltDeg: 0 }, 0)
     expect(Math.hypot(pose.position[0], pose.position[2])).toBeCloseTo(3)
-    expect(pose.rotation[1]).toBeCloseTo(Math.PI)
+    // i=0 sits on +Z nearest the camera; facing outward means no Y-spin, so its
+    // front (+Z) points at the viewer rather than into the ring.
+    expect(pose.rotation[1]).toBeCloseTo(0)
   })
 
   it('ring: phase rotates the whole ring, one turn wraps', () => {

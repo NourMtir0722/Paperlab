@@ -6,6 +6,7 @@ import {
   PaperLighting,
   PaperMesh,
   getPreset,
+  isBuiltinPreset,
   listPresets,
   resolveStateConfig,
   type ContentConfig,
@@ -19,20 +20,11 @@ import { StatesBar } from './StatesBar'
 import { Transport } from './Transport'
 import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
+import { ViewportGuide } from './ViewportGuide'
 import { captureThumbnail } from './userPresets'
+import { DEMO_IMAGES } from './demoAssets'
+import { UIHost, promptDialog, toast } from './ui'
 import { useEditor, zoneToConfig } from './store'
-
-/** Demo pool for the Field Composer; the count slider cycles through them. */
-const FIELD_IMAGES = [
-  'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&q=80',
-  'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80',
-  'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80',
-  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
-  'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=80',
-  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80',
-  'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&q=80',
-  'https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=800&q=80',
-]
 
 export function App() {
   const presetName = useEditor((s) => s.presetName)
@@ -59,11 +51,10 @@ export function App() {
   // Presets are components: the field renders the live edit of its preset.
   const resolvePresetByName = (name: string): PaperConfig =>
     name === presetName ? config : getPreset(name)
-  const slotContent = (i: number): ContentConfig => ({
-    type: 'image',
-    src: FIELD_IMAGES[i % FIELD_IMAGES.length]!,
-    fit: 'cover',
-  })
+  const slotContent = (i: number): ContentConfig =>
+    DEMO_IMAGES.length === 0
+      ? { type: 'blank' }
+      : { type: 'image', src: DEMO_IMAGES[i % DEMO_IMAGES.length]!, fit: 'cover' }
   const fieldPapers = field.slots.map((name, i) => {
     const preset = resolvePresetByName(name)
     return {
@@ -87,7 +78,9 @@ export function App() {
     papers: field.slots.map((name, i) => ({
       presetName: name,
       preset: resolvePresetByName(name),
-      content: fieldPapers[i]!.content,
+      // NB: the demo image pool (slotContent) is a PREVIEW-only fill — never
+      // exported. Each slot's real content already lives inside its preset, so
+      // exports carry the preset's own art, not the editor's stock photos.
       states: field.slotStates[i],
     })),
     zones: fieldZones,
@@ -122,15 +115,29 @@ export function App() {
           <button
             className="save-preset"
             onClick={() => {
-              const name = prompt('Save preset as', config.meta.name === 'untitled' ? '' : config.meta.name)
-              if (!name) return
-              // While a state chip / preview is live the canvas paper holds a
-              // derived view — saving from it would bake that state into the
-              // base and lose the machine. The preset is the store's base.
-              const snapshot =
-                editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-              const error = savePreset(name, snapshot, captureThumbnail())
-              if (error) alert(error)
+              void (async () => {
+                const name = await promptDialog({
+                  title: 'Save preset as',
+                  defaultValue: config.meta.name === 'untitled' ? '' : config.meta.name,
+                  placeholder: 'preset name',
+                  confirmLabel: 'Save',
+                  validate: (v) =>
+                    !v
+                      ? 'Preset needs a name.'
+                      : isBuiltinPreset(v)
+                        ? `"${v}" is a built-in — pick another name.`
+                        : null,
+                })
+                if (!name) return
+                // While a state chip / preview is live the canvas paper holds a
+                // derived view — saving from it would bake that state into the
+                // base and lose the machine. The preset is the store's base.
+                const snapshot =
+                  editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
+                const error = savePreset(name, snapshot, captureThumbnail())
+                if (error) toast(error, 'error')
+                else toast(`Saved "${name}"`, 'success')
+              })()
             }}
           >
             Save preset
@@ -141,16 +148,7 @@ export function App() {
 
       <aside className="left">
         {mode === 'paper' ? (
-          <>
-            <PresetPanel />
-            <h2>Layers</h2>
-            <ul className="layers">
-              <li>Sheet</li>
-              <li>Content</li>
-              <li>Behavior</li>
-              <li>Physics</li>
-            </ul>
-          </>
+          <PresetPanel />
         ) : (
           <>
             <h2>Papers</h2>
@@ -176,6 +174,7 @@ export function App() {
                   <button
                     className="slot-edit"
                     title={`Edit ${name}`}
+                    aria-label={`Edit ${name}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       editFieldPaper(name)
@@ -241,8 +240,9 @@ export function App() {
             />
           )}
           <OrbitControls makeDefault enableDamping />
-          <Stats className="stats" />
+          {import.meta.env.DEV && <Stats className="stats" />}
         </Canvas>
+        {mode === 'paper' && <ViewportGuide />}
       </main>
 
       <aside className="right">
@@ -263,6 +263,7 @@ export function App() {
           </span>
         </footer>
       )}
+      <UIHost />
     </div>
   )
 }

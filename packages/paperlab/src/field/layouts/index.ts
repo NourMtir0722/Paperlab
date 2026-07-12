@@ -44,7 +44,9 @@ export const ring: Layout<z.infer<typeof ringSchema>> = {
     const theta = (i / n + phase) * TAU
     return {
       position: [Math.sin(theta) * o.radius, 0, Math.cos(theta) * o.radius],
-      rotation: [(o.tiltDeg * Math.PI) / 180, theta + Math.PI, 0],
+      // Face radially OUTWARD so the papers nearest the camera show their
+      // front (content) side — you stand outside the ring, not inside it.
+      rotation: [(o.tiltDeg * Math.PI) / 180, theta, 0],
       scale: 1,
     }
   },
@@ -106,7 +108,8 @@ export const helix: Layout<z.infer<typeof helixSchema>> = {
     const theta = (f * o.turns + phase) * TAU
     return {
       position: [Math.sin(theta) * o.radius, (f - 0.5) * o.height, Math.cos(theta) * o.radius],
-      rotation: [0, theta + Math.PI, 0],
+      // Outward-facing, same as the ring — fronts toward the viewer outside.
+      rotation: [0, theta, 0],
       scale: 1,
     }
   },

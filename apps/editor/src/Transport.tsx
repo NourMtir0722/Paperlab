@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import type { PaperHandle } from 'paperlab'
+import { getBehavior, type PaperHandle } from 'paperlab'
 import { useEditor } from './store'
+
+/** The gesture a draggable-handle behavior teaches, keyed by behavior id. */
+const GESTURE: Record<string, string> = {
+  unroll: 'to unroll it',
+  peel: 'to peel the corner',
+  flip: 'to flip it over',
+  'letter-fold': 'to fold the flaps',
+}
 
 interface TransportProps {
   paperRef: RefObject<PaperHandle | null>
@@ -16,9 +24,21 @@ interface TransportProps {
  * parametric loops.
  */
 export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
-  const hasBehavior = useEditor((s) => Boolean(s.config.behavior))
+  const behaviorType = useEditor((s) => s.config.behavior?.type ?? null)
+  const hasBehavior = Boolean(behaviorType)
   const isCloth = useEditor((s) => typeof s.config.physics === 'object')
   const patchConfig = useEditor((s) => s.patchConfig)
+
+  // Name the actual gesture instead of a generic "drag the handle" line.
+  const behavior = behaviorType ? getBehavior(behaviorType) : null
+  const hasHandles = Boolean(behavior?.handles?.length)
+  const hint = isCloth
+    ? 'Cloth simulation — grab the sheet and drag to pull it.'
+    : !behavior
+      ? 'No behavior yet — pick one in the Behavior panel to bring this paper to life.'
+      : hasHandles
+        ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'} — or press Space to autoplay.`
+        : `Space plays/pauses the ${behavior.label.toLowerCase()} · drag the timeline below to pose it by hand.`
   const [playing, setPlaying] = useState(true)
   const scrubbingRef = useRef(false)
 
@@ -79,13 +99,7 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
           patchConfig({ behavior: { progress: v } as never }, { external: true })
         }}
       />
-      <span className="transport-hint">
-        {isCloth
-          ? 'cloth simulation — grab the sheet and pull'
-          : hasBehavior
-            ? 'space to play/pause · drag the blue handle on the paper'
-            : 'no behavior'}
-      </span>
+      <span className="transport-hint">{hint}</span>
     </footer>
   )
 }

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { LevaPanel, button, folder, useControls, useCreateStore } from 'leva'
 import { getLayout, listLayouts, listPresets } from 'paperlab'
 import { schemaControls } from './zodLeva'
@@ -18,9 +19,17 @@ export function FieldInspector() {
   const patchZone = useEditor((s) => s.patchZone)
   const removeZone = useEditor((s) => s.removeZone)
   const store = useCreateStore()
+  // The "replace all" select only stages a target; the button applies it. This
+  // keeps a blast-radius action (overwrites every per-slot preset choice) off a
+  // stray drag of the dropdown — it's a deliberate click, not an on-change.
+  const replaceTarget = useRef(field.slots[0] ?? 'photo-print')
 
   const layout = getLayout(field.layout)
   const layoutValues = { ...layout.defaults, ...field.layoutOptions } as Record<string, unknown>
+  // A stamp sheet owns its own population (rows × columns) and is static +
+  // interactive by design — so the free-count slider and the whole Motion
+  // folder don't apply. Omit them rather than show levers the mode ignores.
+  const isSheet = field.layout === 'sheet'
 
   useControls(
     {
@@ -35,50 +44,81 @@ export function FieldInspector() {
         ...schemaControls(layout.optionsSchema, layoutValues, (key, value) =>
           patchField({ layoutOptions: { ...field.layoutOptions, [key]: value } }),
         ),
-        papers: {
-          value: field.count,
-          min: 2,
-          max: 80,
-          step: 1,
-          onChange: (v: number, _, ctx) => ctx.initial || patchField({ count: v }),
-        },
+        ...(isSheet
+          ? {
+              // The count is derived (rows × columns) and motion is disabled, so
+              // both levers are gone — leave one line explaining why.
+              sheetNote: {
+                value: 'static sheet — rows × columns set the count; interaction states drive motion',
+                editable: false,
+                label: 'ⓘ',
+              },
+            }
+          : {
+              papers: {
+                value: field.count,
+                min: 2,
+                max: 80,
+                step: 1,
+                onChange: (v: number, _: unknown, ctx: { initial: boolean }) =>
+                  ctx.initial || patchField({ count: v }),
+              },
+            }),
       }),
-      Motion: folder({
-        driver: {
-          value: field.driver,
-          options: ['autoplay', 'drag', 'none'],
-          onChange: (v: 'autoplay' | 'drag' | 'none', _, ctx) =>
-            ctx.initial || patchField({ driver: v }),
+      ...(isSheet
+        ? {}
+        : {
+            Motion: folder(
+              {
+                driver: {
+                  value: field.driver,
+                  options: ['autoplay', 'drag', 'none'],
+                  onChange: (v: 'autoplay' | 'drag' | 'none', _: unknown, ctx: { initial: boolean }) =>
+                    ctx.initial || patchField({ driver: v }),
+                },
+                speed: {
+                  value: field.speed,
+                  min: 0,
+                  max: 2,
+                  step: 0.01,
+                  onChange: (v: number, _: unknown, ctx: { initial: boolean }) =>
+                    ctx.initial || patchField({ speed: v }),
+                },
+                entrance: {
+                  value: field.entrance,
+                  options: ['rise', 'scatter', 'none'],
+                  onChange: (v: 'rise' | 'scatter' | 'none', _: unknown, ctx: { initial: boolean }) =>
+                    ctx.initial || patchField({ entrance: v }),
+                },
+              },
+              { collapsed: true },
+            ),
+          }),
+      Paper: folder(
+        {
+          replaceWith: {
+            label: 'replace all with',
+            value: replaceTarget.current,
+            options: listPresets(),
+            // Staging only — no slot is touched until the button below is clicked.
+            onChange: (v: string) => {
+              replaceTarget.current = v
+            },
+          },
+          'Replace all →': button(() => setAllSlots(replaceTarget.current)),
         },
-        speed: {
-          value: field.speed,
-          min: 0,
-          max: 2,
-          step: 0.01,
-          onChange: (v: number, _, ctx) => ctx.initial || patchField({ speed: v }),
+        { collapsed: true },
+      ),
+      'Drop zones': folder(
+        {
+          addZone: button(() => addZone()),
+          ...field.zones.reduce<LevaSchema>(
+            (acc, zone, i) => Object.assign(acc, zoneControls(zone, i, patchZone, removeZone)),
+            {},
+          ),
         },
-        entrance: {
-          value: field.entrance,
-          options: ['rise', 'scatter', 'none'],
-          onChange: (v: 'rise' | 'scatter' | 'none', _, ctx) =>
-            ctx.initial || patchField({ entrance: v }),
-        },
-      }),
-      Paper: folder({
-        setAll: {
-          label: 'set all to',
-          value: field.slots[0] ?? 'photo-print',
-          options: listPresets(),
-          onChange: (v: string, _, ctx) => ctx.initial || setAllSlots(v),
-        },
-      }),
-      'Drop zones': folder({
-        addZone: button(() => addZone()),
-        ...field.zones.reduce<LevaSchema>(
-          (acc, zone, i) => Object.assign(acc, zoneControls(zone, i, patchZone, removeZone)),
-          {},
-        ),
-      }),
+        { collapsed: true },
+      ),
     },
     { store },
   )

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { isBuiltinPreset, listPresets, parsePreset } from 'paperlab'
 import { useEditor } from './store'
 import { downloadPreset } from './userPresets'
+import { confirmDialog, promptDialog, toast } from './ui'
 
 /**
  * The preset library: built-ins (duplicate to fork) and user presets
@@ -26,15 +27,36 @@ export function PresetPanel() {
   const importFiles = async (files: FileList | null) => {
     for (const file of files ?? []) {
       const error = importPreset(await file.text())
-      if (error) alert(error)
+      if (error) toast(error, 'error')
+      else toast(`Imported ${file.name}`, 'success')
     }
   }
 
-  const rename = (name: string) => {
-    const next = prompt('Rename preset', name)
-    if (!next) return
+  const rename = async (name: string) => {
+    const next = await promptDialog({
+      title: 'Rename preset',
+      defaultValue: name,
+      confirmLabel: 'Rename',
+      validate: (v) =>
+        !v || v === name
+          ? null
+          : isBuiltinPreset(v) || userPresets[v]
+            ? `"${v}" is already taken.`
+            : null,
+    })
+    if (!next || next === name) return
     const error = renamePreset(name, next)
-    if (error) alert(error)
+    if (error) toast(error, 'error')
+  }
+
+  const remove = async (name: string) => {
+    const ok = await confirmDialog({
+      title: `Delete "${name}"?`,
+      message: 'This preset will be removed from your library. This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) deletePreset(name)
   }
 
   return (
@@ -52,22 +74,42 @@ export function PresetPanel() {
       }}
     >
       <h2>Presets</h2>
-      <ul className="presets">
-        {builtinNames.map((name) => (
-          <li key={name} className="preset-row">
-            <button className={name === presetName ? 'active' : ''} onClick={() => setPreset(name)}>
+      <div className="preset-picker">
+        <select
+          className="preset-select"
+          aria-label="Choose a built-in preset"
+          value={builtinNames.includes(presetName) ? presetName : ''}
+          onChange={(e) => setPreset(e.target.value)}
+        >
+          {!builtinNames.includes(presetName) && (
+            <option value="" disabled>
+              Pick a preset…
+            </option>
+          )}
+          {builtinNames.map((name) => (
+            <option key={name} value={name}>
               {name}
-            </button>
-            <button className="row-action" title="Duplicate as editable fork" onClick={() => duplicatePreset(name)}>
-              ⧉
-            </button>
-          </li>
-        ))}
-      </ul>
+            </option>
+          ))}
+        </select>
+        <button
+          className="row-action"
+          title="Duplicate as editable fork"
+          aria-label="Duplicate the selected preset as an editable fork"
+          onClick={() => duplicatePreset(builtinNames.includes(presetName) ? presetName : builtinNames[0]!)}
+        >
+          ⧉
+        </button>
+      </div>
 
       <h2>
         Your presets
-        <button className="row-action" title="Import .paper JSON" onClick={() => fileRef.current?.click()}>
+        <button
+          className="row-action"
+          title="Import .paper JSON"
+          aria-label="Import a .paper JSON file"
+          onClick={() => fileRef.current?.click()}
+        >
           ⬆
         </button>
       </h2>
@@ -93,15 +135,26 @@ export function PresetPanel() {
                 <span>{name}</span>
               </button>
               <span className="row-actions">
-                <button className="row-action" title="Rename" onClick={() => rename(name)}>
+                <button
+                  className="row-action"
+                  title="Rename"
+                  aria-label={`Rename ${name}`}
+                  onClick={() => rename(name)}
+                >
                   ✎
                 </button>
-                <button className="row-action" title="Duplicate" onClick={() => duplicatePreset(name)}>
+                <button
+                  className="row-action"
+                  title="Duplicate"
+                  aria-label={`Duplicate ${name}`}
+                  onClick={() => duplicatePreset(name)}
+                >
                   ⧉
                 </button>
                 <button
                   className="row-action"
                   title="Download .paper JSON"
+                  aria-label={`Download ${name} as .paper JSON`}
                   onClick={() => downloadPreset(name, parsePreset(stored.config))}
                 >
                   ⬇
@@ -109,7 +162,8 @@ export function PresetPanel() {
                 <button
                   className="row-action danger"
                   title="Delete"
-                  onClick={() => confirm(`Delete "${name}"?`) && deletePreset(name)}
+                  aria-label={`Delete ${name}`}
+                  onClick={() => remove(name)}
                 >
                   ✕
                 </button>
