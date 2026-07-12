@@ -65,6 +65,7 @@ export {
   PaperStateMachine,
   stateEventTransitions,
   resolveStateConfig,
+  recordStateOverride,
   stripStates,
   flattenNumeric,
   type StateEvent,
@@ -159,7 +160,7 @@ export { composeSurface, type ComposedSurface, type SurfaceMaps } from './surfac
 export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'
 export { receiptTotals, barcodeBars, type ReceiptContent } from './content/receipt'
 
-export { parsePreset, serializePreset, mergeConfig } from './config/serialize'
+export { parsePreset, serializePreset, mergeConfig, mergeWithDeletes } from './config/serialize'
 export { diffConfig, buildJsxSnippet } from './config/diff'
 export {
   buildAgentPayload,

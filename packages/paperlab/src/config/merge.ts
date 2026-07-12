@@ -28,3 +28,31 @@ export function mergeConfig<T>(base: T, override: unknown): T {
   }
   return override as T
 }
+
+/**
+ * Like {@link mergeConfig}, but an explicit `undefined` DELETES its key instead
+ * of being ignored — the semantics a BASE-config write needs: structural
+ * setters can clear `behavior`/`deformers` or toggle a surface effect off.
+ * Discriminated unions (differing `type`) still replace wholesale.
+ */
+export function mergeWithDeletes<T>(base: T, patch: unknown): T {
+  if (
+    base !== null &&
+    patch !== null &&
+    typeof base === 'object' &&
+    typeof patch === 'object' &&
+    !Array.isArray(base) &&
+    !Array.isArray(patch)
+  ) {
+    const b = base as Record<string, unknown>
+    const p = patch as Record<string, unknown>
+    if ('type' in b && 'type' in p && b.type !== p.type) return patch as T
+    const out: Record<string, unknown> = { ...b }
+    for (const [key, value] of Object.entries(p)) {
+      if (value === undefined) delete out[key]
+      else out[key] = mergeWithDeletes(b[key], value)
+    }
+    return out as T
+  }
+  return patch as T
+}

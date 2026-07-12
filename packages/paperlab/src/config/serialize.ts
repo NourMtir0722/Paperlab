@@ -1,6 +1,6 @@
 import { paperConfigSchema, type PaperConfig, type PaperConfigInput } from './schema'
 
-export { mergeConfig } from './merge'
+export { mergeConfig, mergeWithDeletes } from './merge'
 
 /** Parse anything preset-shaped (object or JSON string) into a full, defaulted config. */
 export function parsePreset(input: PaperConfigInput | string): PaperConfig {

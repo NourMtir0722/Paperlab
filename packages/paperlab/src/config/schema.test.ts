@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { paperConfigSchema } from './schema'
-import { mergeConfig, parsePreset, serializePreset } from './serialize'
+import { mergeConfig, mergeWithDeletes, parsePreset, serializePreset } from './serialize'
 import {
   getPreset,
   isBuiltinPreset,
@@ -81,6 +81,35 @@ describe('mergeConfig', () => {
 
   it('ignores undefined overrides', () => {
     expect(mergeConfig({ a: 1 }, undefined)).toEqual({ a: 1 })
+  })
+})
+
+describe('mergeWithDeletes (base-config writes)', () => {
+  it('deep-merges like mergeConfig but an explicit undefined DELETES its key', () => {
+    // Clearing a top-level structural key (behavior/deformers) — what mergeConfig
+    // silently ignored, which is why setPhysics/setBehaviorType could not clear.
+    expect(mergeWithDeletes({ stock: 'kraft', behavior: { type: 'peel' } }, { behavior: undefined })).toEqual({
+      stock: 'kraft',
+    })
+    // Nested delete: toggling a surface effect off.
+    expect(
+      mergeWithDeletes(
+        { surface: { grain: 0.4, deckle: { edges: ['bottom'] } } },
+        { surface: { deckle: undefined } },
+      ),
+    ).toEqual({ surface: { grain: 0.4 } })
+  })
+
+  it('still replaces discriminated unions wholesale and keeps mergeConfig semantics for defined values', () => {
+    expect(
+      mergeWithDeletes(
+        { content: { type: 'image', src: '/a.jpg' } },
+        { content: { type: 'text', text: 'hi' } },
+      ),
+    ).toEqual({ content: { type: 'text', text: 'hi' } })
+    expect(mergeWithDeletes({ sheet: { width: 1, height: 2 } }, { sheet: { width: 3 } })).toEqual({
+      sheet: { width: 3, height: 2 },
+    })
   })
 })
 

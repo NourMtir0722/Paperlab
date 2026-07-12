@@ -1,6 +1,12 @@
 import { gsap } from 'gsap'
 import { mergeConfig } from '../config/merge'
-import { paperConfigSchema, type PaperConfig, type StateName } from '../config/schema'
+import {
+  paperConfigSchema,
+  paperStatesSchema,
+  stateDefSchema,
+  type PaperConfig,
+  type StateName,
+} from '../config/schema'
 
 /**
  * The interaction-state engine. A state is a set of parameter overrides on
@@ -50,6 +56,50 @@ export function resolveStateConfig(base: PaperConfig, state: string): PaperConfi
   const flat = stripStates(base)
   if (!def || Object.keys(def.overrides).length === 0) return flat
   return paperConfigSchema.parse(mergeConfig(flat as Record<string, unknown>, def.overrides))
+}
+
+/** Drop `undefined` leaves at every depth, and any object left empty by that. */
+function pruneUndefined(value: unknown): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value
+  const out: Record<string, unknown> = {}
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v === undefined) continue
+    const pruned = pruneUndefined(v)
+    const isEmptyObject =
+      pruned !== null &&
+      typeof pruned === 'object' &&
+      !Array.isArray(pruned) &&
+      Object.keys(pruned).length === 0
+    if (!isEmptyObject) out[key] = pruned
+  }
+  return out
+}
+
+/**
+ * Record a patch into ONE state's override diff (Figma's overridden
+ * affordance), returning a new base config with that state updated — the base
+ * params and every other state stay untouched. This is how an authoring tool
+ * writes while a state chip is active. `undefined` values are dropped at every
+ * depth: an override can only SET a base param, never remove one. Re-parsing
+ * runs the schema's per-state validation, so an override that wouldn't merge
+ * cleanly throws here.
+ */
+export function recordStateOverride(
+  config: PaperConfig,
+  stateName: string,
+  patch: Record<string, unknown>,
+): PaperConfig {
+  const cleaned = pruneUndefined(patch) as Record<string, unknown>
+  const states = config.states ?? paperStatesSchema.parse({})
+  const def = states.states[stateName] ?? stateDefSchema.parse({})
+  const overrides = mergeConfig(def.overrides, cleaned) as Record<string, unknown>
+  return paperConfigSchema.parse({
+    ...config,
+    states: {
+      ...states,
+      states: { ...states.states, [stateName]: { ...def, overrides } },
+    },
+  })
 }
 
 // ── Numeric flattening (dot paths, array indices included) ──────────────────

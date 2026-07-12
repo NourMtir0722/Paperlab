@@ -6,9 +6,11 @@ import {
   getPreset,
   isBuiltinPreset,
   mergeConfig,
+  mergeWithDeletes,
   paperConfigSchema,
   paperStatesSchema,
   parsePreset,
+  recordStateOverride,
   sheetLayoutSchema,
   stateDefSchema,
   type ClothConfig,
@@ -117,6 +119,39 @@ interface EditorState {
   /** Select 'none' | idle name | 'cloth'. Cloth clears the behavior — they're exclusive. */
   setPhysics(name: string): void
   patchCloth(patch: Partial<ClothConfig>): void
+}
+
+export interface WriteOpts {
+  /** The canvas changed params behind the inspector's back — remount it. */
+  external?: boolean
+  /** The control STRUCTURE changed (effect toggled, behavior/physics swapped) — remount. */
+  structural?: boolean
+}
+
+/**
+ * The single state-aware write path. When a states-bar chip is active the patch
+ * records into that state's override diff (via the library's recordStateOverride)
+ * and the base is untouched; otherwise it merges into the base (mergeWithDeletes,
+ * so `undefined` clears a key). EVERY config setter routes here, so state-editing
+ * is enforced in exactly one place.
+ */
+export function writeConfig(
+  s: EditorState,
+  patch: Record<string, unknown>,
+  opts: WriteOpts = {},
+): Pick<EditorState, 'config' | 'inspectorEpoch'> {
+  const inspectorEpoch =
+    opts.external || opts.structural ? s.inspectorEpoch + 1 : s.inspectorEpoch
+  if (s.editingState) {
+    // Overrides SET base params, never remove them — a no-op patch (all
+    // undefined) leaves the config untouched.
+    if (Object.values(patch).every((v) => v === undefined)) return { config: s.config, inspectorEpoch }
+    return { config: recordStateOverride(s.config, s.editingState, patch), inspectorEpoch }
+  }
+  return {
+    config: paperConfigSchema.parse(mergeWithDeletes(s.config as Record<string, unknown>, patch)),
+    inspectorEpoch,
+  }
 }
 
 // Boot: hydrate the library's runtime registry from localStorage.
@@ -327,87 +362,44 @@ export const useEditor = create<EditorState>((set, get) => ({
     set((s) => ({ mode: 'field', cameFromField: false, inspectorEpoch: s.inspectorEpoch + 1 })),
   setPreset: (name) =>
     set({ presetName: name, config: getPreset(name), editingState: null, statePreview: false }),
+  // Every config setter below delegates to writeConfig — the ONE place that
+  // decides base-vs-state-override, so a live state chip can never be bypassed.
   patchConfig: (patch, opts) =>
-    set((s) => {
-      // State-editing mode: the edit records as the active state's override
-      // diff (Figma's overridden affordance) — the base stays untouched.
-      if (s.editingState) {
-        const states = s.config.states ?? paperStatesSchema.parse({})
-        const def = states.states[s.editingState] ?? stateDefSchema.parse({})
-        const overrides = mergeConfig(def.overrides, patch) as Record<string, unknown>
-        return {
-          config: paperConfigSchema.parse({
-            ...s.config,
-            states: {
-              ...states,
-              states: { ...states.states, [s.editingState]: { ...def, overrides } },
-            },
-          }),
-          inspectorEpoch: opts?.external ? s.inspectorEpoch + 1 : s.inspectorEpoch,
-        }
-      }
-      return {
-        config: paperConfigSchema.parse(mergeConfig(get().config as PaperConfigInput, patch)),
-        inspectorEpoch: opts?.external ? s.inspectorEpoch + 1 : s.inspectorEpoch,
-      }
-    }),
+    set((s) => writeConfig(s, patch as Record<string, unknown>, { external: opts?.external })),
   setBehaviorType: (type) =>
-    set((s) => ({
-      config: {
-        ...s.config,
-        behavior: type ? behaviorConfigSchema.parse({ type }) : undefined,
-      },
-      inspectorEpoch: s.inspectorEpoch + 1,
-    })),
-  setSurface: (patch) => {
-    // Surface edits made while a state chip is active record as overrides
-    // too (effect removal can't — override merge keeps existing keys).
-    if (get().editingState) {
-      const cleaned: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(patch)) {
-        if (value !== undefined) cleaned[key] = value
-      }
-      if (Object.keys(cleaned).length > 0) get().patchConfig({ surface: cleaned as never })
-      return
-    }
+    set((s) =>
+      writeConfig(
+        s,
+        { behavior: type ? behaviorConfigSchema.parse({ type }) : undefined },
+        { structural: true },
+      ),
+    ),
+  setSurface: (patch) =>
     set((s) => {
-      const surface: Record<string, unknown> = { ...s.config.surface }
-      // Toggling an effect on/off changes the control structure — leva needs
-      // a remount (epoch bump). Value edits don't.
-      let structureChanged = false
-      for (const [key, value] of Object.entries(patch)) {
-        const existed = surface[key] !== undefined
-        if (value === undefined) delete surface[key]
-        else surface[key] = value
-        if (existed !== (value !== undefined)) structureChanged = true
-      }
-      return {
-        config: paperConfigSchema.parse({ ...s.config, surface }),
-        inspectorEpoch: structureChanged ? s.inspectorEpoch + 1 : s.inspectorEpoch,
-      }
-    })
-  },
+      // Toggling an effect on/off changes the control structure — leva needs a
+      // remount (epoch bump). Value edits don't.
+      const surface = s.config.surface as Record<string, unknown>
+      const structural = Object.entries(patch).some(
+        ([key, value]) => (surface[key] !== undefined) !== (value !== undefined),
+      )
+      return writeConfig(s, { surface: patch }, { structural })
+    }),
   setPhysics: (name) =>
-    set((s) => ({
-      config: paperConfigSchema.parse({
-        ...s.config,
-        physics: name === 'cloth' ? clothConfigSchema.parse({ type: 'cloth' }) : name,
-        // Cloth owns the vertices — Shape and Simulation are a segmented
-        // choice, not two toggles.
-        behavior: name === 'cloth' ? undefined : s.config.behavior,
-        deformers: name === 'cloth' ? undefined : s.config.deformers,
-      }),
-      inspectorEpoch: s.inspectorEpoch + 1,
-    })),
+    set((s) =>
+      writeConfig(
+        s,
+        // Cloth owns the vertices — Shape and Simulation are a segmented choice,
+        // not two toggles, so switching TO cloth clears behavior/deformers.
+        name === 'cloth'
+          ? { physics: clothConfigSchema.parse({ type: 'cloth' }), behavior: undefined, deformers: undefined }
+          : { physics: name },
+        { structural: true },
+      ),
+    ),
   patchCloth: (patch) =>
     set((s) => {
       if (typeof s.config.physics !== 'object') return s
-      return {
-        config: paperConfigSchema.parse({
-          ...s.config,
-          physics: { ...s.config.physics, ...patch },
-        }),
-      }
+      return writeConfig(s, { physics: patch })
     }),
 
   savePreset: (name, config, thumbnail) => {
