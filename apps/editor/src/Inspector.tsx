@@ -1,4 +1,4 @@
-import { LevaPanel, folder, useControls, useCreateStore } from 'leva'
+import { LevaPanel, button, folder, useControls, useCreateStore } from 'leva'
 import {
   getBehavior,
   getStock,
@@ -276,9 +276,48 @@ function surfaceControls(
   }
 }
 
+/**
+ * Read a local file into a self-contained data URL, downscaled so it stays
+ * serializable (presets live in localStorage and travel in exports).
+ */
+function pickImageAsDataUrl(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return resolve(null)
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 1024
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(img.width * scale))
+        canvas.height = Math.max(1, Math.round(img.height * scale))
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        URL.revokeObjectURL(url)
+        // PNG keeps transparency (die-cut stickers); photos go JPEG.
+        resolve(
+          file.type === 'image/png' || file.type === 'image/webp'
+            ? canvas.toDataURL('image/png')
+            : canvas.toDataURL('image/jpeg', 0.85),
+        )
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        resolve(null)
+      }
+      img.src = url
+    }
+    input.click()
+  })
+}
+
 function contentControls(
   content: ContentConfig,
-  patchConfig: (p: { content: ContentConfig }) => void,
+  patchConfig: (p: { content: ContentConfig }, opts?: { external?: boolean }) => void,
 ): LevaSchema {
   if (content.type === 'text') {
     return {
@@ -301,10 +340,18 @@ function contentControls(
   if (content.type === 'image') {
     return {
       src: {
-        value: content.src,
-        onChange: (v: string, _: unknown, ctx: { initial: boolean }) =>
-          ctx.initial || patchConfig({ content: { ...content, src: v } }),
+        value: content.src.startsWith('data:') ? '(uploaded image)' : content.src,
+        onChange: (v: string, _: unknown, ctx: { initial: boolean }) => {
+          if (ctx.initial || v === '(uploaded image)') return
+          patchConfig({ content: { ...content, src: v } })
+        },
       },
+      'upload image': button(() => {
+        void pickImageAsDataUrl().then((dataUrl) => {
+          // external → the inspector remounts and the src field shows the mask.
+          if (dataUrl) patchConfig({ content: { ...content, src: dataUrl } }, { external: true })
+        })
+      }),
     }
   }
   return {}
