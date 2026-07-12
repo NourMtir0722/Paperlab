@@ -27,6 +27,27 @@ export type SheetLayoutOptions = z.infer<typeof sheetLayoutSchema>
 /** Backing thickness + ε — papers float just above the backing sheet. */
 export const SHEET_LIFT = 0.012
 
+/**
+ * Cell footprint = the paper's own sheet dims unless the user set an
+ * explicit cellWidth/cellHeight — so `gutter` is literally the spacing
+ * between stamps, whatever preset populates the grid.
+ */
+export function withSheetCellFromPaper(
+  parsed: SheetLayoutOptions,
+  rawOptions: Record<string, unknown> | undefined,
+  paperDims: { width: number; height: number } | undefined,
+): SheetLayoutOptions {
+  if (!paperDims) return parsed
+  const hasW = rawOptions !== undefined && rawOptions.cellWidth !== undefined
+  const hasH = rawOptions !== undefined && rawOptions.cellHeight !== undefined
+  if (hasW && hasH) return parsed
+  return {
+    ...parsed,
+    cellWidth: hasW ? parsed.cellWidth : paperDims.width,
+    cellHeight: hasH ? parsed.cellHeight : paperDims.height,
+  }
+}
+
 export function sheetSlotXY(i: number, o: SheetLayoutOptions): { x: number; y: number } {
   const col = i % o.columns
   const row = Math.floor(i / o.columns)

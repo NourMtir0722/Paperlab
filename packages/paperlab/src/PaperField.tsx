@@ -35,7 +35,13 @@ import {
   stackUniformValues,
 } from './field/compose'
 import { getLayout, type PaperPose } from './field/layouts'
-import { outwardCorner, sheetBackingSize, sheetLayoutSchema, type SheetLayoutOptions } from './field/sheetGrid'
+import {
+  outwardCorner,
+  sheetBackingSize,
+  sheetLayoutSchema,
+  withSheetCellFromPaper,
+  type SheetLayoutOptions,
+} from './field/sheetGrid'
 import { drawBacking } from './content/backing'
 import { useContentAtlas } from './content/atlas'
 import { usePrefersReducedMotion } from './a11y'
@@ -158,11 +164,22 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
 
     const layoutId = props.layout ?? 'ring'
     const layout = getLayout(layoutId)
-    const layoutOptions = useMemo(
-      () => layout.optionsSchema.parse({ ...layout.defaults, ...props.layoutOptions }),
+    const firstSheet = groups[0]?.config.sheet
+    const layoutOptions = useMemo(() => {
+      const parsed = layout.optionsSchema.parse({
+        ...layout.defaults,
+        ...props.layoutOptions,
+      }) as Record<string, unknown>
+      // Sheet grids size their cells from the papers themselves — gutter is
+      // then literally the spacing between stamps (explicit cell dims win).
+      if (layoutId !== 'sheet') return parsed
+      return withSheetCellFromPaper(
+        parsed as unknown as SheetLayoutOptions,
+        props.layoutOptions,
+        firstSheet,
+      ) as unknown as Record<string, unknown>
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [layoutId, JSON.stringify(props.layoutOptions ?? {})],
-    ) as Record<string, unknown>
+    }, [layoutId, JSON.stringify(props.layoutOptions ?? {}), firstSheet?.width, firstSheet?.height])
 
     // ── Shared motion state: one driver phase / entrance clock / morph for
     // every group, so a mixed-preset field moves as one field. ──

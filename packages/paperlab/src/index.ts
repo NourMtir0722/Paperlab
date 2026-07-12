@@ -78,6 +78,7 @@ export {
   sheetBackingSize,
   outwardCorner,
   tornEdgesOnDetach,
+  withSheetCellFromPaper,
   SHEET_LIFT,
   type SheetLayoutOptions,
 } from './field/sheetGrid'

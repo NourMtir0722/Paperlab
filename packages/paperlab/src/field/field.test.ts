@@ -10,6 +10,7 @@ import {
   sheetBackingSize,
   sheetLayoutSchema,
   tornEdgesOnDetach,
+  withSheetCellFromPaper,
 } from './sheetGrid'
 import { silhouetteRects } from '../content/backing'
 
@@ -113,6 +114,33 @@ describe('sheet layout (the stamp block)', () => {
       right: 'torn',
       bottom: 'torn',
     })
+  })
+
+  it('cells size themselves from the papers unless set explicitly — gutter is the spacing', () => {
+    const parsed = sheetLayoutSchema.parse({})
+    const stamp = { width: 0.64, height: 0.78 }
+    // No explicit cell dims → the paper's own footprint.
+    const auto = withSheetCellFromPaper(parsed, {}, stamp)
+    expect(auto.cellWidth).toBe(0.64)
+    expect(auto.cellHeight).toBe(0.78)
+    // Explicit dims always win.
+    const explicit = withSheetCellFromPaper(
+      sheetLayoutSchema.parse({ cellWidth: 1.2, cellHeight: 1 }),
+      { cellWidth: 1.2, cellHeight: 1 },
+      stamp,
+    )
+    expect(explicit.cellWidth).toBe(1.2)
+    expect(explicit.cellHeight).toBe(1)
+    // Half-explicit fills only the missing axis.
+    const half = withSheetCellFromPaper(
+      sheetLayoutSchema.parse({ cellWidth: 1.2 }),
+      { cellWidth: 1.2 },
+      stamp,
+    )
+    expect(half.cellWidth).toBe(1.2)
+    expect(half.cellHeight).toBe(0.78)
+    // No paper dims (empty field) → untouched defaults.
+    expect(withSheetCellFromPaper(parsed, {}, undefined)).toBe(parsed)
   })
 
   it('backing bounds are grid + margin; silhouettes sit inside them', () => {
