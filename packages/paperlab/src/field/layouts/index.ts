@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SHEET_LIFT, sheetLayoutSchema, sheetSlotXY, type SheetLayoutOptions } from '../sheetGrid'
 
 /**
  * A layout is a pure `pose(i, n, options, phase)` function — no state, no
@@ -185,6 +186,23 @@ export const scatter: Layout<z.infer<typeof scatterSchema>> = {
   },
 }
 
+/**
+ * A block of stamps: flat rows × columns grid in register, floating a hair
+ * above the (field-rendered) backing sheet. Standard layout contract — it
+ * also works standalone as a plain grid; `backing`/`backingMargin` are read
+ * by the field renderer, not by `pose`.
+ */
+export const sheet: Layout<SheetLayoutOptions> = {
+  id: 'sheet',
+  label: 'Sheet',
+  defaults: sheetLayoutSchema.parse({}),
+  optionsSchema: sheetLayoutSchema,
+  pose(i, _n, o) {
+    const { x, y } = sheetSlotXY(i, o)
+    return { position: [x, y, SHEET_LIFT], rotation: [0, 0, 0], scale: 1 }
+  },
+}
+
 const registry = new Map<string, Layout<any>>()
 
 export function registerLayout(layout: Layout<any>): void {
@@ -210,3 +228,4 @@ registerLayout(helix)
 registerLayout(wall)
 registerLayout(tunnel)
 registerLayout(scatter)
+registerLayout(sheet)

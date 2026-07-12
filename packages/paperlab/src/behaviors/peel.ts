@@ -4,19 +4,23 @@ import { cornerNames } from '../deformers/curl'
 
 export const peelOptionsSchema = z.object({
   progress: z.number().min(0).max(1).default(0.35),
-  corner: z.enum(cornerNames).default('bottom-right'),
+  /** 'auto' resolves per slot in a `sheet` field (outward-facing corner); standalone it means bottom-right. */
+  corner: z.enum([...cornerNames, 'auto']).default('bottom-right'),
   /** Curl sharpness — small is a tight dog-ear, large a soft lift. */
   radius: z.number().min(0.05).max(0.6).default(0.16),
 })
 
 export type PeelOptions = z.infer<typeof peelOptionsSchema>
 
-const CORNER_UV: Record<PeelOptions['corner'], [number, number]> = {
+const CORNER_UV: Record<(typeof cornerNames)[number], [number, number]> = {
   'top-left': [0, 1],
   'top-right': [1, 1],
   'bottom-left': [0, 0],
   'bottom-right': [1, 0],
 }
+
+/** Fields resolve 'auto' per slot; anywhere else it falls back to the default corner. */
+const concreteCorner = (c: PeelOptions['corner']) => (c === 'auto' ? 'bottom-right' : c)
 
 /** A corner lifts and curls back — the hero-image hover peel. */
 export const peel: Behavior<PeelOptions> = {
@@ -35,7 +39,7 @@ export const peel: Behavior<PeelOptions> = {
       {
         type: 'curl',
         options: {
-          corner: o.corner,
+          corner: concreteCorner(o.corner),
           amount: o.progress,
           radius: o.radius + o.progress * 0.3,
           skew: 0,
@@ -46,11 +50,11 @@ export const peel: Behavior<PeelOptions> = {
   handles: [
     {
       id: 'corner',
-      anchor: (o) => CORNER_UV[o.corner],
+      anchor: (o) => CORNER_UV[concreteCorner(o.corner)],
       drag(local, o, sheet) {
         // Pull toward the sheet center = more peel: distance from the flat
         // corner along the inward diagonal, normalized to half the diagonal.
-        const [ux, uy] = CORNER_UV[o.corner]
+        const [ux, uy] = CORNER_UV[concreteCorner(o.corner)]
         const cx = (ux - 0.5) * sheet.width
         const cy = (uy - 0.5) * sheet.height
         const diag = Math.hypot(sheet.width, sheet.height)

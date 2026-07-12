@@ -4,10 +4,27 @@ import { buildDisplacementGLSL, buildFieldVertexShader, stackUniformValues } fro
 import { atlasGrid } from '../content/atlas'
 import { parityCases } from './parity'
 import { getDeformer, listDeformers } from '../deformers/registry'
+import {
+  SHEET_LIFT,
+  outwardCorner,
+  sheetBackingSize,
+  sheetLayoutSchema,
+  tornEdgesOnDetach,
+} from './sheetGrid'
+import { silhouetteRects } from '../content/backing'
 
 describe('layouts', () => {
-  it('registers the seven built-ins', () => {
-    expect(listLayouts()).toEqual(['ring', 'deck', 'cascade', 'helix', 'wall', 'tunnel', 'scatter'])
+  it('registers the eight built-ins', () => {
+    expect(listLayouts()).toEqual([
+      'ring',
+      'deck',
+      'cascade',
+      'helix',
+      'wall',
+      'tunnel',
+      'scatter',
+      'sheet',
+    ])
   })
 
   it('poses are pure and deterministic', () => {
@@ -52,6 +69,67 @@ describe('layouts', () => {
       expect(y).toBeGreaterThan(lastY)
       lastY = y
     }
+  })
+})
+
+describe('sheet layout (the stamp block)', () => {
+  const o = sheetLayoutSchema.parse({}) // 2×5
+
+  it('poses a flat rows×columns grid in register — no jitter, z = backing lift', () => {
+    const sheet = getLayout('sheet')
+    const first = sheet.pose(0, 10, o, 0)
+    const last = sheet.pose(9, 10, o, 0)
+    expect(first.rotation).toEqual([0, 0, 0])
+    expect(first.position[2]).toBe(SHEET_LIFT)
+    // Slot 0 is top-left, slot 9 bottom-right — symmetric about the center.
+    expect(first.position[0]).toBeCloseTo(-last.position[0])
+    expect(first.position[1]).toBeCloseTo(-last.position[1])
+    // Neighbors sit exactly one cell + gutter apart.
+    const second = sheet.pose(1, 10, o, 0)
+    expect(second.position[0] - first.position[0]).toBeCloseTo(o.cellWidth + o.gutter)
+  })
+
+  it('outward corners face away from the sheet center (what a thumb would find)', () => {
+    // 2×5: top row peels top, bottom row peels bottom; left half left, right half right.
+    expect(outwardCorner(0, o)).toBe('top-left')
+    expect(outwardCorner(4, o)).toBe('top-right')
+    expect(outwardCorner(5, o)).toBe('bottom-left')
+    expect(outwardCorner(9, o)).toBe('bottom-right')
+    expect(outwardCorner(2, o)).toBe('top-right') // center column ties break outward-right
+  })
+
+  it('detach tears edges that faced neighbors; boundary edges stay intact', () => {
+    // Top-left corner stamp of the 2×5 block.
+    expect(tornEdgesOnDetach(0, o)).toEqual({
+      top: 'intact',
+      left: 'intact',
+      right: 'torn',
+      bottom: 'torn',
+    })
+    // A middle stamp of the top row: everything torn except the top.
+    expect(tornEdgesOnDetach(2, o)).toEqual({
+      top: 'intact',
+      left: 'torn',
+      right: 'torn',
+      bottom: 'torn',
+    })
+  })
+
+  it('backing bounds are grid + margin; silhouettes sit inside them', () => {
+    const { width, height } = sheetBackingSize(o)
+    expect(width).toBeCloseTo(5 * o.cellWidth + 4 * o.gutter + 2 * o.backingMargin)
+    expect(height).toBeCloseTo(2 * o.cellHeight + 1 * o.gutter + 2 * o.backingMargin)
+    const rects = silhouetteRects(o, 10)
+    expect(rects).toHaveLength(10)
+    for (const r of rects) {
+      expect(r.x).toBeGreaterThan(0)
+      expect(r.y).toBeGreaterThan(0)
+      expect(r.x + r.w).toBeLessThan(1)
+      expect(r.y + r.h).toBeLessThan(1)
+    }
+    // Slot 0 (top-left in world) is top-left on the canvas (y down).
+    expect(rects[0]!.x).toBeLessThan(rects[4]!.x)
+    expect(rects[0]!.y).toBeLessThan(rects[5]!.y)
   })
 })
 

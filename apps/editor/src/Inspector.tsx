@@ -6,6 +6,7 @@ import {
   listBehaviors,
   paperEdges,
   physicsNames,
+  resolveStateConfig,
   stockNames,
   type ClothConfig,
   type ContentConfig,
@@ -25,7 +26,11 @@ type LevaSchema = Parameters<typeof folder>[0]
  * the preset, behavior type, or an external edit (handle drag) changes.
  */
 export function Inspector() {
-  const config = useEditor((s) => s.config)
+  const baseConfig = useEditor((s) => s.config)
+  const editingState = useEditor((s) => s.editingState)
+  // State-editing mode: controls show the state applied (base + overrides);
+  // edits route back into that state's override diff via patchConfig.
+  const config = editingState ? resolveStateConfig(baseConfig, editingState) : baseConfig
   const patchConfig = useEditor((s) => s.patchConfig)
   const setBehaviorType = useEditor((s) => s.setBehaviorType)
   const setSurface = useEditor((s) => s.setSurface)
@@ -203,6 +208,45 @@ function surfaceControls(
             step: 0.01,
             onChange: changed((v: number) =>
               setSurface({ deckle: { ...surface.deckle!, roughness: v } }),
+            ),
+          },
+        }
+      : {}),
+    perforation: {
+      value: Boolean(surface.perforation),
+      onChange: changed((v: boolean) =>
+        setSurface({ perforation: v ? { edges: 'all', holeRadius: 0.016, spacing: 0.055, state: {} } : undefined }),
+      ),
+    },
+    ...(surface.perforation
+      ? {
+          perfEdges: {
+            label: 'perf edges',
+            value: surface.perforation.edges === 'all' ? 'all' : surface.perforation.edges.join('+'),
+            options: ['all', ...paperEdges, 'top+bottom', 'left+right'].map(String),
+            onChange: changed((v: string) => {
+              const edges = v === 'all' ? ('all' as const) : (v.split('+') as PaperEdge[])
+              setSurface({ perforation: { ...surface.perforation!, edges } })
+            }),
+          },
+          perfRadius: {
+            label: 'hole size',
+            value: surface.perforation.holeRadius,
+            min: 0.002,
+            max: 0.1,
+            step: 0.001,
+            onChange: changed((v: number) =>
+              setSurface({ perforation: { ...surface.perforation!, holeRadius: v } }),
+            ),
+          },
+          perfSpacing: {
+            label: 'spacing',
+            value: surface.perforation.spacing,
+            min: 0.01,
+            max: 0.5,
+            step: 0.005,
+            onChange: changed((v: number) =>
+              setSurface({ perforation: { ...surface.perforation!, spacing: v } }),
             ),
           },
         }

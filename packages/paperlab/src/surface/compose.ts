@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { PaperEdge, SurfaceConfig } from '../config/schema'
+import { paperEdges as paperEdgesOrder, type PaperEdge, type SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 
 /**
@@ -135,6 +135,45 @@ void plCrease(inout vec4 color, inout float rough) {
 }
 `
 
+const PERFORATION_CHUNK = /* glsl */ `
+uniform vec4 uPerfEdges;   // top, right, bottom, left enabled
+uniform vec4 uPerfTorn;    // 1 = ripped-through profile, 0 = clean punches
+uniform float uPerfRadius; // world units
+uniform float uPerfSpacing;
+uniform vec2 uSheetSize;
+
+void plPerforation(inout vec4 color) {
+  // Per-edge distance/along coordinates, converted from UV to world units so
+  // hole size is stable across sheet dimensions.
+  vec4 dists = vec4(1.0 - vPaperUv.y, 1.0 - vPaperUv.x, vPaperUv.y, vPaperUv.x);
+  vec4 alongs = vec4(vPaperUv.x, vPaperUv.y, vPaperUv.x, vPaperUv.y);
+  vec4 distScale = vec4(uSheetSize.y, uSheetSize.x, uSheetSize.y, uSheetSize.x);
+  vec4 alongScale = vec4(uSheetSize.x, uSheetSize.y, uSheetSize.x, uSheetSize.y);
+  float fiber = 0.0;
+  for (int e = 0; e < 4; e++) {
+    if (uPerfEdges[e] < 0.5) continue;
+    float d = dists[e] * distScale[e];
+    float a = alongs[e] * alongScale[e];
+    // Signed distance along the edge to the nearest hole center.
+    float cell = mod(a + uPerfSpacing * 0.5, uPerfSpacing) - uPerfSpacing * 0.5;
+    if (uPerfTorn[e] < 0.5) {
+      // Intact: clean semicircular punches on the edge line (alphaTest, not
+      // blending — shadow correctness per v0.2 §4.5).
+      if (length(vec2(cell, d)) < uPerfRadius) color.a = 0.0;
+    } else {
+      // Torn: ripped profile following the hole rhythm — alternating tabs and
+      // notches, gnawed by noise, with a lightened fiber band along the tear.
+      float rhythm = abs(sin(a / uPerfSpacing * 3.14159265));
+      float n = plNoise(vec2(a * 40.0, float(e) * 7.31)) - 0.5;
+      float cut = uPerfRadius * (0.35 + rhythm * 1.35 + n * 0.9);
+      if (d < cut) color.a = 0.0;
+      fiber = max(fiber, smoothstep(uPerfRadius * 2.4, 0.0, d - cut) * step(cut, d));
+    }
+  }
+  color.rgb = mix(color.rgb, vec3(1.0), fiber * 0.4);
+}
+`
+
 const AGING_CHUNK = /* glsl */ `
 uniform float uAgingAmount;
 
@@ -162,19 +201,26 @@ export function composeSurface(
   stock: Stock,
   thickness: number,
   maps: SurfaceMaps = { hasFrontMap: false, hasBackMap: false },
+  /** World dims — perforation holes are sized in world units. */
+  sheet: { width: number; height: number } = { width: 1, height: 1.4 },
 ): ComposedSurface {
   const grain = surface.grain ?? stock.defaultSurface.grain
   const aging = surface.aging ?? stock.defaultSurface.aging
   const deckle = surface.deckle
   const creases = surface.creaseLines
+  const perforation = surface.perforation
   const banding = stock.banding
-  const showThrough = surface.showThrough ?? stock.showThrough
+  // Adhesive undersides are opaque backing-paper white — nothing shows through.
+  const showThrough = stock.adhesive ? 0 : (surface.showThrough ?? stock.showThrough)
 
   const chunks: string[] = []
   const calls: string[] = []
   const uniforms: Record<string, { value: unknown }> = {
     // Backside darkening: thicker/opaque stock lets less light through.
-    uBackDarken: { value: 1 - Math.min(0.45, 0.12 + thickness * 0.9) * stock.opacity },
+    // Adhesive backs skip it — the glue layer is its own bright surface.
+    uBackDarken: {
+      value: stock.adhesive ? 1 : 1 - Math.min(0.45, 0.12 + thickness * 0.9) * stock.opacity,
+    },
     uStockColor: { value: new THREE.Color(stock.color) },
     uOpacity: { value: stock.opacity },
     uShowThrough: { value: showThrough },
@@ -194,6 +240,20 @@ export function composeSurface(
     uniforms.uDeckleEdges = { value: edgeFlags(deckle.edges) }
     uniforms.uDeckleRoughness = { value: deckle.roughness }
   }
+  if (perforation) {
+    const edges = perforation.edges === 'all' ? [...paperEdgesOrder] : perforation.edges
+    chunks.push(PERFORATION_CHUNK)
+    calls.push('plPerforation(csm_DiffuseColor);')
+    uniforms.uPerfEdges = { value: edgeFlags(edges) }
+    uniforms.uPerfTorn = {
+      value: new THREE.Vector4(
+        ...paperEdgesOrder.map((e) => (edges.includes(e) && perforation.state[e] === 'torn' ? 1 : 0)),
+      ),
+    }
+    uniforms.uPerfRadius = { value: perforation.holeRadius }
+    uniforms.uPerfSpacing = { value: perforation.spacing }
+    uniforms.uSheetSize = { value: new THREE.Vector2(sheet.width, sheet.height) }
+  }
   if (creases) {
     chunks.push(CREASE_CHUNK)
     calls.push('plCrease(csm_DiffuseColor, csm_Roughness);')
@@ -209,10 +269,13 @@ export function composeSurface(
   }
 
   const frontExpr = maps.hasFrontMap ? 'texture2D(uFrontMap, vPaperUv).rgb' : 'uStockColor'
-  // The back reads correctly when the sheet is flipped → mirror x.
-  const backBaseExpr = maps.hasBackMap
-    ? 'texture2D(uBackMap, vec2(1.0 - vPaperUv.x, vPaperUv.y)).rgb'
-    : 'uStockColor'
+  // The back reads correctly when the sheet is flipped → mirror x. Adhesive
+  // undersides (sticker stock) are glossy near-white regardless of the front.
+  const backBaseExpr = stock.adhesive
+    ? 'vec3(0.965, 0.96, 0.945)'
+    : maps.hasBackMap
+      ? 'texture2D(uBackMap, vec2(1.0 - vPaperUv.x, vPaperUv.y)).rgb'
+      : 'uStockColor'
 
   const fragmentShader = /* glsl */ `
 ${HELPERS}
@@ -220,7 +283,7 @@ uniform vec3 uStockColor;
 uniform float uOpacity;
 uniform float uShowThrough;
 ${maps.hasFrontMap ? 'uniform sampler2D uFrontMap;' : ''}
-${maps.hasBackMap ? 'uniform sampler2D uBackMap;' : ''}
+${maps.hasBackMap && !stock.adhesive ? 'uniform sampler2D uBackMap;' : ''}
 ${chunks.join('\n')}
 void main() {
   vec3 front = ${frontExpr};
@@ -232,6 +295,7 @@ void main() {
   }
   ${calls.join('\n  ')}
   if (!gl_FrontFacing) csm_DiffuseColor.rgb *= uBackDarken;
+  ${stock.adhesive ? '// Adhesive underside: higher specular than the printed face.\n  if (!gl_FrontFacing) csm_Roughness = 0.18;' : ''}
 }
 `
 
@@ -242,11 +306,13 @@ void main() {
         deckle ? 'd' : '',
         creases ? 'c' : '',
         aging !== undefined ? 'a' : '',
+        perforation ? 'p' : '',
+        stock.adhesive ? 'A' : '',
       ].join('') + `:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}`,
     vertexShader: VERTEX,
     fragmentShader,
     uniforms,
-    alphaTest: deckle ? 0.5 : 0,
+    alphaTest: deckle || perforation ? 0.5 : 0,
   }
 }
 

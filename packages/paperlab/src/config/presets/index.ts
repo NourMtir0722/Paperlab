@@ -109,6 +109,36 @@ const builtins: Record<string, PaperConfigInput> = {
     meta: { name: 'Blank sheet', tags: ['starter'] },
     stock: 'printer',
   },
+  // The M6 driving use case: one stamp of the 2×5 block. Hover peels the
+  // outward-facing corner ('auto' resolves per sheet slot), pressing deepens
+  // the peel; the perforation tears when it detaches (field auto-wiring).
+  'postage-stamp': {
+    meta: { name: 'Postage stamp', tags: ['sticker', 'stamp', 'states', 'sheet'] },
+    sheet: { width: 0.64, height: 0.78, thickness: 0.08 },
+    stock: 'sticker',
+    content: {
+      type: 'image',
+      src: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&q=80',
+      fit: 'cover',
+      alt: 'A forest stamp',
+    },
+    behavior: { type: 'peel', progress: 0, corner: 'auto', radius: 0.12 },
+    surface: { perforation: { edges: 'all', holeRadius: 0.014, spacing: 0.05 } },
+    states: {
+      initial: 'rest',
+      states: {
+        hover: {
+          overrides: { behavior: { progress: 0.22 } },
+          transition: { duration: 0.25, ease: 'power2.out' },
+        },
+        pressed: {
+          overrides: { behavior: { progress: 0.5 } },
+          transition: { duration: 0.16, ease: 'power3.out' },
+        },
+      },
+      pickThreshold: 0.08,
+    },
+  },
   'photo-print': {
     meta: { name: 'Photo print', tags: ['image', 'starter'] },
     sheet: { width: 1.2, height: 0.9 },

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { mergeConfig } from './merge'
 import { peelOptionsSchema } from '../behaviors/peel'
 import { unrollOptionsSchema } from '../behaviors/unroll'
 import { flipOptionsSchema } from '../behaviors/flip'
@@ -30,7 +31,15 @@ export type SheetConfig = z.infer<typeof sheetSchema>
 
 // ── Stock ────────────────────────────────────────────────────────────────────
 
-export const stockNames = ['printer', 'thermal', 'kraft', 'newsprint', 'vellum', 'photo-gloss'] as const
+export const stockNames = [
+  'printer',
+  'thermal',
+  'kraft',
+  'newsprint',
+  'vellum',
+  'photo-gloss',
+  'sticker',
+] as const
 export const stockSchema = z.enum(stockNames)
 export type StockName = z.infer<typeof stockSchema>
 
@@ -139,6 +148,27 @@ export const surfaceSchema = z.object({
   aging: z.number().min(0).max(1).optional(),
   /** Reversed front-content ghost on the backside, 0..1. Stock defaults apply. */
   showThrough: z.number().min(0).max(1).optional(),
+  /**
+   * Postage-stamp perforation: alpha-punched semicircular holes along chosen
+   * edges. `state` flips an edge to a ripped-through profile (torn) — set
+   * automatically when a paper detaches from a `sheet` field, manual wins.
+   */
+  perforation: z
+    .object({
+      edges: z.union([z.array(z.enum(paperEdges)), z.literal('all')]).default('all'),
+      /** World units — default tuned to stamp scale. */
+      holeRadius: z.number().min(0.002).max(0.1).default(0.016),
+      spacing: z.number().min(0.01).max(0.5).default(0.055),
+      state: z
+        .object({
+          top: z.enum(['intact', 'torn']).optional(),
+          right: z.enum(['intact', 'torn']).optional(),
+          bottom: z.enum(['intact', 'torn']).optional(),
+          left: z.enum(['intact', 'torn']).optional(),
+        })
+        .default({}),
+    })
+    .optional(),
 })
 
 export type SurfaceConfig = z.infer<typeof surfaceSchema>
@@ -205,6 +235,59 @@ export const sceneSchema = z.object({
 export type SceneConfig = z.infer<typeof sceneSchema>
 export type LightingName = (typeof lightingNames)[number]
 
+// ── Interaction states ───────────────────────────────────────────────────────
+
+/**
+ * A state is a set of parameter overrides on the base preset — never a
+ * separate preset. The base stays the single source of truth; states are
+ * diffs. Triggers are fixed and built-in for v1 (pointer + pick/drop flow);
+ * `custom:*` names are the escape hatch for editor v2.
+ */
+export const coreStateNames = ['rest', 'hover', 'pressed', 'picked', 'placed'] as const
+export type CoreStateName = (typeof coreStateNames)[number]
+export type StateName = CoreStateName | `custom:${string}`
+
+const isStateName = (s: string): boolean =>
+  (coreStateNames as readonly string[]).includes(s) || s.startsWith('custom:')
+
+// Typed as plain string (not the template-literal union) so PaperConfig stays
+// assignable to PaperConfigInput; the refine still enforces valid names.
+const stateNameSchema = z.string().refine(isStateName, {
+  message: `state names are ${coreStateNames.join(', ')} or "custom:<name>"`,
+})
+
+export const stateTransitionSchema = z.object({
+  duration: z.number().min(0).max(5).default(0.35),
+  /** GSAP ease name. */
+  ease: z.string().default('power2.out'),
+})
+
+export const stateDefSchema = z.object({
+  /** Deep-partial override of the paper schema (behavior params, surface, …). */
+  overrides: z.record(z.unknown()).default({}),
+  /** Transition INTO this state. */
+  transition: stateTransitionSchema.default({}),
+  /** Chained actions after arriving. v1: 'emit:<event>' only. */
+  onEnter: z.array(z.string().regex(/^emit:[\w-]+$/, 'v1 actions are "emit:<event>"')).default([]),
+})
+
+export const paperStatesSchema = z.object({
+  initial: stateNameSchema.default('rest'),
+  states: z
+    .record(z.string(), stateDefSchema)
+    .default({})
+    .refine((rec) => Object.keys(rec).every(isStateName), {
+      message: `state names are ${coreStateNames.join(', ')} or "custom:<name>"`,
+    }),
+  /** World-units drag distance that flips pressed → picked (pick-enabled behaviors only). */
+  pickThreshold: z.number().min(0.005).max(1).default(0.1),
+})
+
+export type StateTransitionConfig = z.infer<typeof stateTransitionSchema>
+export type StateDef = z.infer<typeof stateDefSchema>
+export type PaperStates = z.infer<typeof paperStatesSchema>
+export type PaperStatesInput = z.input<typeof paperStatesSchema>
+
 // ── Paper config ─────────────────────────────────────────────────────────────
 
 export const metaSchema = z.object({
@@ -227,6 +310,8 @@ export const paperConfigSchema = z
     physics: physicsSchema.default('none'),
     scene: sceneSchema.default({}),
     onTwos: z.boolean().default(false),
+    /** Interaction state machine — overrides-on-base diffs (spec M6 §1). */
+    states: paperStatesSchema.optional(),
   })
   .superRefine((config, ctx) => {
     // Cloth owns vertex positions: Shape (behavior/deformers) and Simulation
@@ -238,6 +323,36 @@ export const paperConfigSchema = z
         message:
           'cloth physics and behavior/deformers are exclusive — cloth owns the vertices (pick Shape OR Simulation)',
       })
+    }
+    // State overrides must stay serializable schema paths: merging them over
+    // the base must still parse. (`paperConfigSchema` is initialized by the
+    // time any parse runs; the merged candidate carries no `states`, so this
+    // cannot recurse.)
+    if (config.states) {
+      const { states: _states, ...baseSansStates } = config
+      for (const [name, def] of Object.entries(config.states.states)) {
+        if (!def) continue
+        if ((def.overrides as Record<string, unknown>).states !== undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['states', 'states', name, 'overrides'],
+            message: 'state overrides cannot override `states` (no nested state machines)',
+          })
+          continue
+        }
+        const candidate = mergeConfig(baseSansStates as Record<string, unknown>, def.overrides)
+        const result = paperConfigSchema.safeParse(candidate)
+        if (!result.success) {
+          const first = result.error.issues[0]
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['states', 'states', name, 'overrides'],
+            message: `state "${name}" overrides don't validate against the paper schema: ${
+              first ? `${first.path.join('.')} — ${first.message}` : 'invalid'
+            }`,
+          })
+        }
+      }
     }
   })
 

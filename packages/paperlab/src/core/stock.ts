@@ -21,6 +21,8 @@ export interface Stock {
   defaultSurface: { grain?: number; aging?: number }
   /** Reversed front-content ghost on the backside (thin stocks let ink show). */
   showThrough: number
+  /** Glossy near-white glue underside (stickers) — forces showThrough 0. */
+  adhesive: boolean
 }
 
 export const stocks: Record<StockName, Stock> = {
@@ -34,6 +36,7 @@ export const stocks: Record<StockName, Stock> = {
     banding: 0,
     defaultSurface: { grain: 0.12 },
     showThrough: 0,
+    adhesive: false,
   },
   thermal: {
     id: 'thermal',
@@ -45,6 +48,7 @@ export const stocks: Record<StockName, Stock> = {
     banding: 0.35,
     defaultSurface: { aging: 0.1 },
     showThrough: 0.06,
+    adhesive: false,
   },
   kraft: {
     id: 'kraft',
@@ -56,6 +60,7 @@ export const stocks: Record<StockName, Stock> = {
     banding: 0,
     defaultSurface: { grain: 0.5 },
     showThrough: 0,
+    adhesive: false,
   },
   newsprint: {
     id: 'newsprint',
@@ -67,6 +72,7 @@ export const stocks: Record<StockName, Stock> = {
     banding: 0,
     defaultSurface: { grain: 0.7, aging: 0.15 },
     showThrough: 0.06,
+    adhesive: false,
   },
   vellum: {
     id: 'vellum',
@@ -78,6 +84,7 @@ export const stocks: Record<StockName, Stock> = {
     banding: 0,
     defaultSurface: {},
     showThrough: 0.55,
+    adhesive: false,
   },
   'photo-gloss': {
     id: 'photo-gloss',
@@ -89,6 +96,21 @@ export const stocks: Record<StockName, Stock> = {
     banding: 0,
     defaultSurface: {},
     showThrough: 0,
+    adhesive: false,
+  },
+  // Photo-gloss-like face, glossy near-white glue underside. The default
+  // carrier for perforated stamp sheets.
+  sticker: {
+    id: 'sticker',
+    label: 'Sticker',
+    color: '#ffffff',
+    roughness: 0.3,
+    opacity: 1,
+    inkColor: '#1a1a1a',
+    banding: 0,
+    defaultSurface: {},
+    showThrough: 0,
+    adhesive: true,
   },
 }
 
