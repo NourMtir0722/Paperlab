@@ -99,6 +99,38 @@ describe('sheet layout (the stamp block)', () => {
     expect(outwardCorner(2, o)).toBe('top-right') // center column ties break outward-right
   })
 
+  it('tie-breaks are consistent across grid shapes — dead-center peels bottom-right', () => {
+    const grid = (rows: number, columns: number) =>
+      Array.from({ length: rows * columns }, (_, i) => outwardCorner(i, { rows, columns }))
+
+    // 1×1: a lone stamp falls to the standalone peel default.
+    expect(grid(1, 1)).toEqual(['bottom-right'])
+
+    // 2×2: clean quadrants, symmetric about the center.
+    expect(grid(2, 2)).toEqual(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+
+    // 3×3 (odd both axes): the center row breaks DOWN and the center column
+    // breaks RIGHT, so the dead-center cell (index 4) peels bottom-right.
+    expect(grid(3, 3)).toEqual([
+      'top-left', 'top-right', 'top-right',
+      'bottom-left', 'bottom-right', 'bottom-right',
+      'bottom-left', 'bottom-right', 'bottom-right',
+    ])
+    expect(outwardCorner(4, { rows: 3, columns: 3 })).toBe('bottom-right')
+
+    // 3×5: center row (row 1) all breaks down; center column (col 2) breaks right.
+    expect(outwardCorner(7, { rows: 3, columns: 5 })).toBe('bottom-right') // r1,c2 dead center
+    expect(outwardCorner(2, { rows: 3, columns: 5 })).toBe('top-right') // r0,c2 center column
+
+    // Single-axis grids fall to the down/right default on the tie axis.
+    expect(grid(1, 5)).toEqual([
+      'bottom-left', 'bottom-left', 'bottom-right', 'bottom-right', 'bottom-right',
+    ])
+    expect(grid(5, 1)).toEqual([
+      'top-right', 'top-right', 'bottom-right', 'bottom-right', 'bottom-right',
+    ])
+  })
+
   it('detach tears edges that faced neighbors; boundary edges stay intact', () => {
     // Top-left corner stamp of the 2×5 block.
     expect(tornEdgesOnDetach(0, o)).toEqual({

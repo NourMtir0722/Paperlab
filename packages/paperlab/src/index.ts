@@ -191,6 +191,7 @@ export {
   registerPreset,
   unregisterPreset,
   isBuiltinPreset,
+  uniquePresetName,
 } from './config/presets'
 export { stocks, getStock, type Stock } from './core/stock'
 export { createSheetGeometry, resolveSegments } from './core/sheet'

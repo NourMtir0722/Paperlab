@@ -196,3 +196,18 @@ export function isBuiltinPreset(name: string): boolean {
 export function listPresets(): string[] {
   return [...Object.keys(builtins), ...userPresets.keys()]
 }
+
+/**
+ * A collision-free preset name built from `base`: `base`, else `base 2`,
+ * `base 3`, … The disambiguating suffix always grows from the SAME base — a
+ * name derived from a synthetic base (e.g. an untitled import → "imported")
+ * must not fall back to the original when it collides. `taken` reports whether
+ * a candidate is already used (built-in or user preset).
+ */
+export function uniquePresetName(base: string, taken: (name: string) => boolean): string {
+  if (!taken(base)) return base
+  let n = 2
+  let name = `${base} ${n}`
+  while (taken(name)) name = `${base} ${++n}`
+  return name
+}
