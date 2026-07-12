@@ -133,6 +133,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const behavior: Behavior | null = config.behavior ? getBehavior(config.behavior.type) : null
   const machineRef = useRef<PaperStateMachine | null>(null)
   machineRef.current = machine
+  // The animated `config` has `states` stripped — keep the resolved preset
+  // around so snapshot()/toJSON() never lose the state machine.
+  const resolvedRef = useRef(resolved)
+  resolvedRef.current = resolved
   const isCloth = !reduced && typeof config.physics === 'object'
   const idle =
     !reduced && typeof config.physics === 'string' && config.physics !== 'none'
@@ -256,8 +260,11 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   }, [])
 
   const snapshot = (): PaperConfig => {
-    const cfg = configRef.current
-    if (!cfg.behavior) return cfg
+    // Re-attach `states`: the rendered config is the animated view with the
+    // machine stripped, but a snapshot is a preset — states are part of it.
+    const states = resolvedRef.current.states
+    const cfg = states ? { ...configRef.current, states } : configRef.current
+    if (!cfg.behavior) return states ? paperConfigSchema.parse(cfg) : cfg
     return paperConfigSchema.parse({
       ...cfg,
       behavior: { ...cfg.behavior, ...overridesRef.current },
