@@ -228,3 +228,136 @@ describe('PaperStateMachine', () => {
     })
   })
 })
+
+// GSAP owns values, useFrame owns uploads (spec v0.2 §4): the tween must never
+// be reset by a config edit, and per-tick values must not route through React.
+describe('animation delivery (GSAP owns values)', () => {
+  const tornStamp = (): PaperConfig =>
+    paperConfigSchema.parse({
+      ...stamp(),
+      surface: {
+        ...stamp().surface,
+        perforation: {
+          edges: 'all',
+          holeRadius: 0.014,
+          spacing: 0.05,
+          state: { top: 'torn' },
+        },
+      },
+    })
+
+  it('rebase mid-flight keeps the SAME tween on a stable flat object — no freeze, no snap', () => {
+    const machine = new PaperStateMachine(stamp(), {}) // animated (not instant)
+    machine.send('enter') // rest → hover, tween drives progress 0 → 0.22
+    const tween = machine.activeTween!
+    const flat = (machine as unknown as { flat: Record<string, number> }).flat
+    tween.progress(0.5)
+    const midway = behaviorProgress(machine.config)
+    expect(midway).toBeGreaterThan(0)
+    expect(midway).toBeLessThan(0.22)
+
+    // Torn perforation is patched in mid-transition (the pick auto-wiring).
+    machine.rebase(tornStamp())
+    // Same tween, same flat object — the transition was not restarted.
+    expect(machine.activeTween).toBe(tween)
+    expect((machine as unknown as { flat: Record<string, number> }).flat).toBe(flat)
+    expect(machine.transitioning).toBe(true)
+    // No snap AT the rebase: the value is exactly where the tween left it.
+    expect(behaviorProgress(machine.config)).toBeCloseTo(midway, 6)
+    // …and it keeps animating smoothly to the target.
+    tween.progress(0.75)
+    expect(behaviorProgress(machine.config)).toBeGreaterThan(midway)
+    tween.progress(1)
+    expect(behaviorProgress(machine.config)).toBeCloseTo(0.22, 6)
+    // The structural patch is live too.
+    expect(machine.config.surface.perforation!.state.top).toBe('torn')
+    machine.dispose()
+  })
+
+  it('structure emits only at transition boundaries, never per tick', () => {
+    let emits = 0
+    const machine = new PaperStateMachine(stamp(), { onChange: () => emits++ })
+    expect(emits).toBe(0) // constructor does not emit
+    machine.send('enter') // start boundary
+    expect(emits).toBe(1)
+    const tween = machine.activeTween!
+    // Drive many ticks across the transition — none of them route to React.
+    for (let p = 0.1; p <= 0.9; p += 0.1) tween.progress(p)
+    expect(emits).toBe(1) // still just the start boundary (was ~20 before)
+    machine.dispose()
+  })
+
+  it('liveConfig returns the same mutable object each poll (zero allocation in the tick path)', () => {
+    const machine = new PaperStateMachine(stamp(), {})
+    machine.send('enter')
+    const a = machine.liveConfig
+    const b = machine.liveConfig
+    expect(a).toBe(b) // polled in place; structuralConfig() is the immutable copy
+    expect(machine.structuralConfig()).not.toBe(a)
+    machine.dispose()
+  })
+})
+
+// The keyboard/a11y entry point never generated pointer hover/press events, so
+// a raw send('pick') from 'rest' was a silent no-op (finding #1). The
+// programmatic drivers walk the legal chain so every side effect fires.
+describe('programmatic pick/place/return (keyboard/a11y flow)', () => {
+  it('REGRESSION: raw down/pick from rest do nothing', () => {
+    const machine = new PaperStateMachine(stamp(), { instant: true })
+    expect(machine.send('down')).toBeNull()
+    expect(machine.send('pick')).toBeNull()
+    expect(machine.state).toBe('rest')
+    machine.dispose()
+  })
+
+  it('pickProgrammatic walks rest→hover→pressed→picked, emitting each state', () => {
+    const seen: string[] = []
+    const machine = new PaperStateMachine(stamp(), {
+      instant: true,
+      onChange: (_c, s) => seen.push(s),
+    })
+    expect(machine.pickProgrammatic()).toBe(true)
+    expect(machine.state).toBe('picked')
+    expect(seen).toEqual(['hover', 'pressed', 'picked'])
+    machine.dispose()
+  })
+
+  it('§6 flow: pick applies the override, place fires the emit, return goes home', () => {
+    const onAction = vi.fn()
+    // The field auto-wires this: picked → carry, placed → emit a postmark.
+    const config = paperConfigSchema.parse({
+      behavior: { type: 'peel', progress: 0 },
+      states: {
+        states: {
+          picked: { overrides: { behavior: { type: 'carry', grab: 'top-left' } } },
+          placed: { overrides: {}, onEnter: ['emit:postmark'] },
+        },
+      },
+    })
+
+    const machine = new PaperStateMachine(config, { instant: true, onAction })
+    expect(machine.pickProgrammatic()).toBe(true)
+    expect(machine.state).toBe('picked')
+    // Override applied: the behavior actually swapped to carry.
+    expect(machine.config.behavior!.type).toBe('carry')
+    // Place fires the onEnter emit chain (was unreachable from a keyboard pick).
+    expect(machine.placeProgrammatic()).toBe(true)
+    expect(machine.state).toBe('placed')
+    expect(onAction).toHaveBeenCalledWith('postmark', 'placed')
+    machine.dispose()
+
+    // A pick that is cancelled (Esc) returns to rest instead of placing.
+    const m2 = new PaperStateMachine(config, { instant: true })
+    m2.pickProgrammatic()
+    expect(m2.returnProgrammatic()).toBe(true)
+    expect(m2.state).toBe('rest')
+    m2.dispose()
+  })
+
+  it('place/return report false when they do not apply', () => {
+    const machine = new PaperStateMachine(stamp(), { instant: true })
+    expect(machine.placeProgrammatic()).toBe(false) // still at rest
+    expect(machine.returnProgrammatic()).toBe(false)
+    machine.dispose()
+  })
+})

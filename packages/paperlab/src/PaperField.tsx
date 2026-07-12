@@ -637,7 +637,10 @@ function InteractiveField(props: InteractiveFieldProps) {
       setSlotPatches((prev) => ({ ...prev, [slot]: mergeConfig(prev[slot] ?? {}, patch) }))
     }
 
-    handle.sendState('pick')
+    // Drive the machine through rest→hover→pressed→picked so every side effect
+    // fires for BOTH pointer (already at 'pressed') and keyboard (still at
+    // 'rest') entry — raw send('pick') from 'rest' was a silent no-op.
+    handle.pickProgrammatic()
     carriedRef.current = {
       slot,
       pointerId,
@@ -660,7 +663,7 @@ function InteractiveField(props: InteractiveFieldProps) {
     const handle = handleRefs.current[carried.slot]
     if (!group || !handle) return
     carried.settling = true
-    handle.sendState('place')
+    handle.placeProgrammatic()
     handle.set('drive', 0)
     registry.setHovered(null)
 
@@ -705,7 +708,7 @@ function InteractiveField(props: InteractiveFieldProps) {
 
     const home = carried.homePose
     const done = () => {
-      handle.sendState('return')
+      handle.returnProgrammatic()
       carriedRef.current = null
       if (controls) controls.enabled = true
     }
@@ -837,7 +840,7 @@ function InteractiveField(props: InteractiveFieldProps) {
       pick: (slot) => {
         const home = poses[slot]
         if (!home) return false
-        handleRefs.current[slot]?.sendState('down')
+        // pick() drives the machine (rest→…→picked) itself — no raw events.
         return pick(slot, home.position[0], home.position[1])
       },
       placeAtZone: (slot, zoneId) => {

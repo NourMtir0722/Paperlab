@@ -16,6 +16,12 @@ export interface UsePaperStatesResult {
  * config edits via `rebase` (current state and live values are kept —
  * flipping perforation to torn mid-pick must not snap the stamp to rest);
  * it is only rebuilt when states are toggled on/off.
+ *
+ * `animated` holds an IMMUTABLE structural snapshot for the React tree; it
+ * updates only on structural boundaries (transition start/settle, state swap,
+ * rebase), not per frame. Per-tick numeric values are read straight off
+ * `machine.liveConfig` by the caller's frame loop — GSAP owns values, useFrame
+ * owns uploads. `machine` is returned so the caller can poll it.
  */
 export function usePaperStates(
   config: PaperConfig,
@@ -50,6 +56,7 @@ export function usePaperStates(
     }
     const machine = new PaperStateMachine(config, {
       instant,
+      // Structural boundaries only (not per tick) — safe to route to React.
       onChange: (c, state) => {
         if (state !== lastStateRef.current) {
           lastStateRef.current = state
@@ -61,7 +68,7 @@ export function usePaperStates(
     })
     machineRef.current = machine
     lastStateRef.current = machine.state
-    setAnimated({ config: machine.config, state: machine.state })
+    setAnimated({ config: machine.structuralConfig(), state: machine.state })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, live, instant])
 
