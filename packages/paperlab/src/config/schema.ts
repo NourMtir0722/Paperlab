@@ -7,6 +7,8 @@ import { letterFoldOptionsSchema } from '../behaviors/letter-fold'
 import { hangOptionsSchema } from '../behaviors/hang'
 import { flyOptionsSchema } from '../behaviors/fly'
 import { fallOptionsSchema } from '../behaviors/fall'
+import { carryOptionsSchema } from '../behaviors/carry'
+import { flightOptionsSchema } from '../behaviors/flight'
 
 /**
  * The zod schema is the single source of truth: it validates the public API,
@@ -184,6 +186,8 @@ export const behaviorConfigSchema = z.discriminatedUnion('type', [
   hangOptionsSchema.extend({ type: z.literal('hang') }),
   flyOptionsSchema.extend({ type: z.literal('fly') }),
   fallOptionsSchema.extend({ type: z.literal('fall') }),
+  carryOptionsSchema.extend({ type: z.literal('carry') }),
+  flightOptionsSchema.extend({ type: z.literal('flight') }),
 ])
 
 export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>

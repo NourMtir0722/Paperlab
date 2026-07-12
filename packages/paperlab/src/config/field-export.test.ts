@@ -9,7 +9,7 @@ import {
 } from './field-export'
 import { AGENT_PAYLOAD_VERSION } from './agent-payload'
 import { getPreset } from './presets'
-import { groupFieldPapers } from '../PaperField'
+import { groupFieldPapers, zoneAccepts } from '../PaperField'
 
 const photo = getPreset('photo-print')
 const receipt = getPreset('receipt-unroll')
@@ -27,7 +27,7 @@ const mixedField: FieldExportInput = {
 }
 
 describe('field export', () => {
-  it('payload is v2 with the fixed anatomy and a field verify line', () => {
+  it('payload is v3 with the fixed anatomy and a field verify line', () => {
     const payload = buildFieldAgentPayload(mixedField)
     const order = [
       `agent-payload v${AGENT_PAYLOAD_VERSION}`,
@@ -71,6 +71,62 @@ describe('field export', () => {
       motion: { speed: 0.8 }, // autoplay stripped
       // entrance was all defaults → omitted entirely
     })
+  })
+
+  it('the stamp sheet exports with states, zones, and the M6 verify vocabulary', () => {
+    const stamp = getPreset('postage-stamp')
+    const stampSheet: FieldExportInput = {
+      layout: 'sheet',
+      layoutOptions: { rows: 2, columns: 5 },
+      motion: { driver: 'none' },
+      entrance: { type: 'none' },
+      papers: Array.from({ length: 10 }, (_, i) => ({
+        presetName: 'postage-stamp',
+        preset: stamp,
+        // Slot 3's hover peels deeper than the rest (slot-layer override).
+        ...(i === 3
+          ? { states: { states: { hover: { overrides: { behavior: { progress: 0.4 } } } } } }
+          : {}),
+      })),
+      zones: [
+        {
+          id: 'envelope',
+          accept: ['postage-*'],
+          bounds: { position: [3.2, 0, 0], size: [1.6, 1] },
+        },
+      ],
+    }
+
+    const src = buildFieldComponentSource(stampSheet)
+    // The preset's states serialize inside the inlined const.
+    expect(src).toContain('"states"')
+    expect(src).toContain('"hover"')
+    // The slot override rides on the slot, not the preset.
+    expect(src).toContain('states: {"states":{"hover":{"overrides":{"behavior":{"progress":0.4}}}}}')
+    // Zones export as DropZone children with an onPlace stub.
+    expect(src).toContain("import { PaperField, type FieldPaperSlot, type PaperConfigInput, DropZone } from 'paperlab'")
+    expect(src).toContain('<DropZone')
+    expect(src).toContain('id="envelope"')
+    expect(src).toContain('accept={["postage-*"]}')
+    expect(src).toContain('onPlace={(paper, zone) => {')
+
+    const line = describeFieldConfig(stampSheet)
+    expect(line).toContain('a 2×5 sheet of papers on a shared backing')
+    expect(line).toContain('hovering peels/reacts per paper')
+    expect(line).toContain('carry to the envelope zone')
+
+    const payload = buildFieldAgentPayload(stampSheet)
+    expect(payload).toContain(`agent-payload v${AGENT_PAYLOAD_VERSION}`)
+    expect(payload).toContain('release elsewhere flutters it back')
+  })
+
+  it('zoneAccepts matches preset-name globs, all by default', () => {
+    expect(zoneAccepts({}, 'postage-stamp')).toBe(true)
+    expect(zoneAccepts({ accept: ['postage-*'] }, 'postage-stamp')).toBe(true)
+    expect(zoneAccepts({ accept: ['stamp-*'] }, 'postage-stamp')).toBe(false)
+    expect(zoneAccepts({ accept: ['stamp-*', 'postage-stamp'] }, 'postage-stamp')).toBe(true)
+    // Glob is anchored — a bare prefix doesn't match.
+    expect(zoneAccepts({ accept: ['postage'] }, 'postage-stamp')).toBe(false)
   })
 
   it('deduplicates presets and keeps const names collision-safe', () => {

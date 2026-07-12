@@ -6,14 +6,14 @@ Install: `npm i paperlab three @react-three/fiber gsap` (React ≥ 19, three ≥
 
 ## Core API
 
-- `<Paper />` — one sheet, owns its own <Canvas>, fills its parent (parent needs a height!). Props: preset (name or object), sheet {width,height,thickness}, stock ('printer'|'thermal'|'kraft'|'newsprint'|'vellum'|'photo-gloss'), content ({type:'image',src,alt} | {type:'text',text,...} | {type:'receipt',store,items,...}), behavior, surface {grain,deckle,creaseLines,aging}, physics, interactive, autoplay, reducedMotion.
+- `<Paper />` — one sheet, owns its own <Canvas>, fills its parent (parent needs a height!). Props: preset (name or object), sheet {width,height,thickness}, stock ('printer'|'thermal'|'kraft'|'newsprint'|'vellum'|'photo-gloss'|'sticker'), content ({type:'image',src,alt} | {type:'text',text,...} | {type:'receipt',store,items,...}), behavior, surface {grain,deckle,creaseLines,aging,perforation}, physics, interactive, autoplay, reducedMotion.
 - `<PaperMesh />` — the same, canvas-less, for existing React Three Fiber scenes.
-- `<PaperField />` — many sheets, one instanced draw call. Props: images | papers, preset, layout ('ring'|'deck'|'cascade'|'helix'|'wall'|'tunnel'|'scatter'), layoutOptions, motion {driver:'autoplay'|'drag'|'none', speed}, entrance {type:'rise'|'scatter'|'none', stagger}.
-- Ref API: play(), pause(), set('progress', v), getProgress(), snapshot(), toJSON().
+- `<PaperField />` — many sheets, one instanced draw call. Props: images | papers, preset, layout ('ring'|'deck'|'cascade'|'helix'|'wall'|'tunnel'|'scatter'|'sheet'), layoutOptions, motion {driver:'autoplay'|'drag'|'none', speed}, entrance {type:'rise'|'scatter'|'none', stagger}. A `sheet` layout renders a stamp block on a shared backing; slots with `states` make the field interactive (per-paper hover/press/pick). `<DropZone id bounds={{position,size}} accept={['glob-*']} onPlace={(paper, zone) => …} />` children are drop targets for picked papers.
+- Ref API: play(), pause(), set('progress', v), getProgress(), snapshot(), toJSON(), state, sendState(event).
 
 ## Behaviors (behavior={{ type, ...params }})
 
-peel {progress, corner, radius} · unroll {progress, tightness, sway} · flip {progress, spine, radius} · letter-fold {progress, crease} · hang {wind, sag} · fly {flutter, curve} · fall {flutter, curl}
+peel {progress, corner ('auto' resolves outward in a sheet field), radius} · unroll {progress, tightness, sway} · flip {progress, spine, radius} · letter-fold {progress, crease} · hang {wind, sag} · fly {flutter, curve} · fall {flutter, curl} · carry {grab, stiffness, flutter, lag, drive} (a held paper drooping from its pinch point) · flight {wind:[x,y,z], gustiness, tumble, path:'drift'|'loop', respawn, range} (free paper travelling across the scene)
 
 ## Physics
 
@@ -21,7 +21,11 @@ Idle (compose with behaviors): 'float' 'tumble' 'dangle' 'taped' 'breeze'. Cloth
 
 ## Presets
 
-Built-ins: receipt-unroll, letter-fold, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
+Built-ins: receipt-unroll, letter-fold, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note, postage-stamp. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
+
+## Interaction states (M6)
+
+A preset may carry `states`: overrides-on-base diffs keyed rest/hover/pressed/picked/placed (`{states: {initial:'rest', states: {hover: {overrides: {behavior:{progress:0.4}}, transition: {duration:0.25, ease:'power2.out'}}}, pickThreshold: 0.08}}`). Triggers are built in: hover/press on pointer, drag past pickThreshold tears a stamp off its sheet (perforation edges facing neighbors flip to 'torn' automatically), release over a DropZone settles it (snap → press → flatten, then onPlace fires), release elsewhere flutters it back — torn stays torn. Field slots take a `states` override layer of their own. Keyboard flow ships automatically: focus a paper, Enter picks, arrows move between zones, Enter places, Esc returns.
 
 ## Pitfalls
 

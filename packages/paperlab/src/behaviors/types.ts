@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import type { DeformerInstance, SheetDims } from '../deformers/types'
+import type { AeroPose } from '../physics/aero'
 
 /** A draggable 3D grab point; drags write back to behavior params. */
 export interface HandleSpec<O = any> {
@@ -26,6 +27,13 @@ export interface Behavior<O = any> {
   stack(o: O, sheet: SheetDims): DeformerInstance[]
   /** Transient, time-varying option overrides (idle motion). Never persisted. */
   loop?(o: O, t: number): Partial<O>
+  /**
+   * Whole-sheet motion written into `pose` each frame (allocation-free),
+   * composed after any idle preset's transform. Must be a pure function of
+   * (options, t) — the field applies it per instance with a time offset, so
+   * it has to be deterministic (flight's travel-across-the-scene).
+   */
+  transform?(o: O, t: number, pose: AeroPose): void
   handles?: HandleSpec<O>[]
   /** The option the transport scrubber drives. */
   progressParam: keyof O & string

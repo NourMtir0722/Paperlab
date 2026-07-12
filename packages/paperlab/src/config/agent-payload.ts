@@ -9,8 +9,11 @@ import { diffConfig } from './diff'
  * contract → a verification step the agent can self-check → pre-empted
  * failure modes.
  */
-/** v2: field exports (multi-preset galleries with inlined preset consts). */
-export const AGENT_PAYLOAD_VERSION = 2
+/**
+ * v2: field exports (multi-preset galleries with inlined preset consts).
+ * v3: interaction states, sheet/backing fields, drop zones, carry/flight.
+ */
+export const AGENT_PAYLOAD_VERSION = 3
 
 const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> = {
   peel: (o) => `its ${String(o.corner ?? 'bottom-right').replace('-', ' ')} corner peeling up`,
@@ -23,6 +26,11 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
   hang: () => 'hanging from its top edge, rippling',
   fly: () => 'arched and fluttering like it is airborne',
   fall: () => 'rippling with one corner lifted, like a dropped sheet',
+  carry: () => 'drooping from a pinched corner, fluttering as if being carried',
+  flight: (o) =>
+    o.path === 'loop'
+      ? 'tumbling through a seamless airborne loop'
+      : 'tumbling across the scene on the wind',
 }
 
 /** One line an agent can verify against what it sees after `npm run dev`. */

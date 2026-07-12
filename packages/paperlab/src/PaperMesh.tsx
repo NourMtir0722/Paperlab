@@ -298,12 +298,18 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     // Reduced motion freezes time-driven deformers at their resting phase.
     const now = reduced ? 0 : cfg.onTwos ? quantizeTime(clock.elapsedTime) : clock.elapsedTime
 
-    // Whole-sheet idle motion (float, tumble, dangle) — transform, not vertices.
-    if (idle?.transform && groupRef.current) {
+    // Whole-sheet motion — idle presets and behavior transforms (flight's
+    // travel across the scene) compose additively; vertices stay untouched.
+    const hasBehaviorTransform = Boolean(behavior?.transform && cfg.behavior)
+    if ((idle?.transform || hasBehaviorTransform) && groupRef.current) {
       const pose = idlePose.current
       pose.position[0] = pose.position[1] = pose.position[2] = 0
       pose.rotation[0] = pose.rotation[1] = pose.rotation[2] = 0
-      idle.transform(now, pose)
+      idle?.transform?.(now, pose)
+      if (hasBehaviorTransform) {
+        const o = effectiveOptions(now)
+        if (o) behavior!.transform!(o, now, pose)
+      }
       const base = props.position ?? [0, 0, 0]
       const baseRot = props.rotation ?? [0, 0, 0]
       groupRef.current.position.set(

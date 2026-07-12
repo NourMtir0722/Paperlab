@@ -1,6 +1,6 @@
 import { gsap } from 'gsap'
 import { mergeConfig } from '../config/merge'
-import type { PaperConfig, StateName } from '../config/schema'
+import { paperConfigSchema, type PaperConfig, type StateName } from '../config/schema'
 
 /**
  * The interaction-state engine. A state is a set of parameter overrides on
@@ -35,12 +35,14 @@ export function stripStates(config: PaperConfig): PaperConfig {
 /**
  * Resolve a state name to its full config: base + that state's overrides.
  * States without a recorded def (e.g. an untouched 'rest') are the base.
+ * The merge re-parses so a structural override (a behavior swapped to
+ * `{ type: 'carry' }`) comes back with every default filled.
  */
 export function resolveStateConfig(base: PaperConfig, state: string): PaperConfig {
   const def = base.states?.states[state]
   const flat = stripStates(base)
   if (!def || Object.keys(def.overrides).length === 0) return flat
-  return mergeConfig(flat as Record<string, unknown>, def.overrides) as PaperConfig
+  return paperConfigSchema.parse(mergeConfig(flat as Record<string, unknown>, def.overrides))
 }
 
 // ── Numeric flattening (dot paths, array indices included) ──────────────────

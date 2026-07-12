@@ -4,10 +4,17 @@ export {
   PaperFieldMesh,
   groupFieldPapers,
   resolveFieldSlotConfig,
+  DropZone,
+  DropZoneRegistry,
+  zoneAccepts,
   type PaperFieldProps,
   type PaperFieldMeshProps,
   type FieldPaperSlot,
   type FieldGroupData,
+  type DropZoneConfig,
+  type DropZoneProps,
+  type PlacedPaper,
+  type FieldA11yController,
 } from './PaperField'
 export { PaperMesh, resolveConfig, type PaperMeshProps, type PaperHandle } from './PaperMesh'
 
@@ -101,6 +108,8 @@ export { letterFold, letterFoldOptionsSchema, type LetterFoldOptions } from './b
 export { hang, hangOptionsSchema, type HangOptions } from './behaviors/hang'
 export { fly, flyOptionsSchema, type FlyOptions } from './behaviors/fly'
 export { fall, fallOptionsSchema, type FallOptions } from './behaviors/fall'
+export { carry, carryOptionsSchema, type CarryOptions } from './behaviors/carry'
+export { flight, flightOptionsSchema, type FlightOptions } from './behaviors/flight'
 
 export { idlePresets, getIdlePreset, idleNames, type IdleName, type IdlePreset } from './physics/idle'
 
@@ -135,6 +144,15 @@ export {
   type ParityResult,
 } from './field/parity'
 export { ClothSim, type ClothParams, type PinMode } from './physics/cloth'
+export {
+  dampTo,
+  gust,
+  flightPose,
+  carryDrive,
+  type AeroPose,
+  type DampedValue,
+  type FlightParams,
+} from './physics/aero'
 
 export { composeSurface, type ComposedSurface, type SurfaceMaps } from './surface/compose'
 export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'
@@ -155,6 +173,7 @@ export {
   distinctFieldPresets,
   type FieldExportInput,
   type FieldExportPaper,
+  type FieldExportZone,
 } from './config/field-export'
 export {
   usePrefersReducedMotion,

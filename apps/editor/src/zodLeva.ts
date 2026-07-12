@@ -35,6 +35,27 @@ export function schemaControls(
         step: (max - min) / 200,
         onChange: handler,
       }
+    } else if (inner instanceof z.ZodTuple && isNumberTuple(inner)) {
+      // Numeric tuples (flight's wind vector) → one slider per component.
+      const items = inner._def.items as z.ZodNumber[]
+      const current = Array.isArray(value) ? (value as number[]) : items.map(() => 0)
+      items.forEach((item, axis) => {
+        const min = checkValue(item, 'min') ?? -1
+        const max = checkValue(item, 'max') ?? 1
+        controls[`${key}${'XYZW'[axis] ?? axis}`] = {
+          label: `${key} ${'xyzw'[axis] ?? axis}`,
+          value: current[axis] ?? 0,
+          min,
+          max,
+          step: (max - min) / 200,
+          onChange: (v: unknown, _path: unknown, ctx: { initial: boolean }) => {
+            if (ctx.initial) return
+            const next = [...current]
+            next[axis] = v as number
+            onChange(key, next)
+          },
+        }
+      })
     } else if (inner instanceof z.ZodEnum) {
       controls[key] = { value, options: [...inner.options], onChange: handler }
     } else if (inner instanceof z.ZodBoolean) {
@@ -44,6 +65,11 @@ export function schemaControls(
     }
   }
   return controls as LevaSchema
+}
+
+function isNumberTuple(tuple: z.ZodTuple): boolean {
+  const items = tuple._def.items as z.ZodTypeAny[]
+  return items.length > 0 && items.length <= 4 && items.every((i) => i instanceof z.ZodNumber)
 }
 
 function unwrap(field: z.ZodTypeAny): z.ZodTypeAny {

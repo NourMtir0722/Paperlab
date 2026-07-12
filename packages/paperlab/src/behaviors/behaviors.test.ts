@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { peel } from './peel'
 import { unroll } from './unroll'
 import { flip } from './flip'
+import { carry } from './carry'
+import { flight } from './flight'
 import { getBehavior, listBehaviors } from './registry'
 import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
 
@@ -17,6 +19,8 @@ describe('behavior registry', () => {
       'hang',
       'fly',
       'fall',
+      'carry',
+      'flight',
     ])
   })
 
@@ -84,6 +88,43 @@ describe('flip', () => {
     expect((flat[0]!.options as { boundary: number }).boundary).toBeCloseTo(0.5)
     const turned = flip.stack({ progress: 1, spine: 'left', radius: 0.3 }, s)
     expect((turned[0]!.options as { boundary: number }).boundary).toBeCloseTo(-0.5)
+  })
+})
+
+describe('carry', () => {
+  it('droops from the grab corner; stiffness fights the droop', () => {
+    const soft = carry.stack({ grab: 'top-left', stiffness: 0.2, flutter: 0.5, lag: 0.3, drive: 0 }, sheet)
+    const stiff = carry.stack({ grab: 'top-left', stiffness: 0.9, flutter: 0.5, lag: 0.3, drive: 0 }, sheet)
+    const curvature = (s: typeof soft) => Math.abs((s[0]!.options as { curvature: number }).curvature)
+    expect(curvature(soft)).toBeGreaterThan(curvature(stiff))
+  })
+
+  it('drag velocity becomes flutter: drive scales the wave amplitude', () => {
+    const still = carry.stack({ grab: 'bottom-right', stiffness: 0.7, flutter: 0.5, lag: 0.3, drive: 0 }, sheet)
+    const moving = carry.stack({ grab: 'bottom-right', stiffness: 0.7, flutter: 0.5, lag: 0.3, drive: 1 }, sheet)
+    const amp = (s: typeof still) => (s[1]!.options as { amplitude: number }).amplitude
+    expect(amp(moving)).toBeGreaterThan(amp(still))
+    // The grabbed edge doesn't flutter — it's pinched.
+    expect((still[1]!.options as { pinnedEdge: string }).pinnedEdge).toBe('bottom')
+  })
+})
+
+describe('flight', () => {
+  it('ships a whole-sheet transform (travel) plus a flutter stack', () => {
+    expect(flight.transform).toBeTypeOf('function')
+    const stack = flight.stack(flight.defaults, sheet)
+    expect(stack.map((i) => i.type)).toEqual(['bend', 'wave'])
+  })
+
+  it('is in the registry and the schema union', () => {
+    expect(listBehaviors()).toContain('flight')
+    expect(behaviorConfigSchema.parse({ type: 'flight' })).toMatchObject({
+      wind: [0.6, 0.08, 0],
+      gustiness: 0.4,
+      tumble: 0.6,
+      path: 'drift',
+      respawn: true,
+    })
   })
 })
 

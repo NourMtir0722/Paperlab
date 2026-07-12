@@ -25,6 +25,15 @@ import {
   type UserPresetMap,
 } from './userPresets'
 
+export interface EditorZone {
+  id: string
+  /** Comma-separated preset-name globs; empty = accept all. */
+  accept: string
+  position: [number, number, number]
+  size: [number, number]
+  highlight: 'none' | 'glow' | 'outline'
+}
+
 export interface FieldState {
   layout: string
   layoutOptions: Record<string, unknown>
@@ -36,6 +45,22 @@ export interface FieldState {
   slots: string[]
   /** Per-slot state overrides (slot layer, merged over the preset's states). */
   slotStates: Record<number, PaperStatesInput>
+  /** Drop zones — serialized into the field config and the export. */
+  zones: EditorZone[]
+}
+
+/** Editor zone → library DropZoneConfig. */
+export function zoneToConfig(zone: EditorZone) {
+  const accept = zone.accept
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return {
+    id: zone.id,
+    ...(accept.length > 0 ? { accept } : {}),
+    bounds: { position: zone.position, size: zone.size },
+    highlight: zone.highlight,
+  }
 }
 
 interface EditorState {
@@ -66,6 +91,9 @@ interface EditorState {
   /** Record a slot-layer state override (field mode chip bar). */
   patchSlotState(slot: number, state: string, overrides: Record<string, unknown>): void
   clearSlotState(slot: number, state: string): void
+  addZone(): void
+  patchZone(index: number, patch: Partial<EditorZone>): void
+  removeZone(index: number): void
   setMode(mode: 'paper' | 'field'): void
   patchField(patch: Partial<FieldState>): void
   setSlotPreset(index: number, name: string): void
@@ -110,6 +138,7 @@ export const useEditor = create<EditorState>((set, get) => ({
     entrance: 'rise',
     slots: Array.from({ length: 14 }, () => 'photo-print'),
     slotStates: {},
+    zones: [],
   },
   cameFromField: false,
   editingState: null,
@@ -211,6 +240,36 @@ export const useEditor = create<EditorState>((set, get) => ({
         inspectorEpoch: s.inspectorEpoch + 1,
       }
     }),
+  addZone: () =>
+    set((s) => {
+      let n = s.field.zones.length + 1
+      let id = `zone-${n}`
+      while (s.field.zones.some((z) => z.id === id)) id = `zone-${++n}`
+      const zone: EditorZone = {
+        id,
+        accept: '',
+        // Off to the right of the field — visible, not on top of the papers.
+        position: [2.8, 0, 0],
+        size: [1.6, 1.1],
+        highlight: 'glow',
+      }
+      return {
+        field: { ...s.field, zones: [...s.field.zones, zone] },
+        inspectorEpoch: s.inspectorEpoch + 1,
+      }
+    }),
+  patchZone: (index, patch) =>
+    set((s) => ({
+      field: {
+        ...s.field,
+        zones: s.field.zones.map((z, i) => (i === index ? { ...z, ...patch } : z)),
+      },
+    })),
+  removeZone: (index) =>
+    set((s) => ({
+      field: { ...s.field, zones: s.field.zones.filter((_, i) => i !== index) },
+      inspectorEpoch: s.inspectorEpoch + 1,
+    })),
   setMode: (mode) =>
     set((s) => ({
       mode,

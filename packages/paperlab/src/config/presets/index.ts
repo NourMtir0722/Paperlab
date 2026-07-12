@@ -135,6 +135,9 @@ const builtins: Record<string, PaperConfigInput> = {
           overrides: { behavior: { progress: 0.5 } },
           transition: { duration: 0.16, ease: 'power3.out' },
         },
+        // Picked is auto-choreographed at pick time (carry hanging from the
+        // peeled corner); placed announces itself for a host postmark overlay.
+        placed: { overrides: {}, onEnter: ['emit:postmark'] },
       },
       pickThreshold: 0.08,
     },
