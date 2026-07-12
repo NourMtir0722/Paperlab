@@ -4,6 +4,7 @@ import { paperConfigSchema, type PaperConfig } from '../config/schema'
 import {
   PaperStateMachine,
   flattenNumeric,
+  recordStateOverride,
   resolveStateConfig,
   stateEventTransitions,
   stripStates,
@@ -359,5 +360,68 @@ describe('programmatic pick/place/return (keyboard/a11y flow)', () => {
     expect(machine.placeProgrammatic()).toBe(false) // still at rest
     expect(machine.returnProgrammatic()).toBe(false)
     machine.dispose()
+  })
+})
+
+// The editor's single write path: every setter records into the active state's
+// override diff, never the base (finding #2). recordStateOverride is that path.
+describe('recordStateOverride (editor state-aware writes)', () => {
+  it('records a behavior-param edit as a state override — base and siblings untouched', () => {
+    const base = stamp()
+    const before = JSON.parse(JSON.stringify(base))
+    const next = recordStateOverride(base, 'hover', { behavior: { progress: 0.6 } })
+
+    // The hover override picks up the new value (was 0.22)…
+    expect(next.states!.states.hover!.overrides).toMatchObject({ behavior: { progress: 0.6 } })
+    // …while the BASE behavior stays exactly as it was.
+    expect(behaviorProgress(next)).toBe(behaviorProgress(base))
+    // …and a sibling state (pressed) is not disturbed.
+    expect(next.states!.states.pressed).toEqual(base.states!.states.pressed)
+    // The input config is never mutated.
+    expect(base).toEqual(before)
+  })
+
+  it('records a behavior-TYPE swap into the override without changing the base type', () => {
+    const base = paperConfigSchema.parse({
+      behavior: { type: 'peel', progress: 0.3 },
+      states: { states: { hover: { overrides: {} } } },
+    })
+    const next = recordStateOverride(base, 'hover', { behavior: { type: 'carry', grab: 'top-left' } })
+    // Base stays peel; the hover override carries the carry swap.
+    expect(next.behavior!.type).toBe('peel')
+    expect((next.states!.states.hover!.overrides as { behavior: { type: string } }).behavior.type).toBe(
+      'carry',
+    )
+    // Resolving hover yields the swapped behavior.
+    expect(resolveStateConfig(next, 'hover').behavior!.type).toBe('carry')
+  })
+
+  it('records a physics override; the base physics is left alone', () => {
+    const base = paperConfigSchema.parse({
+      physics: 'none',
+      states: { states: { hover: { overrides: {} } } },
+    })
+    const next = recordStateOverride(base, 'hover', { physics: 'float' })
+    expect(next.physics).toBe('none')
+    expect(next.states!.states.hover!.overrides).toEqual({ physics: 'float' })
+    expect(resolveStateConfig(next, 'hover').physics).toBe('float')
+  })
+
+  it('drops undefined values — an override SETs, it cannot remove a base key', () => {
+    const base = paperConfigSchema.parse({
+      surface: { grain: 0.4 },
+      states: { states: { hover: { overrides: {} } } },
+    })
+    const next = recordStateOverride(base, 'hover', { surface: { grain: undefined } })
+    // Nothing recorded (the only key was undefined) — base grain untouched.
+    expect(next.states!.states.hover!.overrides).toEqual({})
+    expect(next.surface.grain).toBe(0.4)
+  })
+
+  it('seeds transition defaults for a state that had no def yet', () => {
+    const base = paperConfigSchema.parse({ behavior: { type: 'peel' } })
+    expect(base.states).toBeUndefined()
+    const next = recordStateOverride(base, 'hover', { behavior: { progress: 0.5 } })
+    expect(next.states!.states.hover!.transition).toEqual({ duration: 0.35, ease: 'power2.out' })
   })
 })
