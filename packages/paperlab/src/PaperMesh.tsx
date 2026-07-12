@@ -81,6 +81,16 @@ export interface PaperHandle {
   /** Interaction-state machine access (null when the config has no states). */
   readonly state: string
   sendState(event: StateEvent): string | null
+  /**
+   * Drive to 'picked' through the legal chain (rest→hover→pressed→picked),
+   * instantly, so every side effect fires — the keyboard/a11y entry point
+   * where no pointer hover/press ever ran. Returns true if it landed.
+   */
+  pickProgrammatic(): boolean
+  /** Instant, legal place (picked → placed) so onEnter/emit fires. */
+  placeProgrammatic(): boolean
+  /** Instant, legal return (picked → rest). */
+  returnProgrammatic(): boolean
 }
 
 /** Resolve preset + prop overrides into a validated config. */
@@ -208,8 +218,14 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const texture = useContentTexture(config.content, config.sheet, stock)
   const backTexture = useContentTexture(config.content.back, config.sheet, stock)
 
+  // Per-frame config: when a state machine is live it OWNS the animated numeric
+  // values (GSAP tweens them); we poll its mutable liveConfig each frame rather
+  // than routing every tick through React. Falls back to the React config for
+  // non-stateful papers.
+  const liveConfig = (): PaperConfig => machineRef.current?.liveConfig ?? configRef.current
+
   const effectiveOptions = (t: number): Record<string, unknown> | null => {
-    const cfg = configRef.current
+    const cfg = liveConfig()
     if (!cfg.behavior || !behavior) return null
     const o = { ...cfg.behavior, ...overridesRef.current }
     return behavior.loop ? { ...o, ...behavior.loop(o, t) } : o
@@ -296,12 +312,15 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       return machineState
     },
     sendState: (event: StateEvent) => machineRef.current?.send(event) ?? null,
+    pickProgrammatic: () => machineRef.current?.pickProgrammatic() ?? false,
+    placeProgrammatic: () => machineRef.current?.placeProgrammatic() ?? false,
+    returnProgrammatic: () => machineRef.current?.returnProgrammatic() ?? false,
   }))
 
   const idlePose = useRef<IdlePose>({ position: [0, 0, 0], rotation: [0, 0, 0] })
 
   useFrame(({ clock }, delta) => {
-    const cfg = configRef.current
+    const cfg = liveConfig()
     // Reduced motion freezes time-driven deformers at their resting phase.
     const now = reduced ? 0 : cfg.onTwos ? quantizeTime(clock.elapsedTime) : clock.elapsedTime
 
@@ -355,7 +374,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     if (!stack) return
     const animated = !reduced && stackIsAnimated(stack)
     const hasLoop = !reduced && Boolean(cfg.behavior && behavior?.loop)
-    if (!dirtyRef.current && !hasLoop && !animated) return
+    // A state transition tweens numeric leaves off the React path, so the
+    // stack must re-apply every frame while the machine is transitioning.
+    const machineAnimating = Boolean(machineRef.current?.transitioning)
+    if (!dirtyRef.current && !hasLoop && !animated && !machineAnimating) return
     dirtyRef.current = false
 
     const ctx = { t: now, sheet: cfg.sheet }
