@@ -20,7 +20,7 @@ import { Paper } from 'paperlab'
 // Or configure inline (all fields optional, validated by zod):
 <Paper
   sheet={{ width: 1, height: 2.6, thickness: 0.3 }}
-  stock="thermal"          // printer | thermal | kraft | newsprint | vellum | photo-gloss
+  stock="thermal"          // printer | thermal | kraft | newsprint | vellum | photo-gloss | sticker
   content={{ type: 'receipt', store: 'acme.dev', items: [{ name: 'Widget', price: 9.99 }] }}
   behavior={{ type: 'unroll', progress: 0.6, tightness: 0.5, sway: 0.3 }}
   surface={{ grain: 0.3, deckle: { edges: ['bottom'], roughness: 0.5 } }}
@@ -38,12 +38,56 @@ import { PaperField } from 'paperlab'
 <PaperField
   images={['/a.jpg', '/b.jpg', '/c.jpg']}
   preset="photo-print"
-  layout="ring"            // ring | deck | cascade | helix | wall | tunnel | scatter
+  layout="ring"            // ring | deck | cascade | helix | wall | tunnel | scatter | sheet
   layoutOptions={{ radius: 3, tiltDeg: 8 }}
   motion={{ driver: 'autoplay', speed: 0.5 }}   // autoplay | drag | none
   entrance={{ type: 'rise', stagger: 0.06 }}    // rise | scatter | none
 />
 ```
+
+### Interaction states, the stamp sheet, and drop zones (M6)
+
+A preset may carry `states` — overrides-on-base diffs, never separate presets:
+
+```tsx
+// One stamp of a block: hover peels its outward corner, pressing deepens it.
+states: {
+  initial: 'rest',
+  states: {
+    hover:   { overrides: { behavior: { progress: 0.22 } }, transition: { duration: 0.25, ease: 'power2.out' } },
+    pressed: { overrides: { behavior: { progress: 0.5 } } },
+    placed:  { overrides: {}, onEnter: ['emit:postmark'] },   // v1 actions: 'emit:<event>'
+  },
+  pickThreshold: 0.08,   // world-units drag that tears it off the sheet
+}
+```
+
+Triggers are built in (rest ↔ hover ↔ pressed; drag past `pickThreshold` →
+picked; release over a zone → placed, elsewhere → return). A field whose
+slots carry states renders interactive (per-paper hero path) automatically.
+The full stamp flow:
+
+```tsx
+<PaperField
+  papers={Array.from({ length: 10 }, () => ({ preset: 'postage-stamp' }))}
+  layout="sheet"                       // rows × columns on a shared backing
+  layoutOptions={{ rows: 2, columns: 5 }}
+>
+  <DropZone id="envelope" accept={['postage-*']}
+            bounds={{ position: [3, 0, 0], size: [1.6, 1] }}
+            onPlace={(paper, zone) => console.log(paper.presetName, '→', zone)} />
+</PaperField>
+```
+
+Dragging a stamp past the threshold tears its perforation (edges facing
+neighbors flip to 'torn' automatically — torn stays torn), it carries with
+the cursor fluttering from drag velocity, the zone glows on approach, and
+release settles it with a snap → press → flatten choreography before
+`onPlace` fires. Released elsewhere it flutters back to its silhouette on a
+curved path. Keyboard flow ships automatically: focus a paper, Enter picks,
+arrows move between zones, Enter places, Esc returns. Per-slot state
+overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
+{ overrides: … } } } }]`.
 
 ### Imperative API (`ref` on Paper/PaperMesh)
 
@@ -60,6 +104,8 @@ import { PaperField } from 'paperlab'
 | `hang` | wind, sag | poster pinned at top, rippling |
 | `fly` | flutter, curve | airborne note |
 | `fall` | flutter, curl | dropped sheet |
+| `carry` | grab, stiffness, flutter, lag, drive | held paper drooping from its pinch point |
+| `flight` | wind [x,y,z], gustiness, tumble, path, respawn, range | free paper travelling across the scene on the wind |
 
 ### Physics
 
@@ -68,7 +114,7 @@ import { PaperField } from 'paperlab'
 
 ### Presets
 
-Built-ins: `receipt-unroll`, `letter-fold`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
+Built-ins: `receipt-unroll`, `letter-fold`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
 
 ### Common pitfalls (check these before debugging anything else)
 

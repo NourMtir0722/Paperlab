@@ -20,7 +20,7 @@ import { Transport } from './Transport'
 import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
 import { captureThumbnail } from './userPresets'
-import { useEditor } from './store'
+import { useEditor, zoneToConfig } from './store'
 
 /** Demo pool for the Field Composer; the count slider cycles through them. */
 const FIELD_IMAGES = [
@@ -78,6 +78,7 @@ export function App() {
       ...(field.slotStates[i] ? { states: field.slotStates[i] } : {}),
     }
   })
+  const fieldZones = field.zones.map(zoneToConfig)
   const fieldExportInput = (): FieldExportInput => ({
     layout: field.layout,
     layoutOptions: field.layoutOptions,
@@ -89,6 +90,7 @@ export function App() {
       content: fieldPapers[i]!.content,
       states: field.slotStates[i],
     })),
+    zones: fieldZones,
   })
 
   // State-editing mode shows the state applied; preview runs the live machine.
@@ -231,6 +233,7 @@ export function App() {
               layoutOptions={field.layoutOptions}
               motion={{ driver: field.driver, speed: field.speed }}
               entrance={{ type: field.entrance }}
+              zones={fieldZones}
             />
           )}
           <OrbitControls makeDefault enableDamping />

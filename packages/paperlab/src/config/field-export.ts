@@ -19,12 +19,21 @@ export interface FieldExportPaper {
   states?: PaperStatesInput
 }
 
+export interface FieldExportZone {
+  id: string
+  accept?: string[]
+  bounds: { position: [number, number, number]; size: [number, number] }
+  highlight?: 'none' | 'glow' | 'outline'
+}
+
 export interface FieldExportInput {
   layout: string
   layoutOptions?: Record<string, unknown>
   motion?: { driver?: 'autoplay' | 'drag' | 'none'; speed?: number }
   entrance?: { type?: 'rise' | 'scatter' | 'none'; stagger?: number; duration?: number }
   papers: FieldExportPaper[]
+  /** Drop zones — exported as `<DropZone>` children with an onPlace stub. */
+  zones?: FieldExportZone[]
 }
 
 const MOTION_DEFAULTS = { driver: 'autoplay', speed: 0.5 }
@@ -100,17 +109,34 @@ const LAYOUT_PHRASES: Record<string, string> = {
 /** The one-line visual an agent verifies after `npm run dev`. */
 export function describeFieldConfig(input: FieldExportInput): string {
   const n = input.papers.length
-  const layoutPhrase = LAYOUT_PHRASES[input.layout] ?? `a ${input.layout} layout`
-  const parts = [`${n} papers arranged in ${layoutPhrase}`]
+  const stateful = input.papers.some((p) => p.preset.states || p.states)
+  const zones = input.zones ?? []
+  const parts: string[] = []
+
+  if (input.layout === 'sheet') {
+    const rows = Number(input.layoutOptions?.rows ?? 2)
+    const columns = Number(input.layoutOptions?.columns ?? 5)
+    parts.push(`a ${rows}×${columns} sheet of papers on a shared backing`)
+  } else {
+    const layoutPhrase = LAYOUT_PHRASES[input.layout] ?? `a ${input.layout} layout`
+    parts.push(`${n} papers arranged in ${layoutPhrase}`)
+  }
 
   const driver = input.motion?.driver ?? 'autoplay'
-  const stateful = input.papers.some((p) => p.preset.states || p.states)
   if (stateful) {
     // Stateful fields render static and interactive — the motion driver is moot.
-    parts.push('reacting to hover and press (interaction states)')
+    parts.push('hovering peels/reacts per paper (interaction states)')
+    if (zones.length > 0) {
+      parts.push(
+        `dragging one past its tear threshold detaches it to carry to the ${zones
+          .map((z) => z.id)
+          .join(' or ')} zone (release elsewhere flutters it back)`,
+      )
+    }
   } else {
     if (driver === 'autoplay') parts.push('slowly orbiting on their own')
     if (driver === 'drag') parts.push('draggable sideways with the pointer')
+    if (zones.length > 0) parts.push(`${zones.length} drop zone${zones.length > 1 ? 's' : ''}`)
   }
 
   const distinct = distinctFieldPresets(input)
@@ -149,7 +175,24 @@ export function buildFieldComponentSource(input: FieldExportInput): string {
     )
     .join('\n')
 
-  return `import { PaperField, type FieldPaperSlot, type PaperConfigInput } from 'paperlab'
+  const zones = input.zones ?? []
+  const zoneImport = zones.length > 0 ? ', DropZone' : ''
+  const zoneChildren = zones
+    .map((zone) => {
+      const accept = zone.accept ? ` accept={${JSON.stringify(zone.accept)}}` : ''
+      const highlight = zone.highlight && zone.highlight !== 'glow' ? ` highlight="${zone.highlight}"` : ''
+      return `      <DropZone
+        id="${zone.id}"${accept}
+        bounds={${JSON.stringify(zone.bounds)}}${highlight}
+        onPlace={(paper, zone) => {
+          // A paper settled on "${zone.id}" — stamp a postmark, advance the flow, …
+        }}
+      />`
+    })
+    .join('\n')
+
+  if (zones.length === 0) {
+    return `import { PaperField, type FieldPaperSlot, type PaperConfigInput${zoneImport} } from 'paperlab'
 
 ${consts}
 
@@ -163,6 +206,26 @@ export function PaperGallery() {
       papers={papers}
 ${props}
     />
+  )
+}`
+  }
+
+  return `import { PaperField, type FieldPaperSlot, type PaperConfigInput${zoneImport} } from 'paperlab'
+
+${consts}
+
+const papers: FieldPaperSlot[] = [
+${slots}
+]
+
+export function PaperGallery() {
+  return (
+    <PaperField
+      papers={papers}
+${props}
+    >
+${zoneChildren}
+    </PaperField>
   )
 }`
 }

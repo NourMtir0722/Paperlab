@@ -6,6 +6,8 @@ import { letterFold } from './letter-fold'
 import { hang } from './hang'
 import { fly } from './fly'
 import { fall } from './fall'
+import { carry } from './carry'
+import { flight } from './flight'
 
 const registry = new Map<string, Behavior<any>>()
 
@@ -35,3 +37,5 @@ registerBehavior(letterFold)
 registerBehavior(hang)
 registerBehavior(fly)
 registerBehavior(fall)
+registerBehavior(carry)
+registerBehavior(flight)
