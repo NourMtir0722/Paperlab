@@ -79,6 +79,52 @@ describe('composeSurface', () => {
     expect(vellum.uniforms.uOpacity!.value).toBeLessThan(1)
   })
 
+  it('perforation punches via alphaTest with world-unit holes; torn edges flip per edge', () => {
+    const surface = surfaceSchema.parse({
+      perforation: { edges: 'all', holeRadius: 0.014, spacing: 0.05, state: { right: 'torn' } },
+    })
+    const out = composeSurface(surface, getStock('sticker'), 0.08, undefined, {
+      width: 0.64,
+      height: 0.78,
+    })
+    expect(out.alphaTest).toBe(0.5)
+    expect(out.fragmentShader).toContain('plPerforation')
+    expect(out.structureKey).toContain('p')
+    const edges = out.uniforms.uPerfEdges!.value as THREE.Vector4
+    expect([edges.x, edges.y, edges.z, edges.w]).toEqual([1, 1, 1, 1])
+    const torn = out.uniforms.uPerfTorn!.value as THREE.Vector4
+    expect([torn.x, torn.y, torn.z, torn.w]).toEqual([0, 1, 0, 0]) // top,right,bottom,left
+    expect(out.uniforms.uPerfRadius!.value).toBe(0.014)
+    const size = out.uniforms.uSheetSize!.value as THREE.Vector2
+    expect([size.x, size.y]).toEqual([0.64, 0.78])
+  })
+
+  it('perforation and deckle coexist on one paper', () => {
+    const surface = surfaceSchema.parse({
+      deckle: { edges: ['bottom'] },
+      perforation: { edges: ['top'] },
+    })
+    const out = composeSurface(surface, printer, 0.2)
+    expect(out.fragmentShader).toContain('plDeckle')
+    expect(out.fragmentShader).toContain('plPerforation')
+  })
+
+  it('adhesive underside: glossy near-white back, show-through forced off, no back darkening', () => {
+    const sticker = getStock('sticker')
+    expect(sticker.adhesive).toBe(true)
+    const out = composeSurface(surfaceSchema.parse({ showThrough: 0.4 }), sticker, 0.2, {
+      hasFrontMap: true,
+      hasBackMap: false,
+    })
+    expect(out.uniforms.uShowThrough!.value).toBe(0) // adhesive wins over the override
+    expect(out.uniforms.uBackDarken!.value).toBe(1)
+    expect(out.fragmentShader).toContain('csm_Roughness = 0.18')
+    expect(out.structureKey).toContain('A')
+    // Non-adhesive stocks are unchanged.
+    const plain = composeSurface(surfaceSchema.parse({}), printer, 0.2)
+    expect(plain.structureKey).not.toContain('A')
+  })
+
   it('pads crease positions to the fixed uniform array size', () => {
     const surface = surfaceSchema.parse({ creaseLines: { positions: [0.5] } })
     const out = composeSurface(surface, printer, 0.2)

@@ -86,6 +86,8 @@ export function diffConfig(config: PaperConfig): PaperConfigInput {
 
   if (config.scene.lighting !== 'studio') out.scene = { lighting: config.scene.lighting }
   if (config.onTwos) out.onTwos = true
+  // States are already diffs on the base — emit them whole.
+  if (config.states) out.states = config.states
   const meta = diffAgainst(config.meta as never, paperConfigSchema.parse({}).meta as never)
   if (Object.keys(meta).length > 0) out.meta = meta
 

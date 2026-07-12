@@ -1,4 +1,4 @@
-import type { ContentConfig, PaperConfig } from './schema'
+import type { ContentConfig, PaperConfig, PaperStatesInput } from './schema'
 import { diffConfig } from './diff'
 import { AGENT_PAYLOAD_VERSION } from './agent-payload'
 import { getLayout } from '../field/layouts'
@@ -15,6 +15,8 @@ export interface FieldExportPaper {
   /** The RESOLVED preset config (user presets included — nothing to fetch). */
   preset: PaperConfig
   content?: ContentConfig
+  /** Per-slot state overrides (slot 3's hover deeper than slot 4's). */
+  states?: PaperStatesInput
 }
 
 export interface FieldExportInput {
@@ -92,6 +94,7 @@ const LAYOUT_PHRASES: Record<string, string> = {
   wall: 'a jittered wall grid',
   tunnel: 'a receding tunnel',
   scatter: 'a loose scatter',
+  sheet: 'a stamp-block grid on a shared backing sheet',
 }
 
 /** The one-line visual an agent verifies after `npm run dev`. */
@@ -101,8 +104,14 @@ export function describeFieldConfig(input: FieldExportInput): string {
   const parts = [`${n} papers arranged in ${layoutPhrase}`]
 
   const driver = input.motion?.driver ?? 'autoplay'
-  if (driver === 'autoplay') parts.push('slowly orbiting on their own')
-  if (driver === 'drag') parts.push('draggable sideways with the pointer')
+  const stateful = input.papers.some((p) => p.preset.states || p.states)
+  if (stateful) {
+    // Stateful fields render static and interactive — the motion driver is moot.
+    parts.push('reacting to hover and press (interaction states)')
+  } else {
+    if (driver === 'autoplay') parts.push('slowly orbiting on their own')
+    if (driver === 'drag') parts.push('draggable sideways with the pointer')
+  }
 
   const distinct = distinctFieldPresets(input)
   if (distinct.length > 1) {
@@ -129,7 +138,8 @@ export function buildFieldComponentSource(input: FieldExportInput): string {
     .map((paper) => {
       const varName = varByKey.get(JSON.stringify(paper.preset))!
       const content = paper.content ? `, content: ${JSON.stringify(paper.content)}` : ''
-      return `  { preset: ${varName}${content} },`
+      const states = paper.states ? `, states: ${JSON.stringify(paper.states)}` : ''
+      return `  { preset: ${varName}${content}${states} },`
     })
     .join('\n')
 

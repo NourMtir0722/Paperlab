@@ -30,6 +30,8 @@ import { ClothSim } from './physics/cloth'
 import { PaperMaterial } from './surface/PaperMaterial'
 import { usePrefersReducedMotion } from './a11y'
 import { quantizeProgress, quantizeTime } from './motion/onTwos'
+import { usePaperStates } from './states/usePaperStates'
+import type { PaperStateMachine, StateEvent } from './states/machine'
 
 export interface PaperMeshProps {
   /** Built-in preset name, or a (partial) preset object. Props below override it. */
@@ -53,6 +55,16 @@ export interface PaperMeshProps {
   onProgress?(value: number): void
   /** Fires when a handle drag ends, with the params the drag changed. */
   onBehaviorChange?(patch: Record<string, unknown>): void
+  /**
+   * Interaction states: when the config carries `states`, pointer triggers
+   * are live by default. Set false to sculpt a stateful paper without the
+   * machine firing (the editor's state-editing mode).
+   */
+  stateTriggers?: boolean
+  /** Fires when the state machine changes state. */
+  onStateChange?(state: string): void
+  /** Fires for `onEnter` actions ('emit:<event>'). */
+  onStateAction?(event: string, state: string): void
 }
 
 export interface PaperHandle {
@@ -66,6 +78,9 @@ export interface PaperHandle {
   snapshot(): PaperConfig
   toJSON(): string
   readonly mesh: THREE.Mesh | null
+  /** Interaction-state machine access (null when the config has no states). */
+  readonly state: string
+  sendState(event: StateEvent): string | null
 }
 
 /** Resolve preset + prop overrides into a validated config. */
@@ -102,11 +117,22 @@ const quatScratch = new THREE.Quaternion()
  * owns animated values; useFrame owns geometry writes.
  */
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
-  const config = resolveConfig(props)
-  const behavior: Behavior | null = config.behavior ? getBehavior(config.behavior.type) : null
+  const resolved = resolveConfig(props)
   // Reduced motion: behaviors freeze at their resting pose, physics is off,
   // idle motion is off. The sheet still renders fully sculpted.
   const reduced = usePrefersReducedMotion(props.reducedMotion)
+  // Interaction states: the machine animates a live config between state
+  // overrides; `config` below is that animated view (the base when no states).
+  // Reduced motion keeps the machine but makes transitions instant.
+  const statesLive = Boolean(resolved.states) && props.stateTriggers !== false
+  const {
+    config,
+    machine,
+    state: machineState,
+  } = usePaperStates(resolved, statesLive, reduced, props.onStateAction, props.onStateChange)
+  const behavior: Behavior | null = config.behavior ? getBehavior(config.behavior.type) : null
+  const machineRef = useRef<PaperStateMachine | null>(null)
+  machineRef.current = machine
   const isCloth = !reduced && typeof config.physics === 'object'
   const idle =
     !reduced && typeof config.physics === 'string' && config.physics !== 'none'
@@ -259,6 +285,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     get mesh() {
       return meshRef.current
     },
+    get state() {
+      return machineState
+    },
+    sendState: (event: StateEvent) => machineRef.current?.send(event) ?? null,
   }))
 
   const idlePose = useRef<IdlePose>({ position: [0, 0, 0], rotation: [0, 0, 0] })
@@ -384,6 +414,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     ;(e.target as Element).releasePointerCapture(e.pointerId)
   }
 
+  // Interaction-state triggers (rest ↔ hover ↔ pressed); pick/place/return
+  // are driven by the field's carry controller through `sendState`.
+  const sendState = (event: StateEvent) => machineRef.current?.send(event)
+
   return (
     <group ref={groupRef} position={props.position} rotation={props.rotation}>
       <mesh
@@ -392,9 +426,25 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         castShadow
         receiveShadow
         frustumCulled={false}
-        onPointerDown={isCloth ? clothDown : undefined}
+        onPointerOver={statesLive ? () => sendState('enter') : undefined}
+        onPointerOut={statesLive ? () => sendState('leave') : undefined}
+        onPointerDown={
+          isCloth || statesLive
+            ? (e) => {
+                if (isCloth) clothDown(e)
+                if (statesLive) sendState('down')
+              }
+            : undefined
+        }
         onPointerMove={isCloth ? clothMove : undefined}
-        onPointerUp={isCloth ? clothUp : undefined}
+        onPointerUp={
+          isCloth || statesLive
+            ? (e) => {
+                if (isCloth) clothUp(e)
+                if (statesLive) sendState('up')
+              }
+            : undefined
+        }
       >
         <PaperMaterial
           stock={stock}
@@ -402,6 +452,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
           backTexture={backTexture}
           surface={config.surface}
           thickness={config.sheet.thickness}
+          sheet={config.sheet}
         />
       </mesh>
       {props.interactive &&

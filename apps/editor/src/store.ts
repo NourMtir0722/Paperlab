@@ -7,10 +7,14 @@ import {
   isBuiltinPreset,
   mergeConfig,
   paperConfigSchema,
+  paperStatesSchema,
   parsePreset,
+  sheetLayoutSchema,
+  stateDefSchema,
   type ClothConfig,
   type PaperConfig,
   type PaperConfigInput,
+  type PaperStatesInput,
   type SurfaceConfig,
 } from 'paperlab'
 import {
@@ -30,6 +34,8 @@ export interface FieldState {
   entrance: 'rise' | 'scatter' | 'none'
   /** Preset name per slot — each field slot references a preset (components). */
   slots: string[]
+  /** Per-slot state overrides (slot layer, merged over the preset's states). */
+  slotStates: Record<number, PaperStatesInput>
 }
 
 interface EditorState {
@@ -39,6 +45,27 @@ interface EditorState {
   field: FieldState
   /** True while editing a paper that was opened from the Field Composer. */
   cameFromField: boolean
+  /**
+   * State-editing mode (the Figma interactive-components model): non-null
+   * while a states-bar chip is active — inspector/handle edits record as that
+   * state's override diff instead of touching the base.
+   */
+  editingState: string | null
+  /** Live preview: canvas triggers fire so the user can feel the choreography. */
+  statePreview: boolean
+  /** Selected field slot (chip bar edits its slot-layer overrides). */
+  selectedSlot: number | null
+  setEditingState(name: string | null): void
+  setStatePreview(on: boolean): void
+  setStateTransition(name: string, patch: { duration?: number; ease?: string }): void
+  /** Per-control reset: drop one recorded override path from a state. */
+  clearStateOverride(name: string, path: string): void
+  /** Reset-to-base: drop a state's recorded overrides entirely. */
+  resetStateOverrides(name: string): void
+  setSelectedSlot(i: number | null): void
+  /** Record a slot-layer state override (field mode chip bar). */
+  patchSlotState(slot: number, state: string, overrides: Record<string, unknown>): void
+  clearSlotState(slot: number, state: string): void
   setMode(mode: 'paper' | 'field'): void
   patchField(patch: Partial<FieldState>): void
   setSlotPreset(index: number, name: string): void
@@ -82,9 +109,116 @@ export const useEditor = create<EditorState>((set, get) => ({
     speed: 0.5,
     entrance: 'rise',
     slots: Array.from({ length: 14 }, () => 'photo-print'),
+    slotStates: {},
   },
   cameFromField: false,
-  setMode: (mode) => set((s) => ({ mode, inspectorEpoch: s.inspectorEpoch + 1 })),
+  editingState: null,
+  statePreview: false,
+  selectedSlot: null,
+  setEditingState: (name) =>
+    set((s) => ({ editingState: name, statePreview: false, inspectorEpoch: s.inspectorEpoch + 1 })),
+  setStatePreview: (on) =>
+    set((s) => ({
+      statePreview: on,
+      editingState: on ? null : s.editingState,
+      inspectorEpoch: s.inspectorEpoch + 1,
+    })),
+  setStateTransition: (name, patch) =>
+    set((s) => {
+      const states = s.config.states ?? paperStatesSchema.parse({})
+      const def = states.states[name] ?? stateDefSchema.parse({})
+      return {
+        config: paperConfigSchema.parse({
+          ...s.config,
+          states: {
+            ...states,
+            states: {
+              ...states.states,
+              [name]: { ...def, transition: { ...def.transition, ...patch } },
+            },
+          },
+        }),
+      }
+    }),
+  clearStateOverride: (name, path) =>
+    set((s) => {
+      const def = s.config.states?.states[name]
+      if (!def) return s
+      const overrides = JSON.parse(JSON.stringify(def.overrides)) as Record<string, unknown>
+      const keys = path.split('.')
+      let node: Record<string, unknown> | undefined = overrides
+      for (let i = 0; i < keys.length - 1 && node; i++) {
+        node = node[keys[i]!] as Record<string, unknown> | undefined
+      }
+      if (node) delete node[keys[keys.length - 1]!]
+      return {
+        config: paperConfigSchema.parse({
+          ...s.config,
+          states: {
+            ...s.config.states!,
+            states: { ...s.config.states!.states, [name]: { ...def, overrides } },
+          },
+        }),
+        inspectorEpoch: s.inspectorEpoch + 1,
+      }
+    }),
+  resetStateOverrides: (name) =>
+    set((s) => {
+      const def = s.config.states?.states[name]
+      if (!def) return s
+      return {
+        config: paperConfigSchema.parse({
+          ...s.config,
+          states: {
+            ...s.config.states!,
+            states: { ...s.config.states!.states, [name]: { ...def, overrides: {} } },
+          },
+        }),
+        inspectorEpoch: s.inspectorEpoch + 1,
+      }
+    }),
+  setSelectedSlot: (i) => set({ selectedSlot: i }),
+  patchSlotState: (slot, state, overrides) =>
+    set((s) => {
+      const existing = s.field.slotStates[slot] ?? {}
+      const existingDef = existing.states?.[state]
+      const merged: PaperStatesInput = {
+        ...existing,
+        states: {
+          ...existing.states,
+          [state]: {
+            ...existingDef,
+            overrides: mergeConfig(existingDef?.overrides ?? {}, overrides) as Record<
+              string,
+              unknown
+            >,
+          },
+        },
+      }
+      return { field: { ...s.field, slotStates: { ...s.field.slotStates, [slot]: merged } } }
+    }),
+  clearSlotState: (slot, state) =>
+    set((s) => {
+      const existing = s.field.slotStates[slot]
+      if (!existing?.states?.[state]) return s
+      const states = { ...existing.states }
+      delete states[state]
+      const slotStates = { ...s.field.slotStates }
+      if (Object.keys(states).length === 0 && !existing.initial) delete slotStates[slot]
+      else slotStates[slot] = { ...existing, states }
+      return {
+        field: { ...s.field, slotStates },
+        inspectorEpoch: s.inspectorEpoch + 1,
+      }
+    }),
+  setMode: (mode) =>
+    set((s) => ({
+      mode,
+      editingState: null,
+      statePreview: false,
+      selectedSlot: null,
+      inspectorEpoch: s.inspectorEpoch + 1,
+    })),
   patchField: (patch) =>
     set((s) => {
       const field = { ...s.field, ...patch }
@@ -92,6 +226,24 @@ export const useEditor = create<EditorState>((set, get) => ({
       if (patch.count !== undefined && patch.count !== s.field.slots.length) {
         const fill = s.field.slots[s.field.slots.length - 1] ?? 'photo-print'
         field.slots = Array.from({ length: patch.count }, (_, i) => s.field.slots[i] ?? fill)
+      }
+      // Switching INTO the sheet layout seeds the stamp-block demo.
+      if (patch.layout === 'sheet' && s.field.layout !== 'sheet') {
+        const o = sheetLayoutSchema.parse(field.layoutOptions)
+        field.count = o.rows * o.columns
+        field.slots = Array.from({ length: field.count }, () => 'postage-stamp')
+        field.driver = 'none'
+        field.entrance = 'none'
+      }
+      // A sheet's population is its grid: rows × columns drive the count.
+      if (field.layout === 'sheet' && patch.layoutOptions !== undefined) {
+        const o = sheetLayoutSchema.parse(field.layoutOptions)
+        const count = o.rows * o.columns
+        if (count !== field.slots.length) {
+          const fill = field.slots[field.slots.length - 1] ?? 'postage-stamp'
+          field.count = count
+          field.slots = Array.from({ length: count }, (_, i) => field.slots[i] ?? fill)
+        }
       }
       return {
         field,
@@ -114,12 +266,32 @@ export const useEditor = create<EditorState>((set, get) => ({
     })),
   backToField: () =>
     set((s) => ({ mode: 'field', cameFromField: false, inspectorEpoch: s.inspectorEpoch + 1 })),
-  setPreset: (name) => set({ presetName: name, config: getPreset(name) }),
+  setPreset: (name) =>
+    set({ presetName: name, config: getPreset(name), editingState: null, statePreview: false }),
   patchConfig: (patch, opts) =>
-    set((s) => ({
-      config: paperConfigSchema.parse(mergeConfig(get().config as PaperConfigInput, patch)),
-      inspectorEpoch: opts?.external ? s.inspectorEpoch + 1 : s.inspectorEpoch,
-    })),
+    set((s) => {
+      // State-editing mode: the edit records as the active state's override
+      // diff (Figma's overridden affordance) — the base stays untouched.
+      if (s.editingState) {
+        const states = s.config.states ?? paperStatesSchema.parse({})
+        const def = states.states[s.editingState] ?? stateDefSchema.parse({})
+        const overrides = mergeConfig(def.overrides, patch) as Record<string, unknown>
+        return {
+          config: paperConfigSchema.parse({
+            ...s.config,
+            states: {
+              ...states,
+              states: { ...states.states, [s.editingState]: { ...def, overrides } },
+            },
+          }),
+          inspectorEpoch: opts?.external ? s.inspectorEpoch + 1 : s.inspectorEpoch,
+        }
+      }
+      return {
+        config: paperConfigSchema.parse(mergeConfig(get().config as PaperConfigInput, patch)),
+        inspectorEpoch: opts?.external ? s.inspectorEpoch + 1 : s.inspectorEpoch,
+      }
+    }),
   setBehaviorType: (type) =>
     set((s) => ({
       config: {
@@ -128,7 +300,17 @@ export const useEditor = create<EditorState>((set, get) => ({
       },
       inspectorEpoch: s.inspectorEpoch + 1,
     })),
-  setSurface: (patch) =>
+  setSurface: (patch) => {
+    // Surface edits made while a state chip is active record as overrides
+    // too (effect removal can't — override merge keeps existing keys).
+    if (get().editingState) {
+      const cleaned: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(patch)) {
+        if (value !== undefined) cleaned[key] = value
+      }
+      if (Object.keys(cleaned).length > 0) get().patchConfig({ surface: cleaned as never })
+      return
+    }
     set((s) => {
       const surface: Record<string, unknown> = { ...s.config.surface }
       // Toggling an effect on/off changes the control structure — leva needs
@@ -144,7 +326,8 @@ export const useEditor = create<EditorState>((set, get) => ({
         config: paperConfigSchema.parse({ ...s.config, surface }),
         inspectorEpoch: structureChanged ? s.inspectorEpoch + 1 : s.inspectorEpoch,
       }
-    }),
+    })
+  },
   setPhysics: (name) =>
     set((s) => ({
       config: paperConfigSchema.parse({

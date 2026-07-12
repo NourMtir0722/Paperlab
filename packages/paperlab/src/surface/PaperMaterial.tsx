@@ -12,6 +12,8 @@ export interface PaperMaterialProps {
   backTexture?: THREE.Texture | null
   surface: SurfaceConfig
   thickness: number
+  /** World dims — perforation holes are sized in world units. */
+  sheet?: { width: number; height: number }
 }
 
 /**
@@ -27,11 +29,18 @@ export function PaperMaterial({
   backTexture,
   surface,
   thickness,
+  sheet,
 }: PaperMaterialProps) {
-  const composed = composeSurface(surface, stock, thickness, {
-    hasFrontMap: Boolean(texture),
-    hasBackMap: Boolean(backTexture),
-  })
+  const composed = composeSurface(
+    surface,
+    stock,
+    thickness,
+    {
+      hasFrontMap: Boolean(texture),
+      hasBackMap: Boolean(backTexture),
+    },
+    sheet,
+  )
 
   // Uniform objects bound to the current program; stable per structure.
   // eslint-disable-next-line react-hooks/exhaustive-deps

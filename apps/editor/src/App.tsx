@@ -7,6 +7,7 @@ import {
   PaperMesh,
   getPreset,
   listPresets,
+  resolveStateConfig,
   type ContentConfig,
   type FieldExportInput,
   type PaperConfig,
@@ -14,6 +15,7 @@ import {
 } from 'paperlab'
 import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
+import { StatesBar } from './StatesBar'
 import { Transport } from './Transport'
 import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
@@ -46,6 +48,10 @@ export function App() {
   const editFieldPaper = useEditor((s) => s.editFieldPaper)
   const backToField = useEditor((s) => s.backToField)
   const savePreset = useEditor((s) => s.savePreset)
+  const editingState = useEditor((s) => s.editingState)
+  const statePreview = useEditor((s) => s.statePreview)
+  const selectedSlot = useEditor((s) => s.selectedSlot)
+  const setSelectedSlot = useEditor((s) => s.setSelectedSlot)
 
   const paperRef = useRef<PaperHandle>(null)
   const scrubRef = useRef<HTMLInputElement>(null)
@@ -63,9 +69,13 @@ export function App() {
     return {
       preset,
       // Image slots pull from the demo pool; typed content keeps its preset's.
-      ...(preset.content.type === 'image' || preset.content.type === 'blank'
+      // Stamp sheets keep the preset's own art — the demo pool would break register.
+      ...(field.layout !== 'sheet' &&
+      (preset.content.type === 'image' || preset.content.type === 'blank')
         ? { content: slotContent(i) }
         : {}),
+      // Slot-layer state overrides (the component/instance model).
+      ...(field.slotStates[i] ? { states: field.slotStates[i] } : {}),
     }
   })
   const fieldExportInput = (): FieldExportInput => ({
@@ -77,8 +87,13 @@ export function App() {
       presetName: name,
       preset: resolvePresetByName(name),
       content: fieldPapers[i]!.content,
+      states: field.slotStates[i],
     })),
   })
+
+  // State-editing mode shows the state applied; preview runs the live machine.
+  const paperCanvasConfig =
+    editingState && !statePreview ? resolveStateConfig(config, editingState) : config
 
   return (
     <div className="app">
@@ -135,9 +150,17 @@ export function App() {
             <h2>Papers</h2>
             <ul className="slots">
               {field.slots.map((name, i) => (
-                <li key={i} className="slot-row">
+                <li
+                  key={i}
+                  className={`slot-row${selectedSlot === i ? ' selected' : ''}`}
+                  onClick={() => setSelectedSlot(selectedSlot === i ? null : i)}
+                >
                   <span className="slot-index">{i + 1}</span>
-                  <select value={name} onChange={(e) => setSlotPreset(i, e.target.value)}>
+                  <select
+                    value={name}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setSlotPreset(i, e.target.value)}
+                  >
                     {listPresets().map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -147,7 +170,10 @@ export function App() {
                   <button
                     className="slot-edit"
                     title={`Edit ${name}`}
-                    onClick={() => editFieldPaper(name)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      editFieldPaper(name)
+                    }}
                   >
                     ✎
                   </button>
@@ -183,11 +209,12 @@ export function App() {
           {mode === 'paper' ? (
             <>
               <PaperMesh
-                key={presetName}
+                key={`${presetName}:${editingState ?? 'base'}:${statePreview}`}
                 ref={paperRef}
-                preset={config}
+                preset={paperCanvasConfig}
                 interactive
-                autoplay
+                autoplay={!statePreview}
+                stateTriggers={statePreview}
                 onProgress={(v) => {
                   if (scrubRef.current) scrubRef.current.value = String(v)
                 }}
@@ -212,6 +239,7 @@ export function App() {
       </main>
 
       <aside className="right">
+        <StatesBar />
         {mode === 'paper' ? (
           <Inspector key={`${presetName}:${config.behavior?.type ?? 'none'}:${inspectorEpoch}`} />
         ) : (

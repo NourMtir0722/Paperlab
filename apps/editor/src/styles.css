@@ -381,3 +381,148 @@ button.export:hover {
   border-left: 1px solid #2a2b2f;
   overflow-y: auto;
 }
+
+/* ── States bar (M6): chips · transition row · preview toggle ─────────────── */
+
+.states-bar {
+  border-bottom: 1px solid #2a2b2f;
+  padding: 8px 10px;
+  background: #1c1d21;
+}
+
+.states-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.state-chip {
+  background: #26272b;
+  border: 1px solid transparent;
+  color: #c9c7c2;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.state-chip:hover {
+  background: #2e2f34;
+}
+
+.state-chip.active {
+  background: #3d2e5c;
+  border-color: #7a5cc4;
+  color: #fff;
+}
+
+.state-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a78bfa;
+  display: inline-block;
+}
+
+.state-dot.slot {
+  background: #5cc4a0;
+}
+
+.state-preview {
+  margin-left: auto;
+  background: #26272b;
+  border: 1px solid transparent;
+  color: #c9c7c2;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.state-preview.active {
+  background: #1e4634;
+  border-color: #2f8f62;
+  color: #d7f5e7;
+}
+
+.state-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9a988f;
+}
+
+.state-detail input[type='number'] {
+  width: 52px;
+  background: #26272b;
+  border: 1px solid #333;
+  color: #e8e6e1;
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.state-detail select {
+  background: #26272b;
+  border: 1px solid #333;
+  color: #e8e6e1;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.state-overrides {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.state-override,
+.state-reset {
+  background: #2b2438;
+  border: 1px solid #4a3a6b;
+  color: #cbb8f5;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.state-reset {
+  background: #26272b;
+  border-color: #3a3b40;
+  color: #c9c7c2;
+}
+
+.state-hint {
+  font-style: italic;
+  color: #6b6a64;
+}
+
+.states-slot-label {
+  font-size: 11px;
+  color: #9a988f;
+  margin-right: 2px;
+}
+
+.slot-state-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #c9c7c2;
+}
+
+.slot-state-control input[type='range'] {
+  width: 90px;
+}
+
+.slot-row.selected {
+  background: #2e3a5c;
+  border-radius: 6px;
+}

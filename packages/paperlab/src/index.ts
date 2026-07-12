@@ -3,6 +3,7 @@ export {
   PaperField,
   PaperFieldMesh,
   groupFieldPapers,
+  resolveFieldSlotConfig,
   type PaperFieldProps,
   type PaperFieldMeshProps,
   type FieldPaperSlot,
@@ -27,6 +28,10 @@ export {
   lightingNames,
   stockNames,
   paperEdges,
+  coreStateNames,
+  stateDefSchema,
+  stateTransitionSchema,
+  paperStatesSchema,
   type PaperConfig,
   type PaperConfigInput,
   type SheetConfig,
@@ -41,7 +46,35 @@ export {
   type ClothConfig,
   type SceneConfig,
   type LightingName,
+  type CoreStateName,
+  type StateName,
+  type StateDef,
+  type StateTransitionConfig,
+  type PaperStates,
+  type PaperStatesInput,
 } from './config/schema'
+
+export {
+  PaperStateMachine,
+  stateEventTransitions,
+  resolveStateConfig,
+  stripStates,
+  flattenNumeric,
+  type StateEvent,
+  type PaperStateMachineOptions,
+} from './states/machine'
+export { usePaperStates, type UsePaperStatesResult } from './states/usePaperStates'
+
+export {
+  sheetLayoutSchema,
+  sheetSlotXY,
+  sheetBackingSize,
+  outwardCorner,
+  tornEdgesOnDetach,
+  SHEET_LIFT,
+  type SheetLayoutOptions,
+} from './field/sheetGrid'
+export { drawBacking, silhouetteRects, lightenHex, type BackingDrawSpec } from './content/backing'
 
 export {
   lightingPresets,
@@ -89,6 +122,7 @@ export {
   wall,
   tunnel,
   scatter,
+  sheet,
   type Layout,
   type PaperPose,
 } from './field/layouts'
