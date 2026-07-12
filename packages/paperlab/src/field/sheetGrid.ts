@@ -69,15 +69,17 @@ type Corner = CurlOptions['corner']
 
 /**
  * The corner facing away from the sheet's center — what a thumb would find
- * (spec M6 §1.3). Ties (center row/column) break outward-and-down, matching
- * the peel default.
+ * (spec M6 §1.3). A tie (an odd grid's exact-center row/column, where the
+ * cell straddles the midline) breaks outward-and-down: strict `<` on both
+ * axes sends the center right and down, so a dead-center cell peels
+ * bottom-right — the standalone peel default.
  */
 export function outwardCorner(i: number, o: Pick<SheetLayoutOptions, 'rows' | 'columns'>): Corner {
   const col = i % o.columns
   const row = Math.floor(i / o.columns)
   // Row 0 renders at the top of the grid.
   const horizontal = col + 0.5 < o.columns / 2 ? 'left' : 'right'
-  const vertical = row + 0.5 <= o.rows / 2 ? 'top' : 'bottom'
+  const vertical = row + 0.5 < o.rows / 2 ? 'top' : 'bottom'
   return `${vertical}-${horizontal}` as Corner
 }
 

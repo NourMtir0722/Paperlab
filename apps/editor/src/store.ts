@@ -13,6 +13,7 @@ import {
   recordStateOverride,
   sheetLayoutSchema,
   stateDefSchema,
+  uniquePresetName,
   type ClothConfig,
   type PaperConfig,
   type PaperConfigInput,
@@ -423,9 +424,10 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   duplicatePreset: (source) => {
     const base = getPreset(source)
-    let name = `${source} copy`
-    let n = 2
-    while (isBuiltinPreset(name) || get().userPresets[name]) name = `${source} copy ${n++}`
+    const name = uniquePresetName(
+      `${source} copy`,
+      (n) => isBuiltinPreset(n) || Boolean(get().userPresets[n]),
+    )
     get().savePreset(name, base)
   },
 
@@ -482,11 +484,13 @@ export const useEditor = create<EditorState>((set, get) => ({
   importPreset: (json) => {
     try {
       const config = parsePreset(json)
-      let name = config.meta.name === 'untitled' ? 'imported' : config.meta.name
-      let n = 2
-      while (isBuiltinPreset(name) || get().userPresets[name]) {
-        name = `${config.meta.name} ${n++}`
-      }
+      // Disambiguate from the COMPUTED base ('imported' for untitled), not the
+      // raw meta.name — an untitled collision must yield 'imported 2'.
+      const base = config.meta.name === 'untitled' ? 'imported' : config.meta.name
+      const name = uniquePresetName(
+        base,
+        (n) => isBuiltinPreset(n) || Boolean(get().userPresets[n]),
+      )
       return get().savePreset(name, config)
     } catch (error) {
       return `Not a valid .paper file: ${error instanceof Error ? error.message.slice(0, 120) : error}`

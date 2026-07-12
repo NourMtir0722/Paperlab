@@ -6,6 +6,7 @@ import {
   isBuiltinPreset,
   listPresets,
   registerPreset,
+  uniquePresetName,
   unregisterPreset,
 } from './presets'
 
@@ -140,5 +141,23 @@ describe('user preset registry', () => {
     expect(() => registerPreset('receipt-unroll', {})).toThrow(/built-in/)
     expect(() => registerPreset('bad', { stock: 'papyrus' as never })).toThrow()
     expect(listPresets()).not.toContain('bad')
+  })
+})
+
+describe('uniquePresetName', () => {
+  it('returns the base name when it is free', () => {
+    expect(uniquePresetName('imported', () => false)).toBe('imported')
+  })
+
+  it('suffixes from the SAME base on collision — an untitled import yields "imported 2"', () => {
+    // The bug: the disambiguation used the raw meta.name ("untitled"), so a
+    // collision produced "untitled 2" instead of "imported 2".
+    const taken = new Set(['imported'])
+    expect(uniquePresetName('imported', (n) => taken.has(n))).toBe('imported 2')
+  })
+
+  it('walks past every taken suffix', () => {
+    const taken = new Set(['note copy', 'note copy 2', 'note copy 3'])
+    expect(uniquePresetName('note copy', (n) => taken.has(n))).toBe('note copy 4')
   })
 })
