@@ -93,6 +93,23 @@ export interface PaperHandle {
   returnProgrammatic(): boolean
 }
 
+/**
+ * Stable memo key over every prop {@link resolveConfig} reads. Consumers that
+ * cache a resolved config must key on this, not on `preset` alone.
+ */
+export function resolveConfigKey(props: PaperMeshProps): string {
+  return JSON.stringify([
+    props.preset ?? null,
+    props.sheet ?? null,
+    props.stock ?? null,
+    props.content ?? null,
+    props.behavior ?? null,
+    props.deformers ?? null,
+    props.physics ?? null,
+    props.onTwos ?? null,
+  ])
+}
+
 /** Resolve preset + prop overrides into a validated config. */
 export function resolveConfig(props: PaperMeshProps): PaperConfig {
   const base = props.preset
@@ -127,7 +144,10 @@ const quatScratch = new THREE.Quaternion()
  * owns animated values; useFrame owns geometry writes.
  */
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
-  const resolved = resolveConfig(props)
+  // Each resolveConfig call is several zod parses (superRefine re-parses every
+  // state override) — memoized so a render without config-prop changes is free.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const resolved = useMemo(() => resolveConfig(props), [resolveConfigKey(props)])
   // Reduced motion: behaviors freeze at their resting pose, physics is off,
   // idle motion is off. The sheet still renders fully sculpted.
   const reduced = usePrefersReducedMotion(props.reducedMotion)
@@ -193,6 +213,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, capped, capped)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetKey, minSegments, isCloth])
+
+  // Imperatively-created geometry is ours to free — R3F only auto-disposes
+  // JSX-created objects, so a sheet change would otherwise orphan GPU buffers.
+  useEffect(() => () => geometry.dispose(), [geometry])
 
   const basePositions = useMemo(
     () => Float32Array.from(geometry.attributes.position!.array as Float32Array),

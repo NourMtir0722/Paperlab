@@ -111,9 +111,16 @@ export class ClothSim {
   }
 
   setParams(params: Partial<ClothParams>): void {
-    const before = JSON.stringify(this.params)
-    Object.assign(this.params, params)
-    if (JSON.stringify(this.params) !== before) this.wake()
+    // Called every frame while cloth renders — plain numeric compare, no JSON.
+    let changed = false
+    for (const key of ['stiffness', 'gravity', 'wind', 'floor'] as const) {
+      const value = params[key]
+      if (value !== undefined && value !== this.params[key]) {
+        this.params[key] = value
+        changed = true
+      }
+    }
+    if (changed) this.wake()
   }
 
   wake(): void {
