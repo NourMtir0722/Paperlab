@@ -76,4 +76,4 @@ pnpm build
 
 Contributions climb a ladder from presets (JSON only) to dual-implementation deformers — see [CONTRIBUTING.md](https://github.com/NourMtir0722/Paperlab/blob/main/CONTRIBUTING.md).
 
-MIT © Noor Mtir
+Apache 2.0 © Noor Mtir — attribution travels with the code: redistributions must reproduce the [NOTICE](https://github.com/NourMtir0722/Paperlab/blob/main/NOTICE) file. If Paperlab made it into something you shipped, a visible credit or link back is warmly appreciated.
