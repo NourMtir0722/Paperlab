@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {},
+    "packages/paperlab": {
+      "project": "src/**"
+    },
+    "apps/editor": {
+      "entry": ["src/parity-main.ts"],
+      "project": "src/**"
+    }
+  }
+}

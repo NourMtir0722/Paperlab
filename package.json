@@ -9,11 +9,13 @@
     "typecheck": "turbo run typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "knip": "knip",
     "test:parity": "node tools/parity.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",
     "@changesets/cli": "^2.31.1",
+    "knip": "^6.29.0",
     "playwright": "1.62.0",
     "turbo": "^2.10.7"
   }

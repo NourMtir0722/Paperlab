@@ -33,8 +33,6 @@ export {
 export {
   groupFieldPapers,
   resolveFieldSlotConfig,
-  effectiveFieldPapers,
-  fieldIsInteractive,
   type FieldPaperSlot,
   type FieldGroupData,
 } from './field/slots'
