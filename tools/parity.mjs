@@ -28,7 +28,10 @@ for (let i = 0; i < 60; i++) {
   }
 }
 
-const browser = await chromium.launch()
+// CI runners have no GPU; force software WebGL via SwiftShader.
+const browser = await chromium.launch({
+  args: process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
+})
 try {
   const page = await browser.newPage()
   await page.goto(`${base}/parity.html`, { waitUntil: 'networkidle' })
