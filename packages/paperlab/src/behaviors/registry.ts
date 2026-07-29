@@ -19,9 +19,7 @@ export function registerBehavior(behavior: Behavior<any>): void {
 export function getBehavior(id: string): Behavior<any> {
   const b = registry.get(id)
   if (!b) {
-    throw new Error(
-      `[paperlab] Unknown behavior "${id}". Registered: ${[...registry.keys()].join(', ')}`,
-    )
+    throw new Error(`[paperlab] Unknown behavior "${id}". Registered: ${[...registry.keys()].join(', ')}`)
   }
   return b
 }

@@ -32,10 +32,7 @@ export const EMPTY_SET: ReadonlySet<number> = new Set()
  * PaperField wrapper, so the mesh and the keyboard mirror always agree on
  * which papers exist.
  */
-export function effectiveFieldPapers(
-  papers?: FieldPaperSlot[],
-  images?: string[],
-): FieldPaperSlot[] {
+export function effectiveFieldPapers(papers?: FieldPaperSlot[], images?: string[]): FieldPaperSlot[] {
   if (papers) return papers
   if (images) {
     return images.map((src) => ({
@@ -79,8 +76,7 @@ export function fieldIsInteractive(
 ): boolean {
   if (explicit !== undefined) return explicit
   return (
-    papers.some((s) => s.states) ||
-    groupFieldPapers(papers, fallback).some((g) => Boolean(g.config.states))
+    papers.some((s) => s.states) || groupFieldPapers(papers, fallback).some((g) => Boolean(g.config.states))
   )
 }
 
@@ -101,11 +97,7 @@ export function resolveFieldSlotConfig(
   const patch: Record<string, unknown> = {}
   if (slot.content) patch.content = slot.content
   if (slot.states) patch.states = slot.states
-  if (
-    layoutId === 'sheet' &&
-    config.behavior?.type === 'peel' &&
-    config.behavior.corner === 'auto'
-  ) {
+  if (layoutId === 'sheet' && config.behavior?.type === 'peel' && config.behavior.corner === 'auto') {
     const o = sheetLayoutSchema.parse(layoutOptions)
     patch.behavior = { corner: outwardCorner(index, o) }
   }

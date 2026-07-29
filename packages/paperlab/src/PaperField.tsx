@@ -1,15 +1,10 @@
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { gsap } from 'gsap'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import type { PaperConfigInput } from './config/schema'
 import { usePrefersReducedMotion } from './a11y'
-import {
-  DropZoneContext,
-  DropZoneRegistry,
-  type DropZoneConfig,
-  type PlacedPaper,
-} from './field/dropZones'
+import { DropZoneContext, DropZoneRegistry, type DropZoneConfig, type PlacedPaper } from './field/dropZones'
 import {
   EMPTY_SET,
   effectiveFieldPapers,
@@ -43,7 +38,7 @@ export {
   type FieldPaperSlot,
   type FieldGroupData,
 } from './field/slots'
-export { type FieldA11yController } from './field/interactiveField'
+export type { FieldA11yController } from './field/interactiveField'
 export {
   fieldKeyboardStep,
   type KeyboardCarry,
@@ -201,8 +196,7 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
     // raycastable, per-slot state machines) instead of one instanced call.
     // (`groups` already resolved every preset, so reuse them for the check.)
     const interactive =
-      props.interactive ??
-      (papers.some((s) => s.states) || groups.some((g) => Boolean(g.config.states)))
+      props.interactive ?? (papers.some((s) => s.states) || groups.some((g) => Boolean(g.config.states)))
 
     const isSheet = layoutId === 'sheet'
     const sheetOptions = isSheet ? (layoutOptions as SheetLayoutOptions) : null
@@ -228,9 +222,7 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
 
     return (
       <group ref={ref}>
-        {sheetOptions?.backing && (
-          <BackingSheet options={sheetOptions} count={total} removed={EMPTY_SET} />
-        )}
+        {sheetOptions?.backing && <BackingSheet options={sheetOptions} count={total} removed={EMPTY_SET} />}
         {groups.map((group, gi) => (
           <FieldGroup key={`${gi}:${group.indices.length}`} group={group} shared={shared} />
         ))}

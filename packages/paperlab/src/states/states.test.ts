@@ -13,8 +13,7 @@ import { getPreset } from '../config/presets'
 
 const stamp = (): PaperConfig => getPreset('postage-stamp')
 
-const behaviorProgress = (config: PaperConfig): number =>
-  (config.behavior as { progress: number }).progress
+const behaviorProgress = (config: PaperConfig): number => (config.behavior as { progress: number }).progress
 
 describe('states schema', () => {
   it('states serialize inside the preset and round-trip', () => {
@@ -34,9 +33,7 @@ describe('states schema', () => {
   })
 
   it('rejects unknown state names but allows the custom: escape hatch', () => {
-    expect(() =>
-      paperConfigSchema.parse({ states: { states: { gigantic: { overrides: {} } } } }),
-    ).toThrow()
+    expect(() => paperConfigSchema.parse({ states: { states: { gigantic: { overrides: {} } } } })).toThrow()
     expect(() =>
       paperConfigSchema.parse({ states: { states: { 'custom:stamped': { overrides: {} } } } }),
     ).not.toThrow()
@@ -139,9 +136,7 @@ describe('PaperStateMachine', () => {
     const machine = new PaperStateMachine(stamp(), {})
     for (let i = 0; i < 20; i++) {
       machine.send(i % 2 === 0 ? 'enter' : 'leave')
-      const tweens = gsap.getTweensOf(
-        (machine as unknown as { flat: Record<string, number> }).flat,
-      )
+      const tweens = gsap.getTweensOf((machine as unknown as { flat: Record<string, number> }).flat)
       expect(tweens.length).toBeLessThanOrEqual(1)
       // The live value stays in the tweened range — no snapping to endpoints.
       const p = behaviorProgress(machine.config)

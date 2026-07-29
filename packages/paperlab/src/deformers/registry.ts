@@ -15,9 +15,7 @@ export function registerDeformer(deformer: Deformer<any>): void {
 export function getDeformer(id: string): Deformer<any> {
   const d = registry.get(id)
   if (!d) {
-    throw new Error(
-      `[paperlab] Unknown deformer "${id}". Registered: ${[...registry.keys()].join(', ')}`,
-    )
+    throw new Error(`[paperlab] Unknown deformer "${id}". Registered: ${[...registry.keys()].join(', ')}`)
   }
   return d
 }

@@ -33,7 +33,6 @@ export function App() {
   const mode = useEditor((s) => s.mode)
   const field = useEditor((s) => s.field)
   const cameFromField = useEditor((s) => s.cameFromField)
-  const setPreset = useEditor((s) => s.setPreset)
   const patchConfig = useEditor((s) => s.patchConfig)
   const setMode = useEditor((s) => s.setMode)
   const setSlotPreset = useEditor((s) => s.setSlotPreset)
@@ -49,8 +48,7 @@ export function App() {
   const scrubRef = useRef<HTMLInputElement>(null)
 
   // Presets are components: the field renders the live edit of its preset.
-  const resolvePresetByName = (name: string): PaperConfig =>
-    name === presetName ? config : getPreset(name)
+  const resolvePresetByName = (name: string): PaperConfig => (name === presetName ? config : getPreset(name))
   const slotContent = (i: number): ContentConfig =>
     DEMO_IMAGES.length === 0
       ? { type: 'blank' }
@@ -61,8 +59,7 @@ export function App() {
       preset,
       // Image slots pull from the demo pool; typed content keeps its preset's.
       // Stamp sheets keep the preset's own art — the demo pool would break register.
-      ...(field.layout !== 'sheet' &&
-      (preset.content.type === 'image' || preset.content.type === 'blank')
+      ...(field.layout !== 'sheet' && (preset.content.type === 'image' || preset.content.type === 'blank')
         ? { content: slotContent(i) }
         : {}),
       // Slot-layer state overrides (the component/instance model).
@@ -87,32 +84,30 @@ export function App() {
   })
 
   // State-editing mode shows the state applied; preview runs the live machine.
-  const paperCanvasConfig =
-    editingState && !statePreview ? resolveStateConfig(config, editingState) : config
+  const paperCanvasConfig = editingState && !statePreview ? resolveStateConfig(config, editingState) : config
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">Paperlab</div>
-        <div className="filename">
-          {mode === 'paper' ? `${config.meta.name}.paper` : 'Field composer'}
-        </div>
+        <div className="filename">{mode === 'paper' ? `${config.meta.name}.paper` : 'Field composer'}</div>
         <div className="mode-switch">
-          <button className={mode === 'paper' ? 'active' : ''} onClick={() => setMode('paper')}>
+          <button type="button" className={mode === 'paper' ? 'active' : ''} onClick={() => setMode('paper')}>
             Paper
           </button>
-          <button className={mode === 'field' ? 'active' : ''} onClick={() => setMode('field')}>
+          <button type="button" className={mode === 'field' ? 'active' : ''} onClick={() => setMode('field')}>
             Field
           </button>
         </div>
         {cameFromField && mode === 'paper' && (
-          <button className="back-to-field" onClick={backToField}>
+          <button type="button" className="back-to-field" onClick={backToField}>
             ← Back to field
           </button>
         )}
         <div className="spacer" />
         {mode === 'paper' && (
           <button
+            type="button"
             className="save-preset"
             onClick={() => {
               void (async () => {
@@ -172,6 +167,7 @@ export function App() {
                     ))}
                   </select>
                   <button
+                    type="button"
                     className="slot-edit"
                     title={`Edit ${name}`}
                     aria-label={`Edit ${name}`}
@@ -194,9 +190,7 @@ export function App() {
           key={mode}
           shadows
           camera={
-            mode === 'paper'
-              ? { position: [0, 0.35, 2.9], fov: 40 }
-              : { position: [0, 0.9, 6.4], fov: 45 }
+            mode === 'paper' ? { position: [0, 0.35, 2.9], fov: 40 } : { position: [0, 0.9, 6.4], fov: 45 }
           }
           dpr={[1, 2]}
           gl={{ preserveDrawingBuffer: true }}
@@ -212,22 +206,18 @@ export function App() {
             scale={mode === 'paper' ? 10 : 14}
           />
           {mode === 'paper' ? (
-            <>
-              <PaperMesh
-                key={`${presetName}:${editingState ?? 'base'}:${statePreview}`}
-                ref={paperRef}
-                preset={paperCanvasConfig}
-                interactive
-                autoplay={!statePreview}
-                stateTriggers={statePreview}
-                onProgress={(v) => {
-                  if (scrubRef.current) scrubRef.current.value = String(v)
-                }}
-                onBehaviorChange={(patch) =>
-                  patchConfig({ behavior: patch as never }, { external: true })
-                }
-              />
-            </>
+            <PaperMesh
+              key={`${presetName}:${editingState ?? 'base'}:${statePreview}`}
+              ref={paperRef}
+              preset={paperCanvasConfig}
+              interactive
+              autoplay={!statePreview}
+              stateTriggers={statePreview}
+              onProgress={(v) => {
+                if (scrubRef.current) scrubRef.current.value = String(v)
+              }}
+              onBehaviorChange={(patch) => patchConfig({ behavior: patch as never }, { external: true })}
+            />
           ) : (
             <PaperFieldMesh
               key={`${field.layout}:${field.count}:${field.slots.join(',')}:${field.entrance}`}

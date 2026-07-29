@@ -72,7 +72,7 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
 
   return (
     <footer className="transport">
-      <button className="play" onClick={toggle} disabled={!hasBehavior} title="Space">
+      <button type="button" className="play" onClick={toggle} disabled={!hasBehavior} title="Space">
         {playing && hasBehavior ? '❚❚' : '▶'}
       </button>
       <input

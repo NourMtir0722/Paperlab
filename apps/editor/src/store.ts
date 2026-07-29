@@ -141,8 +141,7 @@ export function writeConfig(
   patch: Record<string, unknown>,
   opts: WriteOpts = {},
 ): Pick<EditorState, 'config' | 'inspectorEpoch'> {
-  const inspectorEpoch =
-    opts.external || opts.structural ? s.inspectorEpoch + 1 : s.inspectorEpoch
+  const inspectorEpoch = opts.external || opts.structural ? s.inspectorEpoch + 1 : s.inspectorEpoch
   if (s.editingState) {
     // Overrides SET base params, never remove them — a no-op patch (all
     // undefined) leaves the config untouched.
@@ -253,10 +252,7 @@ export const useEditor = create<EditorState>((set, get) => ({
           ...existing.states,
           [state]: {
             ...existingDef,
-            overrides: mergeConfig(existingDef?.overrides ?? {}, overrides) as Record<
-              string,
-              unknown
-            >,
+            overrides: mergeConfig(existingDef?.overrides ?? {}, overrides) as Record<string, unknown>,
           },
         },
       }
@@ -349,8 +345,7 @@ export const useEditor = create<EditorState>((set, get) => ({
     set((s) => ({
       field: { ...s.field, slots: s.field.slots.map((v, i) => (i === index ? name : v)) },
     })),
-  setAllSlots: (name) =>
-    set((s) => ({ field: { ...s.field, slots: s.field.slots.map(() => name) } })),
+  setAllSlots: (name) => set((s) => ({ field: { ...s.field, slots: s.field.slots.map(() => name) } })),
   editFieldPaper: (name) =>
     set((s) => ({
       mode: 'paper',
@@ -462,9 +457,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       const config = parsePreset(stored.config)
       userPresets[trimmed] = {
         ...stored,
-        config: diffConfig(
-          paperConfigSchema.parse({ ...config, meta: { ...config.meta, name: trimmed } }),
-        ),
+        config: diffConfig(paperConfigSchema.parse({ ...config, meta: { ...config.meta, name: trimmed } })),
       }
       persistUserPresets(userPresets)
       syncRegistry(userPresets, [oldName])
@@ -487,10 +480,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       // Disambiguate from the COMPUTED base ('imported' for untitled), not the
       // raw meta.name — an untitled collision must yield 'imported 2'.
       const base = config.meta.name === 'untitled' ? 'imported' : config.meta.name
-      const name = uniquePresetName(
-        base,
-        (n) => isBuiltinPreset(n) || Boolean(get().userPresets[n]),
-      )
+      const name = uniquePresetName(base, (n) => isBuiltinPreset(n) || Boolean(get().userPresets[n]))
       return get().savePreset(name, config)
     } catch (error) {
       return `Not a valid .paper file: ${error instanceof Error ? error.message.slice(0, 120) : error}`

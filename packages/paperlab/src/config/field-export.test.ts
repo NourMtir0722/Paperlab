@@ -84,9 +84,7 @@ describe('field export', () => {
         presetName: 'postage-stamp',
         preset: stamp,
         // Slot 3's hover peels deeper than the rest (slot-layer override).
-        ...(i === 3
-          ? { states: { states: { hover: { overrides: { behavior: { progress: 0.4 } } } } } }
-          : {}),
+        ...(i === 3 ? { states: { states: { hover: { overrides: { behavior: { progress: 0.4 } } } } } } : {}),
       })),
       zones: [
         {
@@ -104,7 +102,9 @@ describe('field export', () => {
     // The slot override rides on the slot, not the preset.
     expect(src).toContain('states: {"states":{"hover":{"overrides":{"behavior":{"progress":0.4}}}}}')
     // Zones export as DropZone children with an onPlace stub.
-    expect(src).toContain("import { PaperField, type FieldPaperSlot, type PaperConfigInput, DropZone } from 'paperlab'")
+    expect(src).toContain(
+      "import { PaperField, type FieldPaperSlot, type PaperConfigInput, DropZone } from 'paperlab'",
+    )
     expect(src).toContain('<DropZone')
     expect(src).toContain('id="envelope"')
     expect(src).toContain('accept={["postage-*"]}')

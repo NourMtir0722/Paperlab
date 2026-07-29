@@ -10,7 +10,7 @@ body,
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
   font-size: 13px;
   background: #0f1012;
   color: #e6e4df;
@@ -22,9 +22,9 @@ body {
   grid-template-rows: 44px 1fr 46px;
   grid-template-columns: 220px 1fr 300px;
   grid-template-areas:
-    'topbar topbar topbar'
-    'left viewport right'
-    'transport transport transport';
+    "topbar topbar topbar"
+    "left viewport right"
+    "transport transport transport";
   height: 100%;
 }
 
@@ -504,7 +504,7 @@ button.export:hover {
   color: #9a988f;
 }
 
-.state-detail input[type='number'] {
+.state-detail input[type="number"] {
   width: 52px;
   background: #26272b;
   border: 1px solid #333;
@@ -563,7 +563,7 @@ button.export:hover {
   color: #c9c7c2;
 }
 
-.slot-state-control input[type='range'] {
+.slot-state-control input[type="range"] {
   width: 90px;
 }
 

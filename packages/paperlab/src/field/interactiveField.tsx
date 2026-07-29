@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { paperConfigSchema, type PaperConfig, type PaperConfigInput } from '../config/schema'
+import { paperConfigSchema, type PaperConfigInput } from '../config/schema'
 import { mergeConfig } from '../config/merge'
 import { PaperMesh, type PaperHandle } from '../PaperMesh'
 import { carryDrive, dampTo, type DampedValue } from '../physics/aero'
@@ -100,9 +100,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
       papers.map((slot, i) => {
         const config = resolveFieldSlotConfig(slot, fallback, i, layoutId, layoutOptions)
         const patch = slotPatches[i]
-        return patch
-          ? paperConfigSchema.parse(mergeConfig(config as Record<string, unknown>, patch))
-          : config
+        return patch ? paperConfigSchema.parse(mergeConfig(config as Record<string, unknown>, patch)) : config
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -176,9 +174,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
         perforation: { state: { ...auto, ...config.surface.perforation.state } },
       }
     }
-    const pickedOverrides = config.states.states.picked?.overrides as
-      | { behavior?: unknown }
-      | undefined
+    const pickedOverrides = config.states.states.picked?.overrides as { behavior?: unknown } | undefined
     if (!pickedOverrides?.behavior) {
       const grab =
         config.behavior.type === 'peel' && config.behavior.corner !== 'auto'
@@ -443,9 +439,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
 
   return (
     <group>
-      {sheetOptions?.backing && (
-        <BackingSheet options={sheetOptions} count={total} removed={removed} />
-      )}
+      {sheetOptions?.backing && <BackingSheet options={sheetOptions} count={total} removed={removed} />}
       {(props.zones ?? []).map((zone) => (
         <DropZoneVisual key={zone.id} registry={registry} config={zone} />
       ))}

@@ -49,10 +49,7 @@ function PaperStatesBar() {
   const resetStateOverrides = useEditor((s) => s.resetStateOverrides)
 
   const states = config.states?.states ?? {}
-  const names = [
-    ...coreStateNames,
-    ...Object.keys(states).filter((n) => n.startsWith('custom:')),
-  ]
+  const names = [...coreStateNames, ...Object.keys(states).filter((n) => n.startsWith('custom:'))]
   const active = editingState
   const activeDef: StateDef | undefined = active ? states[active] : undefined
   const paths = activeDef ? overridePaths(activeDef.overrides) : []
@@ -65,6 +62,7 @@ function PaperStatesBar() {
           const isActive = name === 'rest' ? active === null && !statePreview : active === name
           return (
             <button
+              type="button"
               key={name}
               className={`state-chip${isActive ? ' active' : ''}`}
               onClick={() => setEditingState(name === 'rest' ? null : name)}
@@ -80,6 +78,7 @@ function PaperStatesBar() {
           )
         })}
         <button
+          type="button"
           className={`state-preview${statePreview ? ' active' : ''}`}
           onClick={() => setStatePreview(!statePreview)}
           title="Preview: hover/press the paper to feel the choreography"
@@ -113,6 +112,7 @@ function PaperStatesBar() {
             <span className="state-overrides">
               {paths.map((p) => (
                 <button
+                  type="button"
                   key={p}
                   className="state-override"
                   title={`Reset ${p} to base`}
@@ -122,6 +122,7 @@ function PaperStatesBar() {
                 </button>
               ))}
               <button
+                type="button"
                 className="state-reset"
                 onClick={() => resetStateOverrides(active)}
                 title="Reset this state to base"
@@ -157,8 +158,7 @@ function FieldStatesBar() {
   const slotPresetName = field.slots[selectedSlot]
   if (!slotPresetName) return null
   // The field renders the LIVE edit of the open preset (components).
-  const preset: PaperConfig =
-    slotPresetName === presetName ? config : getPreset(slotPresetName)
+  const preset: PaperConfig = slotPresetName === presetName ? config : getPreset(slotPresetName)
   const slotStates = field.slotStates[selectedSlot]
   const active = editingState
 
@@ -174,6 +174,7 @@ function FieldStatesBar() {
           const presetRecorded = overridePaths(presetStates[name]?.overrides ?? {}).length > 0
           return (
             <button
+              type="button"
               key={name}
               className={`state-chip${active === name ? ' active' : ''}`}
               onClick={() => setEditingState(active === name ? null : name)}
@@ -195,10 +196,11 @@ function FieldStatesBar() {
             preset={preset}
             onPatch={(overrides) => patchSlotState(selectedSlot, active, overrides)}
           />
-          <button className="state-reset" onClick={() => clearSlotState(selectedSlot, active)}>
+          <button type="button" className="state-reset" onClick={() => clearSlotState(selectedSlot, active)}>
             reset slot
           </button>
           <button
+            type="button"
             className="state-reset"
             title="Edits will apply to every slot using this preset"
             onClick={() => {
@@ -242,9 +244,7 @@ function SlotStateControls({
       ?.behavior ?? {}
 
   const controls: React.ReactNode[] = []
-  for (const [key, fieldSchema] of Object.entries(
-    schema.shape as Record<string, z.ZodTypeAny>,
-  )) {
+  for (const [key, fieldSchema] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
     let inner = fieldSchema
     while (inner instanceof z.ZodDefault || inner instanceof z.ZodOptional) {
       inner = inner instanceof z.ZodDefault ? inner._def.innerType : inner.unwrap()

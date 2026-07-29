@@ -51,8 +51,7 @@ export function ExportMenu({
     setTimeout(() => setCopied((c) => (c === label ? null : c)), 1600)
   }
 
-  const badge = (label: string) =>
-    copied === label ? <span className="copied-badge">Copied ✓</span> : null
+  const badge = (label: string) => (copied === label ? <span className="copied-badge">Copied ✓</span> : null)
 
   const fieldJson = () => {
     const input = fieldInput()
@@ -71,7 +70,7 @@ export function ExportMenu({
 
   return (
     <div className="export-menu" ref={rootRef}>
-      <button className="export" onClick={() => setOpen((v) => !v)}>
+      <button type="button" className="export" onClick={() => setOpen((v) => !v)}>
         Export code
       </button>
       {open && (
@@ -79,6 +78,7 @@ export function ExportMenu({
           {mode === 'paper' ? (
             <>
               <button
+                type="button"
                 className="export-primary"
                 onClick={() => copy('AI brief', buildAgentPayload(currentPaper()))}
               >
@@ -87,12 +87,13 @@ export function ExportMenu({
                 {badge('AI brief')}
               </button>
               <div className="export-secondary">
-                <button onClick={() => copy('JSX', buildJsxSnippet(currentPaper()))}>
+                <button type="button" onClick={() => copy('JSX', buildJsxSnippet(currentPaper()))}>
                   <strong>Copy JSX</strong>
                   <span>&lt;Paper /&gt; with non-default props</span>
                   {badge('JSX')}
                 </button>
                 <button
+                  type="button"
                   onClick={() => copy('.paper JSON', JSON.stringify(diffConfig(currentPaper()), null, 2))}
                 >
                   <strong>Copy .paper JSON</strong>
@@ -104,6 +105,7 @@ export function ExportMenu({
           ) : (
             <>
               <button
+                type="button"
                 className="export-primary"
                 onClick={() => copy('AI brief', buildFieldAgentPayload(fieldInput()))}
               >
@@ -112,12 +114,12 @@ export function ExportMenu({
                 {badge('AI brief')}
               </button>
               <div className="export-secondary">
-                <button onClick={() => copy('JSX', buildFieldComponentSource(fieldInput()))}>
+                <button type="button" onClick={() => copy('JSX', buildFieldComponentSource(fieldInput()))}>
                   <strong>Copy component</strong>
                   <span>&lt;PaperField /&gt; with inlined preset consts</span>
                   {badge('JSX')}
                 </button>
-                <button onClick={() => copy('.field JSON', fieldJson())}>
+                <button type="button" onClick={() => copy('.field JSON', fieldJson())}>
                   <strong>Copy .field JSON</strong>
                   <span>layout + motion + diffed papers</span>
                   {badge('.field JSON')}

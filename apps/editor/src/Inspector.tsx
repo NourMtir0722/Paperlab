@@ -48,64 +48,66 @@ export function Inspector() {
       )
     : {}
 
-  useControls({
-    Behavior: folder({
-      type: {
-        value: config.behavior?.type ?? 'none',
-        options: ['none', ...listBehaviors()],
-        onChange: (v: string, _, ctx) => {
-          if (ctx.initial) return
-          setBehaviorType(v === 'none' ? null : v)
+  useControls(
+    {
+      Behavior: folder({
+        type: {
+          value: config.behavior?.type ?? 'none',
+          options: ['none', ...listBehaviors()],
+          onChange: (v: string, _, ctx) => {
+            if (ctx.initial) return
+            setBehaviorType(v === 'none' ? null : v)
+          },
         },
-      },
-      ...behaviorFields,
-    }),
-    // Behavior stays open (the primary sculpt); the rest collapse so the bar
-    // reads as a summary you expand into, not a wall of controls.
-    Sheet: folder(
-      {
-        width: {
-          value: config.sheet.width,
-          min: 0.2,
-          max: 4,
-          step: 0.05,
-          onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { width: v } }),
+        ...behaviorFields,
+      }),
+      // Behavior stays open (the primary sculpt); the rest collapse so the bar
+      // reads as a summary you expand into, not a wall of controls.
+      Sheet: folder(
+        {
+          width: {
+            value: config.sheet.width,
+            min: 0.2,
+            max: 4,
+            step: 0.05,
+            onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { width: v } }),
+          },
+          height: {
+            value: config.sheet.height,
+            min: 0.2,
+            max: 4,
+            step: 0.05,
+            onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { height: v } }),
+          },
         },
-        height: {
-          value: config.sheet.height,
-          min: 0.2,
-          max: 4,
-          step: 0.05,
-          onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { height: v } }),
+        { collapsed: true },
+      ),
+      Stock: folder(
+        {
+          stock: {
+            value: config.stock,
+            options: [...stockNames],
+            onChange: (v: StockName, _, ctx) => ctx.initial || patchConfig({ stock: v }),
+          },
         },
-      },
-      { collapsed: true },
-    ),
-    Stock: folder(
-      {
-        stock: {
-          value: config.stock,
-          options: [...stockNames],
-          onChange: (v: StockName, _, ctx) => ctx.initial || patchConfig({ stock: v }),
+        { collapsed: true },
+      ),
+      Content: folder(contentControls(config.content, patchConfig), { collapsed: true }),
+      Surface: folder(surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
+      Physics: folder(physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
+      Scene: folder(
+        {
+          lighting: {
+            value: config.scene.lighting,
+            options: [...lightingNames],
+            onChange: (v: string, _, ctx) => ctx.initial || patchConfig({ scene: { lighting: v as never } }),
+          },
         },
-      },
-      { collapsed: true },
-    ),
-    Content: folder(contentControls(config.content, patchConfig), { collapsed: true }),
-    Surface: folder(surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
-    Physics: folder(physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
-    Scene: folder(
-      {
-        lighting: {
-          value: config.scene.lighting,
-          options: [...lightingNames],
-          onChange: (v: string, _, ctx) =>
-            ctx.initial || patchConfig({ scene: { lighting: v as never } }),
-        },
-      },
-      { collapsed: true },
-    ),
-  }, { store })
+        { collapsed: true },
+      ),
+    },
+    { store },
+  )
 
   return <LevaPanel store={store} fill flat titleBar={false} />
 }
@@ -116,9 +118,8 @@ function physicsControls(
   patchCloth: (patch: Partial<ClothConfig>) => void,
 ): LevaSchema {
   const isCloth = typeof physics === 'object'
-  const changed =
-    (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
-      ctx.initial || fn(v as never)
+  const changed = (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
+    ctx.initial || fn(v as never)
 
   const controls: LevaSchema = {
     simulation: {
@@ -166,9 +167,8 @@ function surfaceControls(
   setSurface: (patch: Partial<SurfaceConfig>) => void,
 ): LevaSchema {
   const stock = getStock(stockName)
-  const changed =
-    (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
-      ctx.initial || fn(v as never)
+  const changed = (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
+    ctx.initial || fn(v as never)
 
   return {
     grain: {
@@ -206,8 +206,7 @@ function surfaceControls(
             value: surface.deckle.edges.join('+'),
             options: [...paperEdges, 'top+bottom', 'all'].map(String),
             onChange: changed((v: string) => {
-              const edges =
-                v === 'all' ? [...paperEdges] : (v.split('+') as PaperEdge[])
+              const edges = v === 'all' ? [...paperEdges] : (v.split('+') as PaperEdge[])
               setSurface({ deckle: { ...surface.deckle!, edges } })
             }),
           },
@@ -217,16 +216,16 @@ function surfaceControls(
             min: 0,
             max: 1,
             step: 0.01,
-            onChange: changed((v: number) =>
-              setSurface({ deckle: { ...surface.deckle!, roughness: v } }),
-            ),
+            onChange: changed((v: number) => setSurface({ deckle: { ...surface.deckle!, roughness: v } })),
           },
         }
       : {}),
     perforation: {
       value: Boolean(surface.perforation),
       onChange: changed((v: boolean) =>
-        setSurface({ perforation: v ? { edges: 'all', holeRadius: 0.016, spacing: 0.055, state: {} } : undefined }),
+        setSurface({
+          perforation: v ? { edges: 'all', holeRadius: 0.016, spacing: 0.055, state: {} } : undefined,
+        }),
       ),
     },
     ...(surface.perforation

@@ -69,8 +69,7 @@ export function flightPose(t: number, o: FlightParams, phase: number, pose: Aero
   } else {
     // Drift: travel along the wind; respawn wraps the along-wind coordinate.
     const travel = time * 0.55 * g
-    const wrap = (v: number, r: number) =>
-      o.respawn ? ((((v + r) % (2 * r)) + 2 * r) % (2 * r)) - r : v
+    const wrap = (v: number, r: number) => (o.respawn ? ((((v + r) % (2 * r)) + 2 * r) % (2 * r)) - r : v)
     pose.position[0] = wrap(o.wind[0] * travel, o.range)
     pose.position[1] = wrap(o.wind[1] * travel, o.range * 0.6) + Math.sin(time * 1.3) * 0.08 * g
     pose.position[2] = wrap(o.wind[2] * travel, o.range)

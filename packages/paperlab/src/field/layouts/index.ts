@@ -63,11 +63,7 @@ export const deck: Layout<z.infer<typeof deckSchema>> = {
   optionsSchema: deckSchema,
   pose(i, _n, o) {
     return {
-      position: [
-        jitter(1, i) * 0.09 * o.spread * 3,
-        jitter(2, i) * 0.07 * o.spread * 3,
-        i * o.lift,
-      ],
+      position: [jitter(1, i) * 0.09 * o.spread * 3, jitter(2, i) * 0.07 * o.spread * 3, i * o.lift],
       rotation: [0, 0, jitter(3, i) * 0.35 * o.spread],
       scale: 1,
     }

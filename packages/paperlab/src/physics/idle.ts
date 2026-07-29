@@ -44,7 +44,10 @@ export const idlePresets: Record<IdleName, IdlePreset> = {
       pose.position[0] = Math.sin(t * 0.35) * 0.14
     },
     stack: () => [
-      { type: 'wave', options: { amplitude: 0.02, wavelength: 0.9, speed: 0.9, angle: 25, pinnedEdge: 'none' } },
+      {
+        type: 'wave',
+        options: { amplitude: 0.02, wavelength: 0.9, speed: 0.9, angle: 25, pinnedEdge: 'none' },
+      },
     ],
   },
   dangle: {
@@ -61,14 +64,20 @@ export const idlePresets: Record<IdleName, IdlePreset> = {
     label: 'Taped',
     // Taped at the top of a wall: the free bottom edge breathes.
     stack: () => [
-      { type: 'wave', options: { amplitude: 0.025, wavelength: 1.2, speed: 0.45, angle: 90, pinnedEdge: 'top' } },
+      {
+        type: 'wave',
+        options: { amplitude: 0.025, wavelength: 1.2, speed: 0.45, angle: 90, pinnedEdge: 'top' },
+      },
     ],
   },
   breeze: {
     id: 'breeze',
     label: 'Breeze',
     stack: () => [
-      { type: 'wave', options: { amplitude: 0.035, wavelength: 0.5, speed: 1.0, angle: 20, pinnedEdge: 'none' } },
+      {
+        type: 'wave',
+        options: { amplitude: 0.035, wavelength: 0.5, speed: 1.0, angle: 20, pinnedEdge: 'none' },
+      },
     ],
   },
 }

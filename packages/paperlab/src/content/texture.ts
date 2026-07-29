@@ -32,9 +32,7 @@ function paintImage(
   fit: 'cover' | 'contain',
 ) {
   const scale =
-    fit === 'cover'
-      ? Math.max(w / img.width, h / img.height)
-      : Math.min(w / img.width, h / img.height)
+    fit === 'cover' ? Math.max(w / img.width, h / img.height) : Math.min(w / img.width, h / img.height)
   const dw = img.width * scale
   const dh = img.height * scale
   ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh)

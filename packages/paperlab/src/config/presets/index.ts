@@ -169,9 +169,7 @@ const userPresets = new Map<string, PaperConfigInput>()
 export function getPreset(name: string): PaperConfig {
   const raw = builtins[name] ?? userPresets.get(name)
   if (!raw) {
-    throw new Error(
-      `[paperlab] Unknown preset "${name}". Registered: ${listPresets().join(', ')}`,
-    )
+    throw new Error(`[paperlab] Unknown preset "${name}". Registered: ${listPresets().join(', ')}`)
   }
   return paperConfigSchema.parse(raw)
 }

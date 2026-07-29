@@ -161,7 +161,9 @@ describe('compose', () => {
   })
 
   it('skips disabled instances', () => {
-    const stack = [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.2, spiral: 0 }, enabled: false }]
+    const stack = [
+      { type: 'roll', options: { angle: 90, boundary: 0, radius: 0.2, spiral: 0 }, enabled: false },
+    ]
     const out = displacePoint(new THREE.Vector3(0, 0.4, 0), 0.5, 0.9, stack, ctx)
     expect(out.toArray()).toEqual([0, 0.4, 0])
   })

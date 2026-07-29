@@ -119,8 +119,8 @@ export function FieldKeyboardMirror({
           {carrying?.slot === i && (
             <span aria-live="polite">
               {' '}
-              — carrying; zone {controller.current?.zoneIds()[carrying.zoneIndex] ?? 'none'};
-              Enter places, Escape returns
+              — carrying; zone {controller.current?.zoneIds()[carrying.zoneIndex] ?? 'none'}; Enter places,
+              Escape returns
             </span>
           )}
         </button>

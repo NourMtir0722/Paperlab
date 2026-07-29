@@ -64,9 +64,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
       {
         ...config.sheet,
         segments:
-          config.sheet.segments === 'auto'
-            ? 'auto'
-            : Math.min(config.sheet.segments, FIELD_SEGMENT_CAP),
+          config.sheet.segments === 'auto' ? 'auto' : Math.min(config.sheet.segments, FIELD_SEGMENT_CAP),
       },
       Math.min(stackMinSegments(initialStack), FIELD_SEGMENT_CAP),
     )
@@ -174,10 +172,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
         pose = lerpPose(prev, pose, easeInOut(morph.t))
       }
       if (shared.entranceType !== 'none') {
-        const tIn = Math.min(
-          1,
-          Math.max(0, (elapsed - i * shared.stagger) / shared.entranceDuration),
-        )
+        const tIn = Math.min(1, Math.max(0, (elapsed - i * shared.stagger) / shared.entranceDuration))
         if (tIn < 1) {
           pose = lerpPose(entrancePose(shared.entranceType, i, pose), pose, easeOut(tIn))
         }
@@ -266,5 +261,5 @@ function lerpPose(a: PaperPose, b: PaperPose, t: number): PaperPose {
   }
 }
 
-const easeOut = (t: number) => 1 - Math.pow(1 - t, 3)
-const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
+const easeOut = (t: number) => 1 - (1 - t) ** 3
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
