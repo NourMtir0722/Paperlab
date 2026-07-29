@@ -48,14 +48,7 @@ export class ClothSim {
   /** True when the sim has settled and steps are skipped. */
   asleep = false
 
-  constructor(
-    cols: number,
-    rows: number,
-    width: number,
-    height: number,
-    pins: PinMode,
-    params: ClothParams,
-  ) {
+  constructor(cols: number, rows: number, width: number, height: number, pins: PinMode, params: ClothParams) {
     this.cols = cols
     this.rows = rows
     this.count = cols * rows
@@ -198,8 +191,7 @@ export class ClothSim {
       const z = p[i3 + 2]!
       // Gusty wind: coherent noise over time and position, pushing along +z
       // with a sideways component.
-      const gust =
-        wind * (0.55 + 0.45 * Math.sin(this.time * 1.7 + x * 2.1 + y * 1.3)) * 0.9
+      const gust = wind * (0.55 + 0.45 * Math.sin(this.time * 1.7 + x * 2.1 + y * 1.3)) * 0.9
       const ax = gust * 0.25
       const az = gust
       const vx = (x - this.prev[i3]!) * damping

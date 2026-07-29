@@ -162,10 +162,11 @@ function DialogView({ spec }: { spec: DialogSpec }) {
           </>
         )}
         <div className="dialog-actions">
-          <button className="dialog-btn" onClick={cancel}>
+          <button type="button" className="dialog-btn" onClick={cancel}>
             Cancel
           </button>
           <button
+            type="button"
             className={`dialog-btn primary${spec.kind === 'confirm' && spec.danger ? ' danger' : ''}`}
             onClick={submit}
           >
@@ -184,7 +185,7 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     return () => clearTimeout(timer)
   }, [toast, onDone])
   return (
-    <button className={`toast ${toast.tone}`} onClick={onDone}>
+    <button type="button" className={`toast ${toast.tone}`} onClick={onDone}>
       {toast.message}
     </button>
   )

@@ -44,7 +44,12 @@ export function ViewportGuide() {
 
   if (!open) {
     return (
-      <button className="guide-toggle" title="How to edit this paper" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="guide-toggle"
+        title="How to edit this paper"
+        onClick={() => setOpen(true)}
+      >
         ?
       </button>
     )
@@ -54,7 +59,7 @@ export function ViewportGuide() {
     <div className="viewport-guide" role="dialog" aria-label="How to edit this paper">
       <div className="guide-head">
         <strong>Sculpting this paper</strong>
-        <button className="guide-close" aria-label="Dismiss guide" onClick={dismiss}>
+        <button type="button" className="guide-close" aria-label="Dismiss guide" onClick={dismiss}>
           ✕
         </button>
       </div>
@@ -82,10 +87,11 @@ export function ViewportGuide() {
           <span className="guide-key">Space</span> play / pause · <b>drag the timeline</b> to scrub
         </li>
         <li>
-          <span className="guide-key">drag</span> empty space to orbit · <span className="guide-key">scroll</span> to zoom
+          <span className="guide-key">drag</span> empty space to orbit ·{' '}
+          <span className="guide-key">scroll</span> to zoom
         </li>
       </ul>
-      <button className="guide-got-it" onClick={dismiss}>
+      <button type="button" className="guide-got-it" onClick={dismiss}>
         Got it
       </button>
     </div>

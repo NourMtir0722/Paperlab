@@ -44,10 +44,7 @@ export function stackUniformValues(
   return uniforms
 }
 
-export function buildDisplacementGLSL(
-  stack: DeformerInstance[],
-  sheet: SheetDims,
-): ComposedDisplacement {
+export function buildDisplacementGLSL(stack: DeformerInstance[], sheet: SheetDims): ComposedDisplacement {
   const decls: string[] = ['uniform vec2 uSheet;']
   const functions: string[] = []
   const calls: string[] = []

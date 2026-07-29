@@ -275,9 +275,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         if (behavior.loopMode === 'restart') state.p = 0
       },
       onUpdate: () => {
-        const p = configRef.current.onTwos
-          ? quantizeProgress(state.p, behavior.duration)
-          : state.p
+        const p = configRef.current.onTwos ? quantizeProgress(state.p, behavior.duration) : state.p
         overridesRef.current[param] = p
         dirtyRef.current = true
         props.onProgress?.(p)

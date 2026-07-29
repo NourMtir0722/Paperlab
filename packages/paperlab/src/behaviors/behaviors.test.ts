@@ -31,10 +31,7 @@ describe('behavior registry', () => {
 
 describe('peel', () => {
   it('expands human params to a curl instance', () => {
-    const stack = peel.stack(
-      { progress: 0.4, corner: 'top-left', radius: 0.2 },
-      { width: 1, height: 1 },
-    )
+    const stack = peel.stack({ progress: 0.4, corner: 'top-left', radius: 0.2 }, { width: 1, height: 1 })
     expect(stack).toEqual([
       // radius grows with progress: 0.2 + 0.4·0.3
       { type: 'curl', options: { corner: 'top-left', amount: 0.4, radius: 0.32, skew: 0 } },
@@ -100,8 +97,14 @@ describe('carry', () => {
   })
 
   it('drag velocity becomes flutter: drive scales the wave amplitude', () => {
-    const still = carry.stack({ grab: 'bottom-right', stiffness: 0.7, flutter: 0.5, lag: 0.3, drive: 0 }, sheet)
-    const moving = carry.stack({ grab: 'bottom-right', stiffness: 0.7, flutter: 0.5, lag: 0.3, drive: 1 }, sheet)
+    const still = carry.stack(
+      { grab: 'bottom-right', stiffness: 0.7, flutter: 0.5, lag: 0.3, drive: 0 },
+      sheet,
+    )
+    const moving = carry.stack(
+      { grab: 'bottom-right', stiffness: 0.7, flutter: 0.5, lag: 0.3, drive: 1 },
+      sheet,
+    )
     const amp = (s: typeof still) => (s[1]!.options as { amplitude: number }).amplitude
     expect(amp(moving)).toBeGreaterThan(amp(still))
     // The grabbed edge doesn't flutter — it's pinched.

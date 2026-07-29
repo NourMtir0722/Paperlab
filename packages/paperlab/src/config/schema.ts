@@ -77,13 +77,11 @@ const receiptContentBase = z.object({
   type: z.literal('receipt'),
   store: z.string().default('PAPERLAB'),
   address: z.string().default('124 PAPER ST'),
-  items: z
-    .array(z.object({ name: z.string(), price: z.number() }))
-    .default([
-      { name: 'CURL, TRUE', price: 12 },
-      { name: 'ROLL, TIGHT', price: 8.5 },
-      { name: 'SHEET, ONE', price: 0.99 },
-    ]),
+  items: z.array(z.object({ name: z.string(), price: z.number() })).default([
+    { name: 'CURL, TRUE', price: 12 },
+    { name: 'ROLL, TIGHT', price: 8.5 },
+    { name: 'SHEET, ONE', price: 0.99 },
+  ]),
   taxRate: z.number().min(0).max(1).default(0.08),
   barcode: z.boolean().default(true),
   /** Fixed so presets render deterministically; omit for "now". */

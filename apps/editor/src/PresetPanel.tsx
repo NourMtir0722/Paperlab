@@ -38,11 +38,7 @@ export function PresetPanel() {
       defaultValue: name,
       confirmLabel: 'Rename',
       validate: (v) =>
-        !v || v === name
-          ? null
-          : isBuiltinPreset(v) || userPresets[v]
-            ? `"${v}" is already taken.`
-            : null,
+        !v || v === name ? null : isBuiltinPreset(v) || userPresets[v] ? `"${v}" is already taken.` : null,
     })
     if (!next || next === name) return
     const error = renamePreset(name, next)
@@ -93,6 +89,7 @@ export function PresetPanel() {
           ))}
         </select>
         <button
+          type="button"
           className="row-action"
           title="Duplicate as editable fork"
           aria-label="Duplicate the selected preset as an editable fork"
@@ -105,6 +102,7 @@ export function PresetPanel() {
       <h2>
         Your presets
         <button
+          type="button"
           className="row-action"
           title="Import .paper JSON"
           aria-label="Import a .paper JSON file"
@@ -128,6 +126,7 @@ export function PresetPanel() {
           return (
             <li key={name} className="preset-row user">
               <button
+                type="button"
                 className={name === presetName ? 'active preset-card' : 'preset-card'}
                 onClick={() => setPreset(name)}
               >
@@ -136,6 +135,7 @@ export function PresetPanel() {
               </button>
               <span className="row-actions">
                 <button
+                  type="button"
                   className="row-action"
                   title="Rename"
                   aria-label={`Rename ${name}`}
@@ -144,6 +144,7 @@ export function PresetPanel() {
                   ✎
                 </button>
                 <button
+                  type="button"
                   className="row-action"
                   title="Duplicate"
                   aria-label={`Duplicate ${name}`}
@@ -152,6 +153,7 @@ export function PresetPanel() {
                   ⧉
                 </button>
                 <button
+                  type="button"
                   className="row-action"
                   title="Download .paper JSON"
                   aria-label={`Download ${name} as .paper JSON`}
@@ -160,6 +162,7 @@ export function PresetPanel() {
                   ⬇
                 </button>
                 <button
+                  type="button"
                   className="row-action danger"
                   title="Delete"
                   aria-label={`Delete ${name}`}

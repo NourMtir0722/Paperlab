@@ -133,9 +133,8 @@ function zoneControls(
   patchZone: (index: number, patch: Partial<EditorZone>) => void,
   removeZone: (index: number) => void,
 ): LevaSchema {
-  const changed =
-    (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
-      ctx.initial || fn(v as never)
+  const changed = (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
+    ctx.initial || fn(v as never)
   const key = (name: string) => `zone${i}_${name}`
   return {
     [key('id')]: {
@@ -155,9 +154,7 @@ function zoneControls(
       min: -8,
       max: 8,
       step: 0.05,
-      onChange: changed((v: number) =>
-        patchZone(i, { position: [v, zone.position[1], zone.position[2]] }),
-      ),
+      onChange: changed((v: number) => patchZone(i, { position: [v, zone.position[1], zone.position[2]] })),
     },
     [key('y')]: {
       label: 'y',
@@ -165,9 +162,7 @@ function zoneControls(
       min: -6,
       max: 6,
       step: 0.05,
-      onChange: changed((v: number) =>
-        patchZone(i, { position: [zone.position[0], v, zone.position[2]] }),
-      ),
+      onChange: changed((v: number) => patchZone(i, { position: [zone.position[0], v, zone.position[2]] })),
     },
     [key('w')]: {
       label: 'width',

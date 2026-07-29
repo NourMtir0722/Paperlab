@@ -300,15 +300,14 @@ void main() {
 `
 
   return {
-    structureKey:
-      [
-        grain !== undefined || banding > 0 ? 'g' : '',
-        deckle ? 'd' : '',
-        creases ? 'c' : '',
-        aging !== undefined ? 'a' : '',
-        perforation ? 'p' : '',
-        stock.adhesive ? 'A' : '',
-      ].join('') + `:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}`,
+    structureKey: `${[
+      grain !== undefined || banding > 0 ? 'g' : '',
+      deckle ? 'd' : '',
+      creases ? 'c' : '',
+      aging !== undefined ? 'a' : '',
+      perforation ? 'p' : '',
+      stock.adhesive ? 'A' : '',
+    ].join('')}:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}`,
     vertexShader: VERTEX,
     fragmentShader,
     uniforms,

@@ -28,9 +28,7 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
   fall: () => 'rippling with one corner lifted, like a dropped sheet',
   carry: () => 'drooping from a pinched corner, fluttering as if being carried',
   flight: (o) =>
-    o.path === 'loop'
-      ? 'tumbling through a seamless airborne loop'
-      : 'tumbling across the scene on the wind',
+    o.path === 'loop' ? 'tumbling through a seamless airborne loop' : 'tumbling across the scene on the wind',
 }
 
 /** One line an agent can verify against what it sees after `npm run dev`. */
@@ -41,8 +39,7 @@ export function describeConfig(config: PaperConfig): string {
   let contentPhrase = 'a blank sheet'
   if (config.content.type === 'image') contentPhrase = 'a sheet printed with an image'
   if (config.content.type === 'text') contentPhrase = 'a sheet with typeset text'
-  if (config.content.type === 'receipt')
-    contentPhrase = `a store receipt for "${config.content.store}"`
+  if (config.content.type === 'receipt') contentPhrase = `a store receipt for "${config.content.store}"`
 
   const parts = [`${contentPhrase} on ${stock.label.toLowerCase()} paper stock (${size})`]
 
@@ -58,7 +55,9 @@ export function describeConfig(config: PaperConfig): string {
   }
 
   if (config.surface.deckle) {
-    parts.push(`torn (deckled) ${config.surface.deckle.edges.join(' and ')} edge${config.surface.deckle.edges.length > 1 ? 's' : ''}`)
+    parts.push(
+      `torn (deckled) ${config.surface.deckle.edges.join(' and ')} edge${config.surface.deckle.edges.length > 1 ? 's' : ''}`,
+    )
   }
   if ((config.surface.aging ?? 0) > 0.3) parts.push('visibly aged and yellowed')
 

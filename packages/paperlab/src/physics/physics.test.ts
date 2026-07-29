@@ -11,7 +11,11 @@ import { fall } from '../behaviors/fall'
 
 const params = { stiffness: 0.8, gravity: 1, wind: 0, floor: -10 }
 
-function makeSim(pins: Parameters<typeof ClothSim.prototype.grabNearest> extends never ? never : ConstructorParameters<typeof ClothSim>[4] = 'top-edge') {
+function makeSim(
+  pins: Parameters<typeof ClothSim.prototype.grabNearest> extends never
+    ? never
+    : ConstructorParameters<typeof ClothSim>[4] = 'top-edge',
+) {
   return new ClothSim(8, 10, 1, 1.4, pins, { ...params })
 }
 
@@ -95,9 +99,15 @@ describe('idle presets', () => {
     for (const name of idleNames) {
       const preset = idlePresets[name]
       if (!preset.transform) continue
-      const pose = { position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] }
+      const pose = {
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+      }
       preset.transform(1.7, pose)
-      const again = { position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] }
+      const again = {
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+      }
       preset.transform(1.7, again)
       expect(pose).toEqual(again)
       for (const v of [...pose.position, ...pose.rotation]) expect(Math.abs(v)).toBeLessThan(1)
@@ -144,9 +154,7 @@ describe('physics schema', () => {
       }),
     ).toThrow(/exclusive/)
     // Idle presets compose with behaviors just fine.
-    expect(() =>
-      paperConfigSchema.parse({ behavior: { type: 'fly' }, physics: 'tumble' }),
-    ).not.toThrow()
+    expect(() => paperConfigSchema.parse({ behavior: { type: 'fly' }, physics: 'tumble' })).not.toThrow()
   })
 })
 

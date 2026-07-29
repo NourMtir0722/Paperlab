@@ -11,9 +11,7 @@ import { receiptTotals, type ReceiptContent } from '../content/receipt'
 
 export function usePrefersReducedMotion(override?: boolean): boolean {
   const [system, setSystem] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   )
   useEffect(() => {
     const query = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -98,8 +96,7 @@ export function PaperFallback({ config }: { config: PaperConfig }) {
           boxShadow: '0 6px 24px rgba(0,0,0,0.25)',
           padding: '8%',
           overflow: 'hidden',
-          fontFamily:
-            config.content.type === 'receipt' ? 'ui-monospace, monospace' : 'Georgia, serif',
+          fontFamily: config.content.type === 'receipt' ? 'ui-monospace, monospace' : 'Georgia, serif',
           whiteSpace: 'pre-wrap',
           fontSize: 14,
         }}

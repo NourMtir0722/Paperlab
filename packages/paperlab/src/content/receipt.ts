@@ -51,8 +51,7 @@ export function paintReceipt(
   const pad = w * 0.09
   const colWidth = w - pad * 2
   const base = Math.round(w / 15) // font size scales with receipt width
-  const mono = (size: number, weight = 400) =>
-    `${weight} ${size}px ui-monospace, Menlo, Consolas, monospace`
+  const mono = (size: number, weight = 400) => `${weight} ${size}px ui-monospace, Menlo, Consolas, monospace`
 
   let y = h * 0.045
   const line = (step = 1.6) => (y += base * step)

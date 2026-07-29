@@ -82,7 +82,10 @@ export const parityCases: ParityCase[] = [
   {
     name: 'wave: free ripple at t=1.234',
     stack: [
-      { type: 'wave', options: { amplitude: 0.05, wavelength: 0.5, speed: 1, angle: 20, pinnedEdge: 'none' } },
+      {
+        type: 'wave',
+        options: { amplitude: 0.05, wavelength: 0.5, speed: 1, angle: 20, pinnedEdge: 'none' },
+      },
     ],
     sheet: { width: 1, height: 1 },
     t: 1.234,
@@ -90,7 +93,10 @@ export const parityCases: ParityCase[] = [
   {
     name: 'wave: pinned top at t=2.5',
     stack: [
-      { type: 'wave', options: { amplitude: 0.04, wavelength: 0.4, speed: 1.5, angle: 80, pinnedEdge: 'top' } },
+      {
+        type: 'wave',
+        options: { amplitude: 0.04, wavelength: 0.4, speed: 1.5, angle: 80, pinnedEdge: 'top' },
+      },
     ],
     sheet: { width: 1.2, height: 1.5 },
     t: 2.5,
@@ -109,7 +115,10 @@ export const parityCases: ParityCase[] = [
     stack: [
       { type: 'bend', options: { curvature: 0.6, angle: 0 } },
       { type: 'roll', options: { angle: 90, boundary: 0.1, radius: 0.15, spiral: 0 } },
-      { type: 'wave', options: { amplitude: 0.02, wavelength: 0.6, speed: 0.7, angle: 45, pinnedEdge: 'none' } },
+      {
+        type: 'wave',
+        options: { amplitude: 0.02, wavelength: 0.6, speed: 0.7, angle: 45, pinnedEdge: 'none' },
+      },
     ],
     sheet: { width: 1, height: 1.4 },
     t: 0.8,
@@ -156,6 +165,7 @@ function runCaseOnGPU(gl: WebGL2RenderingContext, c: ParityCase): Float32Array {
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     throw new Error(`[paperlab parity] link failed: ${gl.getProgramInfoLog(program)}`)
   }
+  // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's gl.useProgram, not a React hook
   gl.useProgram(program)
 
   for (const [name, value] of Object.entries(composed.uniforms)) {

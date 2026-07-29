@@ -16,16 +16,7 @@ import { silhouetteRects } from '../content/backing'
 
 describe('layouts', () => {
   it('registers the eight built-ins', () => {
-    expect(listLayouts()).toEqual([
-      'ring',
-      'deck',
-      'cascade',
-      'helix',
-      'wall',
-      'tunnel',
-      'scatter',
-      'sheet',
-    ])
+    expect(listLayouts()).toEqual(['ring', 'deck', 'cascade', 'helix', 'wall', 'tunnel', 'scatter', 'sheet'])
   })
 
   it('poses are pure and deterministic', () => {
@@ -114,9 +105,15 @@ describe('sheet layout (the stamp block)', () => {
     // 3×3 (odd both axes): the center row breaks DOWN and the center column
     // breaks RIGHT, so the dead-center cell (index 4) peels bottom-right.
     expect(grid(3, 3)).toEqual([
-      'top-left', 'top-right', 'top-right',
-      'bottom-left', 'bottom-right', 'bottom-right',
-      'bottom-left', 'bottom-right', 'bottom-right',
+      'top-left',
+      'top-right',
+      'top-right',
+      'bottom-left',
+      'bottom-right',
+      'bottom-right',
+      'bottom-left',
+      'bottom-right',
+      'bottom-right',
     ])
     expect(outwardCorner(4, { rows: 3, columns: 3 })).toBe('bottom-right')
 
@@ -125,12 +122,8 @@ describe('sheet layout (the stamp block)', () => {
     expect(outwardCorner(2, { rows: 3, columns: 5 })).toBe('top-right') // r0,c2 center column
 
     // Single-axis grids fall to the down/right default on the tie axis.
-    expect(grid(1, 5)).toEqual([
-      'bottom-left', 'bottom-left', 'bottom-right', 'bottom-right', 'bottom-right',
-    ])
-    expect(grid(5, 1)).toEqual([
-      'top-right', 'top-right', 'bottom-right', 'bottom-right', 'bottom-right',
-    ])
+    expect(grid(1, 5)).toEqual(['bottom-left', 'bottom-left', 'bottom-right', 'bottom-right', 'bottom-right'])
+    expect(grid(5, 1)).toEqual(['top-right', 'top-right', 'bottom-right', 'bottom-right', 'bottom-right'])
   })
 
   it('detach tears edges that faced neighbors; boundary edges stay intact', () => {
@@ -234,10 +227,7 @@ describe('GLSL composition', () => {
   })
 
   it('field vertex shader wires displacement, normals and atlas varyings', () => {
-    const composed = buildDisplacementGLSL(
-      [{ type: 'bend', options: { curvature: 0.5, angle: 0 } }],
-      sheet,
-    )
+    const composed = buildDisplacementGLSL([{ type: 'bend', options: { curvature: 0.5, angle: 0 } }], sheet)
     const vs = buildFieldVertexShader(composed)
     expect(vs).toContain('csm_Position = p;')
     expect(vs).toContain('csm_Normal')

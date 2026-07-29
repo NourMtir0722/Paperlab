@@ -40,9 +40,7 @@ const MOTION_DEFAULTS = { driver: 'autoplay', speed: 0.5 }
 const ENTRANCE_DEFAULTS = { type: 'rise', stagger: 0.06, duration: 0.9 }
 
 function camel(name: string): string {
-  const id = name
-    .replace(/[^a-zA-Z0-9]+(.)/g, (_, c: string) => c.toUpperCase())
-    .replace(/[^a-zA-Z0-9]/g, '')
+  const id = name.replace(/[^a-zA-Z0-9]+(.)/g, (_, c: string) => c.toUpperCase()).replace(/[^a-zA-Z0-9]/g, '')
   const safe = /^[A-Za-z]/.test(id) ? id : `preset${id}`
   return safe.charAt(0).toLowerCase() + safe.slice(1)
 }
@@ -83,10 +81,7 @@ function nonDefault<T extends Record<string, unknown>>(
 export function diffFieldProps(input: FieldExportInput): Record<string, unknown> {
   const out: Record<string, unknown> = { layout: input.layout }
   const layout = getLayout(input.layout)
-  const layoutOptions = nonDefault(
-    input.layoutOptions ?? {},
-    layout.defaults as Record<string, unknown>,
-  )
+  const layoutOptions = nonDefault(input.layoutOptions ?? {}, layout.defaults as Record<string, unknown>)
   if (Object.keys(layoutOptions).length > 0) out.layoutOptions = layoutOptions
   const motion = nonDefault(input.motion, MOTION_DEFAULTS)
   if (Object.keys(motion).length > 0) out.motion = motion

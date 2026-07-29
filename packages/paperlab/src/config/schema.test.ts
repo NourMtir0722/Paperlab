@@ -66,9 +66,12 @@ describe('paper config schema', () => {
 
 describe('mergeConfig', () => {
   it('deep-merges plain objects, overrides win', () => {
-    const out = mergeConfig({ sheet: { width: 1, height: 2 }, stock: 'printer' }, {
-      sheet: { width: 3 },
-    })
+    const out = mergeConfig(
+      { sheet: { width: 1, height: 2 }, stock: 'printer' },
+      {
+        sheet: { width: 3 },
+      },
+    )
     expect(out).toEqual({ sheet: { width: 3, height: 2 }, stock: 'printer' })
   })
 
@@ -89,9 +92,11 @@ describe('mergeWithDeletes (base-config writes)', () => {
   it('deep-merges like mergeConfig but an explicit undefined DELETES its key', () => {
     // Clearing a top-level structural key (behavior/deformers) — what mergeConfig
     // silently ignored, which is why setPhysics/setBehaviorType could not clear.
-    expect(mergeWithDeletes({ stock: 'kraft', behavior: { type: 'peel' } }, { behavior: undefined })).toEqual({
-      stock: 'kraft',
-    })
+    expect(mergeWithDeletes({ stock: 'kraft', behavior: { type: 'peel' } }, { behavior: undefined })).toEqual(
+      {
+        stock: 'kraft',
+      },
+    )
     // Nested delete: toggling a surface effect off.
     expect(
       mergeWithDeletes(

@@ -58,19 +58,12 @@ export function diffConfig(config: PaperConfig): PaperConfigInput {
     ) as Record<string, unknown>
     out.content = {
       type: config.content.type,
-      ...diffAgainst(
-        config.content as never,
-        defaults,
-        config.content.type === 'image' ? ['src'] : [],
-      ),
+      ...diffAgainst(config.content as never, defaults, config.content.type === 'image' ? ['src'] : []),
     }
   }
 
   if (config.behavior) {
-    const defaults = behaviorConfigSchema.parse({ type: config.behavior.type }) as Record<
-      string,
-      unknown
-    >
+    const defaults = behaviorConfigSchema.parse({ type: config.behavior.type }) as Record<string, unknown>
     out.behavior = { type: config.behavior.type, ...diffAgainst(config.behavior as never, defaults) }
   }
   if (config.deformers) out.deformers = config.deformers

@@ -82,10 +82,7 @@ const globCache = new Map<string, RegExp>()
 const globRegExp = (glob: string): RegExp => {
   let re = globCache.get(glob)
   if (!re) {
-    re = new RegExp(
-      `^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
-      'i',
-    )
+    re = new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`, 'i')
     globCache.set(glob, re)
   }
   return re
@@ -119,13 +116,7 @@ export function DropZone(props: DropZoneProps) {
 }
 
 /** The translucent target — brightens when the carried paper is over it. */
-export function DropZoneVisual({
-  registry,
-  config,
-}: {
-  registry: DropZoneRegistry
-  config: DropZoneConfig
-}) {
+export function DropZoneVisual({ registry, config }: { registry: DropZoneRegistry; config: DropZoneConfig }) {
   useSyncExternalStore(registry.subscribe, registry.getVersion, registry.getVersion)
   const hovered = registry.hovered === config.id
   const style = config.highlight ?? 'glow'

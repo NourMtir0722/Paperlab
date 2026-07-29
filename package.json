@@ -7,9 +7,12 @@
     "dev": "turbo run dev --filter=@paperlab/editor",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "test:parity": "node tools/parity.mjs"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.6",
     "playwright": "1.61.1",
     "turbo": "^2.3.0"
   }
