@@ -42,7 +42,7 @@
   "dependencies": {
     "@react-three/drei": "^10.0.0",
     "three-custom-shader-material": "^6.4.0",
-    "zod": "^3.24.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
