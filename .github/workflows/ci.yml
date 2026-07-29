@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -37,6 +37,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Package publish safety (publint + arethetypeswrong)
+        run: pnpm --filter paperlab run check:package
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
