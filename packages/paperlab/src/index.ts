@@ -139,6 +139,7 @@ export {
   type Layout,
   type PaperPose,
 } from './field/layouts'
+export { fieldBounds, fitCamera, type FieldBounds } from './field/framing'
 export { useContentAtlas, atlasGrid, type ContentAtlas } from './content/atlas'
 export {
   runParityHarness,

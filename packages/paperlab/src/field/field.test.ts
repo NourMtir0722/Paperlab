@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getLayout, listLayouts } from './layouts'
+import { fieldBounds, fitCamera, resolveLayoutOptions } from './framing'
+import { fieldShapeStack } from './stack'
+import type { PaperConfig } from '../config/schema'
 import { buildDisplacementGLSL, buildFieldVertexShader, stackUniformValues } from './compose'
 import { atlasGrid } from '../content/atlas'
 import { parityCases } from './parity'
@@ -306,6 +309,121 @@ describe('GLSL composition', () => {
       sheet,
     )
     expect(composed.functionsSrc).not.toContain('plBias)')
+  })
+})
+
+describe('field framing', () => {
+  const sheet = { width: 1.2, height: 0.9 }
+
+  it('bounds cover every sheet the layout poses, across the whole phase cycle', () => {
+    const reach = Math.hypot(sheet.width, sheet.height) / 2
+    for (const id of listLayouts()) {
+      const layout = getLayout(id)
+      const b = fieldBounds(layout, 9, layout.defaults, sheet)
+      for (let i = 0; i < 9; i++) {
+        for (const phase of [0, 0.25, 0.5, 0.75]) {
+          const pose = layout.pose(i, 9, layout.defaults, phase)
+          for (let axis = 0; axis < 3; axis++) {
+            const r = reach * pose.scale
+            expect(pose.position[axis]! - r).toBeGreaterThanOrEqual(b.center[axis]! - b.half[axis]! - 1e-9)
+            expect(pose.position[axis]! + r).toBeLessThanOrEqual(b.center[axis]! + b.half[axis]! + 1e-9)
+          }
+        }
+      }
+    }
+  })
+
+  it('a wall needs a wider box than a pile of the same papers', () => {
+    const wall = fieldBounds(getLayout('wall'), 12, getLayout('wall').defaults, sheet)
+    const pile = fieldBounds(getLayout('pile'), 12, getLayout('pile').defaults, sheet)
+    expect(wall.half[0]).toBeGreaterThan(pile.half[0])
+    expect(wall.half[1]).toBeGreaterThan(pile.half[1])
+  })
+
+  it('empty fields still frame something rather than dividing by zero', () => {
+    const ring = getLayout('ring')
+    expect(Number.isFinite(fitCamera(ring, 0, ring.defaults, sheet, 45, 1.6).position[2])).toBe(true)
+  })
+
+  it('every sheet lands inside the frustum the camera is placed for', () => {
+    const fov = 45
+    const aspect = 1.6
+    const vTan = Math.tan((fov * Math.PI) / 180 / 2)
+    const hTan = vTan * aspect
+    const reach = Math.hypot(sheet.width, sheet.height) / 2
+    for (const id of listLayouts()) {
+      const layout = getLayout(id)
+      const { position, target } = fitCamera(layout, 9, layout.defaults, sheet, fov, aspect, 1)
+      for (let i = 0; i < 9; i++) {
+        for (const phase of [0, 0.25, 0.5, 0.75]) {
+          const pose = layout.pose(i, 9, layout.defaults, phase)
+          const depth = position[2] - pose.position[2]!
+          const r = reach * pose.scale
+          expect(Math.abs(pose.position[0]! - target[0])).toBeLessThanOrEqual(depth * hTan - r + 1e-9)
+          expect(Math.abs(pose.position[1]! - target[1])).toBeLessThanOrEqual(depth * vTan - r + 1e-9)
+        }
+      }
+    }
+  })
+
+  it('a ring is framed from inside its own depth, not behind its whole box', () => {
+    // The widest sheets of a ring sit at mid-depth. Treating the ring as a
+    // box would add its full half-depth on top of the width fit and push the
+    // camera far enough back to lose the gallery.
+    const ring = getLayout('ring')
+    const o = { radius: 2.6, tiltDeg: 8 }
+    const { position } = fitCamera(ring, 9, o, sheet, 45, 1.96)
+    const box = fieldBounds(ring, 9, o, sheet)
+    expect(position[2]).toBeLessThan(box.half[0] + box.half[2])
+  })
+
+  it('a narrower viewport pushes the camera further back', () => {
+    const wall = getLayout('wall')
+    const near = fitCamera(wall, 9, wall.defaults, sheet, 45, 0.8).position[2]
+    const far = fitCamera(wall, 9, wall.defaults, sheet, 45, 2.4).position[2]
+    expect(near).toBeGreaterThan(far)
+  })
+
+  it('sheet grids resolve their cells from the paper, for camera and renderer alike', () => {
+    const layout = getLayout('sheet')
+    const o = resolveLayoutOptions('sheet', layout, undefined, { width: 0.7, height: 0.9 })
+    expect(o.cellWidth).toBeCloseTo(0.7)
+    expect(o.cellHeight).toBeCloseTo(0.9)
+  })
+})
+
+describe('field deformer stack', () => {
+  const base = { sheet: { width: 1, height: 1.4 } } as unknown as PaperConfig
+
+  it('a raw deformer stack wins over a behavior — the Advanced fork', () => {
+    const config = {
+      ...base,
+      behavior: { type: 'peel', progress: 0.5, corner: 'bottom-right', radius: 0.16 },
+      deformers: [{ type: 'bend', options: { curvature: 0.4, angle: 0 }, enabled: true }],
+    } as unknown as PaperConfig
+    expect(fieldShapeStack(config, 0.5).map((d) => d.type)).toEqual(['bend'])
+  })
+
+  it('a preset shaped only by deformers is not flat in a field', () => {
+    const config = {
+      ...base,
+      deformers: [{ type: 'bend', options: { curvature: 0.35, angle: 0 }, enabled: true }],
+    } as unknown as PaperConfig
+    expect(fieldShapeStack(config, 0)).toHaveLength(1)
+  })
+
+  it('behaviors still drive off progress when no deformers fork them', () => {
+    const config = {
+      ...base,
+      behavior: { type: 'peel', progress: 0.2, corner: 'bottom-right', radius: 0.16 },
+    } as unknown as PaperConfig
+    const early = fieldShapeStack(config, 0.1)
+    const late = fieldShapeStack(config, 0.9)
+    expect(early).not.toEqual(late)
+  })
+
+  it('a config with neither is an empty stack', () => {
+    expect(fieldShapeStack(base, 0)).toEqual([])
   })
 })
 

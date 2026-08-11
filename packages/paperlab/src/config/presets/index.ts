@@ -151,6 +151,10 @@ const builtins: Record<string, PaperConfigInput> = {
       src: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
       fit: 'cover',
     },
+    // No print lies perfectly flat. A shade of bow is the whole difference
+    // between a sheet of paper and a rectangle — and since this is the field
+    // starter, it is what a layout's per-sheet bias has to scale.
+    deformers: [{ type: 'bend', options: { curvature: 0.35, angle: 0 } }],
   },
   'typed-note': {
     meta: { name: 'Typed note', tags: ['text', 'starter'] },
