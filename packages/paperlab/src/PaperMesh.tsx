@@ -510,6 +510,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
           surface={config.surface}
           thickness={config.sheet.thickness}
           sheet={config.sheet}
+          lighting={config.scene.lighting}
         />
       </mesh>
       {props.interactive &&

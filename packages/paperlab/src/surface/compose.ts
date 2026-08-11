@@ -1,6 +1,17 @@
 import * as THREE from 'three'
-import { paperEdges as paperEdgesOrder, type PaperEdge, type SurfaceConfig } from '../config/schema'
+import {
+  paperEdges as paperEdgesOrder,
+  type LightingName,
+  type PaperEdge,
+  type SurfaceConfig,
+} from '../config/schema'
 import type { Stock } from '../core/stock'
+import {
+  TRANSLUCENCY_FRAGMENT,
+  TRANSLUCENCY_VARYINGS,
+  translucencyUniforms,
+  translucencyVertexChunk,
+} from './translucency'
 
 /**
  * Surface effects are fragment-side chunks composed into ONE shader program
@@ -26,8 +37,10 @@ export interface SurfaceMaps {
 
 const VERTEX = /* glsl */ `
 varying vec2 vPaperUv;
+${TRANSLUCENCY_VARYINGS}
 void main() {
   vPaperUv = uv;
+${translucencyVertexChunk({ model: 'modelMatrix', position: 'position', normal: 'normal' })}
 }
 `
 
@@ -203,6 +216,8 @@ export function composeSurface(
   maps: SurfaceMaps = { hasFrontMap: false, hasBackMap: false },
   /** World dims — perforation holes are sized in world units. */
   sheet: { width: number; height: number } = { width: 1, height: 1.4 },
+  /** Whose key light transmission is measured against. */
+  lighting: LightingName = 'studio',
 ): ComposedSurface {
   const grain = surface.grain ?? stock.defaultSurface.grain
   const aging = surface.aging ?? stock.defaultSurface.aging
@@ -224,6 +239,9 @@ export function composeSurface(
     uStockColor: { value: new THREE.Color(stock.color) },
     uOpacity: { value: stock.opacity },
     uShowThrough: { value: showThrough },
+    // Always compiled in: the shader early-outs at zero translucency, which
+    // is cheaper than carrying a second program structure for it.
+    ...translucencyUniforms(surface.translucency ?? stock.translucency, lighting),
   }
   if (maps.hasFrontMap) uniforms.uFrontMap = { value: null }
   if (maps.hasBackMap) uniforms.uBackMap = { value: null }
@@ -284,6 +302,7 @@ uniform float uOpacity;
 uniform float uShowThrough;
 ${maps.hasFrontMap ? 'uniform sampler2D uFrontMap;' : ''}
 ${maps.hasBackMap && !stock.adhesive ? 'uniform sampler2D uBackMap;' : ''}
+${TRANSLUCENCY_FRAGMENT}
 ${chunks.join('\n')}
 void main() {
   vec3 front = ${frontExpr};
@@ -296,6 +315,8 @@ void main() {
   ${calls.join('\n  ')}
   if (!gl_FrontFacing) csm_DiffuseColor.rgb *= uBackDarken;
   ${stock.adhesive ? '// Adhesive underside: higher specular than the printed face.\n  if (!gl_FrontFacing) csm_Roughness = 0.18;' : ''}
+  // What the key light pushes through the sheet, filtered by the ink on it.
+  csm_Emissive = plTransmission(front);
 }
 `
 

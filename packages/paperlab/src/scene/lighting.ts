@@ -19,6 +19,12 @@ export interface LightingPreset {
   exposure: number
   shadow: { mapSize: number; radius: number }
   gobo?: { kind: 'blinds' | 'leaves'; drift: number; angle: number }
+  /**
+   * Distance haze. Depth in a deep space is staged almost entirely by fog —
+   * it is what turns a row of banners into a receding colonnade instead of
+   * a flat row of rectangles.
+   */
+  fog?: { color: string; near: number; far: number }
 }
 
 export const lightingPresets: Record<LightingName, LightingPreset> = {
@@ -73,6 +79,22 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     contactShadowBlur: 1.1,
     exposure: 1.05,
     shadow: { mapSize: 2048, radius: 1 },
+  },
+  nave: {
+    id: 'nave',
+    label: 'Nave',
+    // Dim, and the key sits BEHIND the walk rather than beside it: this mode
+    // is carried by light coming through the paper, not off it. Ambient is
+    // nearly nothing so the only bright thing in frame is the source itself.
+    ambient: 0.09,
+    key: { color: '#fff1dc', intensity: 3.4, position: [0, 7, -16] },
+    contactShadowOpacity: 0.55,
+    contactShadowBlur: 3.6,
+    exposure: 1.2,
+    shadow: { mapSize: 2048, radius: 6 },
+    // Warm and light, not black: distance in a backlit hall washes TOWARD
+    // the source, which is what separates haze from murk.
+    fog: { color: '#c9baa3', near: 5, far: 38 },
   },
 }
 

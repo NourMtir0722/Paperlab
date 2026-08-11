@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { useEffect, useMemo } from 'react'
 import CustomShaderMaterial from 'three-custom-shader-material'
-import type { SurfaceConfig } from '../config/schema'
+import type { LightingName, SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { composeSurface } from './compose'
 
@@ -14,6 +14,8 @@ export interface PaperMaterialProps {
   thickness: number
   /** World dims — perforation holes are sized in world units. */
   sheet?: { width: number; height: number }
+  /** Scene lighting — transmission is measured against its key light. */
+  lighting?: LightingName
 }
 
 /**
@@ -30,6 +32,7 @@ export function PaperMaterial({
   surface,
   thickness,
   sheet,
+  lighting = 'studio',
 }: PaperMaterialProps) {
   const composed = composeSurface(
     surface,
@@ -40,6 +43,7 @@ export function PaperMaterial({
       hasBackMap: Boolean(backTexture),
     },
     sheet,
+    lighting,
   )
 
   // Uniform objects bound to the current program; stable per structure.

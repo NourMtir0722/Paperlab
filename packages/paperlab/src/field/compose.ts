@@ -1,5 +1,10 @@
 import type { DeformerInstance, SheetDims } from '../deformers/types'
 import { getDeformer } from '../deformers/registry'
+import {
+  TRANSLUCENCY_FRAGMENT,
+  TRANSLUCENCY_VARYINGS,
+  translucencyVertexChunk,
+} from '../surface/translucency'
 
 /**
  * Compose a deformer stack into GLSL — the GPU twin of deformers/compose.ts.
@@ -101,6 +106,7 @@ attribute float aAtlas;
 attribute float aBias;
 varying vec2 vPaperUv;
 varying float vAtlas;
+${TRANSLUCENCY_VARYINGS}
 ${composed.functionsSrc}
 ${composed.displaceSrc}
 void main() {
@@ -112,6 +118,7 @@ void main() {
   vec3 n = cross(px - p, py - p);
   csm_Normal = length(n) > 1e-12 ? normalize(n) : vec3(0.0, 0.0, 1.0);
   csm_Position = p;
+${translucencyVertexChunk({ model: 'modelMatrix * instanceMatrix', position: 'p', normal: 'csm_Normal' })}
   vPaperUv = uv;
   vAtlas = aAtlas;
 }
@@ -132,6 +139,7 @@ uniform vec3 uStockColor;
 uniform float uShowThrough;
 varying vec2 vPaperUv;
 varying float vAtlas;
+${TRANSLUCENCY_FRAGMENT}
 void main() {
   float col = mod(vAtlas, uAtlasGrid.x);
   float row = floor(vAtlas / uAtlasGrid.x);
@@ -143,6 +151,10 @@ void main() {
     csm_DiffuseColor = vec4(uStockColor * mix(vec3(1.0), front.rgb, uShowThrough), 1.0);
     csm_DiffuseColor.rgb *= uBackDarken;
   }
+  // Light coming through the sheet, filtered by what is printed on it. Same
+  // ink either side — the light passes through the same fibres regardless of
+  // which face happens to be turned toward the camera.
+  csm_Emissive = plTransmission(front.rgb);
 }
 `
 }

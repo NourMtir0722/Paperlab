@@ -13,6 +13,12 @@ export interface Stock {
   roughness: number
   /** 0 = opaque. Vellum is translucent. */
   opacity: number
+  /**
+   * How much light passes THROUGH the sheet when something is behind it,
+   * 0..1. Distinct from `opacity`: newsprint is fully opaque to look at and
+   * still glows on a lightbox. This is what makes a backlit banner read.
+   */
+  translucency: number
   /** Ink multiply tint for content drawn on this stock (thermal prints grey-black). */
   inkColor: string
   /** Thermal-printer banding intensity baked into the grain effect. */
@@ -32,6 +38,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#fbfaf7',
     roughness: 0.88,
     opacity: 1,
+    translucency: 0.2,
     inkColor: '#222222',
     banding: 0,
     defaultSurface: { grain: 0.12 },
@@ -44,6 +51,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#f6f3e9',
     roughness: 0.62,
     opacity: 1,
+    translucency: 0.34,
     inkColor: '#3a3a3a',
     banding: 0.35,
     defaultSurface: { aging: 0.1 },
@@ -56,6 +64,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#c9a06c',
     roughness: 0.96,
     opacity: 1,
+    translucency: 0.08,
     inkColor: '#33261a',
     banding: 0,
     defaultSurface: { grain: 0.5 },
@@ -68,6 +77,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#e9e4d6',
     roughness: 0.95,
     opacity: 1,
+    translucency: 0.38,
     inkColor: '#3d3a34',
     banding: 0,
     defaultSurface: { grain: 0.7, aging: 0.15 },
@@ -80,6 +90,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#f4f2ec',
     roughness: 0.42,
     opacity: 0.62,
+    translucency: 0.86,
     inkColor: '#4a453d',
     banding: 0,
     defaultSurface: {},
@@ -92,6 +103,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#ffffff',
     roughness: 0.22,
     opacity: 1,
+    translucency: 0.03,
     inkColor: '#111111',
     banding: 0,
     defaultSurface: {},
@@ -106,6 +118,7 @@ export const stocks: Record<StockName, Stock> = {
     color: '#ffffff',
     roughness: 0.3,
     opacity: 1,
+    translucency: 0.06,
     inkColor: '#1a1a1a',
     banding: 0,
     defaultSurface: {},

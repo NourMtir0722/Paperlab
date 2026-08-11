@@ -139,11 +139,46 @@ export {
   book,
   accordion,
   rack,
+  colonnade,
   sheet,
   type Layout,
   type PaperPose,
 } from './field/layouts'
 export { fieldBounds, fitCamera, type FieldBounds } from './field/framing'
+export {
+  createWalkPath,
+  getWalkPath,
+  walkPathSchema,
+  type Ground,
+  type WalkPath,
+  type WalkPathOptions,
+} from './stage/path'
+export {
+  cycleLength,
+  figureGait,
+  figureSchema,
+  placeFigure,
+  PROPORTIONS,
+  type FigureOptions,
+  type FigurePlacement,
+  type FigurePose,
+} from './stage/gait'
+export { Figure, type FigureProps } from './stage/Figure'
+export {
+  shotNames,
+  shotSchema,
+  stageCamera,
+  walkPoint,
+  type ShotName,
+  type ShotOptions,
+  type StageShot,
+} from './stage/camera'
+export {
+  translucencyUniforms,
+  translucencyValues,
+  TRANSMISSION_GAIN,
+  type TranslucencyValues,
+} from './surface/translucency'
 export { useContentAtlas, atlasGrid, type ContentAtlas } from './content/atlas'
 export {
   runParityHarness,

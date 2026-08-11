@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { SheetDims } from '../../deformers/types'
 import { SHEET_LIFT, sheetLayoutSchema, sheetSlotXY, type SheetLayoutOptions } from '../sheetGrid'
+import { getWalkPath, walkPathSchema } from '../../stage/path'
 
 /**
  * A layout is a pure `pose(i, n, options, phase)` function — no state, no
@@ -417,6 +418,71 @@ export const rack: Layout<z.infer<typeof rackSchema>> = {
   },
 }
 
+const colonnadeSchema = z.object({
+  /** The walk the colonnade is built along — see `stage/path`. */
+  path: walkPathSchema.default({}),
+  /** Half-width of the clear aisle: how far each banner stands off the walk line. */
+  aisle: z.number().min(0.2).max(20).default(2.4),
+  /** How much that gap opens and closes along the walk. Nothing hung by hand is a corridor. */
+  breathe: z.number().min(0).max(1).default(0.3),
+  /** Widest angle a banner turns off square to the aisle, degrees. */
+  twist: z.number().min(0).max(90).default(22),
+  /** Fraction of the walk left clear at each end, so the figure has somewhere to enter from. */
+  margin: z.number().min(0).max(0.45).default(0.05),
+  /** Spread of banner heights, 0..1. */
+  rise: z.number().min(0).max(1).default(0.28),
+  /** How far the banners lift off the floor, as a fraction of their height. 0 = they pool on it. */
+  hover: z.number().min(0).max(1).default(0),
+  /** Spread of deformation — no two lengths of hung paper drape alike. */
+  drape: z.number().min(0).max(1).default(0.5),
+  seed: z.number().int().min(0).max(9999).default(2),
+})
+/**
+ * A nave of hanging banners flanking a walk: paper as ARCHITECTURE rather
+ * than as an object on a desk. The first layout here that arranges along a
+ * path instead of around an origin, which is what lets a figure walk through
+ * it — the aisle is guaranteed clear because the banners are placed off the
+ * walk line, not merely near it.
+ *
+ * Banners alternate ranks (left, right, left…) and the two ranks are
+ * staggered by a quarter step, so you pass them one at a time rather than
+ * through a ladder of matched pairs. Each faces across the aisle: a banner
+ * ahead of you presents its face, which is the whole reason to print
+ * anything on it.
+ */
+export const colonnade: Layout<z.infer<typeof colonnadeSchema>> = {
+  id: 'colonnade',
+  label: 'Colonnade',
+  defaults: colonnadeSchema.parse({}),
+  optionsSchema: colonnadeSchema,
+  pose(i, n, o, phase, sheet) {
+    const path = getWalkPath(o.path)
+    const side = i % 2 === 0 ? 1 : -1
+    const pairs = Math.max(Math.ceil(n / 2), 1)
+    const k = Math.floor(i / 2)
+    const span = 1 - o.margin * 2
+    const step = pairs > 1 ? span / (pairs - 1) : 0
+    const base = o.margin + (pairs > 1 ? k * step : span / 2) + side * step * 0.25
+    // Only a closed walk can slide: on an open one, offsetting by phase would
+    // teleport the far banner back to the near end mid-shot.
+    const s = path.closed ? base + phase : base
+    const [px, pz] = path.pointAt(s)
+    const [nx, nz] = path.normalAt(s)
+    const scale = 1 + jitter(o.seed, i) * o.rise * 0.5
+    const offset = o.aisle * (1 + jitter(o.seed + 1, i) * o.breathe)
+    const height = sheet.height * scale
+    // Face the centerline: the inward direction is the aisle normal, negated
+    // on whichever rank this banner stands in.
+    const yaw = Math.atan2(-side * nx, -side * nz) + jitter(o.seed + 2, i) * o.twist * DEG
+    return {
+      position: [px + nx * side * offset, height / 2 + height * o.hover, pz + nz * side * offset],
+      rotation: [0, yaw, 0],
+      scale,
+      bias: 1 - Math.abs(jitter(o.seed + 3, i)) * o.drape,
+    }
+  },
+}
+
 /**
  * A block of stamps: flat rows × columns grid in register, floating a hair
  * above the (field-rendered) backing sheet. Standard layout contract — it
@@ -462,4 +528,5 @@ registerLayout(sweep)
 registerLayout(book)
 registerLayout(accordion)
 registerLayout(rack)
+registerLayout(colonnade)
 registerLayout(sheet)
