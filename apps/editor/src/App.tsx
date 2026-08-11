@@ -15,6 +15,7 @@ import {
   type FieldExportInput,
   type PaperConfig,
   type PaperHandle,
+  type StageExportInput,
 } from 'paperlab'
 import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
@@ -88,6 +89,14 @@ export function App() {
     zones: fieldZones,
   })
 
+  const stageExportInput = (): StageExportInput => ({
+    stage: { ...stage.config, path: getWalk(stage.walk) },
+    layout: stage.layout,
+    layoutOptions: stage.layoutOptions,
+    text: stage.text.trim() ? stage.text : undefined,
+    count: stage.count,
+  })
+
   // State-editing mode shows the state applied; preview runs the live machine.
   const paperCanvasConfig = editingState && !statePreview ? resolveStateConfig(config, editingState) : config
 
@@ -148,9 +157,13 @@ export function App() {
             Save preset
           </button>
         )}
-        {mode !== 'stage' && (
-          <ExportMenu mode={mode} config={config} paperRef={paperRef} fieldInput={fieldExportInput} />
-        )}
+        <ExportMenu
+          mode={mode}
+          config={config}
+          paperRef={paperRef}
+          fieldInput={fieldExportInput}
+          stageInput={stageExportInput}
+        />
       </header>
 
       <aside className="left">
