@@ -96,7 +96,12 @@ export {
 export { PaperLighting, makeGoboTexture, type PaperLightingProps } from './scene/PaperLighting'
 
 export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
-export { registerDeformer, getDeformer, listDeformers } from './deformers/registry'
+export {
+  registerDeformer,
+  getDeformer,
+  listDeformers,
+  resolveDeformerStack,
+} from './deformers/registry'
 export { applyDeformerStack, displacePoint, stackMinSegments } from './deformers/compose'
 export { roll, rollOptionsSchema, type RollOptions } from './deformers/roll'
 export { curl, curlOptionsSchema, cornerNames, type CurlOptions } from './deformers/curl'
@@ -164,6 +169,21 @@ export {
   type FigurePose,
 } from './stage/gait'
 export { Figure, type FigureProps } from './stage/Figure'
+export {
+  PaperStage,
+  PaperStageScene,
+  splitAcrossBanners,
+  bannerTextSize,
+  type PaperStageProps,
+  type PaperStageSceneProps,
+} from './stage/PaperStage'
+export {
+  stageSchema,
+  stageSourceSchema,
+  stageGroundSchema,
+  type StageConfig,
+  type StageConfigInput,
+} from './stage/schema'
 export {
   shotNames,
   shotSchema,

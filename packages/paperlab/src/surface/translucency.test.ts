@@ -48,10 +48,22 @@ describe('translucency values', () => {
     }
   })
 
-  it('binds the three uniforms every program expects', () => {
+  it('binds every uniform the program expects', () => {
     const uniforms = translucencyUniforms(0.4, 'nave')
-    expect(Object.keys(uniforms).sort()).toEqual(['uBackLightColor', 'uBackLightDir', 'uTranslucency'])
+    expect(Object.keys(uniforms).sort()).toEqual([
+      'uAmbientTransmission',
+      'uBackLightColor',
+      'uBackLightDir',
+      'uTranslucency',
+    ])
     expect(uniforms.uTranslucency!.value).toBe(0.4)
+  })
+
+  it('paper edge-on to the only lamp still glows from the room', () => {
+    // A banner facing across the aisle catches no diffuse and no directional
+    // transmission; without an ambient floor it drops out of the picture.
+    expect(translucencyValues(1, 'nave').ambient).toBeGreaterThan(0)
+    expect(translucencyValues(1, 'studio').ambient).toBeGreaterThan(translucencyValues(1, 'nave').ambient)
   })
 })
 

@@ -103,6 +103,28 @@ export const parityCases: ParityCase[] = [
     t: 2.5,
   },
   {
+    name: 'drape: banner hung from the top',
+    stack: [
+      {
+        type: 'drape',
+        options: { amplitude: 0.17, folds: 5, falloff: 1.6, irregular: 0.45, gather: 0.5, pinnedEdge: 'top' },
+      },
+    ],
+    sheet: { width: 1.5, height: 8.5 },
+    t: 0,
+  },
+  {
+    name: 'drape: deep irregular folds pinned at the bottom',
+    stack: [
+      {
+        type: 'drape',
+        options: { amplitude: 0.55, folds: 11, falloff: 0.4, irregular: 1, gather: 1, pinnedEdge: 'bottom' },
+      },
+    ],
+    sheet: { width: 2.2, height: 3 },
+    t: 0,
+  },
+  {
     name: 'stacked: letter-fold pair (fold ∘ fold)',
     stack: [
       { type: 'fold', options: { angle: 270, offset: 0.2333, foldAngle: 120, radius: 0.05 } },
