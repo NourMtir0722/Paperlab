@@ -160,6 +160,15 @@ export {
 } from './stage/path'
 export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
 export {
+  encodeStageShare,
+  decodeStageShare,
+  readStageShare,
+  stageShareUrl,
+  SHARE_PARAM,
+  MAX_SHARE_LENGTH,
+  type StageShare,
+} from './stage/share'
+export {
   stagePresets,
   getStagePreset,
   listStagePresets,

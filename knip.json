@@ -6,6 +6,9 @@
     "packages/paperlab": {
       "project": "src/**"
     },
+    "apps/playground": {
+      "project": "src/**"
+    },
     "apps/editor": {
       "entry": ["src/parity-main.ts", "src/stage-main.tsx"],
       "project": "src/**"

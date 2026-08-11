@@ -1,0 +1,191 @@
+:root {
+  color-scheme: dark;
+  --ink: #f2ede6;
+  --dim: #9a938a;
+  --edge: rgba(242, 237, 230, 0.16);
+  --pane: rgba(12, 10, 11, 0.62);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0c0a0b;
+  color: var(--ink);
+}
+
+.app {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* Chrome floats over the scene — the scene is the product, not a preview
+   panel inside a tool. */
+.chrome {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 16px;
+  padding: 18px 22px;
+  pointer-events: none;
+}
+
+.chrome > * {
+  pointer-events: auto;
+}
+
+.top {
+  top: 0;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wordmark {
+  /* The stage behind this is usually BRIGHT — a backlit hall is the whole
+     mode — so light-on-light chrome disappears. Everything floating over
+     the scene carries its own ground. */
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  padding: 8px 15px;
+  border-radius: 999px;
+  background: var(--pane);
+  border: 1px solid var(--edge);
+  backdrop-filter: blur(10px);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--pane);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  padding: 8px 15px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+button:hover {
+  background: rgba(30, 26, 24, 0.8);
+}
+
+button.primary {
+  background: var(--ink);
+  color: #16110f;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+button.primary:hover {
+  background: #fff;
+}
+
+.bottom {
+  bottom: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.write {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.write span {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+textarea {
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--pane);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 11px 13px;
+  resize: none;
+  backdrop-filter: blur(10px);
+}
+
+textarea:focus {
+  outline: none;
+  border-color: rgba(242, 237, 230, 0.4);
+}
+
+textarea::placeholder {
+  color: #6f6862;
+}
+
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.presets,
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.transport {
+  flex: 1;
+  max-width: 340px;
+}
+
+.chip {
+  padding: 6px 13px;
+  font-size: 12px;
+}
+
+.chip.on {
+  background: rgba(242, 237, 230, 0.92);
+  color: #16110f;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+input[type="range"] {
+  flex: 1;
+  accent-color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  .write {
+    max-width: none;
+  }
+  .transport {
+    max-width: none;
+  }
+}
