@@ -7,7 +7,7 @@
       "project": "src/**"
     },
     "apps/editor": {
-      "entry": ["src/parity-main.ts"],
+      "entry": ["src/parity-main.ts", "src/stage-main.tsx"],
       "project": "src/**"
     }
   }
