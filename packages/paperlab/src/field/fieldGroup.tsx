@@ -17,6 +17,7 @@ import {
   stackUniformValues,
 } from './compose'
 import { getLayout, type PaperPose } from './layouts'
+import { translucencyUniforms } from '../surface/translucency'
 import { fieldShapeStack } from './stack'
 import type { FieldGroupData } from './slots'
 
@@ -111,13 +112,26 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     }
     uniforms.uStockColor = { value: new THREE.Color(stock.color) }
     uniforms.uShowThrough = { value: config.surface.showThrough ?? stock.showThrough }
+    // Transmission reads the scene's own key light, so a backlit sheet can
+    // never disagree with the lamp casting its shadow.
+    Object.assign(
+      uniforms,
+      translucencyUniforms(config.surface.translucency ?? stock.translucency, config.scene.lighting),
+    )
     return {
       vertexShader: buildFieldVertexShader(composed),
       fragmentShader: buildFieldFragmentShader(),
       uniforms,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structureKey, JSON.stringify(config.sheet), stock.id, config.surface.showThrough])
+  }, [
+    structureKey,
+    JSON.stringify(config.sheet),
+    stock.id,
+    config.surface.showThrough,
+    config.surface.translucency,
+    config.scene.lighting,
+  ])
 
   useEffect(() => {
     if (!atlas) return

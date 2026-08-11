@@ -100,6 +100,7 @@ export function PaperLighting({
   const p = getLightingPreset(preset)
   const reduced = usePrefersReducedMotion(reducedMotion)
   const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
 
   useEffect(() => {
     const previous = gl.toneMappingExposure
@@ -108,6 +109,17 @@ export function PaperLighting({
       gl.toneMappingExposure = previous
     }
   }, [gl, p.exposure])
+
+  // Set imperatively rather than via <fog attach="fog" />, which would bind
+  // to whatever group this rig happens to be mounted under instead of the scene.
+  useEffect(() => {
+    if (!p.fog) return
+    const previous = scene.fog
+    scene.fog = new THREE.Fog(p.fog.color, p.fog.near, p.fog.far)
+    return () => {
+      scene.fog = previous
+    }
+  }, [scene, p.fog])
 
   const goboMap = useMemo(
     () => (p.gobo ? makeGoboTexture(p.gobo.kind) : null),

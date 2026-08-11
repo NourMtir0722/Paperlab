@@ -20,7 +20,7 @@ import { silhouetteRects } from '../content/backing'
 const PAPER = { width: 1, height: 1.4 }
 
 describe('layouts', () => {
-  it('registers the eleven built-ins', () => {
+  it('registers the twelve built-ins', () => {
     expect(listLayouts()).toEqual([
       'ring',
       'fan',
@@ -32,6 +32,7 @@ describe('layouts', () => {
       'book',
       'accordion',
       'rack',
+      'colonnade',
       'sheet',
     ])
   })
@@ -567,5 +568,107 @@ describe('atlasGrid', () => {
     expect(atlasGrid(12)).toEqual({ cols: 4, rows: 3 })
     expect(atlasGrid(16)).toEqual({ cols: 4, rows: 4 })
     expect(atlasGrid(17)).toEqual({ cols: 5, rows: 4 })
+  })
+})
+
+describe('colonnade', () => {
+  // A tall banner, not a letter — this layout builds architecture.
+  const BANNER = { width: 1.6, height: 9 }
+  const layout = getLayout('colonnade')
+  const options = (o: Record<string, unknown> = {}) =>
+    layout.optionsSchema.parse({ ...layout.defaults, ...o })
+
+  it('keeps the aisle clear — every banner stands off the walk line', () => {
+    // The default walk runs straight down x = 0, so distance from the line
+    // is just |x|, and no banner may intrude past the narrowest gap.
+    const o = options()
+    const narrowest = o.aisle * (1 - o.breathe)
+    for (let i = 0; i < 24; i++) {
+      const pose = layout.pose(i, 24, o, 0, BANNER)
+      expect(Math.abs(pose.position[0])).toBeGreaterThanOrEqual(narrowest - 1e-9)
+    }
+  })
+
+  it('alternates ranks and staggers them so you pass one banner at a time', () => {
+    const o = options()
+    const left = layout.pose(0, 24, o, 0, BANNER)
+    const right = layout.pose(1, 24, o, 0, BANNER)
+    expect(Math.sign(left.position[0])).toBe(-Math.sign(right.position[0]))
+    // Staggered by a quarter step: the facing rank is offset along the walk.
+    expect(left.position[2]).not.toBeCloseTo(right.position[2], 3)
+  })
+
+  it('banners stand on the floor, and hover lifts them off it', () => {
+    const grounded = layout.pose(2, 12, options({ rise: 0 }), 0, BANNER)
+    expect(grounded.position[1] - (BANNER.height * grounded.scale) / 2).toBeCloseTo(0, 6)
+    const lifted = layout.pose(2, 12, options({ rise: 0, hover: 0.25 }), 0, BANNER)
+    expect(lifted.position[1]).toBeGreaterThan(grounded.position[1])
+  })
+
+  it('every banner faces across the aisle, so the walk sees printed sides', () => {
+    const o = options({ twist: 0, breathe: 0 })
+    for (let i = 0; i < 12; i++) {
+      const pose = layout.pose(i, 12, o, 0, BANNER)
+      const yaw = pose.rotation[1]
+      // The sheet's front is +Z in local space; yaw turns it to (sin, cos).
+      const forwardX = Math.sin(yaw)
+      const forwardZ = Math.cos(yaw)
+      // Pointing inward means pointing back at the walk line (x = 0).
+      expect(forwardX * pose.position[0]).toBeLessThan(0)
+      expect(Math.abs(forwardZ)).toBeLessThan(1e-6)
+    }
+  })
+
+  it('phase slides a closed walk and leaves an open one alone', () => {
+    const open = options()
+    expect(layout.pose(3, 12, open, 0.4, BANNER)).toEqual(layout.pose(3, 12, open, 0, BANNER))
+
+    const ring = options({
+      path: {
+        points: [
+          [4, 0],
+          [0, 4],
+          [-4, 0],
+          [0, -4],
+        ],
+        closed: true,
+      },
+    })
+    const at0 = layout.pose(3, 12, ring, 0, BANNER)
+    const moved = layout.pose(3, 12, ring, 0.1, BANNER)
+    expect(moved.position[0]).not.toBeCloseTo(at0.position[0], 3)
+    // One full turn of phase brings the colonnade back onto itself.
+    const wrapped = layout.pose(3, 12, ring, 1, BANNER)
+    expect(wrapped.position[0]).toBeCloseTo(at0.position[0], 6)
+    expect(wrapped.position[2]).toBeCloseTo(at0.position[2], 6)
+  })
+
+  it('follows a curved walk instead of a straight corridor', () => {
+    const curved = options({
+      path: {
+        points: [
+          [0, 8],
+          [3, 0],
+          [0, -8],
+        ],
+      },
+    })
+    const seen = new Set<string>()
+    for (let i = 0; i < 12; i++) {
+      const pose = layout.pose(i, 12, curved, 0, BANNER)
+      seen.add(pose.rotation[1].toFixed(3))
+    }
+    // A curve turns the banners with it; a straight run would share one yaw.
+    expect(seen.size).toBeGreaterThan(4)
+  })
+
+  it('drape spreads deformation across the banners', () => {
+    const biases = new Set<number>()
+    for (let i = 0; i < 16; i++) biases.add(layout.pose(i, 16, options(), 0, BANNER).bias!)
+    expect(biases.size).toBeGreaterThan(8)
+    for (const bias of biases) {
+      expect(bias).toBeGreaterThanOrEqual(1 - options().drape - 1e-9)
+      expect(bias).toBeLessThanOrEqual(1)
+    }
   })
 })

@@ -24,6 +24,17 @@ describe('lighting presets', () => {
     expect(lightingPresets.goldenhour.exposure).toBeGreaterThan(1)
   })
 
+  it('nave is the backlit one: key behind, ambient near zero, and haze', () => {
+    const nave = lightingPresets.nave
+    // The default walk heads down -Z; a key light there is BEHIND the paper.
+    expect(nave.key.position[2]).toBeLessThan(0)
+    expect(nave.ambient).toBeLessThan(0.12)
+    expect(nave.fog).toBeDefined()
+    expect(nave.fog!.far).toBeGreaterThan(nave.fog!.near)
+    // Every other preset lights paper from the front and needs no haze.
+    expect(lightingPresets.studio.fog).toBeUndefined()
+  })
+
   it('scene.lighting serializes, defaults to studio, and survives round-trip', () => {
     expect(paperConfigSchema.parse({}).scene.lighting).toBe('studio')
     const config = paperConfigSchema.parse({ scene: { lighting: 'goldenhour' } })

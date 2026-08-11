@@ -127,6 +127,8 @@ export const paperEdges = ['top', 'right', 'bottom', 'left'] as const
 export const surfaceSchema = z.object({
   /** Paper fiber noise, 0..1. */
   grain: z.number().min(0).max(1).optional(),
+  /** Light passing through the sheet from behind, 0..1. Stock defaults apply. */
+  translucency: z.number().min(0).max(1).optional(),
   /** Torn-edge alpha with a lightened fiber band. */
   deckle: z
     .object({
@@ -227,7 +229,7 @@ export type PhysicsConfig = z.infer<typeof physicsSchema>
 
 // ── Scene ────────────────────────────────────────────────────────────────────
 
-export const lightingNames = ['studio', 'window', 'leaves', 'goldenhour', 'noir'] as const
+export const lightingNames = ['studio', 'window', 'leaves', 'goldenhour', 'noir', 'nave'] as const
 
 /** Scene-level presentation, serialized with the paper. */
 export const sceneSchema = z.object({
