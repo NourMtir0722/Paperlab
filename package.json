@@ -10,7 +10,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "knip": "knip",
-    "test:parity": "node tools/parity.mjs"
+    "test:parity": "node tools/parity.mjs",
+    "shot": "node tools/stage-shot.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

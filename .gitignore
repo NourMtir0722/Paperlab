@@ -6,3 +6,6 @@ dist/
 coverage/
 .env
 .env.*
+
+# Headless stage renders (pnpm shot)
+.shots/
