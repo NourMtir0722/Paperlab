@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { SheetDims } from '../../deformers/types'
 import { SHEET_LIFT, sheetLayoutSchema, sheetSlotXY, type SheetLayoutOptions } from '../sheetGrid'
 
 /**
@@ -30,8 +31,16 @@ export interface Layout<O = Record<string, unknown>> {
   label: string
   defaults: O
   optionsSchema: z.ZodType<O, z.ZodTypeDef, unknown>
-  pose(i: number, n: number, o: O, phase: number): PaperPose
+  /**
+   * `sheet` is the field's paper size. Layouts that arrange by CONTACT —
+   * edges meeting, sheets resting on each other — cannot work without it,
+   * and a layout that ignores it may simply omit the parameter.
+   */
+  pose(i: number, n: number, o: O, phase: number, sheet: SheetDims): PaperPose
 }
+
+/** For the odd caller that has no papers yet to measure. */
+export const DEFAULT_SHEET: SheetDims = { width: 1, height: 1.4 }
 
 const TAU = Math.PI * 2
 const DEG = Math.PI / 180
@@ -73,8 +82,8 @@ export const ring: Layout<z.infer<typeof ringSchema>> = {
 const fanSchema = z.object({
   /** Total angular sweep from the first sheet to the last, degrees. */
   sweep: z.number().min(0).max(180).default(72),
-  /** Distance from a sheet's center down to the pinned corner they share. */
-  hinge: z.number().min(0).max(4).default(0.78),
+  /** Where the shared pin sits, in half-sheet-heights below center. 1 = the bottom edge. */
+  hinge: z.number().min(0).max(4).default(1.15),
   /** Thickness step so the sheets stack in order instead of z-fighting. */
   lift: z.number().min(0.002).max(0.08).default(0.012),
   /** How much flatter the middle of the fan sits than its outer sheets. */
@@ -90,14 +99,15 @@ export const fan: Layout<z.infer<typeof fanSchema>> = {
   label: 'Fan',
   defaults: fanSchema.parse({}),
   optionsSchema: fanSchema,
-  pose(i, n, o) {
+  pose(i, n, o, _phase, sheet) {
     const f = n > 1 ? i / (n - 1) : 0.5
     const theta = (f - 0.5) * o.sweep * DEG
+    const hinge = (o.hinge * sheet.height) / 2
     // Swing the sheet about the shared pivot, then shift so the middle sheet
     // sits at the origin — the fan stays centered as `sweep` opens and closes.
     const open = Math.abs(f - 0.5) * 2
     return {
-      position: [-Math.sin(theta) * o.hinge, Math.cos(theta) * o.hinge - o.hinge, i * o.lift],
+      position: [-Math.sin(theta) * hinge, Math.cos(theta) * hinge - hinge, i * o.lift],
       rotation: [0, 0, theta],
       scale: 1,
       bias: 1 - (1 - open) * o.bow,
@@ -181,14 +191,15 @@ export const wall: Layout<z.infer<typeof wallSchema>> = {
   label: 'Wall',
   defaults: wallSchema.parse({}),
   optionsSchema: wallSchema,
-  pose(i, n, o) {
-    const cols = Math.ceil(Math.sqrt(n * 1.4))
+  pose(i, n, o, _phase, sheet) {
+    const cols = Math.ceil(Math.sqrt((n * sheet.height) / sheet.width))
     const rows = Math.ceil(n / cols)
     const col = i % cols
     const row = Math.floor(i / cols)
-    // Sheet footprint ≈ 1×1.4 world units; gaps are the breathing room.
-    const cellW = 1 + o.gapX
-    const cellH = 1.4 + o.gapY
+    // Gaps are breathing room around the real paper — a wall of 1.2×0.9
+    // prints and a wall of 1×1.4 letters both want even gutters.
+    const cellW = sheet.width + o.gapX
+    const cellH = sheet.height + o.gapY
     return {
       position: [
         (col - (cols - 1) / 2) * cellW,
@@ -242,6 +253,170 @@ export const spill: Layout<z.infer<typeof spillSchema>> = {
   },
 }
 
+const sweepSchema = z.object({
+  columns: z.number().int().min(1).max(24).default(5),
+  /** Breathing room around each specimen. */
+  gap: z.number().min(0).max(2).default(0.22),
+  /** Deformation at the first specimen and at the last. */
+  from: z.number().min(0).max(1).default(0),
+  to: z.number().min(0).max(1).default(1),
+})
+/**
+ * A specimen chart: the same sheet mounted in a grid, its deformation ramped
+ * across the series so one image shows a curl at ten stages instead of one.
+ * The layout the rest of this library exists to make possible — and the one
+ * that documents every deformer for free.
+ *
+ * Only as legible as the preset it charts: a sheet with no behavior or
+ * deformers has nothing for the ramp to scale, and every specimen comes out
+ * identical.
+ */
+export const sweep: Layout<z.infer<typeof sweepSchema>> = {
+  id: 'sweep',
+  label: 'Sweep',
+  defaults: sweepSchema.parse({}),
+  optionsSchema: sweepSchema,
+  pose(i, n, o, _phase, sheet) {
+    const cols = Math.min(o.columns, Math.max(n, 1))
+    const rows = Math.ceil(n / cols)
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    return {
+      position: [
+        (col - (cols - 1) / 2) * (sheet.width + o.gap),
+        ((rows - 1) / 2 - row) * (sheet.height + o.gap),
+        0,
+      ],
+      rotation: [0, 0, 0],
+      scale: 1,
+      bias: o.from + (o.to - o.from) * ramp(i, n),
+    }
+  },
+}
+
+const bookSchema = z.object({
+  /** How far the outermost page lifts off the block, degrees. */
+  spread: z.number().min(0).max(150).default(55),
+  /** Fraction of the pages bound to the left. 0 = a one-sided sample book. */
+  split: z.number().min(0).max(1).default(0.5),
+  /** Page thickness — the gap between pages of one block. */
+  lift: z.number().min(0.001).max(0.05).default(0.008),
+  /** How much more a lifted page arcs than one lying flat in the block. */
+  gutter: z.number().min(0).max(1).default(0.6),
+})
+/**
+ * An open codex: pages hinged on a shared spine, each block splaying away
+ * from the gutter. `split` slides it between the two bound forms paper takes
+ * — 0.5 is a book lying open, 0 is a swatch deck or sample book bound down
+ * one side. Pages lying flat in the block are pressed by the ones above;
+ * only the lifted pages keep their arc.
+ */
+export const book: Layout<z.infer<typeof bookSchema>> = {
+  id: 'book',
+  label: 'Book',
+  defaults: bookSchema.parse({}),
+  optionsSchema: bookSchema,
+  pose(i, n, o, _phase, sheet) {
+    const half = sheet.width / 2
+    const left = Math.round(n * o.split)
+    const onLeft = i < left
+    const count = onLeft ? left : n - left
+    const k = onLeft ? i : i - left
+    const f = count > 1 ? k / (count - 1) : 1
+    const theta = f * o.spread * DEG
+    // Swing the page about the spine at x = 0; `side` mirrors the left block.
+    const side = onLeft ? -1 : 1
+    const cos = Math.cos(theta)
+    const sin = Math.sin(theta)
+    // Stack along the page's own normal so pages standing near-vertical
+    // separate sideways rather than sinking into each other.
+    const offset = k * o.lift
+    return {
+      position: [side * (half * cos - offset * sin), 0, half * sin + offset * cos],
+      rotation: [0, -side * theta, 0],
+      scale: 1,
+      bias: 1 - (1 - f) * o.gutter,
+    }
+  },
+}
+
+const accordionSchema = z.object({
+  /** How far each panel tilts off the strip's line, degrees. 0 = flat, 90 = shut. */
+  angle: z.number().min(0).max(89).default(55),
+  /** A concertina holds its creases — how much bow the panels keep. */
+  slack: z.number().min(0).max(1).default(0.15),
+})
+/**
+ * A concertina: panels alternating about creases they genuinely share, so
+ * the sheets read as ONE folded strip rather than as N separate papers —
+ * the only layout here where that is true. Adjacent edges are solved to
+ * meet, which is why it needs the sheet's real width.
+ */
+export const accordion: Layout<z.infer<typeof accordionSchema>> = {
+  id: 'accordion',
+  label: 'Accordion',
+  defaults: accordionSchema.parse({}),
+  optionsSchema: accordionSchema,
+  pose(i, n, o, _phase, sheet) {
+    const theta = o.angle * DEG
+    const side = i % 2 === 0 ? 1 : -1
+    // Solving edge-meets-edge for alternating ±angle puts every panel center
+    // on one line, spaced by the panel's foreshortened width.
+    const step = sheet.width * Math.cos(theta)
+    return {
+      position: [(i - (n - 1) / 2) * step, 0, 0],
+      rotation: [0, side * theta, 0],
+      scale: 1,
+      bias: o.slack,
+    }
+  },
+}
+
+const rackSchema = z.object({
+  /** Gap along the row, as a fraction of the paper's width. Under 1 they overlap. */
+  spacing: z.number().min(0.05).max(2).default(0.82),
+  /** How far a sheet leans back off vertical, degrees. */
+  lean: z.number().min(0).max(70).default(16),
+  /** How much that lean differs sheet to sheet — nothing propped is uniform. */
+  vary: z.number().min(0).max(1).default(0.55),
+  /** Small rotations off square. */
+  sway: z.number().min(0).max(1).default(0.35),
+  seed: z.number().int().min(0).max(9999).default(5),
+})
+/**
+ * Prints stood in a row and leaning back — against a wall, in a rack, propped
+ * along a shelf. The one arrangement here that RESTS on a surface rather than
+ * floating: every sheet pivots on the bottom edge it actually stands on, so
+ * the row shares a floor. The further a sheet has leaned, the more it bows
+ * under its own weight.
+ *
+ * (Stacking these front-to-back the way a letter tray really holds paper is
+ * physically honest and visually useless — the front sheet hides the rest.
+ * A row is the arrangement you can actually see.)
+ */
+export const rack: Layout<z.infer<typeof rackSchema>> = {
+  id: 'rack',
+  label: 'Rack',
+  defaults: rackSchema.parse({}),
+  optionsSchema: rackSchema,
+  pose(i, n, o, _phase, sheet) {
+    const lean = o.lean * DEG * (1 + jitter(o.seed, i) * o.vary)
+    const half = sheet.height / 2
+    return {
+      position: [
+        (i - (n - 1) / 2) * sheet.width * o.spacing,
+        // Standing on the floor: the bottom edge stays at y = 0 as it leans.
+        half * Math.cos(lean),
+        -half * Math.sin(lean) + i * 0.004,
+      ],
+      rotation: [-lean, jitter(o.seed + 1, i) * 0.12 * o.sway, jitter(o.seed + 2, i) * 0.06 * o.sway],
+      scale: 1,
+      // A sheet leaning further has more of its own weight to carry.
+      bias: o.lean === 0 ? 0 : Math.min(1, lean / (o.lean * DEG * (1 + o.vary))),
+    }
+  },
+}
+
 /**
  * A block of stamps: flat rows × columns grid in register, floating a hair
  * above the (field-rendered) backing sheet. Standard layout contract — it
@@ -283,4 +458,8 @@ registerLayout(spread)
 registerLayout(pile)
 registerLayout(wall)
 registerLayout(spill)
+registerLayout(sweep)
+registerLayout(book)
+registerLayout(accordion)
+registerLayout(rack)
 registerLayout(sheet)

@@ -97,6 +97,10 @@ const LAYOUT_PHRASES: Record<string, string> = {
   pile: 'a heap on a desk, the sheets underneath pressed flat',
   wall: 'a pinned studio wall of sheets, none hanging quite square',
   spill: 'a dropped stack caught mid-air, each sheet bent its own way',
+  sweep: 'a specimen chart of one sheet at every stage of its deformation',
+  book: 'an open book, its pages splayed from a shared spine',
+  accordion: 'one continuous strip folded into a concertina',
+  rack: 'prints stood in a row and leaning back against a wall',
   sheet: 'a stamp-block grid on a shared backing sheet',
 }
 

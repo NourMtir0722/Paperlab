@@ -52,7 +52,7 @@ export function fieldBounds(layout: Layout<any>, n: number, options: unknown, sh
   const max = [-Infinity, -Infinity, -Infinity]
   for (let s = 0; s < PHASE_SAMPLES; s++) {
     for (let i = 0; i < n; i++) {
-      const pose = layout.pose(i, n, options, s / PHASE_SAMPLES)
+      const pose = layout.pose(i, n, options, s / PHASE_SAMPLES, sheet)
       const r = reach * Math.max(pose.scale, 0)
       for (let axis = 0; axis < 3; axis++) {
         min[axis] = Math.min(min[axis]!, pose.position[axis]! - r)
@@ -94,7 +94,7 @@ export function fitCamera(
   let distance = 0.1
   for (let s = 0; s < PHASE_SAMPLES; s++) {
     for (let i = 0; i < Math.max(n, 0); i++) {
-      const pose = layout.pose(i, n, options, s / PHASE_SAMPLES)
+      const pose = layout.pose(i, n, options, s / PHASE_SAMPLES, sheet)
       const r = reach * Math.max(pose.scale, 0)
       // Depth of this sheet in front of the field's center — a sheet further
       // back needs correspondingly less distance to fit.

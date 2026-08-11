@@ -16,7 +16,7 @@ import { FieldGroup, type SharedMotion } from './field/fieldGroup'
 import { BackingSheet } from './field/backingSheet'
 import { InteractiveField, type FieldA11yController } from './field/interactiveField'
 import { FieldKeyboardMirror } from './field/keyboardMirror'
-import { getLayout } from './field/layouts'
+import { DEFAULT_SHEET, getLayout } from './field/layouts'
 import type { SheetLayoutOptions } from './field/sheetGrid'
 import { fitCamera, resolveLayoutOptions } from './field/framing'
 
@@ -176,6 +176,7 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
       morphRef,
       layoutId,
       layoutOptions,
+      sheet: firstSheet ?? DEFAULT_SHEET,
       entranceType,
       stagger: props.entrance?.stagger ?? 0.06,
       entranceDuration: props.entrance?.duration ?? 0.9,
@@ -201,6 +202,7 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
             layoutId={layoutId}
             layoutOptions={layoutOptions}
             sheetOptions={sheetOptions}
+            sheet={firstSheet ?? DEFAULT_SHEET}
             reducedMotion={props.reducedMotion}
             zones={props.zones}
             onSlotStateChange={props.onSlotStateChange}
@@ -239,7 +241,7 @@ function FitCamera(meshProps: PaperFieldMeshProps) {
     const layout = getLayout(layoutId)
     const sheet = groupFieldPapers(papers, meshProps.preset)[0]?.config.sheet
     const options = resolveLayoutOptions(layoutId, layout, meshProps.layoutOptions, sheet)
-    return { layout, n: papers.length, options, sheet: sheet ?? { width: 1, height: 1.4 } }
+    return { layout, n: papers.length, options, sheet: sheet ?? DEFAULT_SHEET }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     JSON.stringify(meshProps.papers ?? null),

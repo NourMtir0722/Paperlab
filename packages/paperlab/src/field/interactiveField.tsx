@@ -7,6 +7,7 @@ import { mergeConfig } from '../config/merge'
 import { PaperMesh, type PaperHandle } from '../PaperMesh'
 import { carryDrive, dampTo, type DampedValue } from '../physics/aero'
 import { usePrefersReducedMotion } from '../a11y'
+import type { SheetDims } from '../deformers/types'
 import { getLayout, type PaperPose } from './layouts'
 import { tornEdgesOnDetach, type SheetLayoutOptions } from './sheetGrid'
 import {
@@ -37,6 +38,8 @@ export interface InteractiveFieldProps {
   layoutId: string
   layoutOptions: Record<string, unknown>
   sheetOptions: SheetLayoutOptions | null
+  /** The field's paper size, for layouts that arrange by contact. */
+  sheet: SheetDims
   reducedMotion?: boolean
   /** Serialized zones (the editor's) — merged with `<DropZone>` children. */
   zones?: DropZoneConfig[]
@@ -112,9 +115,9 @@ export function InteractiveField(props: InteractiveFieldProps) {
     ],
   )
   const poses = useMemo(
-    () => slotConfigs.map((_, i) => layout.pose(i, total, layoutOptions, 0)),
+    () => slotConfigs.map((_, i) => layout.pose(i, total, layoutOptions, 0, props.sheet)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layoutId, JSON.stringify(layoutOptions), total],
+    [layoutId, JSON.stringify(layoutOptions), total, props.sheet.width, props.sheet.height],
   )
 
   const groupRefs = useRef<(THREE.Group | null)[]>([])
