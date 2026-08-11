@@ -91,6 +91,7 @@ void FN(inout vec3 p, vec2 uv, float t) {
   p.z = newZ;
 }
 `,
+    strength: 'foldAngle',
     uniforms: (o) => ({
       angle: o.angle * DEG,
       offset: o.offset,

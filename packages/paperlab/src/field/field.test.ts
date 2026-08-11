@@ -15,8 +15,8 @@ import {
 import { silhouetteRects } from '../content/backing'
 
 describe('layouts', () => {
-  it('registers the eight built-ins', () => {
-    expect(listLayouts()).toEqual(['ring', 'deck', 'cascade', 'helix', 'wall', 'tunnel', 'scatter', 'sheet'])
+  it('registers the seven built-ins', () => {
+    expect(listLayouts()).toEqual(['ring', 'fan', 'spread', 'pile', 'wall', 'spill', 'sheet'])
   })
 
   it('poses are pure and deterministic', () => {
@@ -55,14 +55,65 @@ describe('layouts', () => {
     expect(Math.abs(sumY)).toBeLessThan(1e-6)
   })
 
-  it('helix climbs monotonically', () => {
-    const helix = getLayout('helix')
-    let lastY = -Infinity
-    for (let i = 0; i < 10; i++) {
-      const y = helix.pose(i, 10, helix.defaults, 0).position[1]
-      expect(y).toBeGreaterThan(lastY)
-      lastY = y
+  it('every pose bias stays within the 0..1 contract', () => {
+    for (const id of listLayouts()) {
+      const layout = getLayout(id)
+      for (let i = 0; i < 12; i++) {
+        const { bias } = layout.pose(i, 12, layout.defaults, 0.3)
+        if (bias === undefined) continue
+        expect(bias).toBeGreaterThanOrEqual(0)
+        expect(bias).toBeLessThanOrEqual(1)
+      }
     }
+  })
+
+  it('fan: hinges at a shared pivot, the middle sheet centered and flattest', () => {
+    const fan = getLayout('fan')
+    const o = { ...fan.defaults, sweep: 90, hinge: 1, lift: 0, bow: 0.8 }
+    const poses = Array.from({ length: 9 }, (_, i) => fan.pose(i, 9, o, 0))
+    // The middle sheet sits at the origin, unrotated.
+    expect(poses[4]!.position[0]).toBeCloseTo(0)
+    expect(poses[4]!.position[1]).toBeCloseTo(0)
+    expect(poses[4]!.rotation[2]).toBeCloseTo(0)
+    // Every sheet keeps its pinned corner the same distance away — that is
+    // what makes the hinge a hinge rather than a circle of sheets.
+    for (const p of poses) {
+      const hingeY = p.position[1] - Math.cos(p.rotation[2]) * o.hinge
+      const hingeX = p.position[0] + Math.sin(p.rotation[2]) * o.hinge
+      expect(hingeX).toBeCloseTo(0)
+      expect(hingeY).toBeCloseTo(-o.hinge)
+    }
+    // The outer sheets carry the curl, the middle of the fan lies flat.
+    expect(poses[0]!.bias).toBeCloseTo(1)
+    expect(poses[4]!.bias).toBeCloseTo(1 - 0.8)
+  })
+
+  it('spread: constant slip per sheet, bowing further along the slide', () => {
+    const spread = getLayout('spread')
+    const o = { ...spread.defaults, slip: 0.4, angle: 0, lift: 0, bow: 0.5, drift: 0 }
+    const poses = Array.from({ length: 6 }, (_, i) => spread.pose(i, 6, o, 0))
+    for (let i = 1; i < poses.length; i++) {
+      expect(poses[i]!.position[0] - poses[i - 1]!.position[0]).toBeCloseTo(0.4)
+      expect(poses[i]!.bias!).toBeGreaterThan(poses[i - 1]!.bias!)
+    }
+  })
+
+  it('pile: sheets stack upward and the ones underneath are pressed flat', () => {
+    const pile = getLayout('pile')
+    const poses = Array.from({ length: 8 }, (_, i) => pile.pose(i, 8, pile.defaults, 0))
+    for (let i = 1; i < poses.length; i++) {
+      expect(poses[i]!.position[2]).toBeGreaterThan(poses[i - 1]!.position[2])
+      expect(poses[i]!.bias!).toBeGreaterThan(poses[i - 1]!.bias!)
+    }
+    // Only the top of the pile keeps the preset's full deformation.
+    expect(poses[7]!.bias).toBeCloseTo(1)
+    expect(poses[0]!.bias).toBeCloseTo(1 - pile.defaults.press)
+  })
+
+  it('spill: no two sheets bend alike', () => {
+    const spill = getLayout('spill')
+    const biases = Array.from({ length: 10 }, (_, i) => spill.pose(i, 10, spill.defaults, 0).bias)
+    expect(new Set(biases).size).toBe(10)
   })
 })
 
@@ -233,6 +284,28 @@ describe('GLSL composition', () => {
     expect(vs).toContain('csm_Normal')
     expect(vs).toContain('attribute float aAtlas;')
     expect(vs).toContain('uPlTime + aPhase')
+    // Displacement (and both normal probes) read the per-instance bias.
+    expect(vs).toContain('attribute float aBias;')
+    expect(vs.match(/, aBias\)/g)).toHaveLength(3)
+  })
+
+  it('the strength uniform scales by bias; other uniforms do not', () => {
+    const composed = buildDisplacementGLSL(
+      [{ type: 'curl', options: { corner: 'bottom-right', amount: 0.4, radius: 0.2, skew: 0 } }],
+      sheet,
+    )
+    expect(composed.functionsSrc).toContain('(uCurl0_amount * plBias)')
+    expect(composed.functionsSrc).toContain('uCurl0_radius')
+    expect(composed.functionsSrc).not.toContain('(uCurl0_radius * plBias)')
+    expect(composed.displaceSrc).toContain('plDisplace(vec3 p, vec2 uv, float t, float bias)')
+  })
+
+  it('roll opts out of bias — its strength has no linear form', () => {
+    const composed = buildDisplacementGLSL(
+      [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.1, spiral: 0 } }],
+      sheet,
+    )
+    expect(composed.functionsSrc).not.toContain('plBias)')
   })
 })
 

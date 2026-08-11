@@ -6,12 +6,23 @@ import { SHEET_LIFT, sheetLayoutSchema, sheetSlotXY, type SheetLayoutOptions } f
  * three.js. `phase` is the motion driver's continuous offset in turns
  * (0..1 = one full cycle); cyclic layouts use it, static ones ignore it.
  * Community layouts are ~30 lines.
+ *
+ * Every built-in names a place paper actually sits — a fanned swatch deck, a
+ * slipped stack, a heap on a desk — because arrangement alone is what makes a
+ * field read as a photo carousel instead of as paper. The other half of that
+ * is `bias`: paper in the world does not all bend alike.
  */
 
 export interface PaperPose {
   position: [number, number, number]
   rotation: [number, number, number]
   scale: number
+  /**
+   * How strongly this sheet takes the field's deformation: 1 = exactly as the
+   * preset configures it, 0 = flat. Lets one instanced draw call curl the top
+   * of a pile while the sheets pressed underneath stay flat. Omitted = 1.
+   */
+  bias?: number
 }
 
 export interface Layout<O = Record<string, unknown>> {
@@ -23,6 +34,7 @@ export interface Layout<O = Record<string, unknown>> {
 }
 
 const TAU = Math.PI * 2
+const DEG = Math.PI / 180
 
 /** Deterministic per-index jitter — layouts must be pure. */
 function jitter(seed: number, i: number): number {
@@ -31,10 +43,16 @@ function jitter(seed: number, i: number): number {
   return (((h ^ (h >>> 16)) >>> 0) / 4294967295) * 2 - 1
 }
 
+/** 0 at the first sheet, 1 at the last — the spine of most layouts. */
+function ramp(i: number, n: number): number {
+  return n > 1 ? i / (n - 1) : 1
+}
+
 const ringSchema = z.object({
   radius: z.number().min(0.5).max(12).default(2.6),
   tiltDeg: z.number().min(-45).max(45).default(8),
 })
+/** Prints pegged around a circle — the one carousel worth keeping. */
 export const ring: Layout<z.infer<typeof ringSchema>> = {
   id: 'ring',
   label: 'Ring',
@@ -52,61 +70,100 @@ export const ring: Layout<z.infer<typeof ringSchema>> = {
   },
 }
 
-const deckSchema = z.object({
-  spread: z.number().min(0).max(1).default(0.3),
-  lift: z.number().min(0.005).max(0.08).default(0.014),
+const fanSchema = z.object({
+  /** Total angular sweep from the first sheet to the last, degrees. */
+  sweep: z.number().min(0).max(180).default(72),
+  /** Distance from a sheet's center down to the pinned corner they share. */
+  hinge: z.number().min(0).max(4).default(0.78),
+  /** Thickness step so the sheets stack in order instead of z-fighting. */
+  lift: z.number().min(0.002).max(0.08).default(0.012),
+  /** How much flatter the middle of the fan sits than its outer sheets. */
+  bow: z.number().min(0).max(1).default(0.7),
 })
-export const deck: Layout<z.infer<typeof deckSchema>> = {
-  id: 'deck',
-  label: 'Deck',
-  defaults: deckSchema.parse({}),
-  optionsSchema: deckSchema,
-  pose(i, _n, o) {
+/**
+ * A Pantone deck, a paint-chip book, a hand of cards: every sheet pinned at
+ * one shared point and swung open. The sheets nearest the outside of the
+ * sweep carry the most curl, which is what sells the hinge as a hinge.
+ */
+export const fan: Layout<z.infer<typeof fanSchema>> = {
+  id: 'fan',
+  label: 'Fan',
+  defaults: fanSchema.parse({}),
+  optionsSchema: fanSchema,
+  pose(i, n, o) {
+    const f = n > 1 ? i / (n - 1) : 0.5
+    const theta = (f - 0.5) * o.sweep * DEG
+    // Swing the sheet about the shared pivot, then shift so the middle sheet
+    // sits at the origin — the fan stays centered as `sweep` opens and closes.
+    const open = Math.abs(f - 0.5) * 2
     return {
-      position: [jitter(1, i) * 0.09 * o.spread * 3, jitter(2, i) * 0.07 * o.spread * 3, i * o.lift],
-      rotation: [0, 0, jitter(3, i) * 0.35 * o.spread],
+      position: [-Math.sin(theta) * o.hinge, Math.cos(theta) * o.hinge - o.hinge, i * o.lift],
+      rotation: [0, 0, theta],
       scale: 1,
+      bias: 1 - (1 - open) * o.bow,
     }
   },
 }
 
-const cascadeSchema = z.object({
-  gap: z.number().min(0.2).max(2).default(0.55),
-  drop: z.number().min(0).max(1).default(0.2),
+const spreadSchema = z.object({
+  /** How far each sheet slides past the one below it. */
+  slip: z.number().min(0.02).max(2).default(0.3),
+  /** Direction of the slide, degrees. 0 slides right, 90 slides up. */
+  angle: z.number().min(-180).max(180).default(28),
+  lift: z.number().min(0.002).max(0.08).default(0.012),
+  /** How much more the sheets at the far end of the slide bow. */
+  bow: z.number().min(0).max(1).default(0.6),
+  /** Nothing hand-slid is perfectly square — a touch of per-sheet rotation. */
+  drift: z.number().min(0).max(1).default(0.15),
 })
-export const cascade: Layout<z.infer<typeof cascadeSchema>> = {
-  id: 'cascade',
-  label: 'Cascade',
-  defaults: cascadeSchema.parse({}),
-  optionsSchema: cascadeSchema,
+/**
+ * A ream pushed sideways, or a deck dealt across a table: parallel sheets at
+ * a constant offset, each one bowing a little more as it comes free of the
+ * stack's weight.
+ */
+export const spread: Layout<z.infer<typeof spreadSchema>> = {
+  id: 'spread',
+  label: 'Spread',
+  defaults: spreadSchema.parse({}),
+  optionsSchema: spreadSchema,
   pose(i, n, o) {
     const centered = i - (n - 1) / 2
+    const a = o.angle * DEG
     return {
-      position: [centered * o.gap, -centered * o.drop, -i * 0.06],
-      rotation: [0, 0, jitter(4, i) * 0.06],
+      position: [Math.cos(a) * o.slip * centered, Math.sin(a) * o.slip * centered, i * o.lift],
+      rotation: [0, 0, jitter(11, i) * 0.2 * o.drift],
       scale: 1,
+      bias: 1 - (1 - ramp(i, n)) * o.bow,
     }
   },
 }
 
-const helixSchema = z.object({
-  radius: z.number().min(0.5).max(12).default(2.2),
-  height: z.number().min(0.5).max(10).default(2.6),
-  turns: z.number().min(0.5).max(5).default(1.5),
+const pileSchema = z.object({
+  /** How far sheets wander from the center of the heap. */
+  scatter: z.number().min(0).max(2).default(0.22),
+  /** Widest angle a sheet sits off square, degrees. */
+  turn: z.number().min(0).max(180).default(24),
+  lift: z.number().min(0.002).max(0.08).default(0.011),
+  /** How flat the sheets underneath are pressed by the ones on top. */
+  press: z.number().min(0).max(1).default(0.85),
+  seed: z.number().int().min(0).max(9999).default(3),
 })
-export const helix: Layout<z.infer<typeof helixSchema>> = {
-  id: 'helix',
-  label: 'Helix',
-  defaults: helixSchema.parse({}),
-  optionsSchema: helixSchema,
-  pose(i, n, o, phase) {
-    const f = n > 1 ? i / (n - 1) : 0
-    const theta = (f * o.turns + phase) * TAU
+/**
+ * The heap on a desk. The physical tell no parametric curve can fake: sheets
+ * rest ON each other, so only the top of the pile keeps its curl and
+ * everything below is pressed flat by the weight above it.
+ */
+export const pile: Layout<z.infer<typeof pileSchema>> = {
+  id: 'pile',
+  label: 'Pile',
+  defaults: pileSchema.parse({}),
+  optionsSchema: pileSchema,
+  pose(i, n, o) {
     return {
-      position: [Math.sin(theta) * o.radius, (f - 0.5) * o.height, Math.cos(theta) * o.radius],
-      // Outward-facing, same as the ring — fronts toward the viewer outside.
-      rotation: [0, theta, 0],
+      position: [jitter(o.seed, i) * o.scatter, jitter(o.seed + 1, i) * o.scatter * 0.8, i * o.lift],
+      rotation: [0, 0, jitter(o.seed + 2, i) * o.turn * DEG],
       scale: 1,
+      bias: 1 - (1 - ramp(i, n)) * o.press,
     }
   },
 }
@@ -115,7 +172,10 @@ const wallSchema = z.object({
   gapX: z.number().min(0.05).max(1).default(0.22),
   gapY: z.number().min(0.05).max(1).default(0.3),
   jitterAmt: z.number().min(0).max(1).default(0.25),
+  /** Spread of sag across the wall — no two pinned sheets hang alike. */
+  sag: z.number().min(0).max(1).default(0.45),
 })
+/** A studio wall of pinned sheets: a grid, but nothing hangs quite square. */
 export const wall: Layout<z.infer<typeof wallSchema>> = {
   id: 'wall',
   label: 'Wall',
@@ -137,50 +197,47 @@ export const wall: Layout<z.infer<typeof wallSchema>> = {
       ],
       rotation: [0, 0, jitter(6, i) * 0.05 * o.jitterAmt * 4],
       scale: 1,
+      bias: 1 - Math.abs(jitter(7, i)) * o.sag,
     }
   },
 }
 
-const tunnelSchema = z.object({
-  radius: z.number().min(0.5).max(6).default(1.7),
-  spacing: z.number().min(0.1).max(3).default(0.55),
-})
-export const tunnel: Layout<z.infer<typeof tunnelSchema>> = {
-  id: 'tunnel',
-  label: 'Tunnel',
-  defaults: tunnelSchema.parse({}),
-  optionsSchema: tunnelSchema,
-  pose(i, _n, o, phase) {
-    // Golden-angle winding lines the tube; phase pulls the tunnel past you.
-    const theta = i * 2.39996 + phase * TAU
-    return {
-      position: [Math.cos(theta) * o.radius, Math.sin(theta) * o.radius, -i * o.spacing],
-      rotation: [0, 0, theta - Math.PI / 2],
-      scale: 1,
-    }
-  },
-}
-
-const scatterSchema = z.object({
+const spillSchema = z.object({
   spreadX: z.number().min(0.5).max(8).default(2.4),
   spreadY: z.number().min(0.5).max(8).default(1.5),
   depth: z.number().min(0).max(6).default(1.6),
+  /** How far sheets pitch and roll out of the picture plane. */
+  tumble: z.number().min(0).max(1).default(0.5),
+  /** Spread of bend across the sheets — a spill does not fold them alike. */
+  vary: z.number().min(0).max(1).default(0.6),
   seed: z.number().int().min(0).max(9999).default(7),
 })
-export const scatter: Layout<z.infer<typeof scatterSchema>> = {
-  id: 'scatter',
-  label: 'Scatter',
-  defaults: scatterSchema.parse({}),
-  optionsSchema: scatterSchema,
+/**
+ * A dropped folder's worth of paper, mid-air — what a `pile` looks like the
+ * moment before it settles. Loose in all three axes, and (the part that
+ * separates it from confetti) every sheet caught at its own angle AND its
+ * own amount of bend.
+ */
+export const spill: Layout<z.infer<typeof spillSchema>> = {
+  id: 'spill',
+  label: 'Spill',
+  defaults: spillSchema.parse({}),
+  optionsSchema: spillSchema,
   pose(i, _n, o) {
+    const tumble = o.tumble * 2
     return {
       position: [
         jitter(o.seed, i) * o.spreadX,
         jitter(o.seed + 1, i) * o.spreadY,
         jitter(o.seed + 2, i) * o.depth,
       ],
-      rotation: [jitter(o.seed + 3, i) * 0.4, jitter(o.seed + 4, i) * 0.5, jitter(o.seed + 5, i) * 0.4],
+      rotation: [
+        jitter(o.seed + 3, i) * 0.4 * tumble,
+        jitter(o.seed + 4, i) * 0.5 * tumble,
+        jitter(o.seed + 5, i) * 0.4 * tumble,
+      ],
       scale: 0.85 + Math.abs(jitter(o.seed + 6, i)) * 0.3,
+      bias: 1 - Math.abs(jitter(o.seed + 7, i)) * o.vary,
     }
   },
 }
@@ -221,10 +278,9 @@ export function listLayouts(): string[] {
 }
 
 registerLayout(ring)
-registerLayout(deck)
-registerLayout(cascade)
-registerLayout(helix)
+registerLayout(fan)
+registerLayout(spread)
+registerLayout(pile)
 registerLayout(wall)
-registerLayout(tunnel)
-registerLayout(scatter)
+registerLayout(spill)
 registerLayout(sheet)

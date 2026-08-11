@@ -45,7 +45,7 @@ export function stackUniformValues(
 }
 
 export function buildDisplacementGLSL(stack: DeformerInstance[], sheet: SheetDims): ComposedDisplacement {
-  const decls: string[] = ['uniform vec2 uSheet;']
+  const decls: string[] = ['uniform vec2 uSheet;', 'float plBias = 1.0;']
   const functions: string[] = []
   const calls: string[] = []
   const uniforms: Record<string, number | number[]> = { uSheet: [sheet.width, sheet.height] }
@@ -65,14 +65,20 @@ export function buildDisplacementGLSL(stack: DeformerInstance[], sheet: SheetDim
       decls.push(`uniform ${glslType(value)} ${ns}${key};`)
       uniforms[ns + key] = value
     }
+    const strength = deformer.glsl.strength
     functions.push(
-      deformer.glsl.chunk.replaceAll('FN', fn).replace(/U_(\w+)/g, (_, name: string) => ns + name),
+      deformer.glsl.chunk.replaceAll('FN', fn).replace(/U_(\w+)/g, (_, name: string) =>
+        // The strength uniform reads through the per-instance bias, so one
+        // instanced draw call can bend every sheet by a different amount.
+        name === strength ? `(${ns}${name} * plBias)` : ns + name,
+      ),
     )
     calls.push(`${fn}(q, uv, t);`)
   })
 
   const displaceSrc = /* glsl */ `
-vec3 plDisplace(vec3 p, vec2 uv, float t) {
+vec3 plDisplace(vec3 p, vec2 uv, float t, float bias) {
+  plBias = bias;
   vec3 q = p;
   ${calls.join('\n  ')}
   return q;
@@ -92,16 +98,17 @@ export function buildFieldVertexShader(composed: ComposedDisplacement): string {
 uniform float uPlTime;
 attribute float aPhase;
 attribute float aAtlas;
+attribute float aBias;
 varying vec2 vPaperUv;
 varying float vAtlas;
 ${composed.functionsSrc}
 ${composed.displaceSrc}
 void main() {
   float t = uPlTime + aPhase;
-  vec3 p = plDisplace(position, uv, t);
+  vec3 p = plDisplace(position, uv, t, aBias);
   vec2 step = uSheet * 0.01;
-  vec3 px = plDisplace(position + vec3(step.x, 0.0, 0.0), uv + vec2(0.01, 0.0), t);
-  vec3 py = plDisplace(position + vec3(0.0, step.y, 0.0), uv + vec2(0.0, 0.01), t);
+  vec3 px = plDisplace(position + vec3(step.x, 0.0, 0.0), uv + vec2(0.01, 0.0), t, aBias);
+  vec3 py = plDisplace(position + vec3(0.0, step.y, 0.0), uv + vec2(0.0, 0.01), t, aBias);
   vec3 n = cross(px - p, py - p);
   csm_Normal = length(n) > 1e-12 ? normalize(n) : vec3(0.0, 0.0, 1.0);
   csm_Position = p;

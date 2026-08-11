@@ -26,7 +26,18 @@ export interface Deformer<O = Record<string, unknown>> {
   /** Mutate `out` (sheet-local space; flat sheet is the XY plane facing +Z). */
   displace(out: THREE.Vector3, uv: THREE.Vector2, o: O, ctx: DeformerContext): void
   /** GPU path — arrives with field mode (M4). */
-  glsl?: { chunk: string; uniforms(o: O): Record<string, unknown> }
+  glsl?: {
+    chunk: string
+    uniforms(o: O): Record<string, unknown>
+    /**
+     * The option whose uniform scales with a field instance's per-sheet
+     * `bias` (0 = flat, 1 = exactly as configured), letting one instanced
+     * draw call bend every sheet differently. Deformers whose strength has
+     * no linear form omit this and ignore bias — `roll` is arc-length-exact,
+     * so a "half roll" is a shorter roll, not a scaled one.
+     */
+    strength?: keyof O & string
+  }
   geometry?: { minSegments?: number }
   /** Time-driven: stacks containing this deformer re-deform every frame. */
   animated?: boolean

@@ -93,6 +93,7 @@ void FN(inout vec3 p, vec2 uv, float t) {
   p.z = newZ;
 }
 `,
+    strength: 'amount',
     uniforms: (o) => {
       const [sx, sy] = CORNER_SIGNS[o.corner]
       return {

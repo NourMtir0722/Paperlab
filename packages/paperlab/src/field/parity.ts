@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { DeformerInstance, SheetDims } from '../deformers/types'
 import { displacePoint } from '../deformers/compose'
+import { getDeformer } from '../deformers/registry'
 import { buildDisplacementGLSL } from './compose'
 
 /**
@@ -130,13 +131,14 @@ function buildParityFragment(stack: DeformerInstance[], sheet: SheetDims): strin
   return /* glsl */ `#version 300 es
 precision highp float;
 uniform float uPlTime;
+uniform float uPlBias;
 ${composed.functionsSrc}
 ${composed.displaceSrc}
 out vec4 outColor;
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5) / float(${GRID - 1});
   vec3 p = vec3((uv - 0.5) * uSheet, 0.0);
-  outColor = vec4(plDisplace(p, uv, uPlTime), 1.0);
+  outColor = vec4(plDisplace(p, uv, uPlTime, uPlBias), 1.0);
 }
 `
 }
@@ -156,7 +158,7 @@ function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLSh
   return shader
 }
 
-function runCaseOnGPU(gl: WebGL2RenderingContext, c: ParityCase): Float32Array {
+function runCaseOnGPU(gl: WebGL2RenderingContext, c: ParityCase, bias = 1): Float32Array {
   const composed = buildDisplacementGLSL(c.stack, c.sheet)
   const program = gl.createProgram()!
   gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERT))
@@ -178,6 +180,8 @@ function runCaseOnGPU(gl: WebGL2RenderingContext, c: ParityCase): Float32Array {
   }
   const timeLoc = gl.getUniformLocation(program, 'uPlTime')
   if (timeLoc) gl.uniform1f(timeLoc, c.t)
+  const biasLoc = gl.getUniformLocation(program, 'uPlBias')
+  if (biasLoc) gl.uniform1f(biasLoc, bias)
 
   const quad = gl.createBuffer()!
   gl.bindBuffer(gl.ARRAY_BUFFER, quad)
@@ -201,6 +205,48 @@ function runCaseOnGPU(gl: WebGL2RenderingContext, c: ParityCase): Float32Array {
   return out
 }
 
+/**
+ * The bias contract, checked on the GPU: a stack of strength-bearing
+ * deformers must go completely flat at bias 0, and a stack of deformers that
+ * opt out (roll) must ignore bias entirely. Parity alone can't catch this —
+ * it only ever evaluates bias 1.
+ */
+function runBiasCases(gl: WebGL2RenderingContext): ParityResult[] {
+  const results: ParityResult[] = []
+  for (const c of parityCases) {
+    const strengths = c.stack.map((i) => getDeformer(i.type).glsl?.strength !== undefined)
+    // Mixed stacks flatten only partway — nothing crisp to assert.
+    if (!strengths.every((h) => h === strengths[0])) continue
+    const scales = strengths[0]
+
+    const at0 = runCaseOnGPU(gl, c, 0)
+    const reference = scales ? null : runCaseOnGPU(gl, c, 1)
+    let maxError = 0
+    for (let row = 0; row < GRID; row++) {
+      for (let col = 0; col < GRID; col++) {
+        const i4 = (row * GRID + col) * 4
+        // At bias 0 a scaling stack collapses onto the flat sheet; an opted-out
+        // stack must land exactly where bias 1 put it.
+        const ex = reference ? reference[i4]! : (col / (GRID - 1) - 0.5) * c.sheet.width
+        const ey = reference ? reference[i4 + 1]! : (row / (GRID - 1) - 0.5) * c.sheet.height
+        const ez = reference ? reference[i4 + 2]! : 0
+        maxError = Math.max(
+          maxError,
+          Math.abs(at0[i4]! - ex),
+          Math.abs(at0[i4 + 1]! - ey),
+          Math.abs(at0[i4 + 2]! - ez),
+        )
+      }
+    }
+    results.push({
+      name: `bias: ${c.name} → ${scales ? 'flat at 0' : 'ignores bias'}`,
+      maxError,
+      pass: maxError < PARITY_EPSILON,
+    })
+  }
+  return results
+}
+
 /** Run every parity case. Requires a WebGL2 context with float render targets. */
 export function runParityHarness(canvas?: HTMLCanvasElement): ParityResult[] {
   const cnv = canvas ?? document.createElement('canvas')
@@ -211,7 +257,7 @@ export function runParityHarness(canvas?: HTMLCanvasElement): ParityResult[] {
   }
 
   const point = new THREE.Vector3()
-  return parityCases.map((c) => {
+  const parity = parityCases.map((c) => {
     const gpu = runCaseOnGPU(gl, c)
     let maxError = 0
     for (let row = 0; row < GRID; row++) {
@@ -231,4 +277,5 @@ export function runParityHarness(canvas?: HTMLCanvasElement): ParityResult[] {
     }
     return { name: c.name, maxError, pass: maxError < PARITY_EPSILON }
   })
+  return [...parity, ...runBiasCases(gl)]
 }
