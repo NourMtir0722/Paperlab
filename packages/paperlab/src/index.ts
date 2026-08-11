@@ -158,6 +158,7 @@ export {
   type WalkPath,
   type WalkPathOptions,
 } from './stage/path'
+export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
 export {
   cycleLength,
   figureGait,

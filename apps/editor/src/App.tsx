@@ -5,6 +5,8 @@ import {
   PaperFieldMesh,
   PaperLighting,
   PaperMesh,
+  PaperStageScene,
+  getWalk,
   getPreset,
   isBuiltinPreset,
   listPresets,
@@ -16,6 +18,7 @@ import {
 } from 'paperlab'
 import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
+import { StageInspector } from './StageInspector'
 import { StatesBar } from './StatesBar'
 import { Transport } from './Transport'
 import { ExportMenu } from './ExportMenu'
@@ -32,6 +35,8 @@ export function App() {
   const inspectorEpoch = useEditor((s) => s.inspectorEpoch)
   const mode = useEditor((s) => s.mode)
   const field = useEditor((s) => s.field)
+  const stage = useEditor((s) => s.stage)
+  const patchStage = useEditor((s) => s.patchStage)
   const cameFromField = useEditor((s) => s.cameFromField)
   const patchConfig = useEditor((s) => s.patchConfig)
   const setMode = useEditor((s) => s.setMode)
@@ -90,13 +95,18 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">Paperlab</div>
-        <div className="filename">{mode === 'paper' ? `${config.meta.name}.paper` : 'Field composer'}</div>
+        <div className="filename">
+          {mode === 'paper' ? `${config.meta.name}.paper` : mode === 'field' ? 'Field composer' : 'Stage'}
+        </div>
         <div className="mode-switch">
           <button type="button" className={mode === 'paper' ? 'active' : ''} onClick={() => setMode('paper')}>
             Paper
           </button>
           <button type="button" className={mode === 'field' ? 'active' : ''} onClick={() => setMode('field')}>
             Field
+          </button>
+          <button type="button" className={mode === 'stage' ? 'active' : ''} onClick={() => setMode('stage')}>
+            Stage
           </button>
         </div>
         {cameFromField && mode === 'paper' && (
@@ -138,12 +148,26 @@ export function App() {
             Save preset
           </button>
         )}
-        <ExportMenu mode={mode} config={config} paperRef={paperRef} fieldInput={fieldExportInput} />
+        {mode !== 'stage' && (
+          <ExportMenu mode={mode} config={config} paperRef={paperRef} fieldInput={fieldExportInput} />
+        )}
       </header>
 
       <aside className="left">
         {mode === 'paper' ? (
           <PresetPanel />
+        ) : mode === 'stage' ? (
+          <>
+            <h2>Stage</h2>
+            <p className="stage-note">
+              Paper as architecture. Type into <strong>Words</strong> and the space is built out of them — one
+              column per banner, stacked down the drop.
+            </p>
+            <p className="stage-note">
+              <strong>Walk</strong> picks the path the figure takes; the layout, the camera and the light all
+              read that same walk.
+            </p>
+          </>
         ) : (
           <>
             <h2>Papers</h2>
@@ -190,22 +214,40 @@ export function App() {
           key={mode}
           shadows
           camera={
-            mode === 'paper' ? { position: [0, 0.35, 2.9], fov: 40 } : { position: [0, 0.9, 6.4], fov: 45 }
+            mode === 'paper'
+              ? { position: [0, 0.35, 2.9], fov: 40 }
+              : mode === 'stage'
+                ? { position: [0, 1.7, 6], fov: 38, near: 0.05, far: 400 }
+                : { position: [0, 0.9, 6.4], fov: 45 }
           }
           dpr={[1, 2]}
           gl={{ preserveDrawingBuffer: true }}
         >
-          <color attach="background" args={['#17181b']} />
-          <PaperLighting
-            preset={
-              mode === 'paper'
-                ? config.scene.lighting
-                : resolvePresetByName(field.slots[0] ?? 'photo-print').scene.lighting
-            }
-            floor={mode === 'paper' ? -1.5 : -2.4}
-            scale={mode === 'paper' ? 10 : 14}
-          />
-          {mode === 'paper' ? (
+          <color attach="background" args={[mode === 'stage' ? '#0c0a0b' : '#17181b']} />
+          {/* Stage brings its own rig — a second one here would double the key. */}
+          {mode !== 'stage' && (
+            <PaperLighting
+              preset={
+                mode === 'paper'
+                  ? config.scene.lighting
+                  : resolvePresetByName(field.slots[0] ?? 'photo-print').scene.lighting
+              }
+              floor={mode === 'paper' ? -1.5 : -2.4}
+              scale={mode === 'paper' ? 10 : 14}
+            />
+          )}
+          {mode === 'stage' ? (
+            <PaperStageScene
+              key={`stage:${stage.walk}:${stage.layout}:${stage.count}`}
+              stage={{ ...stage.config, path: getWalk(stage.walk) }}
+              layout={stage.layout}
+              layoutOptions={stage.layoutOptions}
+              text={stage.text.trim() ? stage.text : undefined}
+              count={stage.count}
+              // Playing hands the walk to the clock; paused, the scrubber owns it.
+              progress={stage.playing ? undefined : stage.progress}
+            />
+          ) : mode === 'paper' ? (
             <PaperMesh
               key={`${presetName}:${editingState ?? 'base'}:${statePreview}`}
               ref={paperRef}
@@ -229,7 +271,7 @@ export function App() {
               zones={fieldZones}
             />
           )}
-          <OrbitControls makeDefault enableDamping />
+          {mode !== 'stage' && <OrbitControls makeDefault enableDamping />}
           {import.meta.env.DEV && <Stats className="stats" />}
         </Canvas>
         {mode === 'paper' && <ViewportGuide />}
@@ -239,6 +281,8 @@ export function App() {
         <StatesBar />
         {mode === 'paper' ? (
           <Inspector key={`${presetName}:${config.behavior?.type ?? 'none'}:${inspectorEpoch}`} />
+        ) : mode === 'stage' ? (
+          <StageInspector key={`stage:${stage.layout}:${inspectorEpoch}`} />
         ) : (
           <FieldInspector key={`field:${field.layout}:${inspectorEpoch}`} />
         )}
@@ -246,6 +290,27 @@ export function App() {
 
       {mode === 'paper' ? (
         <Transport paperRef={paperRef} scrubRef={scrubRef} resetKey={presetName} />
+      ) : mode === 'stage' ? (
+        <footer className="transport">
+          <button type="button" className="play" onClick={() => patchStage({ playing: !stage.playing })}>
+            {stage.playing ? '❚❚' : '▶'}
+          </button>
+          <input
+            type="range"
+            className="scrubber"
+            min={0}
+            max={1}
+            step={0.001}
+            value={stage.progress}
+            disabled={stage.playing}
+            onChange={(e) => patchStage({ progress: Number(e.target.value) })}
+            aria-label="Distance along the walk"
+          />
+          <span className="transport-hint">
+            {stage.playing ? 'walking' : `${Math.round(stage.progress * 100)}% along the walk`} ·{' '}
+            {stage.count} banners
+          </span>
+        </footer>
       ) : (
         <footer className="transport">
           <span className="transport-hint">

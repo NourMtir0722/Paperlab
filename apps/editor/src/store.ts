@@ -19,6 +19,8 @@ import {
   type PaperConfigInput,
   type PaperStatesInput,
   type SurfaceConfig,
+  type StageConfigInput,
+  type WalkName,
 } from 'paperlab'
 import {
   loadUserPresets,
@@ -66,11 +68,34 @@ export function zoneToConfig(zone: EditorZone) {
   }
 }
 
+/**
+ * Stage mode's editable state. The walk is held as a NAME rather than as
+ * points: picking "ess" from a list is the interaction, and it resolves to
+ * a real path at render time.
+ */
+export type EditorMode = 'paper' | 'field' | 'stage'
+
+export interface StageState {
+  walk: WalkName
+  layout: string
+  layoutOptions: Record<string, unknown>
+  /** The words the space is built out of. Empty renders blank banners. */
+  text: string
+  count: number
+  /** 0..1 along the walk, used while paused. */
+  progress: number
+  /** Playing hands the walk to the clock; paused hands it to the scrubber. */
+  playing: boolean
+  /** Shot, figure, lighting, source, ground — everything but the path. */
+  config: StageConfigInput
+}
+
 interface EditorState {
   presetName: string
   config: PaperConfig
-  mode: 'paper' | 'field'
+  mode: EditorMode
   field: FieldState
+  stage: StageState
   /** True while editing a paper that was opened from the Field Composer. */
   cameFromField: boolean
   /**
@@ -97,7 +122,9 @@ interface EditorState {
   addZone(): void
   patchZone(index: number, patch: Partial<EditorZone>): void
   removeZone(index: number): void
-  setMode(mode: 'paper' | 'field'): void
+  setMode(mode: EditorMode): void
+  patchStage(patch: Partial<StageState>): void
+  patchStageConfig(patch: Record<string, unknown>): void
   patchField(patch: Partial<FieldState>): void
   setSlotPreset(index: number, name: string): void
   setAllSlots(name: string): void
@@ -174,6 +201,16 @@ export const useEditor = create<EditorState>((set, get) => ({
     slots: Array.from({ length: 14 }, () => 'photo-print'),
     slotStates: {},
     zones: [],
+  },
+  stage: {
+    walk: 'straight',
+    layout: 'colonnade',
+    layoutOptions: {},
+    text: 'the paper remembers every hand that folded it and every room it was carried through',
+    count: 18,
+    progress: 0.42,
+    playing: false,
+    config: { lighting: 'nave', shot: { shot: 'follow', offset: 1.5, lookAhead: 12 } },
   },
   cameFromField: false,
   editingState: null,
@@ -310,6 +347,9 @@ export const useEditor = create<EditorState>((set, get) => ({
       selectedSlot: null,
       inspectorEpoch: s.inspectorEpoch + 1,
     })),
+  patchStage: (patch) => set((s) => ({ stage: { ...s.stage, ...patch } })),
+  patchStageConfig: (patch) =>
+    set((s) => ({ stage: { ...s.stage, config: { ...s.stage.config, ...patch } } })),
   patchField: (patch) =>
     set((s) => {
       const field = { ...s.field, ...patch }
