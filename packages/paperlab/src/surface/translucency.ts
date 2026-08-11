@@ -60,6 +60,7 @@ export const TRANSLUCENCY_FRAGMENT = /* glsl */ `
 uniform float uTranslucency;
 uniform vec3 uBackLightDir;
 uniform vec3 uBackLightColor;
+uniform float uAmbientTransmission;
 ${TRANSLUCENCY_VARYINGS}
 
 vec3 plTransmission(vec3 inkFilter) {
@@ -72,7 +73,12 @@ vec3 plTransmission(vec3 inkFilter) {
   float behind = clamp(-dot(n, uBackLightDir), 0.0, 1.0);
   // A grazing view looks through more paper, and more paper passes less light.
   float thickness = abs(dot(n, normalize(vPlViewDir)));
-  return uBackLightColor * uTranslucency * behind * mix(0.25, 1.0, thickness) * inkFilter;
+  // Paper in a lit room glows whatever way it is turned — a sheet standing
+  // edge-on to the only lamp is not black. Without this floor, a banner
+  // whose face runs parallel to the key light gets neither diffuse nor
+  // transmission and drops out of the picture entirely.
+  vec3 arriving = uBackLightColor * behind + uAmbientTransmission;
+  return arriving * uTranslucency * mix(0.25, 1.0, thickness) * inkFilter;
 }
 `
 
@@ -81,6 +87,8 @@ export interface TranslucencyValues {
   /** Unit world direction from the scene toward the key light. */
   direction: THREE.Vector3
   color: THREE.Color
+  /** Light the room passes through the sheet from every direction at once. */
+  ambient: number
 }
 
 /**
@@ -96,7 +104,7 @@ export function translucencyValues(translucency: number, lighting: LightingName)
   if (direction.lengthSq() < 1e-12) direction.set(0, 1, 0)
   direction.normalize()
   const color = new THREE.Color(preset.key.color).multiplyScalar(preset.key.intensity * TRANSMISSION_GAIN)
-  return { translucency, direction, color }
+  return { translucency, direction, color, ambient: preset.ambient * TRANSMISSION_GAIN }
 }
 
 /** Ready-to-bind uniform objects for a shader program. */
@@ -109,5 +117,6 @@ export function translucencyUniforms(
     uTranslucency: { value: values.translucency },
     uBackLightDir: { value: values.direction },
     uBackLightColor: { value: values.color },
+    uAmbientTransmission: { value: values.ambient },
   }
 }

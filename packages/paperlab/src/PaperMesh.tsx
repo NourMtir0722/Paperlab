@@ -24,6 +24,7 @@ import { applyDeformerStack, displacePoint, stackMinSegments } from './deformers
 import { stackIsAnimated } from './deformers/registry'
 import type { DeformerInstance } from './deformers/types'
 import { getBehavior } from './behaviors/registry'
+import { resolveDeformerStack } from './deformers/registry'
 import type { Behavior } from './behaviors/types'
 import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
 import { ClothSim } from './physics/cloth'
@@ -563,7 +564,7 @@ function buildStack(
   let shapeStack: DeformerInstance[] = []
   if (config.deformers) {
     // Raw deformer stack wins — it's the Advanced fork of a behavior.
-    shapeStack = config.deformers as DeformerInstance[]
+    shapeStack = resolveDeformerStack(config.deformers)
   } else if (config.behavior) {
     const b = behavior ?? getBehavior(config.behavior.type)
     let options: Record<string, unknown> = { ...config.behavior, ...overrides }

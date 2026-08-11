@@ -1,0 +1,245 @@
+import * as THREE from 'three'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useMemo } from 'react'
+import { z } from 'zod'
+import { usePrefersReducedMotion } from '../a11y'
+import type { ContentConfig, PaperConfigInput } from '../config/schema'
+import { PaperFieldMesh } from '../PaperField'
+import type { FieldPaperSlot } from '../field/slots'
+import { getLayout } from '../field/layouts'
+import { PaperLighting } from '../scene/PaperLighting'
+import { getWalkPath } from './path'
+import { stageCamera, walkPoint } from './camera'
+import { Figure } from './Figure'
+import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
+
+/**
+ * Stage mode: paper as architecture, with a figure walking through it.
+ *
+ * The one guarantee worth stating — every part of the scene reads the SAME
+ * walk. The layout arranges along it, the figure follows it, the camera is
+ * stationed on it, and the source stands at the end of it. Handing those
+ * four their own copies of a path is the failure this component exists to
+ * prevent: a colonnade whose aisle the figure does not walk down is not a
+ * near-miss, it is a completely different picture.
+ */
+
+/** A banner: tall, translucent, with folds running the length of its drop. */
+const BANNER: PaperConfigInput = {
+  sheet: { width: 1.5, height: 8.5, segments: 96 },
+  stock: 'vellum',
+  surface: { grain: 0.22 },
+  deformers: [{ type: 'drape', options: { amplitude: 0.16, folds: 3, falloff: 1.7, gather: 0.28 } }],
+}
+
+export interface PaperStageSceneProps {
+  /** Walk, shot, figure, lighting — see `stageSchema`. */
+  stage?: StageConfigInput
+  /** Any layout, but `colonnade` is the one built to arrange along a walk. */
+  layout?: string
+  layoutOptions?: Record<string, unknown>
+  /** Per-banner slots, exactly as in field mode. */
+  papers?: FieldPaperSlot[]
+  images?: string[]
+  /**
+   * Words on the banners. A string is split across them a line at a time; an
+   * array is used as given. This is the whole point of the mode — a space
+   * built out of something the viewer wrote.
+   */
+  text?: string | string[]
+  /** Shared preset behind every banner. */
+  preset?: string | PaperConfigInput
+  /** How many banners, when none of `papers` / `images` / `text` says. */
+  count?: number
+  /**
+   * How far along the walk the figure is, 0..1. Bind it to scroll and the
+   * page scrolls the walk. Omit and it walks on the clock at its own speed.
+   */
+  progress?: number
+  reducedMotion?: boolean
+}
+
+export interface PaperStageProps extends PaperStageSceneProps {
+  children?: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+}
+
+/**
+ * Split a paragraph across banners, and stack each banner's share DOWN its
+ * drop rather than across its width.
+ *
+ * A banner is roughly six times taller than it is wide, so a line of prose
+ * set across it wraps to nothing and leaves the other 90% of the paper
+ * blank. Every reference image runs its text as a vertical column, which is
+ * both what the shape wants and what makes the paper read as printed rather
+ * than as a rectangle with a caption.
+ */
+export function splitAcrossBanners(text: string, banners: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length === 0 || banners <= 0) return []
+  const per = Math.ceil(words.length / banners)
+  const out: string[] = []
+  for (let i = 0; i < words.length; i += per) out.push(words.slice(i, i + per).join('\n'))
+  return out
+}
+
+/**
+ * Type size for a banner carrying `lines` stacked lines — chosen to FILL the
+ * drop, because a column of type that stops a third of the way down reads as
+ * a mistake rather than as a design.
+ *
+ * The banner's texture is 1024px on its long edge and the column is set at
+ * 1.25 line-height inside a 6% margin, so `lines × size × 1.25 ≈ 900` is the
+ * size that lands the last line at the bottom of the paper. Clamped at both
+ * ends: two words on an eight-metre drop should be enormous, but not so
+ * enormous they crop, and a dense column still has to stay legible.
+ */
+export function bannerTextSize(lines: number): number {
+  return Math.round(Math.min(150, Math.max(26, 720 / Math.max(lines, 1))))
+}
+
+/** The walk drives the camera; nothing else is allowed to move it. */
+function ShotRig({ stage, progress, still }: { stage: StageConfig; progress?: number; still: boolean }) {
+  const camera = useThree((s) => s.camera)
+  const path = useMemo(() => getWalkPath(stage.path), [stage.path])
+
+  useFrame((state) => {
+    const walked = stageWalked(path.length, stage, progress, still ? 0 : state.clock.elapsedTime)
+    const { position, target } = stageCamera(path, walked, stage.figure.height, stage.shot)
+    camera.position.set(position[0], position[1], position[2])
+    camera.lookAt(target[0], target[1], target[2])
+  })
+  return null
+}
+
+/**
+ * Distance walked, from whichever driver is in charge. Shared by the camera
+ * and the figure so they cannot drift apart by a frame or a formula.
+ */
+function stageWalked(
+  length: number,
+  stage: StageConfig,
+  progress: number | undefined,
+  elapsed: number,
+): number {
+  if (progress !== undefined) return progress * length
+  return elapsed * stage.figure.speed
+}
+
+export function PaperStageScene({
+  stage: stageInput,
+  layout = 'colonnade',
+  layoutOptions,
+  papers,
+  images,
+  text,
+  preset,
+  count = 22,
+  progress,
+  reducedMotion,
+}: PaperStageSceneProps) {
+  const still = usePrefersReducedMotion(reducedMotion)
+  const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageInput])
+  const path = useMemo(() => getWalkPath(stage.path), [stage.path])
+
+  // The walk reaches the layout too. A layout that arranges along a path and
+  // a figure that walks a different one is the one bug this whole component
+  // is arranged to make impossible, so the stage's path always wins.
+  const resolvedLayoutOptions = useMemo(() => {
+    const schema = getLayout(layout).optionsSchema
+    const takesPath = schema instanceof z.ZodObject && 'path' in schema.shape
+    return takesPath ? { ...layoutOptions, path: stage.path } : layoutOptions
+  }, [layout, layoutOptions, stage.path])
+
+  const slots = useMemo<FieldPaperSlot[] | undefined>(() => {
+    if (papers) return papers
+    if (images) return undefined
+    if (text !== undefined) {
+      const columns = Array.isArray(text) ? text : splitAcrossBanners(text, count)
+      const longest = columns.reduce((n, c) => Math.max(n, c.split('\n').length), 1)
+      const size = bannerTextSize(longest)
+      return columns.map((column) => ({
+        content: {
+          type: 'text',
+          text: column,
+          size,
+          align: 'center',
+          color: '#241f1a',
+          lineHeight: 1.25,
+          font: 'Georgia, "Times New Roman", serif',
+          weight: 400,
+          padding: 0.06,
+        } satisfies ContentConfig,
+      }))
+    }
+    return Array.from({ length: count }, () => ({}))
+  }, [papers, images, text, count])
+
+  const figureDistance = progress !== undefined ? progress * path.length : undefined
+
+  // The source stands past the end of the walk, facing back down it.
+  const source = useMemo(() => {
+    const [x, z] = walkPoint(path, path.length + stage.source.beyond)
+    const [tx, tz] = path.tangentAt(1)
+    const size = stage.figure.height * stage.source.spread
+    return { position: [x, size * 0.35, z] as const, yaw: Math.atan2(-tx, -tz), size }
+  }, [path, stage.source.beyond, stage.source.spread, stage.figure.height])
+
+  return (
+    <>
+      <ShotRig stage={stage} progress={progress} still={still} />
+      <PaperLighting preset={stage.lighting} floor={0} scale={60} reducedMotion={reducedMotion} />
+
+      {stage.source.enabled && (
+        <mesh position={source.position as unknown as THREE.Vector3} rotation={[0, source.yaw, 0]}>
+          <planeGeometry args={[source.size * 2, source.size]} />
+          {/* Unlit and unfogged: it IS the light, not a thing the light reaches. */}
+          <meshBasicMaterial color={stage.source.color} toneMapped={false} fog={false} />
+        </mesh>
+      )}
+
+      {stage.ground.enabled && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[path.length * 8, path.length * 8]} />
+          <meshStandardMaterial color={stage.ground.color} roughness={1} />
+        </mesh>
+      )}
+
+      <PaperFieldMesh
+        preset={preset ?? BANNER}
+        papers={slots}
+        images={images}
+        layout={layout}
+        layoutOptions={resolvedLayoutOptions}
+        motion={{ driver: 'none' }}
+        entrance={{ type: 'none' }}
+        reducedMotion={reducedMotion}
+      />
+
+      {stage.showFigure && (
+        <Figure path={stage.path} figure={stage.figure} distance={figureDistance} frozen={reducedMotion} />
+      )}
+    </>
+  )
+}
+
+/** `<PaperStage />` owns its Canvas; `<PaperStageScene />` drops into an existing one. */
+export function PaperStage({ children, className, style, ...sceneProps }: PaperStageProps) {
+  return (
+    <div className={className} style={{ width: '100%', height: '100%', ...style }}>
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        camera={{ fov: 38, near: 0.05, far: 400 }}
+        onCreated={({ gl, scene }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          scene.background = new THREE.Color('#0c0a0b')
+        }}
+      >
+        <PaperStageScene {...sceneProps} />
+        {children}
+      </Canvas>
+    </div>
+  )
+}

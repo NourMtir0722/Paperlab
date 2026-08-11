@@ -1,4 +1,5 @@
 import { getBehavior } from '../behaviors/registry'
+import { resolveDeformerStack } from '../deformers/registry'
 import type { PaperConfig } from '../config/schema'
 import type { DeformerInstance } from '../deformers/types'
 
@@ -11,7 +12,7 @@ import type { DeformerInstance } from '../deformers/types'
  * say "this print has a permanent bow") silently rendered flat.
  */
 export function fieldShapeStack(config: PaperConfig, progress: number): DeformerInstance[] {
-  if (config.deformers) return config.deformers as DeformerInstance[]
+  if (config.deformers) return resolveDeformerStack(config.deformers)
   if (!config.behavior) return []
   const behavior = getBehavior(config.behavior.type)
   const options = { ...config.behavior, [behavior.progressParam]: progress }

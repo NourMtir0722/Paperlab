@@ -569,6 +569,22 @@ describe('atlasGrid', () => {
     expect(atlasGrid(16)).toEqual({ cols: 4, rows: 4 })
     expect(atlasGrid(17)).toEqual({ cols: 5, rows: 4 })
   })
+
+  it('lays tall tiles out wide, so the atlas stays roughly square', () => {
+    // 22 stage banners at 8.5 × 1.5. A square grid would build an atlas five
+    // times taller than wide, which then gets squashed to fit the budget —
+    // and squashes the printing with it.
+    const banner = atlasGrid(22, 8.5 / 1.5)
+    expect(banner.cols).toBeGreaterThan(banner.rows)
+    expect(banner.cols * banner.rows).toBeGreaterThanOrEqual(22)
+    // Grid proportions track the tile's aspect: cols/rows ≈ aspect.
+    expect(banner.cols / banner.rows).toBeGreaterThan(3)
+  })
+
+  it('never packs more columns than there are tiles', () => {
+    expect(atlasGrid(3, 20).cols).toBe(3)
+    expect(atlasGrid(1, 40)).toEqual({ cols: 1, rows: 1 })
+  })
 })
 
 describe('colonnade', () => {

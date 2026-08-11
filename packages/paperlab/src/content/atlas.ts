@@ -12,8 +12,17 @@ import { renderContentToCanvas } from './texture'
 
 const MAX_ATLAS = 4096
 
-export function atlasGrid(count: number): { cols: number; rows: number } {
-  const cols = Math.max(1, Math.ceil(Math.sqrt(count)))
+/**
+ * Grid shape for `count` tiles of a given aspect (height / width).
+ *
+ * Square tiles want a square grid, but a stage banner is 5.7 times taller
+ * than it is wide, and packing those into a square GRID makes an atlas five
+ * times taller than it is wide — which then has to be squashed to fit the
+ * texture budget, and the content with it. Choosing cols/rows ≈ aspect keeps
+ * the atlas itself roughly square whatever shape the paper is.
+ */
+export function atlasGrid(count: number, aspect = 1): { cols: number; rows: number } {
+  const cols = Math.max(1, Math.min(count, Math.ceil(Math.sqrt(count * Math.max(aspect, 0.01)))))
   return { cols, rows: Math.max(1, Math.ceil(count / cols)) }
 }
 
@@ -33,10 +42,17 @@ export function useContentAtlas(
 
   useEffect(() => {
     let disposed = false
-    const { cols, rows } = atlasGrid(contents.length)
     const aspect = sheet.height / sheet.width
-    const tileW = Math.min(1024, Math.floor(MAX_ATLAS / cols))
-    const tileH = Math.min(Math.round(tileW * aspect), Math.floor(MAX_ATLAS / rows))
+    const { cols, rows } = atlasGrid(contents.length, aspect)
+    // Fit the tile to the budget WITHOUT breaking its aspect: a tile squashed
+    // to fit renders its content squashed too. Resolution is the thing that
+    // gives, never shape.
+    let tileW = Math.min(1024, Math.floor(MAX_ATLAS / cols))
+    let tileH = Math.round(tileW * aspect)
+    if (tileH * rows > MAX_ATLAS) {
+      tileH = Math.floor(MAX_ATLAS / rows)
+      tileW = Math.max(1, Math.round(tileH / aspect))
+    }
 
     const canvas = document.createElement('canvas')
     canvas.width = tileW * cols

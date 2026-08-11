@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWalkPath, walkPathSchema } from './path'
 import { shotSchema, stageCamera, walkPoint } from './camera'
+import { bannerTextSize, splitAcrossBanners } from './PaperStage'
 
 const HEIGHT = 1.75
 const path = (o: Record<string, unknown> = {}) => createWalkPath(walkPathSchema.parse(o))
@@ -105,5 +106,35 @@ describe('stage camera', () => {
     const early = stageCamera(curve, 3, HEIGHT, shot())
     const late = stageCamera(curve, curve.length - 3, HEIGHT, shot())
     expect(early.target[0]).not.toBeCloseTo(late.target[0], 1)
+  })
+})
+
+describe('banner typography', () => {
+  it('sizes a column to fill the drop, not to stop a third of the way down', () => {
+    // lines × size × 1.25 lands near the 900px of usable texture height.
+    for (const lines of [6, 10, 18, 28]) {
+      const filled = lines * bannerTextSize(lines) * 1.25
+      expect(filled).toBeGreaterThan(700)
+      expect(filled).toBeLessThan(1250)
+    }
+  })
+
+  it('clamps at both ends — two words are huge, a dense column stays legible', () => {
+    expect(bannerTextSize(1)).toBe(150)
+    expect(bannerTextSize(200)).toBe(26)
+    expect(bannerTextSize(4)).toBeGreaterThan(bannerTextSize(20))
+  })
+
+  it('stacks each banner share DOWN the drop, never across the width', () => {
+    const columns = splitAcrossBanners('one two three four five six', 3)
+    expect(columns).toHaveLength(3)
+    // Two words per banner, one above the other.
+    expect(columns[0]).toBe('one\ntwo')
+    expect(columns.every((c) => !c.includes(' '))).toBe(true)
+  })
+
+  it('survives text with nothing in it', () => {
+    expect(splitAcrossBanners('   ', 8)).toEqual([])
+    expect(splitAcrossBanners('word', 0)).toEqual([])
   })
 })
