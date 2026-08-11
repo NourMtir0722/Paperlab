@@ -17,23 +17,37 @@ import {
 } from './sheetGrid'
 import { silhouetteRects } from '../content/backing'
 
+const PAPER = { width: 1, height: 1.4 }
+
 describe('layouts', () => {
-  it('registers the seven built-ins', () => {
-    expect(listLayouts()).toEqual(['ring', 'fan', 'spread', 'pile', 'wall', 'spill', 'sheet'])
+  it('registers the eleven built-ins', () => {
+    expect(listLayouts()).toEqual([
+      'ring',
+      'fan',
+      'spread',
+      'pile',
+      'wall',
+      'spill',
+      'sweep',
+      'book',
+      'accordion',
+      'rack',
+      'sheet',
+    ])
   })
 
   it('poses are pure and deterministic', () => {
     for (const id of listLayouts()) {
       const layout = getLayout(id)
-      const a = layout.pose(3, 12, layout.defaults, 0.25)
-      const b = layout.pose(3, 12, layout.defaults, 0.25)
+      const a = layout.pose(3, 12, layout.defaults, 0.25, PAPER)
+      const b = layout.pose(3, 12, layout.defaults, 0.25, PAPER)
       expect(a).toEqual(b)
     }
   })
 
   it('ring: sheets sit on the radius facing outward (front toward the viewer)', () => {
     const ring = getLayout('ring')
-    const pose = ring.pose(0, 8, { radius: 3, tiltDeg: 0 }, 0)
+    const pose = ring.pose(0, 8, { radius: 3, tiltDeg: 0 }, 0, PAPER)
     expect(Math.hypot(pose.position[0], pose.position[2])).toBeCloseTo(3)
     // i=0 sits on +Z nearest the camera; facing outward means no Y-spin, so its
     // front (+Z) points at the viewer rather than into the ring.
@@ -42,8 +56,8 @@ describe('layouts', () => {
 
   it('ring: phase rotates the whole ring, one turn wraps', () => {
     const ring = getLayout('ring')
-    const at0 = ring.pose(2, 8, ring.defaults, 0)
-    const at1 = ring.pose(2, 8, ring.defaults, 1)
+    const at0 = ring.pose(2, 8, ring.defaults, 0, PAPER)
+    const at1 = ring.pose(2, 8, ring.defaults, 1, PAPER)
     expect(at0.position[0]).toBeCloseTo(at1.position[0], 5)
     expect(at0.position[2]).toBeCloseTo(at1.position[2], 5)
   })
@@ -51,7 +65,7 @@ describe('layouts', () => {
   it('wall: a full grid is symmetric about the center', () => {
     const wall = getLayout('wall')
     // 8 papers → 4×2 grid, fully occupied.
-    const poses = Array.from({ length: 8 }, (_, i) => wall.pose(i, 8, wall.defaults, 0))
+    const poses = Array.from({ length: 8 }, (_, i) => wall.pose(i, 8, wall.defaults, 0, PAPER))
     const sumX = poses.reduce((a, p) => a + p.position[0], 0)
     const sumY = poses.reduce((a, p) => a + p.position[1], 0)
     expect(Math.abs(sumX)).toBeLessThan(1e-6)
@@ -62,7 +76,7 @@ describe('layouts', () => {
     for (const id of listLayouts()) {
       const layout = getLayout(id)
       for (let i = 0; i < 12; i++) {
-        const { bias } = layout.pose(i, 12, layout.defaults, 0.3)
+        const { bias } = layout.pose(i, 12, layout.defaults, 0.3, PAPER)
         if (bias === undefined) continue
         expect(bias).toBeGreaterThanOrEqual(0)
         expect(bias).toBeLessThanOrEqual(1)
@@ -73,7 +87,8 @@ describe('layouts', () => {
   it('fan: hinges at a shared pivot, the middle sheet centered and flattest', () => {
     const fan = getLayout('fan')
     const o = { ...fan.defaults, sweep: 90, hinge: 1, lift: 0, bow: 0.8 }
-    const poses = Array.from({ length: 9 }, (_, i) => fan.pose(i, 9, o, 0))
+    const hinge = (o.hinge * PAPER.height) / 2
+    const poses = Array.from({ length: 9 }, (_, i) => fan.pose(i, 9, o, 0, PAPER))
     // The middle sheet sits at the origin, unrotated.
     expect(poses[4]!.position[0]).toBeCloseTo(0)
     expect(poses[4]!.position[1]).toBeCloseTo(0)
@@ -81,10 +96,10 @@ describe('layouts', () => {
     // Every sheet keeps its pinned corner the same distance away — that is
     // what makes the hinge a hinge rather than a circle of sheets.
     for (const p of poses) {
-      const hingeY = p.position[1] - Math.cos(p.rotation[2]) * o.hinge
-      const hingeX = p.position[0] + Math.sin(p.rotation[2]) * o.hinge
+      const hingeY = p.position[1] - Math.cos(p.rotation[2]) * hinge
+      const hingeX = p.position[0] + Math.sin(p.rotation[2]) * hinge
       expect(hingeX).toBeCloseTo(0)
-      expect(hingeY).toBeCloseTo(-o.hinge)
+      expect(hingeY).toBeCloseTo(-hinge)
     }
     // The outer sheets carry the curl, the middle of the fan lies flat.
     expect(poses[0]!.bias).toBeCloseTo(1)
@@ -94,7 +109,7 @@ describe('layouts', () => {
   it('spread: constant slip per sheet, bowing further along the slide', () => {
     const spread = getLayout('spread')
     const o = { ...spread.defaults, slip: 0.4, angle: 0, lift: 0, bow: 0.5, drift: 0 }
-    const poses = Array.from({ length: 6 }, (_, i) => spread.pose(i, 6, o, 0))
+    const poses = Array.from({ length: 6 }, (_, i) => spread.pose(i, 6, o, 0, PAPER))
     for (let i = 1; i < poses.length; i++) {
       expect(poses[i]!.position[0] - poses[i - 1]!.position[0]).toBeCloseTo(0.4)
       expect(poses[i]!.bias!).toBeGreaterThan(poses[i - 1]!.bias!)
@@ -103,7 +118,7 @@ describe('layouts', () => {
 
   it('pile: sheets stack upward and the ones underneath are pressed flat', () => {
     const pile = getLayout('pile')
-    const poses = Array.from({ length: 8 }, (_, i) => pile.pose(i, 8, pile.defaults, 0))
+    const poses = Array.from({ length: 8 }, (_, i) => pile.pose(i, 8, pile.defaults, 0, PAPER))
     for (let i = 1; i < poses.length; i++) {
       expect(poses[i]!.position[2]).toBeGreaterThan(poses[i - 1]!.position[2])
       expect(poses[i]!.bias!).toBeGreaterThan(poses[i - 1]!.bias!)
@@ -115,8 +130,127 @@ describe('layouts', () => {
 
   it('spill: no two sheets bend alike', () => {
     const spill = getLayout('spill')
-    const biases = Array.from({ length: 10 }, (_, i) => spill.pose(i, 10, spill.defaults, 0).bias)
+    const biases = Array.from({ length: 10 }, (_, i) => spill.pose(i, 10, spill.defaults, 0, PAPER).bias)
     expect(new Set(biases).size).toBe(10)
+  })
+})
+
+describe('contact layouts (they need the real sheet)', () => {
+  it('wall sizes its cells from the paper, not a hardcoded footprint', () => {
+    const wall = getLayout('wall')
+    const o = { ...wall.defaults, gapX: 0.2, gapY: 0.2, jitterAmt: 0, sag: 0 }
+    // Neighbours in a row sit one paper-width plus one gutter apart, whatever
+    // the paper is — a 1×1.4 letter and a 2×1.4 landscape print alike.
+    for (const paper of [PAPER, { width: 2, height: 1.4 }]) {
+      const a = wall.pose(0, 8, o, 0, paper)
+      const b = wall.pose(1, 8, o, 0, paper)
+      expect(b.position[1]).toBeCloseTo(a.position[1]!)
+      expect(b.position[0]! - a.position[0]!).toBeCloseTo(paper.width + o.gapX)
+    }
+  })
+
+  it('wall keeps the whole grid roughly square as the paper changes shape', () => {
+    const wall = getLayout('wall')
+    const o = { ...wall.defaults, jitterAmt: 0, sag: 0 }
+    // A wide sheet wants fewer columns than a tall one for the same count.
+    const cols = (paper: { width: number; height: number }) =>
+      new Set(Array.from({ length: 12 }, (_, i) => wall.pose(i, 12, o, 0, paper).position[0])).size
+    expect(cols({ width: 2, height: 0.5 })).toBeLessThan(cols({ width: 0.5, height: 2 }))
+  })
+
+  it('sweep ramps deformation across the series and nothing else', () => {
+    const sweep = getLayout('sweep')
+    const poses = Array.from({ length: 6 }, (_, i) => sweep.pose(i, 6, sweep.defaults, 0, PAPER))
+    expect(poses[0]!.bias).toBeCloseTo(0)
+    expect(poses[5]!.bias).toBeCloseTo(1)
+    for (const p of poses) expect(p.rotation).toEqual([0, 0, 0])
+    for (let i = 1; i < poses.length; i++) {
+      expect(poses[i]!.bias!).toBeGreaterThan(poses[i - 1]!.bias!)
+    }
+  })
+
+  it('book: every page hinges on the one shared spine', () => {
+    const book = getLayout('book')
+    const o = { spread: 70, split: 0.5, lift: 0, gutter: 0.5 }
+    for (let i = 0; i < 8; i++) {
+      const p = book.pose(i, 8, o, 0, PAPER)
+      // Undo the page's swing: its inner edge must land back on the spine.
+      const theta = -p.rotation[1]!
+      const spineX = p.position[0]! - Math.cos(theta) * (PAPER.width / 2) * Math.sign(p.position[0]! || 1)
+      expect(spineX).toBeCloseTo(0)
+      expect(Math.hypot(p.position[0]!, p.position[2]!)).toBeCloseTo(PAPER.width / 2)
+    }
+  })
+
+  it('book: split slides between an open codex and a one-sided sample deck', () => {
+    const book = getLayout('book')
+    const codex = Array.from({ length: 8 }, (_, i) =>
+      book.pose(i, 8, { ...book.defaults, split: 0.5 }, 0, PAPER),
+    )
+    expect(codex.filter((p) => p.position[0]! < 0)).toHaveLength(4)
+
+    const deck = Array.from({ length: 8 }, (_, i) =>
+      book.pose(i, 8, { ...book.defaults, split: 0 }, 0, PAPER),
+    )
+    expect(deck.every((p) => p.position[0]! > 0)).toBe(true)
+  })
+
+  it('accordion: adjacent panels genuinely share a crease', () => {
+    const accordion = getLayout('accordion')
+    const o = { angle: 50, slack: 0 }
+    const edge = (p: ReturnType<typeof accordion.pose>, dir: number) => {
+      const a = p.rotation[1]!
+      return [
+        p.position[0]! + dir * (PAPER.width / 2) * Math.cos(a),
+        p.position[2]! - dir * (PAPER.width / 2) * Math.sin(a),
+      ]
+    }
+    for (let i = 0; i < 5; i++) {
+      const right = edge(accordion.pose(i, 6, o, 0, PAPER), 1)
+      const left = edge(accordion.pose(i + 1, 6, o, 0, PAPER), -1)
+      expect(right[0]!).toBeCloseTo(left[0]!)
+      expect(right[1]!).toBeCloseTo(left[1]!)
+    }
+  })
+
+  it('accordion: panels alternate, and a wider strip spreads further', () => {
+    const accordion = getLayout('accordion')
+    const o = { angle: 50, slack: 0 }
+    expect(accordion.pose(0, 4, o, 0, PAPER).rotation[1]).toBeCloseTo(
+      -accordion.pose(1, 4, o, 0, PAPER).rotation[1]!,
+    )
+    const narrow = accordion.pose(3, 4, o, 0, { width: 1, height: 1 }).position[0]!
+    const broad = accordion.pose(3, 4, o, 0, { width: 2, height: 1 }).position[0]!
+    expect(broad).toBeCloseTo(narrow * 2)
+  })
+
+  it('rack: every sheet stands on the same floor, whatever its lean', () => {
+    const rack = getLayout('rack')
+    const poses = Array.from({ length: 8 }, (_, i) => rack.pose(i, 8, rack.defaults, 0, PAPER))
+    for (const p of poses) {
+      // Undo the lean about the bottom edge — the foot must land on y = 0.
+      const footY = p.position[1]! - Math.cos(-p.rotation[0]!) * (PAPER.height / 2)
+      expect(footY).toBeCloseTo(0)
+      expect(p.rotation[0]!).toBeLessThanOrEqual(0)
+    }
+  })
+
+  it('rack: spacing is measured in real paper widths', () => {
+    const rack = getLayout('rack')
+    const o = { ...rack.defaults, spacing: 0.5, vary: 0, sway: 0 }
+    const step = (paper: { width: number; height: number }) =>
+      rack.pose(1, 4, o, 0, paper).position[0]! - rack.pose(0, 4, o, 0, paper).position[0]!
+    expect(step(PAPER)).toBeCloseTo(PAPER.width * 0.5)
+    expect(step({ width: 3, height: 1 })).toBeCloseTo(1.5)
+  })
+
+  it('rack: a sheet leaning further carries more bow', () => {
+    const rack = getLayout('rack')
+    const poses = Array.from({ length: 10 }, (_, i) => rack.pose(i, 10, rack.defaults, 0, PAPER))
+    const sorted = [...poses].sort((a, b) => a.rotation[0]! - b.rotation[0]!)
+    for (let i = 1; i < sorted.length; i++) {
+      expect(sorted[i]!.bias!).toBeLessThanOrEqual(sorted[i - 1]!.bias! + 1e-9)
+    }
   })
 })
 
@@ -125,15 +259,15 @@ describe('sheet layout (the stamp block)', () => {
 
   it('poses a flat rows×columns grid in register — no jitter, z = backing lift', () => {
     const sheet = getLayout('sheet')
-    const first = sheet.pose(0, 10, o, 0)
-    const last = sheet.pose(9, 10, o, 0)
+    const first = sheet.pose(0, 10, o, 0, PAPER)
+    const last = sheet.pose(9, 10, o, 0, PAPER)
     expect(first.rotation).toEqual([0, 0, 0])
     expect(first.position[2]).toBe(SHEET_LIFT)
     // Slot 0 is top-left, slot 9 bottom-right — symmetric about the center.
     expect(first.position[0]).toBeCloseTo(-last.position[0])
     expect(first.position[1]).toBeCloseTo(-last.position[1])
     // Neighbors sit exactly one cell + gutter apart.
-    const second = sheet.pose(1, 10, o, 0)
+    const second = sheet.pose(1, 10, o, 0, PAPER)
     expect(second.position[0] - first.position[0]).toBeCloseTo(o.cellWidth + o.gutter)
   })
 
@@ -322,7 +456,7 @@ describe('field framing', () => {
       const b = fieldBounds(layout, 9, layout.defaults, sheet)
       for (let i = 0; i < 9; i++) {
         for (const phase of [0, 0.25, 0.5, 0.75]) {
-          const pose = layout.pose(i, 9, layout.defaults, phase)
+          const pose = layout.pose(i, 9, layout.defaults, phase, sheet)
           for (let axis = 0; axis < 3; axis++) {
             const r = reach * pose.scale
             expect(pose.position[axis]! - r).toBeGreaterThanOrEqual(b.center[axis]! - b.half[axis]! - 1e-9)
@@ -356,7 +490,7 @@ describe('field framing', () => {
       const { position, target } = fitCamera(layout, 9, layout.defaults, sheet, fov, aspect, 1)
       for (let i = 0; i < 9; i++) {
         for (const phase of [0, 0.25, 0.5, 0.75]) {
-          const pose = layout.pose(i, 9, layout.defaults, phase)
+          const pose = layout.pose(i, 9, layout.defaults, phase, sheet)
           const depth = position[2] - pose.position[2]!
           const r = reach * pose.scale
           expect(Math.abs(pose.position[0]! - target[0])).toBeLessThanOrEqual(depth * hTan - r + 1e-9)

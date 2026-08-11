@@ -7,7 +7,7 @@ import { getStock } from '../core/stock'
 import { createSheetGeometry } from '../core/sheet'
 import { getBehavior } from '../behaviors/registry'
 import { stackMinSegments } from '../deformers/compose'
-import type { DeformerInstance } from '../deformers/types'
+import type { DeformerInstance, SheetDims } from '../deformers/types'
 import type { AeroPose } from '../physics/aero'
 import { useContentAtlas } from '../content/atlas'
 import {
@@ -31,6 +31,8 @@ export interface SharedMotion {
   morphRef: React.MutableRefObject<{ from: { id: string; options: unknown } | null; t: number }>
   layoutId: string
   layoutOptions: Record<string, unknown>
+  /** The field's paper size — one sheet for every group, so layouts agree. */
+  sheet: SheetDims
   entranceType: 'rise' | 'scatter' | 'none'
   stagger: number
   entranceDuration: number
@@ -172,13 +174,14 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     let biasChanged = false
     for (let j = 0; j < count; j++) {
       const i = indices[j]!
-      let pose = layout.pose(i, shared.total, shared.layoutOptions, shared.phaseRef.current)
+      let pose = layout.pose(i, shared.total, shared.layoutOptions, shared.phaseRef.current, shared.sheet)
       if (morph.from && morph.t < 1) {
         const prev = getLayout(morph.from.id).pose(
           i,
           shared.total,
           morph.from.options,
           shared.phaseRef.current,
+          shared.sheet,
         )
         pose = lerpPose(prev, pose, easeInOut(morph.t))
       }
