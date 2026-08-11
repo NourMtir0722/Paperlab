@@ -179,6 +179,15 @@ export {
   type PaperStageSceneProps,
 } from './stage/PaperStage'
 export {
+  buildStageAgentPayload,
+  buildStageComponentSource,
+  describeStage,
+  diffStage,
+  walkNameFor,
+  stringifyStage,
+  type StageExportInput,
+} from './config/stage-export'
+export {
   stageSchema,
   stageSourceSchema,
   stageGroundSchema,

@@ -4,9 +4,13 @@ import {
   buildFieldAgentPayload,
   buildFieldComponentSource,
   buildJsxSnippet,
+  buildStageAgentPayload,
+  buildStageComponentSource,
   diffConfig,
   diffFieldProps,
+  diffStage,
   type FieldExportInput,
+  type StageExportInput,
   type PaperConfig,
   type PaperHandle,
 } from 'paperlab'
@@ -14,18 +18,22 @@ import {
 /**
  * The tool's job ends in someone's codebase. Export serializes the ACTIVE
  * editor mode: a <Paper> in Paper mode, a <PaperField> (with every
- * referenced preset inlined) in Field mode.
+ * referenced preset inlined) in Field mode, a <PaperStage> in Stage mode —
+ * where the primary offer is the SCROLL-bound hero, because binding the walk
+ * to the page is the thing people want and the fiddly thing to write.
  */
 export function ExportMenu({
   mode,
   config,
   paperRef,
   fieldInput,
+  stageInput,
 }: {
-  mode: 'paper' | 'field'
+  mode: 'paper' | 'field' | 'stage'
   config: PaperConfig
   paperRef: React.RefObject<PaperHandle | null>
   fieldInput: () => FieldExportInput
+  stageInput: () => StageExportInput
 }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
@@ -75,7 +83,62 @@ export function ExportMenu({
       </button>
       {open && (
         <div className="export-dropdown">
-          {mode === 'paper' ? (
+          {mode === 'stage' ? (
+            <>
+              <button
+                type="button"
+                className="export-primary"
+                onClick={() => copy('AI brief', buildStageAgentPayload({ ...stageInput(), scroll: true }))}
+              >
+                <strong>Copy for AI</strong>
+                <span>scroll-driven stage — the page scroll walks the figure</span>
+                {badge('AI brief')}
+              </button>
+              <div className="export-secondary">
+                <button
+                  type="button"
+                  onClick={() =>
+                    copy('scroll component', buildStageComponentSource({ ...stageInput(), scroll: true }))
+                  }
+                >
+                  <strong>Copy scroll component</strong>
+                  <span>pinned section, walk bound to scroll</span>
+                  {badge('scroll component')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copy('component', buildStageComponentSource(stageInput()))}
+                >
+                  <strong>Copy component</strong>
+                  <span>&lt;PaperStage /&gt;, walking on its own clock</span>
+                  {badge('component')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = stageInput()
+                    copy(
+                      '.stage JSON',
+                      JSON.stringify(
+                        {
+                          ...diffStage(input.stage),
+                          layout: input.layout,
+                          ...(input.text ? { text: input.text } : {}),
+                          ...(input.count !== undefined ? { count: input.count } : {}),
+                        },
+                        null,
+                        2,
+                      ),
+                    )
+                  }}
+                >
+                  <strong>Copy .stage JSON</strong>
+                  <span>the diffed stage config</span>
+                  {badge('.stage JSON')}
+                </button>
+              </div>
+            </>
+          ) : mode === 'paper' ? (
             <>
               <button
                 type="button"
