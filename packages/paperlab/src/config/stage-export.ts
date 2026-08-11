@@ -1,4 +1,6 @@
 import { AGENT_PAYLOAD_VERSION } from './agent-payload'
+import { diffConfig } from './diff'
+import { paperConfigSchema, type PaperConfigInput } from './schema'
 import { getLayout } from '../field/layouts'
 import { stageSchema, type StageConfig, type StageConfigInput } from '../stage/schema'
 import { walkNames, walks } from '../stage/walks'
@@ -17,6 +19,8 @@ export interface StageExportInput {
   stage: StageConfigInput
   layout: string
   layoutOptions?: Record<string, unknown>
+  /** The banner itself — dims, stock, drape. Omitted uses the built-in banner. */
+  paper?: PaperConfigInput
   /** The words the space is built from. Omitted renders blank banners. */
   text?: string
   count?: number
@@ -130,6 +134,7 @@ export function describeStage(input: StageExportInput): string {
 
 function propLines(input: StageExportInput, indent: string): string {
   const lines: string[] = []
+  if (input.paper) lines.push(`${indent}preset={banner}`)
   if (input.text?.trim()) lines.push(`${indent}text={text}`)
   if (input.count !== undefined) lines.push(`${indent}count={${input.count}}`)
   if (input.layout !== 'colonnade') lines.push(`${indent}layout="${input.layout}"`)
@@ -151,12 +156,17 @@ export function buildStageComponentSource(input: StageExportInput): string {
   const name = input.componentName ?? 'PaperNave'
   const stage = diffStage(input.stage)
   const stageConst = `const stage = ${stringifyStage(stage)} satisfies StageConfigInput`
+  // The banner is inlined for the same reason field presets are: the receiver
+  // does not have the sender's preset library.
+  const bannerConst = input.paper
+    ? `\n\nconst banner = ${stringifyStage(diffConfig(paperConfigSchema.parse(input.paper)))} satisfies PaperConfigInput`
+    : ''
   const textConst = input.text?.trim() ? `\n\nconst text = ${JSON.stringify(input.text)}` : ''
 
   if (!input.scroll) {
-    return `import { PaperStage, type StageConfigInput } from 'paperlab'
+    return `import { PaperStage, type StageConfigInput${input.paper ? ', type PaperConfigInput' : ''} } from 'paperlab'
 
-${stageConst}${textConst}
+${stageConst}${bannerConst}${textConst}
 
 export function ${name}() {
   return (
@@ -168,9 +178,9 @@ ${propLines(input, '      ')}
   }
 
   return `import { useEffect, useRef, useState } from 'react'
-import { PaperStage, type StageConfigInput } from 'paperlab'
+import { PaperStage, type StageConfigInput${input.paper ? ', type PaperConfigInput' : ''} } from 'paperlab'
 
-${stageConst}${textConst}
+${stageConst}${bannerConst}${textConst}
 
 export function ${name}() {
   const ref = useRef<HTMLDivElement>(null)

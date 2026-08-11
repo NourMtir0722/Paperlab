@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWalkPath, walkPathSchema } from './path'
-import { shotSchema, stageCamera, walkPoint } from './camera'
+import { DEFAULT_PAPER_RATIO, shotSchema, stageCamera, walkPoint } from './camera'
 import { bannerTextSize, splitAcrossBanners } from './PaperStage'
 
 const HEIGHT = 1.75
@@ -65,13 +65,24 @@ describe('stage camera', () => {
     expect(camera.target[1]).toBeGreaterThan(HEIGHT * 2)
   })
 
-  it('wide steps off the walk line by its full distance', () => {
+  it('wide clears the paper rather than standing inside the colonnade', () => {
     const walk = path()
-    const camera = stageCamera(walk, 6, HEIGHT, shot({ shot: 'wide', distance: 8 }))
-    const figure = walkPoint(walk, 6)
-    expect(Math.abs(camera.position[0])).toBeCloseTo(8, 4)
-    // Level with the figure along the walk, not behind it.
-    expect(camera.position[2]).toBeCloseTo(figure[1], 4)
+    const scale = { figure: 1.75, paper: 8.5 }
+    const camera = stageCamera(walk, 6, scale, shot({ shot: 'wide', distance: 8 }))
+    // An aisle is a couple of units across, so a sideways step measured in
+    // walk-distance drops the camera among the banners looking at the back
+    // of one. It has to be measured against the thing it must clear.
+    expect(Math.abs(camera.position[0])).toBeGreaterThan(scale.paper)
+    // And it stands BACK along the walk as well — a 3/4 establishing shot.
+    expect(camera.position[2]).toBeGreaterThan(walkPoint(walk, 6)[1])
+    expect(camera.target[2]).toBeCloseTo(walkPoint(walk, 6)[1], 4)
+  })
+
+  it('taller paper pushes wide further out', () => {
+    const walk = path()
+    const near = stageCamera(walk, 6, { figure: 1.75, paper: 4 }, shot({ shot: 'wide' }))
+    const far = stageCamera(walk, 6, { figure: 1.75, paper: 12 }, shot({ shot: 'wide' }))
+    expect(Math.abs(far.position[0])).toBeGreaterThan(Math.abs(near.position[0]))
   })
 
   it('offset steps the camera sideways off the walk', () => {
@@ -106,6 +117,46 @@ describe('stage camera', () => {
     const early = stageCamera(curve, 3, HEIGHT, shot())
     const late = stageCamera(curve, curve.length - 3, HEIGHT, shot())
     expect(early.target[0]).not.toBeCloseTo(late.target[0], 1)
+  })
+})
+
+describe('framing the architecture', () => {
+  const walk = path()
+  const scale = { figure: 1.75, paper: 8.5 }
+
+  it('aims above the figure, because the paper is what fills the frame', () => {
+    // The bug: a shot that only knew the body aimed at chest height, and a
+    // colonnade of 8.5-unit banners showed its bottom third.
+    const camera = stageCamera(walk, 6, scale, shot())
+    expect(camera.target[1]).toBeGreaterThan(scale.figure)
+    expect(camera.target[1]).toBeLessThan(scale.paper)
+  })
+
+  it('taller paper lifts the aim; the camera stays at eye level', () => {
+    const short = stageCamera(walk, 6, { figure: 1.75, paper: 3 }, shot())
+    const tall = stageCamera(walk, 6, { figure: 1.75, paper: 12 }, shot())
+    expect(tall.target[1]).toBeGreaterThan(short.target[1])
+    // Where you STAND is a body measurement and must not move with the paper.
+    expect(tall.position[1]).toBeCloseTo(short.position[1], 6)
+  })
+
+  it('low looks up the banners and barely acknowledges the figure', () => {
+    const low = stageCamera(walk, 6, scale, shot({ shot: 'low' }))
+    expect(low.target[1]).toBeGreaterThan(scale.paper * 0.5)
+    // Same shot with a different sized person aims at the same place.
+    const bigger = stageCamera(walk, 6, { figure: 2.1, paper: 8.5 }, shot({ shot: 'low' }))
+    expect(bigger.target[1]).toBeCloseTo(low.target[1], 6)
+  })
+
+  it('lead still frames the person — it is their shot', () => {
+    const lead = stageCamera(walk, 6, scale, shot({ shot: 'lead' }))
+    expect(lead.target[1]).toBeLessThan(stageCamera(walk, 6, scale, shot()).target[1])
+  })
+
+  it('a bare number assumes banner-ish paper, so old call sites still frame', () => {
+    const bare = stageCamera(walk, 6, 1.75, shot())
+    const explicit = stageCamera(walk, 6, { figure: 1.75, paper: 1.75 * DEFAULT_PAPER_RATIO }, shot())
+    expect(bare.target[1]).toBeCloseTo(explicit.target[1], 9)
   })
 })
 

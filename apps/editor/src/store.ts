@@ -21,6 +21,9 @@ import {
   type SurfaceConfig,
   type StageConfigInput,
   type WalkName,
+  getStagePreset,
+  walkNames,
+  walks,
 } from 'paperlab'
 import {
   loadUserPresets,
@@ -76,6 +79,8 @@ export function zoneToConfig(zone: EditorZone) {
 export type EditorMode = 'paper' | 'field' | 'stage'
 
 export interface StageState {
+  /** Which named stage is loaded — the left rail's selection. */
+  preset: string
   walk: WalkName
   layout: string
   layoutOptions: Record<string, unknown>
@@ -88,6 +93,8 @@ export interface StageState {
   playing: boolean
   /** Shot, figure, lighting, source, ground — everything but the path. */
   config: StageConfigInput
+  /** The banner itself: dims, stock, drape. */
+  paper?: PaperConfigInput
 }
 
 interface EditorState {
@@ -125,6 +132,7 @@ interface EditorState {
   setMode(mode: EditorMode): void
   patchStage(patch: Partial<StageState>): void
   patchStageConfig(patch: Record<string, unknown>): void
+  loadStagePreset(id: string): void
   patchField(patch: Partial<FieldState>): void
   setSlotPreset(index: number, name: string): void
   setAllSlots(name: string): void
@@ -185,6 +193,26 @@ export function writeConfig(
 const bootUserPresets = loadUserPresets()
 syncRegistry(bootUserPresets)
 
+/** A stage preset unpacked into the editor's own editable shape. */
+function stageStateFrom(id: string): StageState {
+  const preset = getStagePreset(id)
+  const walk =
+    walkNames.find((name) => JSON.stringify(walks[name]) === JSON.stringify(preset.stage.path)) ?? 'straight'
+  const { path: _path, ...config } = preset.stage
+  return {
+    preset: id,
+    walk,
+    layout: preset.layout,
+    layoutOptions: { ...preset.layoutOptions },
+    text: preset.text ?? '',
+    count: preset.count,
+    progress: 0.42,
+    playing: false,
+    config,
+    paper: preset.paper,
+  }
+}
+
 export const useEditor = create<EditorState>((set, get) => ({
   userPresets: bootUserPresets,
   presetName: 'receipt-unroll',
@@ -202,16 +230,7 @@ export const useEditor = create<EditorState>((set, get) => ({
     slotStates: {},
     zones: [],
   },
-  stage: {
-    walk: 'straight',
-    layout: 'colonnade',
-    layoutOptions: {},
-    text: 'the paper remembers every hand that folded it and every room it was carried through',
-    count: 18,
-    progress: 0.42,
-    playing: false,
-    config: { lighting: 'nave', shot: { shot: 'follow', offset: 1.5, lookAhead: 12 } },
-  },
+  stage: stageStateFrom('nave'),
   cameFromField: false,
   editingState: null,
   statePreview: false,
@@ -348,6 +367,13 @@ export const useEditor = create<EditorState>((set, get) => ({
       inspectorEpoch: s.inspectorEpoch + 1,
     })),
   patchStage: (patch) => set((s) => ({ stage: { ...s.stage, ...patch } })),
+  loadStagePreset: (id) =>
+    set((s) => ({
+      // A preset replaces the stage wholesale rather than merging: half of
+      // "archive" over half of "threshold" is a space nobody designed.
+      stage: { ...stageStateFrom(id), progress: s.stage.progress, playing: s.stage.playing },
+      inspectorEpoch: s.inspectorEpoch + 1,
+    })),
   patchStageConfig: (patch) =>
     set((s) => ({ stage: { ...s.stage, config: { ...s.stage.config, ...patch } } })),
   patchField: (patch) =>

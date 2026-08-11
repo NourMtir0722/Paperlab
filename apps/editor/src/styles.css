@@ -856,3 +856,46 @@ button.export:hover {
   color: #c9c6c0;
   font-weight: 600;
 }
+
+.stage-presets {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stage-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #202125;
+  color: #e6e4df;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stage-preset:hover {
+  background: #26272b;
+}
+
+.stage-preset.selected {
+  border-color: #4f7cff;
+  background: #23262f;
+}
+
+.stage-preset strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stage-preset span {
+  color: #8b8a86;
+  font-size: 11px;
+  line-height: 1.45;
+}

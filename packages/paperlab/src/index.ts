@@ -160,6 +160,12 @@ export {
 } from './stage/path'
 export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
 export {
+  stagePresets,
+  getStagePreset,
+  listStagePresets,
+  type StagePreset,
+} from './stage/presets'
+export {
   cycleLength,
   figureGait,
   figureSchema,
@@ -170,6 +176,7 @@ export {
   type FigurePose,
 } from './stage/gait'
 export { Figure, type FigureProps } from './stage/Figure'
+export { Source, Surround, makeGlowTexture, makeSkyTexture } from './stage/Surround'
 export {
   PaperStage,
   PaperStageScene,
@@ -201,6 +208,7 @@ export {
   walkPoint,
   type ShotName,
   type ShotOptions,
+  type StageScale,
   type StageShot,
 } from './stage/camera'
 export {
