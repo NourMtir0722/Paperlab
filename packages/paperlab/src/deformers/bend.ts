@@ -57,6 +57,7 @@ void FN(inout vec3 p, vec2 uv, float t) {
   p.z = newZ;
 }
 `,
+    strength: 'curvature',
     uniforms: (o) => ({ curvature: o.curvature, angle: o.angle * DEG }),
   },
 }

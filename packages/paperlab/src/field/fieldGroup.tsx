@@ -70,12 +70,16 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     )
     const atlasIdx = new Float32Array(count)
     const phase = new Float32Array(count)
+    const bias = new Float32Array(count).fill(1)
     for (let i = 0; i < count; i++) {
       atlasIdx[i] = i
       phase[i] = ((indices[i]! * 0.618034) % 1) * 4 // golden-ratio spread by global slot
     }
     geo.setAttribute('aAtlas', new THREE.InstancedBufferAttribute(atlasIdx, 1))
     geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phase, 1))
+    // Per-sheet deformation strength, written from the layout's pose each
+    // frame — how a single instanced draw call bends every sheet differently.
+    geo.setAttribute('aBias', new THREE.InstancedBufferAttribute(bias, 1))
     return geo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(config.sheet), structureKey, count])
@@ -159,6 +163,9 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     const layout = getLayout(shared.layoutId)
     const morph = shared.morphRef.current
     const behaviorTransform = behavior?.transform && config.behavior ? behavior : null
+    const biasAttr = geometry.getAttribute('aBias') as THREE.InstancedBufferAttribute
+    const biases = biasAttr.array as Float32Array
+    let biasChanged = false
     for (let j = 0; j < count; j++) {
       const i = indices[j]!
       let pose = layout.pose(i, shared.total, shared.layoutOptions, shared.phaseRef.current)
@@ -176,6 +183,11 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
         if (tIn < 1) {
           pose = lerpPose(entrancePose(shared.entranceType, i, pose), pose, easeOut(tIn))
         }
+      }
+      const bias = Math.min(1, Math.max(0, pose.bias ?? 1))
+      if (biases[j] !== bias) {
+        biases[j] = bias
+        biasChanged = true
       }
       scratchObj.position.set(...pose.position)
       scratchObj.rotation.set(...pose.rotation)
@@ -204,6 +216,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
       mesh.setMatrixAt(j, scratchObj.matrix)
     }
     mesh.instanceMatrix.needsUpdate = true
+    if (biasChanged) biasAttr.needsUpdate = true
   })
 
   return (
@@ -234,6 +247,7 @@ function entrancePose(type: 'rise' | 'scatter', i: number, target: PaperPose): P
       position: [target.position[0], target.position[1] - 3.2, target.position[2] - 0.5],
       rotation: [target.rotation[0] - 0.7, target.rotation[1], target.rotation[2] + 0.25],
       scale: target.scale * 0.85,
+      bias: target.bias,
     }
   }
   const a = i * 2.399
@@ -241,6 +255,7 @@ function entrancePose(type: 'rise' | 'scatter', i: number, target: PaperPose): P
     position: [Math.cos(a) * 7, Math.sin(a * 1.3) * 4, Math.sin(a) * 6],
     rotation: [Math.sin(a) * 2, a, Math.cos(a) * 2],
     scale: target.scale * 0.6,
+    bias: target.bias,
   }
 }
 
@@ -258,6 +273,7 @@ function lerpPose(a: PaperPose, b: PaperPose, t: number): PaperPose {
       lerp(a.rotation[2], b.rotation[2]),
     ],
     scale: lerp(a.scale, b.scale),
+    bias: lerp(a.bias ?? 1, b.bias ?? 1),
   }
 }
 

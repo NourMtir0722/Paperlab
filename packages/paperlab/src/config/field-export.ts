@@ -92,12 +92,11 @@ export function diffFieldProps(input: FieldExportInput): Record<string, unknown>
 
 const LAYOUT_PHRASES: Record<string, string> = {
   ring: 'a ring you can see around',
-  deck: 'a stacked deck',
-  cascade: 'a diagonal cascade',
-  helix: 'a climbing helix',
-  wall: 'a jittered wall grid',
-  tunnel: 'a receding tunnel',
-  scatter: 'a loose scatter',
+  fan: 'a fanned swatch deck hinged at one corner',
+  spread: 'a stack slid sideways, each sheet bowing further than the last',
+  pile: 'a heap on a desk, the sheets underneath pressed flat',
+  wall: 'a pinned studio wall of sheets, none hanging quite square',
+  spill: 'a dropped stack caught mid-air, each sheet bent its own way',
   sheet: 'a stamp-block grid on a shared backing sheet',
 }
 

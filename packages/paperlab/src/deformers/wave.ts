@@ -57,6 +57,7 @@ void FN(inout vec3 p, vec2 uv, float t) {
   p.z += U_amplitude * env * (sin(phase) + 0.35 * sin(phase * 2.7 + 1.3));
 }
 `,
+    strength: 'amplitude',
     uniforms: (o) => ({
       amplitude: o.amplitude,
       wavelength: o.wavelength,
