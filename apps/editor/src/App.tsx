@@ -6,7 +6,9 @@ import {
   PaperLighting,
   PaperMesh,
   PaperStageScene,
+  getStagePreset,
   getWalk,
+  listStagePresets,
   getPreset,
   isBuiltinPreset,
   listPresets,
@@ -38,6 +40,7 @@ export function App() {
   const field = useEditor((s) => s.field)
   const stage = useEditor((s) => s.stage)
   const patchStage = useEditor((s) => s.patchStage)
+  const loadStagePreset = useEditor((s) => s.loadStagePreset)
   const cameFromField = useEditor((s) => s.cameFromField)
   const patchConfig = useEditor((s) => s.patchConfig)
   const setMode = useEditor((s) => s.setMode)
@@ -93,6 +96,7 @@ export function App() {
     stage: { ...stage.config, path: getWalk(stage.walk) },
     layout: stage.layout,
     layoutOptions: stage.layoutOptions,
+    paper: stage.paper,
     text: stage.text.trim() ? stage.text : undefined,
     count: stage.count,
   })
@@ -171,14 +175,27 @@ export function App() {
           <PresetPanel />
         ) : mode === 'stage' ? (
           <>
-            <h2>Stage</h2>
+            <h2>Stages</h2>
+            <ul className="stage-presets">
+              {listStagePresets().map((id) => {
+                const preset = getStagePreset(id)
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      className={`stage-preset${stage.preset === id ? ' selected' : ''}`}
+                      onClick={() => loadStagePreset(id)}
+                    >
+                      <strong>{preset.label}</strong>
+                      <span>{preset.description}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
             <p className="stage-note">
-              Paper as architecture. Type into <strong>Words</strong> and the space is built out of them — one
-              column per banner, stacked down the drop.
-            </p>
-            <p className="stage-note">
-              <strong>Walk</strong> picks the path the figure takes; the layout, the camera and the light all
-              read that same walk.
+              Type into <strong>Words</strong> and the space is rebuilt out of them — one column per banner,
+              stacked down the drop.
             </p>
           </>
         ) : (
@@ -251,8 +268,9 @@ export function App() {
           )}
           {mode === 'stage' ? (
             <PaperStageScene
-              key={`stage:${stage.walk}:${stage.layout}:${stage.count}`}
+              key={`stage:${stage.preset}:${stage.walk}:${stage.layout}:${stage.count}`}
               stage={{ ...stage.config, path: getWalk(stage.walk) }}
+              preset={stage.paper}
               layout={stage.layout}
               layoutOptions={stage.layoutOptions}
               text={stage.text.trim() ? stage.text : undefined}

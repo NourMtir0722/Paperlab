@@ -5,12 +5,14 @@ import { z } from 'zod'
 import { usePrefersReducedMotion } from '../a11y'
 import type { ContentConfig, PaperConfigInput } from '../config/schema'
 import { PaperFieldMesh } from '../PaperField'
+import { resolveConfig } from '../PaperMesh'
 import type { FieldPaperSlot } from '../field/slots'
 import { getLayout } from '../field/layouts'
 import { PaperLighting } from '../scene/PaperLighting'
 import { getWalkPath } from './path'
 import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
+import { Source, Surround } from './Surround'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
 
 /**
@@ -26,7 +28,7 @@ import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
 
 /** A banner: tall, translucent, with folds running the length of its drop. */
 const BANNER: PaperConfigInput = {
-  sheet: { width: 1.5, height: 8.5, segments: 96 },
+  sheet: { width: 1.5, height: 8.5, segments: 'auto' },
   stock: 'vellum',
   surface: { grain: 0.22 },
   deformers: [{ type: 'drape', options: { amplitude: 0.16, folds: 3, falloff: 1.7, gather: 0.28 } }],
@@ -100,13 +102,27 @@ export function bannerTextSize(lines: number): number {
 }
 
 /** The walk drives the camera; nothing else is allowed to move it. */
-function ShotRig({ stage, progress, still }: { stage: StageConfig; progress?: number; still: boolean }) {
+function ShotRig({
+  stage,
+  paperHeight,
+  progress,
+  still,
+}: {
+  stage: StageConfig
+  paperHeight: number
+  progress?: number
+  still: boolean
+}) {
   const camera = useThree((s) => s.camera)
   const path = useMemo(() => getWalkPath(stage.path), [stage.path])
+  const scale = useMemo(
+    () => ({ figure: stage.figure.height, paper: paperHeight }),
+    [stage.figure.height, paperHeight],
+  )
 
   useFrame((state) => {
     const walked = stageWalked(path.length, stage, progress, still ? 0 : state.clock.elapsedTime)
-    const { position, target } = stageCamera(path, walked, stage.figure.height, stage.shot)
+    const { position, target } = stageCamera(path, walked, scale, stage.shot)
     camera.position.set(position[0], position[1], position[2])
     camera.lookAt(target[0], target[1], target[2])
   })
@@ -142,6 +158,9 @@ export function PaperStageScene({
   const still = usePrefersReducedMotion(reducedMotion)
   const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageInput])
   const path = useMemo(() => getWalkPath(stage.path), [stage.path])
+  // The shot frames the ARCHITECTURE, so it has to know how tall the paper
+  // is — read from the preset in play rather than assumed.
+  const paperHeight = useMemo(() => resolveConfig({ preset: preset ?? BANNER }).sheet.height, [preset])
 
   // The walk reaches the layout too. A layout that arranges along a path and
   // a figure that walks a different one is the one bug this whole component
@@ -178,30 +197,39 @@ export function PaperStageScene({
 
   const figureDistance = progress !== undefined ? progress * path.length : undefined
 
+  // One radius for the room: the sky, the floor and the far clip all measure
+  // from it, and they have to agree or the horizon tears.
+  const surroundRadius = useMemo(
+    () => Math.max(path.length * 1.6, paperHeight * 9),
+    [path.length, paperHeight],
+  )
+
   // The source stands past the end of the walk, facing back down it.
   const source = useMemo(() => {
     const [x, z] = walkPoint(path, path.length + stage.source.beyond)
     const [tx, tz] = path.tangentAt(1)
-    const size = stage.figure.height * stage.source.spread
+    const size = paperHeight * stage.source.spread
     return { position: [x, size * 0.35, z] as const, yaw: Math.atan2(-tx, -tz), size }
-  }, [path, stage.source.beyond, stage.source.spread, stage.figure.height])
+  }, [path, stage.source.beyond, stage.source.spread, paperHeight])
 
   return (
     <>
-      <ShotRig stage={stage} progress={progress} still={still} />
+      <ShotRig stage={stage} paperHeight={paperHeight} progress={progress} still={still} />
       <PaperLighting preset={stage.lighting} floor={0} scale={60} reducedMotion={reducedMotion} />
 
+      {stage.source.surround && (
+        <Surround radius={surroundRadius} horizon={stage.source.color} zenith={stage.source.zenith} />
+      )}
+
       {stage.source.enabled && (
-        <mesh position={source.position as unknown as THREE.Vector3} rotation={[0, source.yaw, 0]}>
-          <planeGeometry args={[source.size * 2, source.size]} />
-          {/* Unlit and unfogged: it IS the light, not a thing the light reaches. */}
-          <meshBasicMaterial color={stage.source.color} toneMapped={false} fog={false} />
-        </mesh>
+        <Source size={source.size} position={source.position} yaw={source.yaw} color={stage.source.color} />
       )}
 
       {stage.ground.enabled && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[path.length * 8, path.length * 8]} />
+          {/* A square of side s has corners at s·0.707 — keep them inside the
+              surround, or the floor punches out through the sky. */}
+          <planeGeometry args={[surroundRadius * 1.3, surroundRadius * 1.3]} />
           <meshStandardMaterial color={stage.ground.color} roughness={1} />
         </mesh>
       )}

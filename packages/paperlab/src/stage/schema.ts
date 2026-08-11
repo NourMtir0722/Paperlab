@@ -17,8 +17,17 @@ export const stageSourceSchema = z.object({
   color: z.string().default('#fff4e2'),
   /** How far past the end of the walk it stands, world units. */
   beyond: z.number().min(0).max(80).default(10),
-  /** Size, as a multiple of the figure's height. It only has to out-fill the frame. */
-  spread: z.number().min(1).max(60).default(22),
+  /**
+   * A cyclorama around the whole stage, graded from the source colour at the
+   * horizon to near-dark overhead. The source plane only faces down the walk,
+   * so without this every shot that isn't axial — `wide` especially — looks
+   * out at a black void where the room should be.
+   */
+  surround: z.boolean().default(true),
+  /** Colour overhead. The horizon takes the source's own colour. */
+  zenith: z.string().default('#241c17'),
+  /** Size, as a multiple of the PAPER height — it only has to out-fill the frame. */
+  spread: z.number().min(1).max(60).default(5),
 })
 
 export const stageGroundSchema = z.object({

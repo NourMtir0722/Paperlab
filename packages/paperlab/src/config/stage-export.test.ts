@@ -166,3 +166,21 @@ describe('stringifyStage', () => {
     expect(JSON.parse(stringifyStage(diff))).toEqual(diff)
   })
 })
+
+describe('the banner travels with the export', () => {
+  it('inlines the paper preset — receivers have no preset library', () => {
+    const source = buildStageComponentSource(
+      base({ paper: { sheet: { width: 0.9, height: 11 }, stock: 'vellum' } }),
+    )
+    expect(source).toContain('const banner =')
+    expect(source).toContain('type PaperConfigInput')
+    expect(source).toContain('preset={banner}')
+    expect(source).toContain('"height": 11')
+  })
+
+  it('says nothing about paper when the built-in banner is used', () => {
+    const source = buildStageComponentSource(base())
+    expect(source).not.toContain('const banner')
+    expect(source).not.toContain('PaperConfigInput')
+  })
+})
