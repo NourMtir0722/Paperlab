@@ -1,4 +1,4 @@
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { forwardRef, useEffect, useMemo, useRef } from 'react'
@@ -17,7 +17,8 @@ import { BackingSheet } from './field/backingSheet'
 import { InteractiveField, type FieldA11yController } from './field/interactiveField'
 import { FieldKeyboardMirror } from './field/keyboardMirror'
 import { getLayout } from './field/layouts'
-import { withSheetCellFromPaper, type SheetLayoutOptions } from './field/sheetGrid'
+import type { SheetLayoutOptions } from './field/sheetGrid'
+import { fitCamera, resolveLayoutOptions } from './field/framing'
 
 // The field system lives in field/*; this module is the public composition.
 // Re-exported here so `import { … } from './PaperField'` (index.ts, tests,
@@ -103,21 +104,13 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
     const layoutId = props.layout ?? 'ring'
     const layout = getLayout(layoutId)
     const firstSheet = groups[0]?.config.sheet
-    const layoutOptions = useMemo(() => {
-      const parsed = layout.optionsSchema.parse({
-        ...layout.defaults,
-        ...props.layoutOptions,
-      }) as Record<string, unknown>
+    const layoutOptions = useMemo(
       // Sheet grids size their cells from the papers themselves — gutter is
       // then literally the spacing between stamps (explicit cell dims win).
-      if (layoutId !== 'sheet') return parsed
-      return withSheetCellFromPaper(
-        parsed as unknown as SheetLayoutOptions,
-        props.layoutOptions,
-        firstSheet,
-      ) as unknown as Record<string, unknown>
+      () => resolveLayoutOptions(layoutId, layout, props.layoutOptions, firstSheet),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [layoutId, JSON.stringify(props.layoutOptions ?? {}), firstSheet?.width, firstSheet?.height])
+      [layoutId, JSON.stringify(props.layoutOptions ?? {}), firstSheet?.width, firstSheet?.height],
+    )
 
     // ── Shared motion state: one driver phase / entrance clock / morph for
     // every group, so a mixed-preset field moves as one field. ──
@@ -229,6 +222,51 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
   },
 )
 
+/**
+ * Frames whatever the layout actually lays out. A fixed camera can only suit
+ * one layout — a `wall` of 12 runs past the top of a frame that a `pile`
+ * leaves nearly empty — and layouts are pure, so the right distance is just
+ * arithmetic over their poses.
+ */
+function FitCamera(meshProps: PaperFieldMeshProps) {
+  const camera = useThree((s) => s.camera)
+  const width = useThree((s) => s.size.width)
+  const height = useThree((s) => s.size.height)
+
+  const field = useMemo(() => {
+    const papers = effectiveFieldPapers(meshProps.papers, meshProps.images)
+    const layoutId = meshProps.layout ?? 'ring'
+    const layout = getLayout(layoutId)
+    const sheet = groupFieldPapers(papers, meshProps.preset)[0]?.config.sheet
+    const options = resolveLayoutOptions(layoutId, layout, meshProps.layoutOptions, sheet)
+    return { layout, n: papers.length, options, sheet: sheet ?? { width: 1, height: 1.4 } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    JSON.stringify(meshProps.papers ?? null),
+    JSON.stringify(meshProps.images ?? null),
+    JSON.stringify(meshProps.preset ?? null),
+    meshProps.layout,
+    JSON.stringify(meshProps.layoutOptions ?? {}),
+  ])
+
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return
+    const { position, target } = fitCamera(
+      field.layout,
+      field.n,
+      field.options,
+      field.sheet,
+      camera.fov,
+      width / Math.max(height, 1),
+    )
+    camera.position.set(...position)
+    camera.lookAt(...target)
+    camera.updateProjectionMatrix()
+  }, [camera, width, height, field])
+
+  return null
+}
+
 /** `<PaperField />` owns its own Canvas; PaperFieldMesh drops into existing scenes. */
 export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function PaperField(
   { children, className, style, ...meshProps },
@@ -254,6 +292,7 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       <DropZoneContext.Provider value={registry}>
         <Canvas shadows camera={{ position: [0, 0.6, 5.2], fov: 45 }} dpr={[1, 2]}>
+          <FitCamera {...meshProps} />
           <ambientLight intensity={0.7} />
           <directionalLight
             position={[3, 5, 4]}

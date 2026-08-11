@@ -17,6 +17,7 @@ import {
   stackUniformValues,
 } from './compose'
 import { getLayout, type PaperPose } from './layouts'
+import { fieldShapeStack } from './stack'
 import type { FieldGroupData } from './slots'
 
 const scratchObj = new THREE.Object3D()
@@ -42,20 +43,23 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
   const { config, indices, contents } = group
   const count = indices.length
   const stock = getStock(config.stock)
-  const behavior = config.behavior ? getBehavior(config.behavior.type) : null
+  // A raw deformer stack is the Advanced fork of a behavior and wins over one
+  // — the same precedence the hero path's buildStack applies. Field mode used
+  // to read `behavior` only, so a preset shaped by `deformers` rendered flat.
+  const behavior = config.behavior && !config.deformers ? getBehavior(config.behavior.type) : null
 
   const progressRef = useRef(
     behavior ? ((config.behavior as Record<string, unknown>)[behavior.progressParam] as number) : 0,
   )
-  const buildStackAt = (progress: number): DeformerInstance[] => {
-    if (!config.behavior || !behavior) return []
-    const options = { ...config.behavior, [behavior.progressParam]: progress }
-    return behavior.stack(options, config.sheet)
-  }
+  const buildStackAt = (progress: number): DeformerInstance[] => fieldShapeStack(config, progress)
   const initialStack = useMemo(
     () => buildStackAt(progressRef.current),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(config.behavior ?? null), JSON.stringify(config.sheet)],
+    [
+      JSON.stringify(config.behavior ?? null),
+      JSON.stringify(config.deformers ?? null),
+      JSON.stringify(config.sheet),
+    ],
   )
   const structureKey = initialStack.map((i) => i.type).join('|')
 
