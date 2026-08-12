@@ -10,6 +10,6 @@ It ships as the whole slice — the `crumple` deformer (JS `displace` plus its G
 
 The field is the gap between the two nearest points of a jittered cell grid, signed per cell. It vanishes on every cell boundary, so the sheet stays continuous, and its gradient flips across one — which is a crease. What you get is an irregular polygonal network of facets alternating toward and away from you, rather than the periodic egg-crate or the smooth hammered-metal look the two earlier attempts produced. The normals are the point: a crumple that does not shade its own facets is a noisy sheet, not a crushed one.
 
-It asks for `minSegments: 72` and is by some distance the most expensive deformer in field mode — a crease the grid cannot resolve is just a smooth bump.
+It is the most expensive deformer in the set, and measurably so: `pnpm perf:field` puts a field of them about 45% longer per frame than the same field of an undeformed preset. Almost none of that is geometry — `segments: 'auto'` already gives every sheet 72 a side, so its `minSegments: 72` is a floor that only bites when a preset asks for a coarser grid by hand. The cost is the nine cell lookups per probe, three probes deep for the vertex normal.
 
 Also: `describeConfig` now has a phrase for `crumple`, and a test asserts that *every* registered behavior has one, so a new behavior can no longer describe itself as nothing.
