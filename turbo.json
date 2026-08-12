@@ -10,10 +10,15 @@
       "persistent": true
     },
     "test": {
-      "dependsOn": []
+      "dependsOn": ["^typecheck"]
     },
     "typecheck": {
-      "dependsOn": []
+      // ^typecheck, not [] — the apps consume the library through its public
+      // API, so a change in `paperlab` must invalidate THEIR cached
+      // typecheck. With no upstream dependency turbo hashed each package's
+      // own files only, and deleting a library export left the apps replaying
+      // a stale "pass" while `build` failed on the same code.
+      "dependsOn": ["^typecheck"]
     }
   }
 }
