@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
+  // The editor ships under /editor on the public site; '/' for local dev.
+  base: process.env.PAPERLAB_BASE ?? '/',
   plugins: [react()],
   resolve: {
     alias: {

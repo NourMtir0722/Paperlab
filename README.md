@@ -2,10 +2,16 @@
 
 **Physical, realistic paper as a React component.** A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints — real 3D paper, not a CSS fake. Content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
+**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/)  ·  [for agents](AGENTS.md)
+
 | | |
 |---|---|
-| ![A thermal receipt unrolling from a paper roll](docs/media/receipt-unroll.png) | ![A photo print with its corner peeling up](docs/media/hero-peel.png) |
-| ![A cloth-simulated sheet grabbed and pulled](docs/media/cloth-grab.png) | ![A ring gallery of photo prints](docs/media/field-ring.png) |
+| ![A thermal receipt unrolling from a paper roll](docs/media/receipt-unroll.gif) | ![A photo print with its corner peeling up](docs/media/hero-peel.gif) |
+| ![A letter folding itself into thirds](docs/media/letter-fold.gif) | ![A page turning on its spine](docs/media/page-flip.gif) |
+
+Every frame above is real geometry — no video, no sprite sheet. Type a sentence into the playground and it builds you a room out of it:
+
+![Banners hung along a walk, a figure walking down the aisle](docs/media/stage-nave.gif)
 
 ## Quick start
 

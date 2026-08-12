@@ -14,7 +14,8 @@
     "shot": "node tools/stage-shot.mjs",
     "shot:ui": "node tools/editor-shot.mjs",
     "shot:play": "node tools/playground-shot.mjs",
-    "perf": "node tools/stage-perf.mjs"
+    "perf": "node tools/stage-perf.mjs",
+    "media": "node tools/media.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",
