@@ -10,8 +10,6 @@ export default defineConfig({
       // so editor dev needs no library build step.
       paperlab: fileURLToPath(new URL('../../packages/paperlab/src/index.ts', import.meta.url)),
     },
-    // zustand deliberately not deduped: leva pins zustand v4 (default-export
-    // `shallow`), the app uses v5 — each keeps its own copy.
-    dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei'],
+    dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei', 'zustand'],
   },
 })
