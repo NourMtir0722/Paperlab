@@ -166,8 +166,6 @@ interface EditorState {
 export interface WriteOpts {
   /** The canvas changed params behind the inspector's back — remount it. */
   external?: boolean
-  /** The control STRUCTURE changed (effect toggled, behavior/physics swapped) — remount. */
-  structural?: boolean
 }
 
 /**
@@ -182,7 +180,7 @@ export function writeConfig(
   patch: Record<string, unknown>,
   opts: WriteOpts = {},
 ): Pick<EditorState, 'config' | 'inspectorEpoch'> {
-  const inspectorEpoch = opts.external || opts.structural ? s.inspectorEpoch + 1 : s.inspectorEpoch
+  const inspectorEpoch = opts.external ? s.inspectorEpoch + 1 : s.inspectorEpoch
   if (s.editingState) {
     // Overrides SET base params, never remove them — a no-op patch (all
     // undefined) leaves the config untouched.
@@ -437,23 +435,11 @@ export const useEditor = create<EditorState>((set, get) => ({
   patchConfig: (patch, opts) =>
     set((s) => writeConfig(s, patch as Record<string, unknown>, { external: opts?.external })),
   setBehaviorType: (type) =>
-    set((s) =>
-      writeConfig(
-        s,
-        { behavior: type ? behaviorConfigSchema.parse({ type }) : undefined },
-        { structural: true },
-      ),
-    ),
-  setSurface: (patch) =>
-    set((s) => {
-      // Toggling an effect on/off changes the control structure — leva needs a
-      // remount (epoch bump). Value edits don't.
-      const surface = s.config.surface as Record<string, unknown>
-      const structural = Object.entries(patch).some(
-        ([key, value]) => (surface[key] !== undefined) !== (value !== undefined),
-      )
-      return writeConfig(s, { surface: patch }, { structural })
-    }),
+    set((s) => writeConfig(s, { behavior: type ? behaviorConfigSchema.parse({ type }) : undefined })),
+  // Toggling an effect on/off adds or removes controls; the inspector derives
+  // its rows from the config on every render, so that needs no remount — and
+  // remounting would collapse the folder the toggle lives in.
+  setSurface: (patch) => set((s) => writeConfig(s, { surface: patch })),
   setPhysics: (name) =>
     set((s) =>
       writeConfig(
@@ -463,7 +449,6 @@ export const useEditor = create<EditorState>((set, get) => ({
         name === 'cloth'
           ? { physics: clothConfigSchema.parse({ type: 'cloth' }), behavior: undefined, deformers: undefined }
           : { physics: name },
-        { structural: true },
       ),
     ),
   patchCloth: (patch) =>

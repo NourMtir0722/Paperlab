@@ -899,3 +899,239 @@ button.export:hover {
   font-size: 11px;
   line-height: 1.45;
 }
+
+/* ── Inspector controls (F9: schema-generated, no control library) ─────────── */
+
+.panel {
+  padding: 6px 0 12px;
+}
+
+.control-folder {
+  border-bottom: 1px solid #26272b;
+}
+
+.control-folder-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  color: #c9c7c2;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.control-folder-head:hover {
+  background: #1e1f23;
+}
+
+.control-folder-caret {
+  color: #8b8a86;
+  font-size: 10px;
+  transition: transform 120ms ease;
+}
+
+.control-folder.open .control-folder-caret {
+  transform: rotate(90deg);
+}
+
+.control-folder-body {
+  padding: 2px 10px 8px;
+}
+
+/* Nested folders (a stage's shot/figure/source) indent and lose the rule. */
+.control-folder-body .control-folder {
+  border-bottom: 0;
+  border-left: 1px solid #2a2b2f;
+  margin-left: 2px;
+}
+
+.control-folder-body .control-folder-head {
+  padding-left: 8px;
+  font-weight: 500;
+  color: #a8a6a1;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 88px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  min-height: 26px;
+}
+
+.control-row.stacked {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.control-row.disabled {
+  opacity: 0.45;
+}
+
+.control-row-button {
+  grid-template-columns: 1fr;
+}
+
+.control-label {
+  color: #8b8a86;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-label.scrub {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.control-label.scrub:hover {
+  color: #c9c7c2;
+}
+
+.control-slider {
+  width: 100%;
+  accent-color: #4f7cff;
+  height: 14px;
+}
+
+.control-value {
+  background: #26272b;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #e6e4df;
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 4px;
+  text-align: right;
+  cursor: text;
+  width: 100%;
+}
+
+.control-value:hover:not(:disabled) {
+  border-color: #3a3b40;
+}
+
+.control-value.editing {
+  border-color: #4f7cff;
+  outline: none;
+}
+
+.control-select,
+.control-text {
+  background: #26272b;
+  border: 1px solid #3a3b40;
+  border-radius: 4px;
+  color: #e6e4df;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  width: 100%;
+  grid-column: 2 / -1;
+}
+
+.control-row.stacked .control-text {
+  grid-column: 1;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.control-select:focus,
+.control-text:focus {
+  border-color: #4f7cff;
+  outline: none;
+}
+
+.control-toggle {
+  grid-column: 2 / -1;
+  justify-self: start;
+  display: inline-flex;
+  cursor: pointer;
+  position: relative;
+}
+
+/* The real checkbox lies transparent ON TOP of the drawn track, rather than
+   being shrunk to 0×0 — it stays clickable, focusable, and hit-testable. */
+.control-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.control-toggle-track {
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: #26272b;
+  border: 1px solid #3a3b40;
+  position: relative;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.control-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #8b8a86;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.control-toggle input:checked + .control-toggle-track {
+  background: #23305c;
+  border-color: #4f7cff;
+}
+
+.control-toggle input:checked + .control-toggle-track::after {
+  transform: translateX(13px);
+  background: #4f7cff;
+}
+
+.control-toggle input:focus-visible + .control-toggle-track {
+  outline: 2px solid #4f7cff;
+  outline-offset: 2px;
+}
+
+.control-button {
+  width: 100%;
+  background: #26272b;
+  border: 1px solid #3a3b40;
+  border-radius: 5px;
+  color: #c9c7c2;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.control-button:hover {
+  background: #2e2f34;
+  border-color: #4f7cff;
+  color: #fff;
+}
+
+.control-note {
+  color: #8b8a86;
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 4px 0 6px;
+}

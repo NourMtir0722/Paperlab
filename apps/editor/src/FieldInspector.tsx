@@ -1,15 +1,13 @@
-import { useRef } from 'react'
-import { LevaPanel, button, folder, useControls, useCreateStore } from 'leva'
+import { useState } from 'react'
 import { getLayout, listLayouts, listPresets } from 'paperlab'
-import { schemaControls } from './zodLeva'
+import { button, folder, note, num, schemaControls, select, text, type Control } from './controlModel'
+import { Panel } from './controls'
 import { useEditor, type EditorZone } from './store'
 
-type LevaSchema = Parameters<typeof folder>[0]
-
 /**
- * Field mode inspector: Layout / Motion / Scene. Layout options are
- * generated from each layout's zod schema — community layouts get editor UI
- * for free, same as behaviors.
+ * Field mode inspector: Layout / Motion / Paper / Drop zones. Layout options
+ * are generated from each layout's zod schema — community layouts get editor
+ * UI for free, same as behaviors.
  */
 export function FieldInspector() {
   const field = useEditor((s) => s.field)
@@ -18,11 +16,10 @@ export function FieldInspector() {
   const addZone = useEditor((s) => s.addZone)
   const patchZone = useEditor((s) => s.patchZone)
   const removeZone = useEditor((s) => s.removeZone)
-  const store = useCreateStore()
   // The "replace all" select only stages a target; the button applies it. This
   // keeps a blast-radius action (overwrites every per-slot preset choice) off a
   // stray drag of the dropdown — it's a deliberate click, not an on-change.
-  const replaceTarget = useRef(field.slots[0] ?? 'photo-print')
+  const [replaceTarget, setReplaceTarget] = useState(field.slots[0] ?? 'photo-print')
 
   const layout = getLayout(field.layout)
   const layoutValues = { ...layout.defaults, ...field.layoutOptions } as Record<string, unknown>
@@ -31,99 +28,54 @@ export function FieldInspector() {
   // folder don't apply. Omit them rather than show levers the mode ignores.
   const isSheet = field.layout === 'sheet'
 
-  useControls(
-    {
-      Layout: folder({
-        type: {
-          value: field.layout,
-          options: listLayouts(),
-          onChange: (v: string, _, ctx) => {
-            if (!ctx.initial) patchField({ layout: v, layoutOptions: {} })
-          },
-        },
-        ...schemaControls(layout.optionsSchema, layoutValues, (key, value) =>
-          patchField({ layoutOptions: { ...field.layoutOptions, [key]: value } }),
-        ),
-        ...(isSheet
-          ? {
-              // The count is derived (rows × columns) and motion is disabled, so
-              // both levers are gone — leave one line explaining why.
-              sheetNote: {
-                value: 'static sheet — rows × columns set the count; interaction states drive motion',
-                editable: false,
-                label: 'ⓘ',
-              },
-            }
-          : {
-              papers: {
-                value: field.count,
-                min: 2,
-                max: 80,
-                step: 1,
-                onChange: (v: number, _: unknown, ctx: { initial: boolean }) =>
-                  ctx.initial || patchField({ count: v }),
-              },
-            }),
-      }),
-      ...(isSheet
-        ? {}
-        : {
-            Motion: folder(
-              {
-                driver: {
-                  value: field.driver,
-                  options: ['autoplay', 'drag', 'none'],
-                  onChange: (v: 'autoplay' | 'drag' | 'none', _: unknown, ctx: { initial: boolean }) =>
-                    ctx.initial || patchField({ driver: v }),
-                },
-                speed: {
-                  value: field.speed,
-                  min: 0,
-                  max: 2,
-                  step: 0.01,
-                  onChange: (v: number, _: unknown, ctx: { initial: boolean }) =>
-                    ctx.initial || patchField({ speed: v }),
-                },
-                entrance: {
-                  value: field.entrance,
-                  options: ['rise', 'scatter', 'none'],
-                  onChange: (v: 'rise' | 'scatter' | 'none', _: unknown, ctx: { initial: boolean }) =>
-                    ctx.initial || patchField({ entrance: v }),
-                },
-              },
-              { collapsed: true },
-            ),
-          }),
-      Paper: folder(
-        {
-          replaceWith: {
-            label: 'replace all with',
-            value: replaceTarget.current,
-            options: listPresets(),
-            // Staging only — no slot is touched until the button below is clicked.
-            onChange: (v: string) => {
-              replaceTarget.current = v
-            },
-          },
-          'Replace all →': button(() => setAllSlots(replaceTarget.current)),
-        },
-        { collapsed: true },
+  const controls: Control[] = [
+    folder('Layout', [
+      select('type', field.layout, listLayouts(), (v) => patchField({ layout: v, layoutOptions: {} })),
+      ...schemaControls(layout.optionsSchema, layoutValues, (key, value) =>
+        patchField({ layoutOptions: { ...field.layoutOptions, [key]: value } }),
       ),
-      'Drop zones': folder(
-        {
-          addZone: button(() => addZone()),
-          ...field.zones.reduce<LevaSchema>(
-            (acc, zone, i) => Object.assign(acc, zoneControls(zone, i, patchZone, removeZone)),
-            {},
+      isSheet
+        ? // The count is derived (rows × columns) and motion is disabled, so
+          // both levers are gone — leave one line explaining why.
+          note('sheetNote', 'static sheet — rows × columns set the count; interaction states drive motion')
+        : num('papers', field.count, { min: 2, max: 80, step: 1 }, (v) => patchField({ count: v })),
+    ]),
+    ...(isSheet
+      ? []
+      : [
+          folder(
+            'Motion',
+            [
+              select('driver', field.driver, ['autoplay', 'drag', 'none'], (v) =>
+                patchField({ driver: v as 'autoplay' | 'drag' | 'none' }),
+              ),
+              num('speed', field.speed, { min: 0, max: 2, step: 0.01 }, (v) => patchField({ speed: v })),
+              select('entrance', field.entrance, ['rise', 'scatter', 'none'], (v) =>
+                patchField({ entrance: v as 'rise' | 'scatter' | 'none' }),
+              ),
+            ],
+            { collapsed: true },
           ),
-        },
-        { collapsed: true },
-      ),
-    },
-    { store },
-  )
+        ]),
+    folder(
+      'Paper',
+      [
+        select('replaceWith', replaceTarget, listPresets(), setReplaceTarget, 'replace all with'),
+        button('Replace all →', () => setAllSlots(replaceTarget)),
+      ],
+      { collapsed: true },
+    ),
+    folder(
+      'Drop zones',
+      [
+        button('addZone', () => addZone()),
+        ...field.zones.flatMap((zone, i) => zoneControls(zone, i, patchZone, removeZone)),
+      ],
+      { collapsed: true },
+    ),
+  ]
 
-  return <LevaPanel store={store} fill flat titleBar={false} />
+  return <Panel controls={controls} />
 }
 
 /** One zone's controls (id, accept globs, rect, highlight, remove). */
@@ -132,60 +84,33 @@ function zoneControls(
   i: number,
   patchZone: (index: number, patch: Partial<EditorZone>) => void,
   removeZone: (index: number) => void,
-): LevaSchema {
-  const changed = (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
-    ctx.initial || fn(v as never)
+): Control[] {
   const key = (name: string) => `zone${i}_${name}`
-  return {
-    [key('id')]: {
-      label: `#${i + 1} id`,
-      value: zone.id,
-      onChange: changed((v: string) => patchZone(i, { id: v })),
-    },
-    [key('accept')]: {
+  return [
+    text(key('id'), zone.id, (v) => patchZone(i, { id: v }), { label: `#${i + 1} id` }),
+    text(key('accept'), zone.accept, (v) => patchZone(i, { accept: v }), {
       label: 'accept',
-      value: zone.accept,
       hint: 'comma-separated preset globs; empty = all',
-      onChange: changed((v: string) => patchZone(i, { accept: v })),
-    },
-    [key('x')]: {
-      label: 'x',
-      value: zone.position[0],
-      min: -8,
-      max: 8,
-      step: 0.05,
-      onChange: changed((v: number) => patchZone(i, { position: [v, zone.position[1], zone.position[2]] })),
-    },
-    [key('y')]: {
-      label: 'y',
-      value: zone.position[1],
-      min: -6,
-      max: 6,
-      step: 0.05,
-      onChange: changed((v: number) => patchZone(i, { position: [zone.position[0], v, zone.position[2]] })),
-    },
-    [key('w')]: {
-      label: 'width',
-      value: zone.size[0],
-      min: 0.2,
-      max: 8,
-      step: 0.05,
-      onChange: changed((v: number) => patchZone(i, { size: [v, zone.size[1]] })),
-    },
-    [key('h')]: {
-      label: 'height',
-      value: zone.size[1],
-      min: 0.2,
-      max: 6,
-      step: 0.05,
-      onChange: changed((v: number) => patchZone(i, { size: [zone.size[0], v] })),
-    },
-    [key('highlight')]: {
-      label: 'highlight',
-      value: zone.highlight,
-      options: ['glow', 'outline', 'none'],
-      onChange: changed((v: EditorZone['highlight']) => patchZone(i, { highlight: v })),
-    },
-    [key('remove')]: button(() => removeZone(i)),
-  }
+    }),
+    num(key('x'), zone.position[0], { min: -8, max: 8, step: 0.05, label: 'x' }, (v) =>
+      patchZone(i, { position: [v, zone.position[1], zone.position[2]] }),
+    ),
+    num(key('y'), zone.position[1], { min: -6, max: 6, step: 0.05, label: 'y' }, (v) =>
+      patchZone(i, { position: [zone.position[0], v, zone.position[2]] }),
+    ),
+    num(key('w'), zone.size[0], { min: 0.2, max: 8, step: 0.05, label: 'width' }, (v) =>
+      patchZone(i, { size: [v, zone.size[1]] }),
+    ),
+    num(key('h'), zone.size[1], { min: 0.2, max: 6, step: 0.05, label: 'height' }, (v) =>
+      patchZone(i, { size: [zone.size[0], v] }),
+    ),
+    select(
+      key('highlight'),
+      zone.highlight,
+      ['glow', 'outline', 'none'],
+      (v) => patchZone(i, { highlight: v as EditorZone['highlight'] }),
+      'highlight',
+    ),
+    button('remove', () => removeZone(i), key('remove')),
+  ]
 }

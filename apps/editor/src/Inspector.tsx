@@ -1,4 +1,3 @@
-import { LevaPanel, button, folder, useControls, useCreateStore } from 'leva'
 import {
   getBehavior,
   getStock,
@@ -15,15 +14,17 @@ import {
   type StockName,
   type SurfaceConfig,
 } from 'paperlab'
-import { schemaControls } from './zodLeva'
+import { button, folder, num, schemaControls, select, text, toggle, type Control } from './controlModel'
+import { Panel } from './controls'
 import { useEditor } from './store'
 
-type LevaSchema = Parameters<typeof folder>[0]
-
 /**
- * Inspector of the selection. Bootstrapped on leva for v0 — replaced by the
- * schema-generated custom panel before public launch. Remounted (keyed) when
- * the preset, behavior type, or an external edit (handle drag) changes.
+ * Inspector of the selection: a tree of `Control` descriptors rendered by the
+ * app's own control set. Behavior fields are generated from the behavior's
+ * zod schema, so a community behavior gets editor UI for free.
+ *
+ * Still remounted (keyed) when the preset or behavior type changes — the
+ * folders' open/closed state should reset with the subject.
  */
 export function Inspector() {
   const baseConfig = useEditor((s) => s.config)
@@ -36,127 +37,78 @@ export function Inspector() {
   const setSurface = useEditor((s) => s.setSurface)
   const setPhysics = useEditor((s) => s.setPhysics)
   const patchCloth = useEditor((s) => s.patchCloth)
-  // Own store per mount — leva's global store would keep stale values across
-  // preset switches (the Inspector is remounted by key to reset controls).
-  const store = useCreateStore()
 
-  const behaviorFields: LevaSchema = config.behavior
+  const behaviorFields: Control[] = config.behavior
     ? schemaControls(
         getBehavior(config.behavior.type).optionsSchema,
         config.behavior as unknown as Record<string, unknown>,
         (key, value) => patchConfig({ behavior: { [key]: value } as never }),
       )
-    : {}
+    : []
 
-  useControls(
-    {
-      Behavior: folder({
-        type: {
-          value: config.behavior?.type ?? 'none',
-          options: ['none', ...listBehaviors()],
-          onChange: (v: string, _, ctx) => {
-            if (ctx.initial) return
-            setBehaviorType(v === 'none' ? null : v)
-          },
-        },
-        ...behaviorFields,
-      }),
-      // Behavior stays open (the primary sculpt); the rest collapse so the bar
-      // reads as a summary you expand into, not a wall of controls.
-      Sheet: folder(
-        {
-          width: {
-            value: config.sheet.width,
-            min: 0.2,
-            max: 4,
-            step: 0.05,
-            onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { width: v } }),
-          },
-          height: {
-            value: config.sheet.height,
-            min: 0.2,
-            max: 4,
-            step: 0.05,
-            onChange: (v: number, _, ctx) => ctx.initial || patchConfig({ sheet: { height: v } }),
-          },
-        },
-        { collapsed: true },
+  const controls: Control[] = [
+    // Behavior stays open (the primary sculpt); the rest collapse so the panel
+    // reads as a summary you expand into, not a wall of controls.
+    folder('Behavior', [
+      select('type', config.behavior?.type ?? 'none', ['none', ...listBehaviors()], (v) =>
+        setBehaviorType(v === 'none' ? null : v),
       ),
-      Stock: folder(
-        {
-          stock: {
-            value: config.stock,
-            options: [...stockNames],
-            onChange: (v: StockName, _, ctx) => ctx.initial || patchConfig({ stock: v }),
-          },
-        },
-        { collapsed: true },
-      ),
-      Content: folder(contentControls(config.content, patchConfig), { collapsed: true }),
-      Surface: folder(surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
-      Physics: folder(physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
-      Scene: folder(
-        {
-          lighting: {
-            value: config.scene.lighting,
-            options: [...lightingNames],
-            onChange: (v: string, _, ctx) => ctx.initial || patchConfig({ scene: { lighting: v as never } }),
-          },
-        },
-        { collapsed: true },
-      ),
-    },
-    { store },
-  )
+      ...behaviorFields,
+    ]),
+    folder(
+      'Sheet',
+      [
+        num('width', config.sheet.width, { min: 0.2, max: 4, step: 0.05 }, (v) =>
+          patchConfig({ sheet: { width: v } }),
+        ),
+        num('height', config.sheet.height, { min: 0.2, max: 4, step: 0.05 }, (v) =>
+          patchConfig({ sheet: { height: v } }),
+        ),
+      ],
+      { collapsed: true },
+    ),
+    folder(
+      'Stock',
+      [select('stock', config.stock, [...stockNames], (v) => patchConfig({ stock: v as StockName }))],
+      { collapsed: true },
+    ),
+    folder('Content', contentControls(config.content, patchConfig), { collapsed: true }),
+    folder('Surface', surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
+    folder('Physics', physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
+    folder(
+      'Scene',
+      [
+        select('lighting', config.scene.lighting, [...lightingNames], (v) =>
+          patchConfig({ scene: { lighting: v as never } }),
+        ),
+      ],
+      { collapsed: true },
+    ),
+  ]
 
-  return <LevaPanel store={store} fill flat titleBar={false} />
+  return <Panel controls={controls} />
 }
 
 function physicsControls(
   physics: PhysicsConfig,
   setPhysics: (name: string) => void,
   patchCloth: (patch: Partial<ClothConfig>) => void,
-): LevaSchema {
+): Control[] {
   const isCloth = typeof physics === 'object'
-  const changed = (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
-    ctx.initial || fn(v as never)
-
-  const controls: LevaSchema = {
-    simulation: {
-      value: isCloth ? 'cloth' : physics,
-      options: [...physicsNames, 'cloth'],
-      onChange: changed((v: string) => setPhysics(v)),
-    },
-  }
+  const controls: Control[] = [
+    select('simulation', isCloth ? 'cloth' : physics, [...physicsNames, 'cloth'], setPhysics),
+  ]
   if (isCloth) {
-    Object.assign(controls, {
-      pins: {
-        value: physics.pins,
-        options: ['top-edge', 'top-corners', 'corner', 'none'],
-        onChange: changed((v: ClothConfig['pins']) => patchCloth({ pins: v })),
-      },
-      wind: {
-        value: physics.wind,
-        min: 0,
-        max: 1,
-        step: 0.01,
-        onChange: changed((v: number) => patchCloth({ wind: v })),
-      },
-      stiffness: {
-        value: physics.stiffness,
-        min: 0,
-        max: 1,
-        step: 0.01,
-        onChange: changed((v: number) => patchCloth({ stiffness: v })),
-      },
-      gravity: {
-        value: physics.gravity,
-        min: 0,
-        max: 2,
-        step: 0.01,
-        onChange: changed((v: number) => patchCloth({ gravity: v })),
-      },
-    })
+    controls.push(
+      select('pins', physics.pins, ['top-edge', 'top-corners', 'corner', 'none'], (v) =>
+        patchCloth({ pins: v as ClothConfig['pins'] }),
+      ),
+      num('wind', physics.wind, { min: 0, max: 1, step: 0.01 }, (v) => patchCloth({ wind: v })),
+      num('stiffness', physics.stiffness, { min: 0, max: 1, step: 0.01 }, (v) =>
+        patchCloth({ stiffness: v }),
+      ),
+      num('gravity', physics.gravity, { min: 0, max: 2, step: 0.01 }, (v) => patchCloth({ gravity: v })),
+    )
   }
   return controls
 }
@@ -165,125 +117,93 @@ function surfaceControls(
   surface: SurfaceConfig,
   stockName: StockName,
   setSurface: (patch: Partial<SurfaceConfig>) => void,
-): LevaSchema {
+): Control[] {
   const stock = getStock(stockName)
-  const changed = (fn: (v: never) => void) => (v: unknown, _: unknown, ctx: { initial: boolean }) =>
-    ctx.initial || fn(v as never)
+  const controls: Control[] = [
+    num('grain', surface.grain ?? stock.defaultSurface.grain ?? 0, { min: 0, max: 1, step: 0.01 }, (v) =>
+      setSurface({ grain: v }),
+    ),
+    num('aging', surface.aging ?? stock.defaultSurface.aging ?? 0, { min: 0, max: 1, step: 0.01 }, (v) =>
+      setSurface({ aging: v }),
+    ),
+    num(
+      'showThrough',
+      surface.showThrough ?? stock.showThrough,
+      { min: 0, max: 1, step: 0.01, label: 'show-through' },
+      (v) => setSurface({ showThrough: v }),
+    ),
+    toggle('deckle', Boolean(surface.deckle), (v) =>
+      setSurface({ deckle: v ? { edges: ['bottom'], roughness: 0.5 } : undefined }),
+    ),
+  ]
 
-  return {
-    grain: {
-      value: surface.grain ?? stock.defaultSurface.grain ?? 0,
-      min: 0,
-      max: 1,
-      step: 0.01,
-      onChange: changed((v: number) => setSurface({ grain: v })),
-    },
-    aging: {
-      value: surface.aging ?? stock.defaultSurface.aging ?? 0,
-      min: 0,
-      max: 1,
-      step: 0.01,
-      onChange: changed((v: number) => setSurface({ aging: v })),
-    },
-    showThrough: {
-      label: 'show-through',
-      value: surface.showThrough ?? stock.showThrough,
-      min: 0,
-      max: 1,
-      step: 0.01,
-      onChange: changed((v: number) => setSurface({ showThrough: v })),
-    },
-    deckle: {
-      value: Boolean(surface.deckle),
-      onChange: changed((v: boolean) =>
-        setSurface({ deckle: v ? { edges: ['bottom'], roughness: 0.5 } : undefined }),
+  if (surface.deckle) {
+    const deckle = surface.deckle
+    controls.push(
+      select(
+        'deckleEdge',
+        deckle.edges.join('+'),
+        [...paperEdges, 'top+bottom', 'all'].map(String),
+        (v) => {
+          const edges = v === 'all' ? [...paperEdges] : (v.split('+') as PaperEdge[])
+          setSurface({ deckle: { ...deckle, edges } })
+        },
+        'edges',
       ),
-    },
-    ...(surface.deckle
-      ? {
-          deckleEdge: {
-            label: 'edges',
-            value: surface.deckle.edges.join('+'),
-            options: [...paperEdges, 'top+bottom', 'all'].map(String),
-            onChange: changed((v: string) => {
-              const edges = v === 'all' ? [...paperEdges] : (v.split('+') as PaperEdge[])
-              setSurface({ deckle: { ...surface.deckle!, edges } })
-            }),
-          },
-          deckleRoughness: {
-            label: 'tear',
-            value: surface.deckle.roughness,
-            min: 0,
-            max: 1,
-            step: 0.01,
-            onChange: changed((v: number) => setSurface({ deckle: { ...surface.deckle!, roughness: v } })),
-          },
-        }
-      : {}),
-    perforation: {
-      value: Boolean(surface.perforation),
-      onChange: changed((v: boolean) =>
-        setSurface({
-          perforation: v ? { edges: 'all', holeRadius: 0.016, spacing: 0.055, state: {} } : undefined,
-        }),
+      num('deckleRoughness', deckle.roughness, { min: 0, max: 1, step: 0.01, label: 'tear' }, (v) =>
+        setSurface({ deckle: { ...deckle, roughness: v } }),
       ),
-    },
-    ...(surface.perforation
-      ? {
-          perfEdges: {
-            label: 'perf edges',
-            value: surface.perforation.edges === 'all' ? 'all' : surface.perforation.edges.join('+'),
-            options: ['all', ...paperEdges, 'top+bottom', 'left+right'].map(String),
-            onChange: changed((v: string) => {
-              const edges = v === 'all' ? ('all' as const) : (v.split('+') as PaperEdge[])
-              setSurface({ perforation: { ...surface.perforation!, edges } })
-            }),
-          },
-          perfRadius: {
-            label: 'hole size',
-            value: surface.perforation.holeRadius,
-            min: 0.002,
-            max: 0.1,
-            step: 0.001,
-            onChange: changed((v: number) =>
-              setSurface({ perforation: { ...surface.perforation!, holeRadius: v } }),
-            ),
-          },
-          perfSpacing: {
-            label: 'spacing',
-            value: surface.perforation.spacing,
-            min: 0.01,
-            max: 0.5,
-            step: 0.005,
-            onChange: changed((v: number) =>
-              setSurface({ perforation: { ...surface.perforation!, spacing: v } }),
-            ),
-          },
-        }
-      : {}),
-    creases: {
-      value: Boolean(surface.creaseLines),
-      onChange: changed((v: boolean) =>
-        setSurface({
-          creaseLines: v ? { angle: 0, positions: [1 / 3, 2 / 3], strength: 0.5 } : undefined,
-        }),
-      ),
-    },
-    ...(surface.creaseLines
-      ? {
-          creaseStrength: {
-            label: 'strength',
-            value: surface.creaseLines.strength,
-            min: 0,
-            max: 1,
-            step: 0.01,
-            onChange: changed((v: number) =>
-              setSurface({ creaseLines: { ...surface.creaseLines!, strength: v } }),
-            ),
-          },
-        }
-      : {}),
+    )
   }
+
+  controls.push(
+    toggle('perforation', Boolean(surface.perforation), (v) =>
+      setSurface({
+        perforation: v ? { edges: 'all', holeRadius: 0.016, spacing: 0.055, state: {} } : undefined,
+      }),
+    ),
+  )
+
+  if (surface.perforation) {
+    const perf = surface.perforation
+    controls.push(
+      select(
+        'perfEdges',
+        perf.edges === 'all' ? 'all' : perf.edges.join('+'),
+        ['all', ...paperEdges, 'top+bottom', 'left+right'].map(String),
+        (v) => {
+          const edges = v === 'all' ? ('all' as const) : (v.split('+') as PaperEdge[])
+          setSurface({ perforation: { ...perf, edges } })
+        },
+        'perf edges',
+      ),
+      num('perfRadius', perf.holeRadius, { min: 0.002, max: 0.1, step: 0.001, label: 'hole size' }, (v) =>
+        setSurface({ perforation: { ...perf, holeRadius: v } }),
+      ),
+      num('perfSpacing', perf.spacing, { min: 0.01, max: 0.5, step: 0.005, label: 'spacing' }, (v) =>
+        setSurface({ perforation: { ...perf, spacing: v } }),
+      ),
+    )
+  }
+
+  controls.push(
+    toggle('creases', Boolean(surface.creaseLines), (v) =>
+      setSurface({
+        creaseLines: v ? { angle: 0, positions: [1 / 3, 2 / 3], strength: 0.5 } : undefined,
+      }),
+    ),
+  )
+
+  if (surface.creaseLines) {
+    const creases = surface.creaseLines
+    controls.push(
+      num('creaseStrength', creases.strength, { min: 0, max: 1, step: 0.01, label: 'strength' }, (v) =>
+        setSurface({ creaseLines: { ...creases, strength: v } }),
+      ),
+    )
+  }
+
+  return controls
 }
 
 /**
@@ -328,41 +248,28 @@ function pickImageAsDataUrl(): Promise<string | null> {
 function contentControls(
   content: ContentConfig,
   patchConfig: (p: { content: ContentConfig }, opts?: { external?: boolean }) => void,
-): LevaSchema {
+): Control[] {
   if (content.type === 'text') {
-    return {
-      text: {
-        value: content.text,
-        rows: 4,
-        onChange: (v: string, _: unknown, ctx: { initial: boolean }) =>
-          ctx.initial || patchConfig({ content: { ...content, text: v } }),
-      },
-      size: {
-        value: content.size,
-        min: 12,
-        max: 128,
-        step: 1,
-        onChange: (v: number, _: unknown, ctx: { initial: boolean }) =>
-          ctx.initial || patchConfig({ content: { ...content, size: v } }),
-      },
-    }
+    return [
+      text('text', content.text, (v) => patchConfig({ content: { ...content, text: v } }), { rows: 4 }),
+      num('size', content.size, { min: 12, max: 128, step: 1 }, (v) =>
+        patchConfig({ content: { ...content, size: v } }),
+      ),
+    ]
   }
   if (content.type === 'image') {
-    return {
-      src: {
-        value: content.src.startsWith('data:') ? '(uploaded image)' : content.src,
-        onChange: (v: string, _: unknown, ctx: { initial: boolean }) => {
-          if (ctx.initial || v === '(uploaded image)') return
-          patchConfig({ content: { ...content, src: v } })
-        },
-      },
-      'upload image': button(() => {
+    return [
+      text('src', content.src.startsWith('data:') ? '(uploaded image)' : content.src, (v) => {
+        if (v === '(uploaded image)') return
+        patchConfig({ content: { ...content, src: v } })
+      }),
+      button('upload image', () => {
         void pickImageAsDataUrl().then((dataUrl) => {
           // external → the inspector remounts and the src field shows the mask.
           if (dataUrl) patchConfig({ content: { ...content, src: dataUrl } }, { external: true })
         })
       }),
-    }
+    ]
   }
-  return {}
+  return []
 }
