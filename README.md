@@ -75,6 +75,33 @@ pnpm install && pnpm dev   # → localhost:5173
 
 A Figma-shaped editor: presets on the left, sculpt on canvas (drag the blue handles), inspector on the right, transport at the bottom (space = play/pause). Field mode composes galleries; **Export code** ends the session in your codebase.
 
+## Papers are made to be passed around
+
+A paper is data — a `.paper` JSON object validated by a zod schema — so it travels without asking anyone's permission. **You do not need to fork this repo to share one.**
+
+**Sending one.** Sculpt a paper in the [editor](https://nourmtir0722.github.io/Paperlab/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. Paste it in a thread, a PR, a Discord. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
+
+**Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins, ready to take apart.
+
+**Using one in your project.** A `.paper` file is a preset object, so it goes straight in:
+
+```tsx
+import alice from './alice-note.paper.json'
+
+<Paper preset={alice} autoplay />
+```
+
+Or register it once by name and refer to it everywhere:
+
+```tsx
+import { registerPreset } from 'paperlab'
+
+registerPreset('alice-note', alice)
+<Paper preset="alice-note" />
+```
+
+That's the whole loop: **make → send → remix → ship.** If you'd rather your paper shipped *with* the library so everyone gets it by name, that's the first rung of [CONTRIBUTING.md](CONTRIBUTING.md) — a preset PR is JSON and no code.
+
 ## Repository
 
 | | |

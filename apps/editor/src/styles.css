@@ -131,7 +131,8 @@ body {
   background: #26272b;
 }
 
-.save-preset {
+.save-preset,
+.share-paper {
   background: #26272b;
   color: #e6e4df;
   border: 1px solid #3a3b40;
@@ -140,7 +141,8 @@ body {
   cursor: pointer;
 }
 
-.save-preset:hover {
+.save-preset:hover,
+.share-paper:hover {
   background: #3a3b40;
 }
 

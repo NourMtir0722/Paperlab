@@ -159,6 +159,19 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 
 Built-ins: `receipt-unroll`, `letter-fold`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
 
+**If the user hands you a `.paper` file** (they made it in the editor, or someone sent it to them), it is already a preset object — import the JSON and pass it straight through. Do NOT translate it into individual props; the whole point of the format is that it round-trips.
+
+```tsx
+import theirPaper from './their-paper.paper.json'
+
+<Paper preset={theirPaper} autoplay />
+// or, to name it once and reuse it:
+import { registerPreset } from 'paperlab'
+registerPreset('their-paper', theirPaper)
+```
+
+`preset` takes a name (string) or a config object, so both forms are first-class. `describeConfig(theirPaper)` returns the one-line visual to check you rendered what they meant.
+
 ### Common pitfalls (check these before debugging anything else)
 
 1. **Blank canvas** → the parent container has no height. `<Paper>` fills its parent.

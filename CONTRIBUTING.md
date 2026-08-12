@@ -2,6 +2,8 @@
 
 Contributions climb a ladder — start wherever you're comfortable. Merged presets and behaviors ship in the editor's library with attribution: credit is the currency here.
 
+**Before the ladder: you don't need it.** A paper is a `.paper` JSON object, so you can make one in the [editor](https://nourmtir0722.github.io/Paperlab/editor/), hit **Share**, and send the link to anyone — they open it, get an editable copy, and drop it in their project with `<Paper preset={json} />`. No fork, no PR, no waiting on a review. The ladder below is for when you want your work to ship *inside* the library so everyone gets it by name.
+
 ## Setup
 
 ```sh
