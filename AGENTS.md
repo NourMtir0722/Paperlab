@@ -38,7 +38,7 @@ import { PaperField } from 'paperlab'
 <PaperField
   images={['/a.jpg', '/b.jpg', '/c.jpg']}
   preset="photo-print"
-  layout="ring"            // ring | deck | cascade | helix | wall | tunnel | scatter | sheet
+  layout="ring"            // ring | fan | spread | pile | wall | spill | sweep | book | accordion | rack | colonnade | sheet
   layoutOptions={{ radius: 3, tiltDeg: 8 }}
   motion={{ driver: 'autoplay', speed: 0.5 }}   // autoplay | drag | none
   entrance={{ type: 'rise', stagger: 0.06 }}    // rise | scatter | none
