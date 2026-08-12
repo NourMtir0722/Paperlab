@@ -28,6 +28,7 @@ import {
   type QualityTier,
 } from 'paperlab'
 import type { PaperShare } from './paperShare'
+import { readSession } from './session'
 import {
   loadUserPresets,
   persistUserPresets,
@@ -196,9 +197,15 @@ export function writeConfig(
   }
 }
 
-// Boot: hydrate the library's runtime registry from localStorage.
+// Boot: hydrate the library's runtime registry from localStorage. This has to
+// happen before the session is read — a remembered paper may BE a user preset,
+// and the session's names are checked against the live registry.
 const bootUserPresets = loadUserPresets()
 syncRegistry(bootUserPresets)
+
+// …then reopen on whatever was last on screen. Null means a first visit, or a
+// session this build cannot read, and both land on the default paper.
+const bootSession = readSession()
 
 /** A stage preset unpacked into the editor's own editable shape. */
 function stageStateFrom(id: string): StageState {
@@ -222,24 +229,32 @@ function stageStateFrom(id: string): StageState {
   }
 }
 
+const DEFAULT_PRESET = 'receipt-unroll'
+
+const DEFAULT_FIELD: FieldState = {
+  layout: 'ring',
+  layoutOptions: {},
+  count: 14,
+  driver: 'autoplay',
+  speed: 0.5,
+  entrance: 'rise',
+  slots: Array.from({ length: 14 }, () => 'photo-print'),
+  slotStates: {},
+  zones: [],
+}
+
 export const useEditor = create<EditorState>((set, get) => ({
   userPresets: bootUserPresets,
-  presetName: 'receipt-unroll',
-  config: getPreset('receipt-unroll'),
+  presetName: bootSession?.paper?.name ?? DEFAULT_PRESET,
+  config: bootSession?.paper?.config ?? getPreset(DEFAULT_PRESET),
   inspectorEpoch: 0,
-  mode: 'paper',
-  field: {
-    layout: 'ring',
-    layoutOptions: {},
-    count: 14,
-    driver: 'autoplay',
-    speed: 0.5,
-    entrance: 'rise',
-    slots: Array.from({ length: 14 }, () => 'photo-print'),
-    slotStates: {},
-    zones: [],
-  },
-  stage: stageStateFrom('nave'),
+  mode: bootSession?.mode ?? 'paper',
+  field: bootSession?.field ?? DEFAULT_FIELD,
+  // A remembered stage keeps the space you picked and the edits you made to
+  // it; the transport (playing, progress) is not part of the view.
+  stage: bootSession?.stage
+    ? { ...stageStateFrom(bootSession.stage.preset), ...bootSession.stage }
+    : stageStateFrom('nave'),
   cameFromField: false,
   editingState: null,
   statePreview: false,
