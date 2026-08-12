@@ -2,6 +2,8 @@
 
 Paperlab renders physical, realistic paper as a React component. Content is a texture on a mesh that genuinely bends — text and imagery curl with perfect continuity. This file is the dense reference for agents integrating Paperlab into a project or contributing to this repo.
 
+> Working *on* Paperlab rather than *with* it? Read [docs/roadmap.md](docs/roadmap.md) first — it carries the project's intent, the decisions already settled (and why), and what we plan to build next.
+
 ## Integrating Paperlab into a project
 
 ```sh

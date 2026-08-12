@@ -59,7 +59,7 @@ import { PaperStage } from 'paperlab'
 ## What's inside
 
 - **Behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`, `fall`: human-named params ('tightness', not 'cylinderRadius') over a stack of pure geometry deformers. Draggable handles when `interactive`.
-- **Stocks & surfaces** — six paper stocks (thermal gets banding, newsprint gets grain) plus grain, torn deckle edges, crease lines, and aging as composable shader effects. Real lighting throughout.
+- **Stocks & surfaces** — seven paper stocks (thermal gets banding, newsprint gets grain) plus grain, torn deckle edges, crease lines, and aging as composable shader effects. Real lighting throughout.
 - **Physics** — curated idle motion (`float`, `tumble`, `breeze`…) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull.
 - **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU (parity-tested against the CPU path), arranged by pure layout functions. Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners arranged along a walk, for stage mode), plus `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl. Each pose carries a **bias** — how strongly that one sheet takes the deformation — so the top of a pile curls while the sheets pressed underneath lie flat, in the same draw call. The camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
 - **Stage mode** — paper as *architecture*: banners hung along a walk, a figure walking down it, light coming through the paper from the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk. Every part of the scene — the arrangement, the figure, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own.
@@ -110,6 +110,7 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 | [`apps/editor`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/editor/) | the editor |
 | [`apps/playground`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/playground/) | the playground — one input, one scene, shareable by link |
 | [`docs/llms.txt`](https://github.com/NourMtir0722/Paperlab/blob/main/docs/llms.txt) | the agent-readable API reference |
+| [`docs/roadmap.md`](https://github.com/NourMtir0722/Paperlab/blob/main/docs/roadmap.md) | what this is, what's decided, and what's next |
 
 ```sh
 pnpm test           # unit suite — deformer math, schema, cloth, layouts, exports
