@@ -150,62 +150,25 @@ export {
   type PaperPose,
 } from './field/layouts'
 export { fieldBounds, fitCamera, type FieldBounds } from './field/framing'
-export {
-  createWalkPath,
-  getWalkPath,
-  walkPathSchema,
-  type Ground,
-  type WalkPath,
-  type WalkPathOptions,
-} from './stage/path'
-export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
-export {
-  encodeStageShare,
-  decodeStageShare,
-  readStageShare,
-  stageShareUrl,
-  SHARE_PARAM,
-  MAX_SHARE_LENGTH,
-  type StageShare,
-} from './stage/share'
-export {
-  qualityNames,
-  qualityTiers,
-  qualityFor,
-  tierUp,
-  tierDown,
-  INITIAL_TIER,
-  TIER_ORDER,
-  type QualityName,
-  type QualityTier,
-  type QualitySettings,
-} from './stage/quality'
-export {
-  stagePresets,
-  getStagePreset,
-  listStagePresets,
-  type StagePreset,
-} from './stage/presets'
-export {
-  cycleLength,
-  figureGait,
-  figureSchema,
-  placeFigure,
-  PROPORTIONS,
-  type FigureOptions,
-  type FigurePlacement,
-  type FigurePose,
-} from './stage/gait'
-export { Figure, type FigureProps } from './stage/Figure'
-export { Source, Surround, makeGlowTexture, makeSkyTexture } from './stage/Surround'
+// ── Stage ───────────────────────────────────────────────────────────────────
+// The scene's own parts — the figure, the surround, the gait and camera math,
+// the quality ladder — are deliberately NOT exported. They are the inside of
+// one composition, and `<PaperStage>` is the composition. What is public here
+// is what you need to configure a stage, name one, or serialize one.
 export {
   PaperStage,
   PaperStageScene,
-  splitAcrossBanners,
-  bannerTextSize,
   type PaperStageProps,
   type PaperStageSceneProps,
 } from './stage/PaperStage'
+export { stageSchema, type StageConfig, type StageConfigInput } from './stage/schema'
+export { stagePresets, getStagePreset, listStagePresets, type StagePreset } from './stage/presets'
+export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
+export { createWalkPath, type Ground, type WalkPath, type WalkPathOptions } from './stage/path'
+// QualityTier is the argument `onQualityChange` hands back — a consumer
+// cannot type that handler without it.
+export { qualityNames, type QualityName, type QualityTier } from './stage/quality'
+export { shotNames, type ShotName, type ShotOptions, type StageScale, type StageShot } from './stage/camera'
 export {
   buildStageAgentPayload,
   buildStageComponentSource,
@@ -214,24 +177,7 @@ export {
   walkNameFor,
   stringifyStage,
   type StageExportInput,
-} from './config/stage-export'
-export {
-  stageSchema,
-  stageSourceSchema,
-  stageGroundSchema,
-  type StageConfig,
-  type StageConfigInput,
-} from './stage/schema'
-export {
-  shotNames,
-  shotSchema,
-  stageCamera,
-  walkPoint,
-  type ShotName,
-  type ShotOptions,
-  type StageScale,
-  type StageShot,
-} from './stage/camera'
+} from './stage/export'
 export {
   translucencyUniforms,
   translucencyValues,
