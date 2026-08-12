@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "paperlab": ["../../packages/paperlab/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

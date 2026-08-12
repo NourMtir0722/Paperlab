@@ -2,7 +2,7 @@
 
 **Physical, realistic paper as a React component.** A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints — real 3D paper, not a CSS fake. Content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/)  ·  [for agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
+**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
 
 | | |
 |---|---|
