@@ -4,15 +4,17 @@ import { useFrame, useThree } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import type {
-  BehaviorConfig,
+  BehaviorConfigInput,
   ClothConfig,
-  ContentConfig,
-  DeformerInstanceConfig,
+  ContentConfigInput,
+  DeformerInstanceConfigInput,
   PaperConfig,
   PaperConfigInput,
-  PhysicsConfig,
+  PhysicsConfigInput,
+  SceneConfigInput,
   SheetConfig,
   StockName,
+  SurfaceConfigInput,
 } from './config/schema'
 import { paperConfigSchema } from './config/schema'
 import { mergeConfig, parsePreset, serializePreset } from './config/serialize'
@@ -39,10 +41,20 @@ export interface PaperMeshProps {
   preset?: string | PaperConfigInput
   sheet?: Partial<SheetConfig>
   stock?: StockName
-  content?: ContentConfig
-  behavior?: BehaviorConfig
-  deformers?: DeformerInstanceConfig[]
-  physics?: PhysicsConfig | 'cloth'
+  /**
+   * These take the schema's INPUT types, not its parsed ones: writing
+   * `content={{ type: 'text', text: 'hi' }}` has to compile, and with the
+   * inferred type it does not — it demands every field of every nested
+   * object. Every default stays a default.
+   */
+  content?: ContentConfigInput
+  behavior?: BehaviorConfigInput
+  deformers?: DeformerInstanceConfigInput[]
+  /** Fragment-side effects: grain, aging, deckle, creases, perforation. */
+  surface?: SurfaceConfigInput
+  /** Scene-level presentation that travels with the paper (lighting). */
+  scene?: SceneConfigInput
+  physics?: PhysicsConfigInput | 'cloth'
   onTwos?: boolean
   /** Show draggable behavior handles; cloth sheets become grabbable. */
   interactive?: boolean
@@ -106,6 +118,8 @@ export function resolveConfigKey(props: PaperMeshProps): string {
     props.content ?? null,
     props.behavior ?? null,
     props.deformers ?? null,
+    props.surface ?? null,
+    props.scene ?? null,
     props.physics ?? null,
     props.onTwos ?? null,
   ])
@@ -124,6 +138,10 @@ export function resolveConfig(props: PaperMeshProps): PaperConfig {
   if (props.content) overrides.content = props.content
   if (props.behavior) overrides.behavior = props.behavior
   if (props.deformers) overrides.deformers = props.deformers
+  // Surface merges over the stock's defaults rather than replacing them, so
+  // `surface={{ grain: 0.6 }}` on thermal keeps thermal's banding.
+  if (props.surface) overrides.surface = { ...base.surface, ...props.surface }
+  if (props.scene) overrides.scene = { ...base.scene, ...props.scene }
   if (props.physics) overrides.physics = props.physics
   if (props.onTwos !== undefined) overrides.onTwos = props.onTwos
   return paperConfigSchema.parse(mergeConfig(base as PaperConfigInput, overrides))
