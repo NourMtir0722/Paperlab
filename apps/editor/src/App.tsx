@@ -71,9 +71,15 @@ export function App() {
     const url = new URL(window.location.href)
     url.searchParams.delete(SHARE_PARAM)
     window.history.replaceState(null, '', url)
-    if (error) toast(error, 'error')
-    else toast(`Opened "${share.name}" — it's yours to edit now`, 'success')
-  }, [importSharedPaper])
+    if (error) {
+      toast(error, 'error')
+      return
+    }
+    // A link outranks the remembered session: someone who was last in stage
+    // mode has to be shown the paper they just opened, not told about it.
+    setMode('paper')
+    toast(`Opened "${share.name}" — it's yours to edit now`, 'success')
+  }, [importSharedPaper, setMode])
 
   // Presets are components: the field renders the live edit of its preset.
   const resolvePresetByName = (name: string): PaperConfig => (name === presetName ? config : getPreset(name))
