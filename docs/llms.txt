@@ -24,6 +24,7 @@ Idle (compose with behaviors): 'float' 'tumble' 'dangle' 'taped' 'breeze'. Cloth
 ## Presets
 
 Built-ins: receipt-unroll, letter-fold, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note, postage-stamp. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
+- A `.paper` file someone shares IS a preset object: `import p from './x.paper.json'` then `<Paper preset={p} />`, or `registerPreset('x', p)` to name it. `preset` accepts a string OR a config object — never expand a shared .paper into individual props.
 
 ## Interaction states (M6)
 

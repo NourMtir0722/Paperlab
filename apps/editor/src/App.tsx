@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stats } from '@react-three/drei'
 import {
@@ -28,12 +28,14 @@ import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
 import { ViewportGuide } from './ViewportGuide'
 import { captureThumbnail } from './userPresets'
+import { SHARE_PARAM, paperShareUrl, readPaperShare } from './paperShare'
 import { DEMO_IMAGES } from './demoAssets'
 import { UIHost, promptDialog, toast } from './ui'
 import { useEditor, zoneToConfig } from './store'
 
 export function App() {
   const presetName = useEditor((s) => s.presetName)
+  const importSharedPaper = useEditor((s) => s.importSharedPaper)
   const config = useEditor((s) => s.config)
   const inspectorEpoch = useEditor((s) => s.inspectorEpoch)
   const mode = useEditor((s) => s.mode)
@@ -55,6 +57,23 @@ export function App() {
 
   const paperRef = useRef<PaperHandle>(null)
   const scrubRef = useRef<HTMLInputElement>(null)
+
+  // A paper on the URL is adopted once, on arrival, and then the parameter
+  // is cleared: it is now a preset in your library, and leaving the link in
+  // the address bar would re-import a second copy on every refresh.
+  const adopted = useRef(false)
+  useEffect(() => {
+    if (adopted.current) return
+    adopted.current = true
+    const share = readPaperShare(window.location.search)
+    if (!share) return
+    const error = importSharedPaper(share)
+    const url = new URL(window.location.href)
+    url.searchParams.delete(SHARE_PARAM)
+    window.history.replaceState(null, '', url)
+    if (error) toast(error, 'error')
+    else toast(`Opened "${share.name}" — it's yours to edit now`, 'success')
+  }, [importSharedPaper])
 
   // Presets are components: the field renders the live edit of its preset.
   const resolvePresetByName = (name: string): PaperConfig => (name === presetName ? config : getPreset(name))
@@ -159,6 +178,32 @@ export function App() {
             }}
           >
             Save preset
+          </button>
+        )}
+        {mode === 'paper' && (
+          <button
+            type="button"
+            className="share-paper"
+            title="Copy a link that opens this paper in someone else's editor"
+            onClick={() => {
+              // Share what is on the canvas, including an un-saved sculpt —
+              // asking someone to save first before they can send a link is
+              // a step that stops the thing from being sent at all.
+              const snapshot =
+                editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
+              const url = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
+              if (!url) {
+                toast(
+                  'This paper carries an uploaded image, which is too big for a link. Download the .paper file and send that instead.',
+                  'error',
+                )
+                return
+              }
+              void navigator.clipboard.writeText(url)
+              toast('Link copied — anyone who opens it gets an editable copy', 'success')
+            }}
+          >
+            Share
           </button>
         )}
         <ExportMenu

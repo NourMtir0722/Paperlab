@@ -27,6 +27,7 @@ import {
   type QualityName,
   type QualityTier,
 } from 'paperlab'
+import type { PaperShare } from './paperShare'
 import {
   loadUserPresets,
   persistUserPresets,
@@ -151,6 +152,8 @@ interface EditorState {
   deletePreset(name: string): void
   renamePreset(oldName: string, newName: string): string | null
   importPreset(json: string): string | null
+  /** Adopt a paper that arrived on the URL. Returns an error, or null. */
+  importSharedPaper(share: PaperShare): string | null
   /** Bumped when the canvas changes params behind the inspector's back (handle drags, transport commits) — remounts the inspector. */
   inspectorEpoch: number
   setPreset(name: string): void
@@ -533,6 +536,19 @@ export const useEditor = create<EditorState>((set, get) => ({
     return null
   },
 
+  // A shared paper lands as a normal user preset — editable, renameable,
+  // deletable. Opening someone's link should hand you a fork, not a
+  // read-only view: remixing it IS the point.
+  importSharedPaper: (share) => {
+    const name = uniquePresetName(share.name, (n) => isBuiltinPreset(n) || Boolean(get().userPresets[n]))
+    try {
+      return get().savePreset(name, paperConfigSchema.parse(share.config))
+    } catch (error) {
+      return `That link isn't a paper this build can open: ${
+        error instanceof Error ? error.message.slice(0, 120) : error
+      }`
+    }
+  },
   importPreset: (json) => {
     try {
       const config = parsePreset(json)
