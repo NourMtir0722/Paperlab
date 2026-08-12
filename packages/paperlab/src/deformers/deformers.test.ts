@@ -145,6 +145,49 @@ describe('bend', () => {
     expect(up.z).toBeGreaterThan(0)
     expect(down.z).toBeLessThan(0)
   })
+
+  /**
+   * The gentle end used to be where the GLSL twin fell apart: `r(1 − cos θ)`
+   * and `r·sin θ − d` are both differences of nearly-equal large numbers as
+   * curvature → 0, and float32 has nothing left after the subtraction. These
+   * pin the limit the cancellation-free form has to reproduce — a shallow arc
+   * is a parabola, z → d²·k/2, and the in-plane pull-in is third order.
+   */
+  it('approaches the parabola z = d²·k/2 for a shallow arc', () => {
+    const d = 0.45
+    for (const curvature of [0.35, 0.1, 0.02]) {
+      const out = displaceWith(bend, [d, 0, 0], { curvature, angle: 0 })
+      // Relative, not absolute: at 0.02 the whole arc is 2e-3 tall, and the
+      // gap from the parabola is the (tiny) fourth-order term.
+      expect(out.z / ((d * d * curvature) / 2)).toBeCloseTo(1, 2)
+      expect(Math.abs(out.x)).toBeLessThan(d)
+      // Shallower arc, less lift — monotone, and never the wrong sign.
+      expect(out.z).toBeGreaterThan(0)
+    }
+  })
+
+  it('has no kink where the series hands over to the exact form at |θ| = 1', () => {
+    // The branch is an implementation detail and must not be visible in the
+    // surface: a step or a crease here would shade as a ring. Probe the
+    // second difference straight through the crossover — smooth is ~h², a
+    // discontinuity would show up whole.
+    const k = 1.2
+    const h = 1e-4
+    const curl = (d: number, axis: 'x' | 'z') => {
+      const at = (x: number) => displaceWith(bend, [x, 0, 0], { curvature: k, angle: 0 })[axis]
+      return Math.abs(at(d - h) + at(d + h) - 2 * at(d))
+    }
+    for (const axis of ['z', 'x'] as const) {
+      // A second difference is never zero — it is the real curvature, ~f''h².
+      // What matters is that the crossover is not an OUTLIER against the same
+      // measurement taken well inside each branch.
+      const atCrossover = curl(1 / k, axis)
+      const inSeries = curl(0.7 / k, axis)
+      const inExact = curl(1.4 / k, axis)
+      const ordinary = Math.max(inSeries, inExact)
+      expect(atCrossover).toBeLessThan(ordinary * 3)
+    }
+  })
 })
 
 describe('compose', () => {
