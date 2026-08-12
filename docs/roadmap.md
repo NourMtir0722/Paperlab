@@ -31,6 +31,7 @@ If a feature can't serialize into a preset, it doesn't ship.
 | `packages/paperlab` | the npm library — the only published artifact |
 | `apps/editor` | the sculpting tool: presets, canvas handles, inspector, export |
 | `apps/playground` | the front door: one input, one scene, shareable by link |
+| `apps/docs` | the human reference: the whole catalogue, rendering live |
 | `docs/llms.txt` · `AGENTS.md` | the agent-readable API reference |
 
 ### What exists today
@@ -47,7 +48,7 @@ If a feature can't serialize into a preset, it doesn't ship.
 - **12 paper presets**, **5 stage presets**, **7 stocks**.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **372 tests** + a 27-case GPU/CPU parity gate, all green in CI.
+- **387 tests** + a 27-case GPU/CPU parity gate, all green in CI.
 
 ---
 
@@ -147,11 +148,39 @@ Open questions to settle when we pick this up: does it live in the repo or get
 its own submission flow? Is it curated or open? Does it need a backend at all
 (probably not, for v1)?
 
-### 2. A human documentation site
+### 2. ~~A human documentation site~~ — *done*
 
-`llms.txt` and `AGENTS.md` are excellent *for machines*. There is no
-human-readable API reference — a person evaluating the library reads the README
-and then falls off a cliff. Probably the highest-value thing after launch.
+`apps/docs`, shipping at `/docs` beside the playground and the editor. A
+person evaluating the library used to read the README and then fall off a
+cliff; now there is a page that shows them everything.
+
+The decision that shapes it: **the catalogue is read from the registries at
+runtime, not typed into a page.** Every preset, behavior, layout, stock and
+stage card comes from `listPresets()`, `listBehaviors()`, `listLayouts()`,
+`stocks` and `listStagePresets()`, and every parameter table is walked out of
+that entry's own zod schema — bounds, enums and defaults included. Register a
+behavior and it documents itself; delete a layout and its card disappears.
+This page structurally cannot advertise something the library does not have,
+which is the failure the README has already had once.
+
+Everything on it renders live rather than as a screenshot, because a library
+whose pitch is *real geometry that bends* cannot be sold in stills. Each card
+holds a WebGL context only while it is on screen (a browser gives you about
+sixteen), and the stages load on click because a stage is a whole room.
+
+**What building it found, which is the better half of the story:** writing
+real examples against the public API proved the documented API did not
+compile. `<Paper surface={{…}} />` was documented in three places and was not
+a prop at all — silently dropped at runtime — and every config prop took its
+schema's *parsed* type instead of its *input* type, so the README's own
+"sculpt your own" example was a type error. Both fixed, with
+`config/props.test.ts` pinning the documented examples at the type level and
+at runtime. Worth remembering as an argument: **the docs site is a test of
+the API, not just a description of it.**
+
+Still open, and deliberately not done yet: a per-prop reference for the
+top-level paper schema itself (the JSDoc prose lives in the schema source and
+would have to be extracted at build time), and any kind of search.
 
 ### 3. Smaller things worth doing
 

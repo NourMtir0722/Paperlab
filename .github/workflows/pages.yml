@@ -1,7 +1,8 @@
 name: Deploy site
 
 # The playground is the demo — a 3D library nobody can try is a screenshot.
-# Publishes the playground at the site root and the editor at /editor.
+# Publishes the playground at the site root, the editor at /editor, and the
+# reference at /docs.
 #
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
 # No secrets, no third-party account: the OIDC token below is issued by
@@ -55,12 +56,19 @@ jobs:
         env:
           PAPERLAB_BASE: ${{ env.BASE }}editor/
 
+      - name: Build the reference (/docs)
+        run: pnpm --filter @paperlab/docs exec vite build
+        env:
+          PAPERLAB_BASE: ${{ env.BASE }}docs/
+
       - name: Assemble the site
         run: |
           mkdir -p site
           cp -r apps/playground/dist/* site/
           mkdir -p site/editor
           cp -r apps/editor/dist/* site/editor/
+          mkdir -p site/docs
+          cp -r apps/docs/dist/* site/docs/
           # Pages serves 404.html for unknown paths; point it at the
           # playground so a stale shared link still lands on something.
           cp site/index.html site/404.html
