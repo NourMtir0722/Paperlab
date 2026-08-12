@@ -277,6 +277,8 @@ export function App() {
               count={stage.count}
               // Playing hands the walk to the clock; paused, the scrubber owns it.
               progress={stage.playing ? undefined : stage.progress}
+              quality={stage.quality}
+              onQualityChange={(settled) => patchStage({ settled })}
             />
           ) : mode === 'paper' ? (
             <PaperMesh
@@ -339,7 +341,8 @@ export function App() {
           />
           <span className="transport-hint">
             {stage.playing ? 'walking' : `${Math.round(stage.progress * 100)}% along the walk`} ·{' '}
-            {stage.count} banners
+            {stage.count} banners · quality{' '}
+            {stage.quality === 'auto' ? `auto → ${stage.settled ?? '…'}` : stage.quality}
           </span>
         </footer>
       ) : (

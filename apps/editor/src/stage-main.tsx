@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client'
+import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PaperStage, getStagePreset, type ShotName } from 'paperlab'
 
@@ -12,6 +13,7 @@ import { PaperStage, getStagePreset, type ShotName } from 'paperlab'
 declare global {
   interface Window {
     __STAGE__?: { ready: boolean; errors: string[] }
+    __PERF__?: { frames: number[]; done: boolean; tier?: string }
   }
 }
 
@@ -24,11 +26,36 @@ const num = (key: string, fallback: number) => {
   return Number.isFinite(value) && has(key) ? value : fallback
 }
 
+window.__PERF__ = { frames: [], done: false }
+
+/** Warm-up frames to discard: shader compiles and texture uploads land here. */
+const WARMUP = 25
+/** Frames to time. Enough that one hitch cannot move the median. */
+const SAMPLE = 90
+
 function Ready() {
   const gl = useThree((s) => s.gl)
-  useFrame(() => {
-    // Two frames in, anything that was going to fail to compile has.
+  const peakTris = useRef(0)
+  useFrame((_, delta) => {
+    const perf = window.__PERF__!
     if (!window.__STAGE__!.ready && gl.info.render.frame > 2) window.__STAGE__!.ready = true
+    if (perf.done) return
+    if (gl.info.render.frame < WARMUP) return
+    // info.render resets every frame and the shadow pass files its own, so
+    // take the peak across the sample rather than one arbitrary reading.
+    peakTris.current = Math.max(peakTris.current, gl.info.render.triangles)
+    perf.frames.push(delta * 1000)
+    if (perf.frames.length >= SAMPLE) {
+      perf.done = true
+      // Report what the scene cost to build, not just what it costs to draw.
+      Object.assign(perf, {
+        triangles: peakTris.current,
+        drawCalls: gl.info.render.calls,
+        programs: gl.info.programs?.length ?? 0,
+        textures: gl.info.memory.textures,
+        geometries: gl.info.memory.geometries,
+      })
+    }
   })
   return null
 }
@@ -37,17 +64,29 @@ const preset = getStagePreset(query.get('preset') ?? 'nave')
 
 window.addEventListener('error', (e) => window.__STAGE__!.errors.push(String(e.message)))
 
+const paper = preset.paper as { sheet?: Record<string, unknown> } | undefined
+const tuned =
+  has('segments') && paper?.sheet
+    ? { ...paper, sheet: { ...paper.sheet, segments: num('segments', 0) } }
+    : preset.paper
+
 createRoot(document.getElementById('root')!).render(
   <PaperStage
+    quality={(query.get('quality') as never) ?? 'high'}
+    onQualityChange={(tier) => {
+      window.__PERF__!.tier = tier
+    }}
     text={query.get('text') ?? preset.text}
     count={num('banners', preset.count)}
-    preset={preset.paper}
+    preset={tuned}
     layout={preset.layout}
     layoutOptions={preset.layoutOptions}
     progress={num('progress', 0.42)}
     reducedMotion={false}
     stage={{
       ...preset.stage,
+      ...(query.get('shadows') === '0' ? { shadows: false } : {}),
+      ...(query.get('surround') === '0' ? { source: { ...preset.stage.source, surround: false } } : {}),
       shot: {
         ...preset.stage.shot,
         ...(has('shot') ? { shot: query.get('shot') as ShotName } : {}),

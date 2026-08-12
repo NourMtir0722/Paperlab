@@ -24,6 +24,8 @@ import {
   getStagePreset,
   walkNames,
   walks,
+  type QualityName,
+  type QualityTier,
 } from 'paperlab'
 import {
   loadUserPresets,
@@ -95,6 +97,10 @@ export interface StageState {
   config: StageConfigInput
   /** The banner itself: dims, stock, drape. */
   paper?: PaperConfigInput
+  /** Render cost. `auto` adapts; the fixed tiers are how you see what a weak machine gets. */
+  quality: QualityName
+  /** What `auto` actually settled on, reported back by the scene. */
+  settled: QualityTier | null
 }
 
 interface EditorState {
@@ -210,6 +216,8 @@ function stageStateFrom(id: string): StageState {
     playing: false,
     config,
     paper: preset.paper,
+    quality: 'auto',
+    settled: null,
   }
 }
 
