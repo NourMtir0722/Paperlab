@@ -3,6 +3,7 @@ import { paperConfigSchema } from './schema'
 import { diffConfig, buildJsxSnippet } from './diff'
 import { buildAgentPayload, describeConfig, AGENT_PAYLOAD_VERSION } from './agent-payload'
 import { getPreset, listPresets } from './presets'
+import { listBehaviors } from '../behaviors/registry'
 import { quantizeProgress, quantizeTime } from '../motion/onTwos'
 
 describe('diffConfig', () => {
@@ -96,6 +97,21 @@ describe('buildAgentPayload', () => {
     )
     expect(describeConfig(getPreset('pinned-sheet'))).toContain('moving like cloth in wind')
     expect(describeConfig(getPreset('vintage-note'))).toContain('visibly aged')
+  })
+
+  /**
+   * `describeConfig` is the one line an agent checks its render against, and
+   * its phrase table is hand-written — so a new behavior joins the registry
+   * and is silently described as nothing at all, which is how `crumple`
+   * shipped its first render reading "a sheet with typeset text" and no
+   * mention of being crushed. Nothing enforced the pair. Now something does.
+   */
+  it('every registered behavior has a phrase — a new one cannot describe as nothing', () => {
+    const bare = describeConfig(paperConfigSchema.parse({}))
+    for (const id of listBehaviors()) {
+      const described = describeConfig(paperConfigSchema.parse({ behavior: { type: id } }))
+      expect(described, `behavior "${id}" has no phrase in describeConfig`).not.toBe(bare)
+    }
   })
 })
 

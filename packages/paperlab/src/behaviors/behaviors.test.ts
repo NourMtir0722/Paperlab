@@ -21,6 +21,7 @@ describe('behavior registry', () => {
       'fall',
       'carry',
       'flight',
+      'crumple',
     ])
   })
 

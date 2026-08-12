@@ -156,6 +156,20 @@ const builtins: Record<string, PaperConfigInput> = {
     // starter, it is what a layout's per-sheet bias has to scale.
     deformers: [{ type: 'bend', options: { curvature: 0.35, angle: 0 } }],
   },
+  'crumpled-note': {
+    meta: { name: 'Crumpled note', tags: ['crumple', 'text', 'handled'] },
+    sheet: { width: 1.1, height: 1.4 },
+    stock: 'printer',
+    content: {
+      type: 'text',
+      text: 'I wrote it out three times\nand threw all three away.',
+      size: 42,
+    },
+    behavior: { type: 'crumple', progress: 0.62, coarseness: 0.4, ball: 0.55 },
+    // Handled paper is dirty paper: the grain is what stops the facets
+    // reading as folded plastic.
+    surface: { grain: 0.5, aging: 0.18 },
+  },
   'typed-note': {
     meta: { name: 'Typed note', tags: ['text', 'starter'] },
     sheet: { width: 1, height: 1.4 },
