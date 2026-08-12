@@ -14,6 +14,14 @@ import { flightOptionsSchema } from '../behaviors/flight'
  * The zod schema is the single source of truth: it validates the public API,
  * generates editor panels, defines the `.paper` preset format, and feeds the docs.
  * If a feature can't serialize into this schema, it waits.
+ *
+ * Every schema here exports BOTH of its types, and the difference is
+ * load-bearing. `z.infer` is the parsed config — every default filled in,
+ * every field present — and it is what the renderer reads. `z.input` is what
+ * a caller is allowed to write, where anything with a default is optional,
+ * and it is what every public prop must take. Handing a component the
+ * inferred type instead demands that the caller supply every field of every
+ * nested object, which turns the documented one-liner into a type error.
  */
 
 // ── Sheet ────────────────────────────────────────────────────────────────────
@@ -114,6 +122,8 @@ export const contentSchema = z.discriminatedUnion('type', [
 ])
 
 export type ContentConfig = z.infer<typeof contentSchema>
+/** What a caller may WRITE — defaults still unfilled. This is the prop type. */
+export type ContentConfigInput = z.input<typeof contentSchema>
 
 // ── Surface ──────────────────────────────────────────────────────────────────
 
@@ -174,6 +184,7 @@ export const surfaceSchema = z.object({
 })
 
 export type SurfaceConfig = z.infer<typeof surfaceSchema>
+export type SurfaceConfigInput = z.input<typeof surfaceSchema>
 export type PaperEdge = (typeof paperEdges)[number]
 
 // ── Behavior & deformers ─────────────────────────────────────────────────────
@@ -191,6 +202,7 @@ export const behaviorConfigSchema = z.discriminatedUnion('type', [
 ])
 
 export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>
+export type BehaviorConfigInput = z.input<typeof behaviorConfigSchema>
 
 /** Advanced escape hatch: a raw deformer stack (editing one forks the behavior). */
 export const deformerInstanceSchema = z.object({
@@ -200,6 +212,7 @@ export const deformerInstanceSchema = z.object({
 })
 
 export type DeformerInstanceConfig = z.infer<typeof deformerInstanceSchema>
+export type DeformerInstanceConfigInput = z.input<typeof deformerInstanceSchema>
 
 // ── Physics ──────────────────────────────────────────────────────────────────
 
@@ -226,6 +239,7 @@ export const physicsSchema = z.union([
 ])
 
 export type PhysicsConfig = z.infer<typeof physicsSchema>
+export type PhysicsConfigInput = z.input<typeof physicsSchema>
 
 // ── Scene ────────────────────────────────────────────────────────────────────
 
@@ -237,6 +251,7 @@ export const sceneSchema = z.object({
 })
 
 export type SceneConfig = z.infer<typeof sceneSchema>
+export type SceneConfigInput = z.input<typeof sceneSchema>
 export type LightingName = (typeof lightingNames)[number]
 
 // ── Interaction states ───────────────────────────────────────────────────────
