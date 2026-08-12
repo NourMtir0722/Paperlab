@@ -45,6 +45,49 @@ import { PaperField } from 'paperlab'
 />
 ```
 
+### Stage mode — paper as architecture
+
+`<PaperStage>` builds a *space* out of paper: banners hung along a walk, with
+a figure walking down it. It is the one mode where the paper is the room
+rather than the object, and it is what the playground is built on.
+
+```tsx
+import { PaperStage } from 'paperlab'
+
+<PaperStage
+  text="the paper remembers every hand that folded it"   // split across banners, a line each
+  count={18}
+  stage={{
+    path: getWalk('straight'),   // straight | bend | ess | ring | spiral
+    shot: { shot: 'follow' },    // follow | lead | low | wide
+    lighting: 'nave',            // stage mode is built for this one; the rest are front-lit
+    showFigure: true,
+  }}
+  progress={scrollProgress}      // 0..1 — omit it and the figure walks on its own clock
+  quality="auto"                 // auto | low | medium | high — auto adapts to the machine
+/>
+```
+
+The load-bearing invariant: **every part of the scene reads the same walk.**
+The layout arranges along it, the figure follows it, the camera is stationed
+on it, and the light source stands at the end of it. Handing any of those its
+own copy of a path is the bug this component exists to prevent.
+
+Binding `progress` to scroll is the primary use — the page scroll walks the
+figure through the space. That's what `buildStageComponentSource({ …, scroll:
+true })` emits, and what the editor's **Copy for AI** offers first in stage
+mode. `<PaperStageScene>` is the canvas-less twin for an existing R3F scene.
+
+Stage presets — `nave`, `procession`, `cloister`, `threshold`, `archive` —
+come from `getStagePreset(id)` / `listStagePresets()`. The whole thing
+serializes through `stageSchema`, same contract as `.paper`.
+
+Note `quality` is deliberately NOT part of `stageSchema`: it describes the
+*device*, not the artwork, so it never travels in a preset or a shared link.
+The scene's own parts (the figure, the surround, the gait and camera math)
+are not exported — `<PaperStage>` is the composition, and its insides are
+free to change.
+
 ### Interaction states, the stamp sheet, and drop zones (M6)
 
 A preset may carry `states` — overrides-on-base diffs, never separate presets:
