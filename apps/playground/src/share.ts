@@ -1,6 +1,5 @@
 import { z } from 'zod'
-import { stageSchema, type StageConfigInput } from './schema'
-import { listStagePresets } from './presets'
+import { listStagePresets, stageSchema, type StageConfigInput } from 'paperlab'
 
 /**
  * A stage in a URL.
@@ -10,9 +9,14 @@ import { listStagePresets } from './presets'
  * It has to stay SHORT — hence single-letter keys and storing a preset id
  * plus what changed rather than the whole config — and it has to treat what
  * comes back as hostile, because anyone can hand you a link. Decoding runs
- * the payload through the same zod schemas the rest of the library uses and
- * returns null rather than throwing, so a mangled link opens the default
- * stage instead of a blank page.
+ * the payload through the library's own zod schemas and returns null rather
+ * than throwing, so a mangled link opens the default stage instead of a
+ * blank page.
+ *
+ * This lives in the app, not in `paperlab`. The payload shape is this
+ * playground's — a preset id, the words, and a diff — and no library
+ * consumer could use it. The library's job ends at `stageSchema`, which is
+ * what the untrusted half of the link gets validated against.
  */
 
 /** Beyond this, browsers and chat apps start truncating. */

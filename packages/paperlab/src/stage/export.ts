@@ -1,10 +1,10 @@
-import { AGENT_PAYLOAD_VERSION } from './agent-payload'
-import { diffConfig } from './diff'
-import { paperConfigSchema, type PaperConfigInput } from './schema'
+import { AGENT_PAYLOAD_VERSION } from '../config/agent-payload'
+import { diffConfig } from '../config/diff'
+import { paperConfigSchema, type PaperConfigInput } from '../config/schema'
 import { getLayout } from '../field/layouts'
-import { stageSchema, type StageConfig, type StageConfigInput } from '../stage/schema'
-import { walkNames, walks } from '../stage/walks'
-import type { WalkName } from '../stage/walks'
+import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
+import { walkNames, walks } from './walks'
+import type { WalkName } from './walks'
 
 /**
  * Stage-mode export. Same anatomy and version as the paper and field

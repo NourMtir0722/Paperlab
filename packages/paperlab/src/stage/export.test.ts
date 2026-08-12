@@ -7,9 +7,9 @@ import {
   diffStage,
   walkNameFor,
   type StageExportInput,
-} from './stage-export'
-import { stageSchema } from '../stage/schema'
-import { walks } from '../stage/walks'
+} from './export'
+import { stageSchema } from './schema'
+import { walks } from './walks'
 
 const base = (o: Partial<StageExportInput> = {}): StageExportInput => ({
   stage: {},

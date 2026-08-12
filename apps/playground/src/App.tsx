@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  PaperStage,
-  buildStageAgentPayload,
-  getStagePreset,
-  listStagePresets,
-  readStageShare,
-  stageShareUrl,
-  type StageShare,
-} from 'paperlab'
+import { PaperStage, buildStageAgentPayload, getStagePreset, listStagePresets } from 'paperlab'
+import { readStageShare, stageShareUrl, type StageShare } from './share'
 
 /**
  * The playground: one screen, one input, one scene.
