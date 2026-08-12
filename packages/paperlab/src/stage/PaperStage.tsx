@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
 import { usePrefersReducedMotion } from '../a11y'
 import type { ContentConfig, PaperConfigInput } from '../config/schema'
@@ -14,6 +14,18 @@ import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
+import {
+  FIRST_WINDOW,
+  INITIAL_TIER,
+  SETTLE_FRAMES,
+  STEADY_WINDOW,
+  qualityFor,
+  qualityTiers,
+  tierDown,
+  tierUp,
+  type QualityName,
+  type QualityTier,
+} from './quality'
 
 /**
  * Stage mode: paper as architecture, with a figure walking through it.
@@ -59,6 +71,19 @@ export interface PaperStageSceneProps {
    */
   progress?: number
   reducedMotion?: boolean
+  /**
+   * How much the render is allowed to cost. `auto` (the default) starts in
+   * the middle and adapts to whatever the machine turns out to manage — this
+   * scene runs on hardware nobody developing it owns. Not part of the stage
+   * config: quality describes the DEVICE, not the artwork, so it must never
+   * travel in a preset or a shared link.
+   */
+  quality?: QualityName
+  /**
+   * Fires when `auto` moves the tier. Useful for showing the viewer what
+   * they are getting, and for measuring what real machines settle on.
+   */
+  onQualityChange?(tier: QualityTier): void
 }
 
 export interface PaperStageProps extends PaperStageSceneProps {
@@ -143,8 +168,65 @@ function stageWalked(
   return elapsed * stage.figure.speed
 }
 
+/** Below this, step down. Above the upper one, step up. */
+const FLOOR_FPS = 26
+const CEILING_FPS = 55
+
+/**
+ * Watches the real frame rate and moves the tier.
+ *
+ * Deliberately hysteretic and slow: the two thresholds are far apart and
+ * there is a settling period after every change, because a monitor that
+ * reacts fast oscillates — dropping quality raises the frame rate, which
+ * immediately argues for raising quality again, and the scene visibly
+ * pumps. A machine that cannot hold the floor should sink once and stay.
+ */
+function QualityWatch({ tier, onChange }: { tier: QualityTier; onChange: (tier: QualityTier) => void }) {
+  const samples = useRef<number[]>([])
+  const settle = useRef(SETTLE_FRAMES)
+  // The first verdict comes quickly; later ones are measured carefully.
+  const window = useRef(FIRST_WINDOW)
+
+  const settled = useCallback((next: QualityTier) => {
+    samples.current = []
+    settle.current = SETTLE_FRAMES
+    window.current = STEADY_WINDOW
+    return next
+  }, [])
+
+  useFrame((_, delta) => {
+    if (settle.current > 0) {
+      settle.current -= 1
+      return
+    }
+    // A tab returning from the background delivers one enormous delta;
+    // it says nothing about the hardware.
+    if (delta > 0.5) return
+    samples.current.push(delta)
+    if (samples.current.length < window.current) return
+
+    const sorted = [...samples.current].sort((a, b) => a - b)
+    const median = sorted[Math.floor(sorted.length / 2)]!
+    const fps = 1 / median
+    samples.current = []
+    // Even if the tier does not move, stop judging on the short window.
+    window.current = STEADY_WINDOW
+
+    if (fps < FLOOR_FPS) {
+      const next = tierDown(tier)
+      if (next !== tier) onChange(settled(next))
+    } else if (fps > CEILING_FPS) {
+      const next = tierUp(tier)
+      if (next !== tier) onChange(settled(next))
+    }
+  })
+  return null
+}
+
 export function PaperStageScene({
   stage: stageInput,
+  quality = 'auto',
+  onQualityChange,
   layout = 'colonnade',
   layoutOptions,
   papers,
@@ -156,11 +238,30 @@ export function PaperStageScene({
   reducedMotion,
 }: PaperStageSceneProps) {
   const still = usePrefersReducedMotion(reducedMotion)
+  // `auto` starts mid and is stepped by the frame-rate watcher below.
+  const [tier, setTier] = useState<QualityTier>(quality === 'auto' ? INITIAL_TIER : (quality as QualityTier))
+  useEffect(() => {
+    if (quality !== 'auto') setTier(quality as QualityTier)
+  }, [quality])
+  useEffect(() => {
+    onQualityChange?.(tier)
+  }, [tier, onQualityChange])
+  const settings = quality === 'auto' ? qualityTiers[tier] : qualityFor(quality)
+
   const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageInput])
   const path = useMemo(() => getWalkPath(stage.path), [stage.path])
   // The shot frames the ARCHITECTURE, so it has to know how tall the paper
   // is — read from the preset in play rather than assumed.
   const paperHeight = useMemo(() => resolveConfig({ preset: preset ?? BANNER }).sheet.height, [preset])
+
+  // Subdivision is the biggest single cost and the easiest to scale: every
+  // sheet is a grid, so halving it quarters the vertex work.
+  const paper = useMemo(() => {
+    const base = (preset ?? BANNER) as Record<string, unknown>
+    if (typeof base !== 'object') return preset ?? BANNER
+    const sheet = (base.sheet ?? {}) as Record<string, unknown>
+    return { ...base, sheet: { ...sheet, segments: settings.segments } } as typeof BANNER
+  }, [preset, settings.segments])
 
   // The walk reaches the layout too. A layout that arranges along a path and
   // a figure that walks a different one is the one bug this whole component
@@ -215,9 +316,17 @@ export function PaperStageScene({
   return (
     <>
       <ShotRig stage={stage} paperHeight={paperHeight} progress={progress} still={still} />
-      <PaperLighting preset={stage.lighting} floor={0} scale={60} reducedMotion={reducedMotion} />
+      <PaperLighting
+        preset={stage.lighting}
+        floor={0}
+        scale={60}
+        reducedMotion={reducedMotion}
+        shadowMapSize={settings.shadowMapSize}
+        contactShadow={settings.contactShadow}
+      />
+      {quality === 'auto' && <QualityWatch tier={tier} onChange={setTier} />}
 
-      {stage.source.surround && (
+      {stage.source.surround && settings.surround && (
         <Surround radius={surroundRadius} horizon={stage.source.color} zenith={stage.source.zenith} />
       )}
 
@@ -235,7 +344,7 @@ export function PaperStageScene({
       )}
 
       <PaperFieldMesh
-        preset={preset ?? BANNER}
+        preset={paper}
         papers={slots}
         images={images}
         layout={layout}
@@ -254,11 +363,15 @@ export function PaperStageScene({
 
 /** `<PaperStage />` owns its Canvas; `<PaperStageScene />` drops into an existing one. */
 export function PaperStage({ children, className, style, ...sceneProps }: PaperStageProps) {
+  // Fragment cost scales with the SQUARE of pixel ratio, and this scene is
+  // fragment-heavy. The canvas is created once, so the cap is taken from the
+  // tier the scene starts at rather than followed live.
+  const dpr = qualityFor(sceneProps.quality ?? 'auto').dpr
   return (
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={[1, dpr]}
         camera={{ fov: 38, near: 0.05, far: 400 }}
         onCreated={({ gl, scene }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping

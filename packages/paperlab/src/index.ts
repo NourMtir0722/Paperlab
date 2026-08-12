@@ -169,6 +169,18 @@ export {
   type StageShare,
 } from './stage/share'
 export {
+  qualityNames,
+  qualityTiers,
+  qualityFor,
+  tierUp,
+  tierDown,
+  INITIAL_TIER,
+  TIER_ORDER,
+  type QualityName,
+  type QualityTier,
+  type QualitySettings,
+} from './stage/quality'
+export {
   stagePresets,
   getStagePreset,
   listStagePresets,

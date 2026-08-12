@@ -13,7 +13,8 @@
     "test:parity": "node tools/parity.mjs",
     "shot": "node tools/stage-shot.mjs",
     "shot:ui": "node tools/editor-shot.mjs",
-    "shot:play": "node tools/playground-shot.mjs"
+    "shot:play": "node tools/playground-shot.mjs",
+    "perf": "node tools/stage-perf.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

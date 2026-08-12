@@ -1,5 +1,5 @@
 import { LevaPanel, folder, useControls, useCreateStore } from 'leva'
-import { getLayout, listLayouts, stageSchema, walkNames } from 'paperlab'
+import { getLayout, listLayouts, qualityNames, stageSchema, walkNames } from 'paperlab'
 import { schemaControls } from './zodLeva'
 import { useEditor } from './store'
 
@@ -81,6 +81,25 @@ export function StageInspector() {
         ),
       }),
       Stage: folder(schemaControls(stageSchema, stageValues, patchStageConfigKey, ['path'])),
+      Performance: folder({
+        quality: {
+          value: stage.quality,
+          options: [...qualityNames],
+          onChange: (v: string, _, ctx) => {
+            if (!ctx.initial) patchStage({ quality: v as never, settled: null })
+          },
+        },
+        // Quality describes the DEVICE, not the artwork — it is deliberately
+        // not in the stage schema, so it never travels in a preset or a link.
+        note: {
+          value:
+            stage.quality === 'auto'
+              ? `adapting — now at ${stage.settled ?? 'medium'}`
+              : 'fixed: this is what that tier looks like everywhere',
+          editable: false,
+          label: 'ⓘ',
+        },
+      }),
     },
     { store },
     [stage],

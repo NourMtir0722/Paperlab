@@ -84,6 +84,14 @@ export interface PaperLightingProps {
   scale?: number
   /** Override prefers-reduced-motion (freezes gobo drift). */
   reducedMotion?: boolean
+  /**
+   * Shadow map resolution, overriding the preset's. 0 turns the shadow pass
+   * off — it re-renders the scene's geometry, so on a weak machine it is
+   * often the single most expensive thing in the frame.
+   */
+  shadowMapSize?: number
+  /** Draw the soft contact shadow. It is its own render pass. */
+  contactShadow?: boolean
 }
 
 /**
@@ -96,8 +104,12 @@ export function PaperLighting({
   floor = -1.2,
   scale = 10,
   reducedMotion,
+  shadowMapSize,
+  contactShadow = true,
 }: PaperLightingProps) {
   const p = getLightingPreset(preset)
+  const mapSize = shadowMapSize ?? p.shadow.mapSize
+  const castShadow = mapSize > 0
   const reduced = usePrefersReducedMotion(reducedMotion)
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
@@ -147,9 +159,9 @@ export function PaperLighting({
           angle={p.gobo.angle}
           penumbra={0.5}
           decay={0}
-          castShadow
+          castShadow={castShadow}
           map={goboMap}
-          shadow-mapSize={[p.shadow.mapSize, p.shadow.mapSize]}
+          shadow-mapSize={[mapSize || 1, mapSize || 1]}
           shadow-radius={p.shadow.radius}
           shadow-normalBias={0.05}
         />
@@ -158,19 +170,21 @@ export function PaperLighting({
           position={p.key.position}
           color={p.key.color}
           intensity={p.key.intensity}
-          castShadow
-          shadow-mapSize={[p.shadow.mapSize, p.shadow.mapSize]}
+          castShadow={castShadow}
+          shadow-mapSize={[mapSize || 1, mapSize || 1]}
           shadow-radius={p.shadow.radius}
           shadow-normalBias={0.05}
         />
       )}
-      <ContactShadows
-        position={[0, floor, 0]}
-        opacity={p.contactShadowOpacity}
-        scale={scale}
-        blur={p.contactShadowBlur}
-        far={3}
-      />
+      {contactShadow && (
+        <ContactShadows
+          position={[0, floor, 0]}
+          opacity={p.contactShadowOpacity}
+          scale={scale}
+          blur={p.contactShadowBlur}
+          far={3}
+        />
+      )}
     </>
   )
 }
