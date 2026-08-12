@@ -83,17 +83,24 @@ function cellSign(cx: number, cy: number, seed: number): number {
  *
  * Both normal paths agree with that: the hero path averages vertex normals
  * over a dense grid, the field path probes two tangents a hundredth of a
- * sheet apart. Both need facets several segments wide, which is why this asks
- * for more geometry than anything else in the set.
+ * sheet apart. Both need facets several segments wide.
+ *
+ * Cost, measured rather than assumed: a field of these runs about 45% longer
+ * per frame than the same field of an undeformed preset, and almost none of
+ * that is geometry — `segments: 'auto'` already gives every sheet 72 a side.
+ * It is the nine cell lookups per probe, three probes deep for the normal.
  */
 export const crumple: Deformer<CrumpleOptions> = {
   id: 'crumple',
   label: 'Crumple',
   defaults: crumpleOptionsSchema.parse({}),
   optionsSchema: crumpleOptionsSchema,
-  // The most expensive deformer here, and unavoidably so: a crease the grid
-  // cannot resolve is a smooth bump, and a sheet of smooth bumps is not a
-  // crumple. Below roughly this, `scale` stops meaning anything.
+  // A crease the grid cannot resolve is a smooth bump, and a sheet of smooth
+  // bumps is not a crumple. Note this is a FLOOR, and `segments: 'auto'`
+  // already hands the long side 72 — so this only bites when a preset asks
+  // for a coarser grid by hand. Measured (`pnpm perf:field`), the real cost
+  // of this deformer is not geometry at all: it is nine cell evaluations per
+  // probe and three probes per vertex for the normal.
   geometry: { minSegments: 72 },
   displace(out, _uv, o) {
     if (o.amount === 0) return

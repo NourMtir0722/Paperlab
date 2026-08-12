@@ -14,7 +14,7 @@
       "project": "src/**"
     },
     "apps/editor": {
-      "entry": ["src/parity-main.ts", "src/stage-main.tsx", "src/media-main.tsx"],
+      "entry": ["src/parity-main.ts", "src/stage-main.tsx", "src/media-main.tsx", "src/field-main.tsx"],
       "project": "src/**"
     }
   }

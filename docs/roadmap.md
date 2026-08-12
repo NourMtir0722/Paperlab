@@ -48,7 +48,7 @@ If a feature can't serialize into a preset, it doesn't ship.
 - **13 paper presets**, **5 stage presets**, **7 stocks**.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **401 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+- **414 tests** + a 37-case GPU/CPU parity gate, all green in CI.
 
 ---
 
@@ -182,30 +182,68 @@ Still open, and deliberately not done yet: a per-prop reference for the
 top-level paper schema itself (the JSDoc prose lives in the schema source and
 would have to be extracted at build time), and any kind of search.
 
-### 3. Found in passing — small, real, not yet done
+### 3. Found in passing — closed, plus what they turned up
 
-Things that turned up while building something else. None of them blocked
-what they turned up in; all of them are real.
+All four of the things found while building crumple are now closed. What
+they turned into:
 
-- **The README's capability lists drift, and nothing catches it.** Its
-  behavior list had said seven for as long as there were nine — `carry` and
-  `flight` were simply missing, and `crumple` would have been the third.
-  Fixed by hand this time, but the fix is to *derive* those lists from the
-  registries at build time, exactly the way `tools/sync-readme.mjs` derives
-  the npm README from the repo one and the docs site derives its catalogue.
-  `AGENTS.md` and `docs/llms.txt` carry the same hand-typed lists and the
-  same exposure.
-- **Deformer exports are inconsistent.** `roll`, `curl`, `bend`, `fold` and
-  `wave` are each exported individually from `index.ts`; `drape` and
-  `crumple` are not. Nothing depends on the difference — `getDeformer(id)`
-  reaches all seven — so this is a decision waiting to be made rather than a
-  bug. Settle it with the export trim below, in one direction, on purpose.
-- **The docs site has no Deformers section.** It documents the 10 behaviors
-  but not the 7 deformers underneath them, even though they carry schemas the
-  page could walk exactly like the rest. Anyone writing a raw `deformers`
-  stack — the Advanced fork — has nothing to read.
-- **Nobody has measured a field of crumples.** `minSegments: 72` against
-  `roll`'s much lower ask, times N instances. `pnpm perf` exists.
+- ~~The README's capability lists drift, and nothing catches it.~~ **Closed.**
+  Generating the lists would only move the hand-maintenance — each name
+  carries a sentence of prose that no registry knows. What has to be true is
+  that the *names* match, so `apps/docs/src/docsDrift.test.ts` asserts exactly
+  that, both directions, across thirteen lists in `README.md`, `AGENTS.md` and
+  `docs/llms.txt`: every registered behavior/preset/layout/stock/stage/idle
+  name appears, and no listed name is unregistered. Verified against both
+  failure modes — a dropped `crumple` and an invented `helix` — and it names
+  the file and the entry when it fails.
+- ~~Deformer exports are inconsistent.~~ **Closed, and this one is
+  reversible on purpose.** `drape` and `crumple` (and the `crumple` behavior)
+  are now exported like the other five. Nothing in the repo consumes any of
+  them — they are purely public surface — so the alternative was removing all
+  seven, which is breaking and belongs to the export trim below, not to a
+  tidy-up. Consistent-now was chosen over smaller-now; when the trim happens,
+  the deformer objects and their schemas go as **one group of seven**, not as
+  a cleanup of an accident.
+- ~~The docs site has no Deformers section.~~ **Closed.** All seven, live,
+  with their schemas walked into parameter tables, plus what a raw
+  `deformers` stack is for and why order matters.
+- ~~Nobody has measured a field of crumples.~~ **Closed, and it corrected
+  something we believed.** See below.
+
+### `segments: 'auto'` does not adapt to anything
+
+Found by building `pnpm perf:field` (`tools/field-perf.mjs` + the
+`field.html` entry, same shape as the stage harness behind `pnpm perf`).
+
+**The schema said `'auto'` "sizes the grid from the active deformers' needs".
+It does not.** It gives the long side a flat 72 segments whatever is on the
+sheet; a deformer's `minSegments` is only a floor and nothing ever lowers it.
+So a blank sheet is tessellated exactly as finely as a crumpled one, and
+`crumple`'s `minSegments: 72` — which the changeset first described as asking
+for more geometry than anything else in the set — is a no-op unless a preset
+hand-picks a coarser grid. The comment is corrected; the behaviour is not.
+
+Measured, at 20 papers in a ring (**SwiftShader**, which is what headless
+Chromium actually runs — a weak-machine floor, not a GPU number):
+
+| case | median frame | triangles/frame |
+| --- | --- | --- |
+| `typed-note` ×20, no deformer | 141 ms | 588k |
+| `crumpled-note` ×20 | 204 ms | 657k |
+| `typed-note` ×60 | 380 ms | 1.76M |
+| `crumpled-note` ×60 | did not finish | — |
+
+So crumple costs ~45% more per frame for ~12% more triangles: the price is
+the shader (nine cell lookups per probe, three probes per vertex for the
+normal), not the grid. **Nobody has run this on a real GPU** — headless
+Chromium won't give one — so the absolute numbers are a floor and the ratio
+is the useful part.
+
+The open question is what `'auto'` should be. Lowering it is a real
+performance win for every simple preset and a visible regression risk for
+every smooth deformer (a `bend` at 16 segments is visibly faceted where 72 is
+not), across every preset and every recorded asset. That is a change with
+library-wide visual consequences and it wants a decision, not a tidy-up.
 
 ### 4. Smaller things worth doing
 

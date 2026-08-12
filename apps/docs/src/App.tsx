@@ -4,6 +4,7 @@ import { Live } from './Live'
 import { Snippet } from './Snippet'
 import { Presets } from './sections/Presets'
 import { Behaviors } from './sections/Behaviors'
+import { Deformers } from './sections/Deformers'
 import { Physics } from './sections/Physics'
 import { Surfaces } from './sections/Surfaces'
 import { Stocks } from './sections/Stocks'
@@ -14,6 +15,7 @@ const SECTIONS = [
   ['start', 'Start'],
   ['presets', 'Presets'],
   ['behaviors', 'Behaviors'],
+  ['deformers', 'Deformers'],
   ['physics', 'Physics'],
   ['surfaces', 'Surface'],
   ['stocks', 'Stocks'],
@@ -52,6 +54,7 @@ export function App() {
         <Start />
         <Presets />
         <Behaviors />
+        <Deformers />
         <Physics />
         <Surfaces />
         <Stocks />

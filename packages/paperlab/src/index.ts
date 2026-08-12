@@ -114,6 +114,8 @@ export { curl, curlOptionsSchema, cornerNames, type CurlOptions } from './deform
 export { bend, bendOptionsSchema, type BendOptions } from './deformers/bend'
 export { fold, foldOptionsSchema, type FoldOptions } from './deformers/fold'
 export { wave, waveOptionsSchema, type WaveOptions } from './deformers/wave'
+export { drape, drapeOptionsSchema, type DrapeOptions } from './deformers/drape'
+export { crumple, crumpleOptionsSchema, type CrumpleOptions } from './deformers/crumple'
 
 export type { Behavior, HandleSpec } from './behaviors/types'
 export { registerBehavior, getBehavior, listBehaviors } from './behaviors/registry'
@@ -126,6 +128,13 @@ export { fly, flyOptionsSchema, type FlyOptions } from './behaviors/fly'
 export { fall, fallOptionsSchema, type FallOptions } from './behaviors/fall'
 export { carry, carryOptionsSchema, type CarryOptions } from './behaviors/carry'
 export { flight, flightOptionsSchema, type FlightOptions } from './behaviors/flight'
+// The first behavior whose name is already taken by the deformer it drives.
+// Both are `crumple` to their own registries; only the JS binding has to give.
+export {
+  crumpleBehavior,
+  crumpleBehaviorOptionsSchema,
+  type CrumpleBehaviorOptions,
+} from './behaviors/crumple'
 
 export { idlePresets, getIdlePreset, idleNames, type IdleName, type IdlePreset } from './physics/idle'
 

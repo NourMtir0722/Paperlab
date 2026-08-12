@@ -33,7 +33,12 @@ export const sheetSchema = z.object({
   height: z.number().positive().max(20).default(1.4),
   /** Visual thickness in mm-ish units; drives edge/shadow treatment, not geometry (yet). */
   thickness: z.number().min(0).max(2).default(0.2),
-  /** 'auto' sizes the grid from the active deformers' needs. */
+  /**
+   * `'auto'` gives the LONG side 72 segments, whatever is on the sheet — a
+   * deformer's `minSegments` can only raise that floor, never lower it, so in
+   * practice a blank sheet is tessellated exactly as finely as a crumpled
+   * one. Set a number to take the decision yourself.
+   */
   segments: z.union([z.literal('auto'), z.number().int().min(2).max(256)]).default('auto'),
   cornerRadius: z.number().min(0).max(0.5).default(0),
 })
