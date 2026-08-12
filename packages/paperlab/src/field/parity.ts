@@ -63,6 +63,25 @@ export const parityCases: ParityCase[] = [
     t: 0,
   },
   {
+    /**
+     * The gentle end, which nothing used to cover: the gate only ever tried
+     * |curvature| ≥ 0.6, and `photo-print` — the field starter preset — bends
+     * at 0.35. That band is where the arc's float32 evaluation loses its
+     * cancellation, and where the two paths were 6e-4 apart until `bend` was
+     * rewritten in cancellation-free form. Keep a case down here.
+     */
+    name: 'bend: barely-there arc (the band photo-print lives in)',
+    stack: [{ type: 'bend', options: { curvature: 0.35, angle: 0 } }],
+    sheet: { width: 1.2, height: 0.9 },
+    t: 0,
+  },
+  {
+    name: 'bend: the gentlest arc the schema allows',
+    stack: [{ type: 'bend', options: { curvature: 0.02, angle: 61 } }],
+    sheet: { width: 2, height: 2.6 },
+    t: 0,
+  },
+  {
     name: 'bend: negative arc',
     stack: [{ type: 'bend', options: { curvature: -0.8, angle: 0 } }],
     sheet: { width: 1, height: 1.4 },
@@ -122,6 +141,33 @@ export const parityCases: ParityCase[] = [
       },
     ],
     sheet: { width: 2.2, height: 3 },
+    t: 0,
+  },
+  {
+    name: 'crumple: defaults',
+    stack: [{ type: 'crumple', options: { amount: 0.35, scale: 3, pull: 0.4, seed: 0 } }],
+    sheet: { width: 1, height: 1.4 },
+    t: 0,
+  },
+  {
+    // The adversarial one. `fract` is a sawtooth, so the two halves disagree
+    // hardest where a crease lands exactly on a sample — a fine scale and a
+    // seed whose fold directions are near-axis puts the most creases in
+    // reach of the grid.
+    name: 'crumple: fully crushed, fine creases, off-axis seed',
+    stack: [{ type: 'crumple', options: { amount: 1, scale: 7.5, pull: 1, seed: 5 } }],
+    sheet: { width: 1.3, height: 0.9 },
+    t: 0,
+  },
+  {
+    // Crush then curl, which is the order the crumple BEHAVIOR stacks them:
+    // the creases have to be placed on the flat sheet, not on a bent one.
+    name: 'stacked: crumple ∘ bend (the crumple behavior)',
+    stack: [
+      { type: 'crumple', options: { amount: 0.62, scale: 3.3, pull: 0.5, seed: 2 } },
+      { type: 'bend', options: { curvature: 0.31, angle: 35 } },
+    ],
+    sheet: { width: 1.1, height: 1.4 },
     t: 0,
   },
   {

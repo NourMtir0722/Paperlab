@@ -29,6 +29,12 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
   carry: () => 'drooping from a pinched corner, fluttering as if being carried',
   flight: (o) =>
     o.path === 'loop' ? 'tumbling through a seamless airborne loop' : 'tumbling across the scene on the wind',
+  crumple: (o) =>
+    (o.progress as number) < 0.3
+      ? 'lightly handled — a few soft creases across it'
+      : (o.progress as number) < 0.7
+        ? 'crushed into irregular creased facets, as if screwed up and flattened out again'
+        : 'balled up in a fist',
 }
 
 /** One line an agent can verify against what it sees after `npm run dev`. */

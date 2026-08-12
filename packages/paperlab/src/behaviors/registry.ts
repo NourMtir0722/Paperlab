@@ -8,6 +8,7 @@ import { fly } from './fly'
 import { fall } from './fall'
 import { carry } from './carry'
 import { flight } from './flight'
+import { crumpleBehavior } from './crumple'
 
 const registry = new Map<string, Behavior<any>>()
 
@@ -37,3 +38,4 @@ registerBehavior(fly)
 registerBehavior(fall)
 registerBehavior(carry)
 registerBehavior(flight)
+registerBehavior(crumpleBehavior)

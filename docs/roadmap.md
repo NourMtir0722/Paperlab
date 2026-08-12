@@ -36,19 +36,19 @@ If a feature can't serialize into a preset, it doesn't ship.
 
 ### What exists today
 
-- **9 behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`,
-  `fall`, `carry`, `flight`. Human-named params ("tightness", not
+- **10 behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`,
+  `fall`, `carry`, `flight`, `crumple`. Human-named params ("tightness", not
   "cylinderRadius") over a stack of pure geometry deformers.
-- **6 deformers** — `roll`, `curl`, `bend`, `fold`, `wave`, `drape`. Each has a
-  JS implementation (CPU/hero path) and a GLSL twin (GPU/field path), held
-  identical by a golden-vector parity gate.
+- **7 deformers** — `roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple`.
+  Each has a JS implementation (CPU/hero path) and a GLSL twin (GPU/field
+  path), held identical by a golden-vector parity gate.
 - **12 layouts** — every one names a place paper actually sits: `book`,
   `accordion`, `fan`, `spread`, `pile`, `rack`, `wall`, `spill`, `sweep`,
   `ring`, `colonnade`, `sheet`.
-- **12 paper presets**, **5 stage presets**, **7 stocks**.
+- **13 paper presets**, **5 stage presets**, **7 stocks**.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **387 tests** + a 27-case GPU/CPU parity gate, all green in CI.
+- **401 tests** + a 37-case GPU/CPU parity gate, all green in CI.
 
 ---
 
@@ -182,7 +182,32 @@ Still open, and deliberately not done yet: a per-prop reference for the
 top-level paper schema itself (the JSDoc prose lives in the schema source and
 would have to be extracted at build time), and any kind of search.
 
-### 3. Smaller things worth doing
+### 3. Found in passing — small, real, not yet done
+
+Things that turned up while building something else. None of them blocked
+what they turned up in; all of them are real.
+
+- **The README's capability lists drift, and nothing catches it.** Its
+  behavior list had said seven for as long as there were nine — `carry` and
+  `flight` were simply missing, and `crumple` would have been the third.
+  Fixed by hand this time, but the fix is to *derive* those lists from the
+  registries at build time, exactly the way `tools/sync-readme.mjs` derives
+  the npm README from the repo one and the docs site derives its catalogue.
+  `AGENTS.md` and `docs/llms.txt` carry the same hand-typed lists and the
+  same exposure.
+- **Deformer exports are inconsistent.** `roll`, `curl`, `bend`, `fold` and
+  `wave` are each exported individually from `index.ts`; `drape` and
+  `crumple` are not. Nothing depends on the difference — `getDeformer(id)`
+  reaches all seven — so this is a decision waiting to be made rather than a
+  bug. Settle it with the export trim below, in one direction, on purpose.
+- **The docs site has no Deformers section.** It documents the 10 behaviors
+  but not the 7 deformers underneath them, even though they carry schemas the
+  page could walk exactly like the rest. Anyone writing a raw `deformers`
+  stack — the Advanced fork — has nothing to read.
+- **Nobody has measured a field of crumples.** `minSegments: 72` against
+  `roll`'s much lower ask, times N instances. `pnpm perf` exists.
+
+### 4. Smaller things worth doing
 
 - **Trim the public API** before 1.0 (see Decisions above).
 - **The `field-ring` hero asset** shows the blank backs of the far sheets. It's
@@ -309,23 +334,39 @@ term instead. So a transmitting stock either works in hero mode only, or the
 field path needs its own approximation and the two modes stop matching. Decide
 which before starting.
 
-### Crumple — the missing primitive
+### ~~Crumple — the missing primitive~~ — *done*
 
-For anyone who wants paper that has been *handled*. Six deformers and not one
-of them crushes a sheet. `wave` and `fold` are the nearest and neither reads
-as crumpled; the mood board's ball of scrap paper is unreachable today.
+Shipped as the full vertical slice: the `crumple` deformer (JS + GLSL twin, 3
+parity cases), a `crumple` behavior, and a `crumpled-note` preset. The docs
+site picked up all three on its own, which was the point of building it that
+way.
 
-Crumple is the most recognizable paper state there is, which makes this the
-biggest single gap in the deformer set.
+**The field took three attempts, and the two failures are the useful part.**
+Three summed triangle waves: piecewise linear and cheap, but periodic — it
+rendered as an egg-crate. Plain distance-to-nearest on a jittered grid
+(Worley `F1`): irregular at last, but the cone tips are smooth, so it read as
+hammered metal. What works is `F2 − F1` — the gap between the two nearest
+cell points — signed per cell. That goes to zero on every cell boundary, so
+the sheet stays continuous, and its gradient flips across one, which is a
+crease. Irregular polygonal facets alternating toward and away from you.
+**The lesson to keep: for anything meant to look creased, the test is not
+"is the displacement right" but "does the gradient break where a crease
+should be".**
 
-Constraints:
-- Ships as a pair, like every deformer: JS `displace` + GLSL twin + golden
-  vectors in `pnpm test:parity`.
-- **The normals matter more than the displacement.** A crumple that doesn't
-  shade its own facets looks like a noisy sheet, not a crushed one, and the
-  current deformers all lean on smooth-shaded geometry.
-- It needs segments. Whatever `geometry.minSegments` ends up being will make
-  it the most expensive deformer in field mode.
+Two things worth knowing before touching it:
+- The hash is small-integer arithmetic (every product under 2^13, exact in
+  float32 and in a double alike) rather than the usual `fract(sin(dot(…)) *
+  43758.5)`. That one is not reproducible across CPU and GPU and would fail
+  parity outright. Also: JS `%` is not GLSL `mod` for negative inputs, and
+  half of every sheet is at a negative coordinate.
+- `NORM` is calibrated against the measured peak of `F2 − F1` so `amount`
+  means a peak-to-peak height. `crumple.test.ts` holds that bound across
+  every seed and the whole `scale` range — change the jitter and it will tell
+  you.
+
+Still open: it asks for `minSegments: 72`, which makes it much the most
+expensive deformer in field mode. Nobody has measured what a field of them
+actually costs.
 
 ### Fire and wet as surface states
 

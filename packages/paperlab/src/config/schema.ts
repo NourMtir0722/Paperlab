@@ -9,6 +9,7 @@ import { flyOptionsSchema } from '../behaviors/fly'
 import { fallOptionsSchema } from '../behaviors/fall'
 import { carryOptionsSchema } from '../behaviors/carry'
 import { flightOptionsSchema } from '../behaviors/flight'
+import { crumpleBehaviorOptionsSchema } from '../behaviors/crumple'
 
 /**
  * The zod schema is the single source of truth: it validates the public API,
@@ -199,6 +200,7 @@ export const behaviorConfigSchema = z.discriminatedUnion('type', [
   fallOptionsSchema.extend({ type: z.literal('fall') }),
   carryOptionsSchema.extend({ type: z.literal('carry') }),
   flightOptionsSchema.extend({ type: z.literal('flight') }),
+  crumpleBehaviorOptionsSchema.extend({ type: z.literal('crumple') }),
 ])
 
 export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>

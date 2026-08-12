@@ -15,7 +15,7 @@ Install: `npm i paperlab three @react-three/fiber gsap` (React ≥ 19, three ≥
 
 ## Behaviors (behavior={{ type, ...params }})
 
-peel {progress, corner ('auto' resolves outward in a sheet field), radius} · unroll {progress, tightness, sway} · flip {progress, spine, radius} · letter-fold {progress, crease} · hang {wind, sag} · fly {flutter, curve} · fall {flutter, curl} · carry {grab, stiffness, flutter, lag, drive} (a held paper drooping from its pinch point) · flight {wind:[x,y,z], gustiness, tumble, path:'drift'|'loop', respawn, range} (free paper travelling across the scene)
+peel {progress, corner ('auto' resolves outward in a sheet field), radius} · unroll {progress, tightness, sway} · flip {progress, spine, radius} · letter-fold {progress, crease} · hang {wind, sag} · fly {flutter, curve} · fall {flutter, curl} · carry {grab, stiffness, flutter, lag, drive} (a held paper drooping from its pinch point) · flight {wind:[x,y,z], gustiness, tumble, path:'drift'|'loop', respawn, range} (free paper travelling across the scene) · crumple {progress, coarseness, ball, seed} (a sheet crushed in a fist — an irregular crease network; the densest geometry of any deformer)
 
 ## Physics
 
@@ -23,7 +23,7 @@ Idle (compose with behaviors): 'float' 'tumble' 'dangle' 'taped' 'breeze'. Cloth
 
 ## Presets
 
-Built-ins: receipt-unroll, letter-fold, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note, postage-stamp. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
+Built-ins: receipt-unroll, letter-fold, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note, postage-stamp, crumpled-note. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
 - A `.paper` file someone shares IS a preset object: `import p from './x.paper.json'` then `<Paper preset={p} />`, or `registerPreset('x', p)` to name it. `preset` accepts a string OR a config object — never expand a shared .paper into individual props.
 
 ## Interaction states (M6)
