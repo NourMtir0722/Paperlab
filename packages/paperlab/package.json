@@ -27,7 +27,7 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "node ../../tools/sync-readme.mjs && tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

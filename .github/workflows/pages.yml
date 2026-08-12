@@ -1,0 +1,82 @@
+name: Deploy site
+
+# The playground is the demo — a 3D library nobody can try is a screenshot.
+# Publishes the playground at the site root and the editor at /editor.
+#
+# One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+# No secrets, no third-party account: the OIDC token below is issued by
+# GitHub to this workflow.
+#
+# On a custom domain (paperlab.dev), set BASE to '/' and add the CNAME step.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  # Project-pages subpath. Change to '/' when a custom domain is attached.
+  BASE: /Paperlab/
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the library
+        run: pnpm --filter paperlab build
+
+      - name: Build the playground (site root)
+        run: pnpm --filter @paperlab/playground exec vite build
+        env:
+          PAPERLAB_BASE: ${{ env.BASE }}
+
+      - name: Build the editor (/editor)
+        run: pnpm --filter @paperlab/editor exec vite build
+        env:
+          PAPERLAB_BASE: ${{ env.BASE }}editor/
+
+      - name: Assemble the site
+        run: |
+          mkdir -p site
+          cp -r apps/playground/dist/* site/
+          mkdir -p site/editor
+          cp -r apps/editor/dist/* site/editor/
+          # Pages serves 404.html for unknown paths; point it at the
+          # playground so a stale shared link still lands on something.
+          cp site/index.html site/404.html
+          # .nojekyll keeps Pages from eating asset dirs that start with _.
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

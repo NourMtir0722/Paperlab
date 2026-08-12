@@ -1,6 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["ffmpeg"],
   "workspaces": {
     ".": {},
     "packages/paperlab": {
@@ -10,7 +11,7 @@
       "project": "src/**"
     },
     "apps/editor": {
-      "entry": ["src/parity-main.ts", "src/stage-main.tsx"],
+      "entry": ["src/parity-main.ts", "src/stage-main.tsx", "src/media-main.tsx"],
       "project": "src/**"
     }
   }
