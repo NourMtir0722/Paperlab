@@ -254,17 +254,18 @@ export function App() {
             <h2>Papers</h2>
             <ul className="slots">
               {field.slots.map((name, i) => (
-                <li
-                  key={i}
-                  className={`slot-row${selectedSlot === i ? ' selected' : ''}`}
-                  onClick={() => setSelectedSlot(selectedSlot === i ? null : i)}
-                >
-                  <span className="slot-index">{i + 1}</span>
-                  <select
-                    value={name}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setSlotPreset(i, e.target.value)}
+                // biome-ignore lint/suspicious/noArrayIndexKey: a slot IS its index — selection, edits and preset writes all address a paper by slot number.
+                <li key={i} className={`slot-row${selectedSlot === i ? ' selected' : ''}`}>
+                  <button
+                    type="button"
+                    className="slot-select"
+                    aria-pressed={selectedSlot === i}
+                    aria-label={`Select paper ${i + 1}`}
+                    onClick={() => setSelectedSlot(selectedSlot === i ? null : i)}
                   >
+                    <span className="slot-index">{i + 1}</span>
+                  </button>
+                  <select value={name} onChange={(e) => setSlotPreset(i, e.target.value)}>
                     {listPresets().map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -276,10 +277,7 @@ export function App() {
                     className="slot-edit"
                     title={`Edit ${name}`}
                     aria-label={`Edit ${name}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      editFieldPaper(name)
-                    }}
+                    onClick={() => editFieldPaper(name)}
                   >
                     ✎
                   </button>

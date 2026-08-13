@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { SheetDims } from '../../deformers/types'
+import type { AnyOptions, SheetDims } from '../../deformers/types'
 import { SHEET_LIFT, sheetLayoutSchema, sheetSlotXY, type SheetLayoutOptions } from '../sheetGrid'
 import { getWalkPath, walkPathSchema } from '../../stage/path'
 
@@ -500,13 +500,13 @@ export const sheet: Layout<SheetLayoutOptions> = {
   },
 }
 
-const registry = new Map<string, Layout<any>>()
+const registry = new Map<string, Layout<AnyOptions>>()
 
-export function registerLayout(layout: Layout<any>): void {
+export function registerLayout(layout: Layout<AnyOptions>): void {
   registry.set(layout.id, layout)
 }
 
-export function getLayout(id: string): Layout<any> {
+export function getLayout(id: string): Layout<AnyOptions> {
   const layout = registry.get(id)
   if (!layout) {
     throw new Error(`[paperlab] Unknown layout "${id}". Registered: ${[...registry.keys()].join(', ')}`)

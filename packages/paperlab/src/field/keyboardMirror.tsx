@@ -106,9 +106,11 @@ export function FieldKeyboardMirror({
   }
 
   return (
-    <div style={mirrorHidden} role="group" aria-label="Interactive papers">
+    <fieldset style={mirrorHidden}>
+      <legend>Interactive papers</legend>
       {papers.map((slot, i) => (
         <button
+          // biome-ignore lint/suspicious/noArrayIndexKey: a slot IS its index — the carry state and every keyboard step address a paper by slot number.
           key={i}
           type="button"
           onKeyDown={onKeyDown(i)}
@@ -125,6 +127,6 @@ export function FieldKeyboardMirror({
           )}
         </button>
       ))}
-    </div>
+    </fieldset>
   )
 }

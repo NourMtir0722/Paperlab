@@ -98,6 +98,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
   const [slotPatches, setSlotPatches] = useState<Record<number, Record<string, unknown>>>({})
   const [slotStates, setSlotStates] = useState<Record<number, string>>({})
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — slots and layout options are fresh objects every render.
   const slotConfigs = useMemo(
     () =>
       papers.map((slot, i) => {
@@ -105,7 +106,6 @@ export function InteractiveField(props: InteractiveFieldProps) {
         const patch = slotPatches[i]
         return patch ? paperConfigSchema.parse(mergeConfig(config as Record<string, unknown>, patch)) : config
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       JSON.stringify(papers),
       JSON.stringify(fallback ?? null),
@@ -114,9 +114,9 @@ export function InteractiveField(props: InteractiveFieldProps) {
       slotPatches,
     ],
   )
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — poses depend on the layout, not on config identity.
   const poses = useMemo(
     () => slotConfigs.map((_, i) => layout.pose(i, total, layoutOptions, 0, props.sheet)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [layoutId, JSON.stringify(layoutOptions), total, props.sheet.width, props.sheet.height],
   )
 
@@ -450,6 +450,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
         const pose = poses[i]!
         return (
           <group
+            // biome-ignore lint/suspicious/noArrayIndexKey: a slot IS its index — refs, poses, drags and drops all address a paper by slot number.
             key={i}
             ref={(g) => {
               groupRefs.current[i] = g

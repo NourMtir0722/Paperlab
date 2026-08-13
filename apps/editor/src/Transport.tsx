@@ -42,6 +42,7 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
   const [playing, setPlaying] = useState(true)
   const scrubbingRef = useRef(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetKey is a reset trigger, not a value the effect reads.
   useEffect(() => {
     setPlaying(true)
   }, [resetKey])

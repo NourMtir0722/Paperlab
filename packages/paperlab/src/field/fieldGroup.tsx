@@ -55,9 +55,9 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     behavior ? ((config.behavior as Record<string, unknown>)[behavior.progressParam] as number) : 0,
   )
   const buildStackAt = (progress: number): DeformerInstance[] => fieldShapeStack(config, progress)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — the stack rebuilds on shape, not on identity.
   const initialStack = useMemo(
     () => buildStackAt(progressRef.current),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       JSON.stringify(config.behavior ?? null),
       JSON.stringify(config.deformers ?? null),
@@ -66,6 +66,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
   )
   const structureKey = initialStack.map((i) => i.type).join('|')
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on sheet, stack structure and count — the only things that change the buffer.
   const geometry = useMemo(() => {
     const geo = createSheetGeometry(
       {
@@ -88,7 +89,6 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     // frame — how a single instanced draw call bends every sheet differently.
     geo.setAttribute('aBias', new THREE.InstancedBufferAttribute(bias, 1))
     return geo
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(config.sheet), structureKey, count])
 
   // Imperatively created — R3F won't auto-dispose a geometry passed via args.
@@ -96,6 +96,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
 
   const atlas = useContentAtlas(contents, config.sheet, stock)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the stack structure — uniforms update in place, the program does not.
   const shader = useMemo(() => {
     const composed = buildDisplacementGLSL(initialStack, config.sheet)
     const uniforms: Record<string, { value: unknown }> = {}
@@ -123,7 +124,6 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
       fragmentShader: buildFieldFragmentShader(),
       uniforms,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     structureKey,
     JSON.stringify(config.sheet),
@@ -140,6 +140,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
   }, [atlas, shader])
 
   // Behavior progress loops on GSAP — the field is always alive.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the behavior itself; progress lives on a ref so the tween is not restarted each render.
   useEffect(() => {
     if (!behavior || shared.reduced) return
     const state = { p: progressRef.current }
@@ -156,7 +157,6 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     return () => {
       tween.kill()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structureKey, shared.reduced])
 
   const meshRef = useRef<THREE.InstancedMesh>(null)

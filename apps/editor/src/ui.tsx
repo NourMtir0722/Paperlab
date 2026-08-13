@@ -96,6 +96,7 @@ export function UIHost() {
 function DialogView({ spec }: { spec: DialogSpec }) {
   const close = useUI((s) => s.close)
   const inputRef = useRef<HTMLInputElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null)
   const [value, setValue] = useState(spec.kind === 'prompt' ? (spec.defaultValue ?? '') : '')
   const [error, setError] = useState<string | null>(null)
 
@@ -103,6 +104,7 @@ function DialogView({ spec }: { spec: DialogSpec }) {
   // the common "rename over the old name" gesture is one keystroke.
   useEffect(() => {
     if (spec.kind === 'prompt') inputRef.current?.select()
+    else confirmRef.current?.focus()
   }, [spec])
 
   const cancel = () => {
@@ -128,6 +130,7 @@ function DialogView({ spec }: { spec: DialogSpec }) {
   }
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: click-outside is a pointer affordance; Escape and Cancel are the keyboard paths, and the effect above puts focus inside the dialog so both are reachable.
     <div className="dialog-backdrop" onMouseDown={cancel}>
       <div
         className="dialog"
@@ -149,7 +152,6 @@ function DialogView({ spec }: { spec: DialogSpec }) {
               className={error ? 'dialog-input invalid' : 'dialog-input'}
               value={value}
               placeholder={spec.placeholder}
-              autoFocus
               onChange={(e) => {
                 setValue(e.target.value)
                 if (error) setError(null)
@@ -166,6 +168,7 @@ function DialogView({ spec }: { spec: DialogSpec }) {
             Cancel
           </button>
           <button
+            ref={confirmRef}
             type="button"
             className={`dialog-btn primary${spec.kind === 'confirm' && spec.danger ? ' danger' : ''}`}
             onClick={submit}

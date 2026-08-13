@@ -1,4 +1,4 @@
-import type { SheetDims } from '../deformers/types'
+import type { AnyOptions, SheetDims } from '../deformers/types'
 import type { Layout } from './layouts'
 import { withSheetCellFromPaper, type SheetLayoutOptions } from './sheetGrid'
 
@@ -23,7 +23,7 @@ const PHASE_SAMPLES = 8
  */
 export function resolveLayoutOptions(
   layoutId: string,
-  layout: Layout<any>,
+  layout: Layout<AnyOptions>,
   propOptions: Record<string, unknown> | undefined,
   firstSheet: SheetDims | undefined,
 ): Record<string, unknown> {
@@ -44,7 +44,12 @@ export function resolveLayoutOptions(
  * of its half-diagonal, which covers every rotation the pose can apply
  * without having to build the pose matrices.
  */
-export function fieldBounds(layout: Layout<any>, n: number, options: unknown, sheet: SheetDims): FieldBounds {
+export function fieldBounds(
+  layout: Layout<AnyOptions>,
+  n: number,
+  options: unknown,
+  sheet: SheetDims,
+): FieldBounds {
   const reach = Math.hypot(sheet.width, sheet.height) / 2
   if (n <= 0) return { center: [0, 0, 0], half: [reach, reach, 0] }
 
@@ -78,7 +83,7 @@ const DEG = Math.PI / 180
  * to lose the gallery entirely.
  */
 export function fitCamera(
-  layout: Layout<any>,
+  layout: Layout<AnyOptions>,
   n: number,
   options: unknown,
   sheet: SheetDims,

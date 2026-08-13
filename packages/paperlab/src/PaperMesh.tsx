@@ -165,7 +165,7 @@ const quatScratch = new THREE.Quaternion()
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
   // Each resolveConfig call is several zod parses (superRefine re-parses every
   // state override) — memoized so a render without config-prop changes is free.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resolveConfigKey serializes every prop resolveConfig reads — the props object itself is new each render.
   const resolved = useMemo(() => resolveConfig(props), [resolveConfigKey(props)])
   // Reduced motion: behaviors freeze at their resting pose, physics is off,
   // idle motion is off. The sheet still renders fully sculpted.
@@ -213,24 +213,25 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const sheetKey = JSON.stringify(config.sheet)
   const physicsKey = JSON.stringify(config.physics)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: The keys are change triggers; the body only touches refs.
   useEffect(() => {
     if (!draggingRef.current && !playingRef.current) overridesRef.current = {}
     dirtyRef.current = true
   }, [behaviorKey, deformersKey, sheetKey, physicsKey])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the stack shape — the probe reads config off a ref.
   const minSegments = useMemo(() => {
     const probe = buildStack(configRef.current, {})
     return probe ? stackMinSegments(probe) : 2
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [behaviorKey, deformersKey, physicsKey])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the sheet — rebuilding geometry on identity would orphan GPU buffers every render.
   const geometry = useMemo(() => {
     if (!isCloth) return createSheetGeometry(config.sheet, minSegments)
     // Cloth: explicit capped grid so sim particles == mesh vertices.
     const [sx, sy] = resolveSegments(config.sheet, 2)
     const capped = Math.min(Math.max(sx, sy), CLOTH_MAX_SEGMENTS)
     return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, capped, capped)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetKey, minSegments, isCloth])
 
   // Imperatively-created geometry is ours to free — R3F only auto-disposes
@@ -242,6 +243,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     [geometry],
   )
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Rebuild only on geometry or pin layout change — sliders update the sim in place.
   const sim = useMemo(() => {
     if (!isCloth) return null
     const cloth = configRef.current.physics as ClothConfig
@@ -253,8 +255,6 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       wind: cloth.wind,
       floor: cloth.floor,
     })
-    // Rebuild only on geometry or pin layout change — sliders update in place.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geometry, isCloth, isCloth ? (config.physics as ClothConfig).pins : ''])
 
   const stock = getStock(config.stock)
@@ -307,13 +307,13 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     tweenRef.current?.pause()
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Mount-only: autoplay starts once, and the cleanup kills the tween on unmount.
   useEffect(() => {
     if (props.autoplay && !reduced) play()
     return () => {
       tweenRef.current?.kill()
       tweenRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const snapshot = (): PaperConfig => {

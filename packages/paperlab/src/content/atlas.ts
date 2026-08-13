@@ -40,6 +40,7 @@ export function useContentAtlas(
   const [atlas, setAtlas] = useState<ContentAtlas | null>(null)
   const key = JSON.stringify({ contents, w: sheet.width, h: sheet.height, stock: stock.id })
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: key serializes the contents, sheet and stock the atlas draws from.
   useEffect(() => {
     let disposed = false
     const aspect = sheet.height / sheet.width
@@ -91,7 +92,6 @@ export function useContentAtlas(
       disposed = true
       texture.dispose()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   return atlas

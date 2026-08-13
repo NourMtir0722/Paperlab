@@ -43,6 +43,7 @@ export function usePaperStates(
   const lastStateRef = useRef<string>('rest')
   const [animated, setAnimated] = useState<{ config: PaperConfig; state: string } | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: key serializes the config — the machine rebases onto a new config instead of being rebuilt.
   useEffect(() => {
     if (!live) {
       machineRef.current?.dispose()
@@ -69,7 +70,6 @@ export function usePaperStates(
     machineRef.current = machine
     lastStateRef.current = machine.state
     setAnimated({ config: machine.structuralConfig(), state: machine.state })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, live, instant])
 
   useEffect(

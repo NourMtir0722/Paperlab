@@ -106,10 +106,10 @@ export const zoneContains = (zone: ZoneEntry, x: number, y: number): boolean =>
 export function DropZone(props: DropZoneProps) {
   const registry = useContext(DropZoneContext)
   const { id, accept, bounds, highlight = 'glow', onPlace } = props
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — re-registering on object identity would thrash the registry.
   useEffect(() => {
     if (!registry) return
     return registry.register({ id, accept, bounds, highlight, onPlace })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry, id, JSON.stringify(accept ?? null), JSON.stringify(bounds), highlight, onPlace])
   if (!registry) return null
   return <DropZoneVisual registry={registry} config={{ id, accept, bounds, highlight }} />
