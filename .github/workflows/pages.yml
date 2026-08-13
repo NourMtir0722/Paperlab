@@ -8,6 +8,19 @@ name: Deploy site
 # No secrets, no third-party account: the OIDC token below is issued by
 # GitHub to this workflow.
 #
+# NOT ENABLED TODAY, and it is not a toggle anyone forgot to flip: this repo is
+# private, and GitHub Pages does not serve a private repo on the free plan
+# (the API answers 422, "Your current plan does not support GitHub Pages").
+# Enabling it means making the repo public, or GitHub Pro, or hosting the demo
+# somewhere else — see the launch runway in docs/roadmap.md.
+#
+# Until then both jobs below skip themselves. They ran and failed on every
+# push from 2026-08-12 to 2026-08-13: the build always succeeded and
+# deploy-pages always 404'd, mailing a failure each time for a site that
+# cannot exist yet. The guard is `has_pages` rather than a disabled workflow
+# so that nobody has to remember this — enable Pages and the very next push
+# deploys, with no edit here.
+#
 # On a custom domain (paperlab.dev), set BASE to '/' and add the CNAME step.
 
 on:
@@ -29,7 +42,28 @@ env:
   BASE: /Paperlab/
 
 jobs:
+  # TEMPORARY probe — deleted in the next commit. Confirms that
+  # `github.event.repository.has_pages` is actually present in the push
+  # payload, because if it is absent the guards below read falsy forever and
+  # deploys would never resume after Pages is enabled. `null` means absent
+  # (guard is wrong); `false` means present (guard is right).
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "event:     ${{ github.event_name }}"
+          echo "has_pages: ${{ toJSON(github.event.repository.has_pages) }}"
+          echo "private:   ${{ toJSON(github.event.repository.private) }}"
+
   build:
+    # Skipped while Pages is off, which also skips deploy (it `needs` this).
+    # A manual run forces it anyway, so the build stays testable from the
+    # Actions tab. Note the apps are already built by CI on every push
+    # (`pnpm build` → `tsc --noEmit && vite build` in all three), so nothing
+    # is lost by not running here; what this job adds is the PAPERLAB_BASE
+    # subpath wiring and the site assembly, and neither is exercisable
+    # without somewhere to put the result.
+    if: github.event.repository.has_pages || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -81,6 +115,10 @@ jobs:
 
   deploy:
     needs: build
+    # Deliberately NOT `|| workflow_dispatch` like build is: deploying is the
+    # half that cannot work without Pages, so a manual run builds and
+    # assembles the site and stops there rather than 404ing again.
+    if: github.event.repository.has_pages
     runs-on: ubuntu-latest
     environment:
       name: github-pages
