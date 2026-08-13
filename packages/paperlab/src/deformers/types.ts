@@ -6,6 +6,20 @@ export interface SheetDims {
   height: number
 }
 
+/**
+ * The options type of a registry entry whose concrete shape is unknowable at
+ * the storage site. The registries are heterogeneous — every behavior,
+ * deformer and layout declares its own options — and this is the only top type
+ * that admits all of them. `unknown` collapses `keyof O & string` (a
+ * behavior's `progressParam`) to `never`, and `Record<string, unknown>` is
+ * rejected in both directions: an entry's own `stack`/`pose` demands its own
+ * keys, and an interface-declared options type has no implicit index
+ * signature. Narrowing this would close the registries to the community
+ * extensions they exist for.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: the registries are heterogeneous — see above.
+export type AnyOptions = any
+
 export interface DeformerContext {
   /** Seconds since the paper mounted. */
   t: number

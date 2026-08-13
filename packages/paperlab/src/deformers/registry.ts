@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Deformer, DeformerInstance } from './types'
+import type { AnyOptions, Deformer, DeformerInstance } from './types'
 import { roll } from './roll'
 import { curl } from './curl'
 import { bend } from './bend'
@@ -8,14 +8,14 @@ import { wave } from './wave'
 import { drape } from './drape'
 import { crumple } from './crumple'
 
-const registry = new Map<string, Deformer<any>>()
+const registry = new Map<string, Deformer<AnyOptions>>()
 
 /** Community deformers register here; built-ins are pre-registered. */
-export function registerDeformer(deformer: Deformer<any>): void {
+export function registerDeformer(deformer: Deformer<AnyOptions>): void {
   registry.set(deformer.id, deformer)
 }
 
-export function getDeformer(id: string): Deformer<any> {
+export function getDeformer(id: string): Deformer<AnyOptions> {
   const d = registry.get(id)
   if (!d) {
     throw new Error(`[paperlab] Unknown deformer "${id}". Registered: ${[...registry.keys()].join(', ')}`)

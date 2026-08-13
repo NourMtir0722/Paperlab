@@ -118,6 +118,7 @@ export function useContentTexture(
   const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null)
   const key = JSON.stringify({ content: content ?? null, w: sheet.width, h: sheet.height, stock: stock.id })
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: key serializes the content, sheet and stock the canvas draws from.
   useEffect(() => {
     let disposed = false
     let tex: THREE.CanvasTexture | null = null
@@ -149,7 +150,6 @@ export function useContentTexture(
       disposed = true
       tex?.dispose()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   return texture

@@ -94,9 +94,9 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
       () => effectiveFieldPapers(props.papers, props.images),
       [props.papers, props.images],
     )
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — papers and preset are fresh objects every render.
     const groups = useMemo(
       () => groupFieldPapers(papers, props.preset),
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       [JSON.stringify(papers), JSON.stringify(props.preset ?? null)],
     )
     const total = papers.length
@@ -104,11 +104,11 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
     const layoutId = props.layout ?? 'ring'
     const layout = getLayout(layoutId)
     const firstSheet = groups[0]?.config.sheet
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — layoutOptions and the first sheet are fresh objects every render.
     const layoutOptions = useMemo(
       // Sheet grids size their cells from the papers themselves — gutter is
       // then literally the spacing between stamps (explicit cell dims win).
       () => resolveLayoutOptions(layoutId, layout, props.layoutOptions, firstSheet),
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       [layoutId, JSON.stringify(props.layoutOptions ?? {}), firstSheet?.width, firstSheet?.height],
     )
 
@@ -217,6 +217,7 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
       <group ref={ref}>
         {sheetOptions?.backing && <BackingSheet options={sheetOptions} count={total} removed={EMPTY_SET} />}
         {groups.map((group, gi) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: groups are derived from the slot list in order, so position is their only identity.
           <FieldGroup key={`${gi}:${group.indices.length}`} group={group} shared={shared} />
         ))}
       </group>
@@ -235,6 +236,7 @@ function FitCamera(meshProps: PaperFieldMeshProps) {
   const width = useThree((s) => s.size.width)
   const height = useThree((s) => s.size.height)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — the camera refits on prop *content*, not on identity.
   const field = useMemo(() => {
     const papers = effectiveFieldPapers(meshProps.papers, meshProps.images)
     const layoutId = meshProps.layout ?? 'ring'
@@ -242,7 +244,6 @@ function FitCamera(meshProps: PaperFieldMeshProps) {
     const sheet = groupFieldPapers(papers, meshProps.preset)[0]?.config.sheet
     const options = resolveLayoutOptions(layoutId, layout, meshProps.layoutOptions, sheet)
     return { layout, n: papers.length, options, sheet: sheet ?? DEFAULT_SHEET }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     JSON.stringify(meshProps.papers ?? null),
     JSON.stringify(meshProps.images ?? null),
@@ -284,9 +285,9 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
     () => effectiveFieldPapers(meshProps.papers, meshProps.images),
     [meshProps.papers, meshProps.images],
   )
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — must match the mesh derivation above exactly.
   const interactive = useMemo(
     () => fieldIsInteractive(papers, meshProps.preset, meshProps.interactive),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(papers), JSON.stringify(meshProps.preset ?? null), meshProps.interactive],
   )
 

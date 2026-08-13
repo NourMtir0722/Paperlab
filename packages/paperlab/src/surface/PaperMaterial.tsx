@@ -47,7 +47,7 @@ export function PaperMaterial({
   )
 
   // Uniform objects bound to the current program; stable per structure.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Uniform objects are bound per shader program — rebinding on value change would drop the binding every frame.
   const bound = useMemo(() => composed.uniforms, [composed.structureKey])
   useEffect(() => {
     for (const [key, uniform] of Object.entries(composed.uniforms)) {

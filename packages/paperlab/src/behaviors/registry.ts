@@ -1,3 +1,4 @@
+import type { AnyOptions } from '../deformers/types'
 import type { Behavior } from './types'
 import { peel } from './peel'
 import { unroll } from './unroll'
@@ -10,14 +11,14 @@ import { carry } from './carry'
 import { flight } from './flight'
 import { crumpleBehavior } from './crumple'
 
-const registry = new Map<string, Behavior<any>>()
+const registry = new Map<string, Behavior<AnyOptions>>()
 
 /** Community behaviors register here; built-ins are pre-registered. */
-export function registerBehavior(behavior: Behavior<any>): void {
+export function registerBehavior(behavior: Behavior<AnyOptions>): void {
   registry.set(behavior.id, behavior)
 }
 
-export function getBehavior(id: string): Behavior<any> {
+export function getBehavior(id: string): Behavior<AnyOptions> {
   const b = registry.get(id)
   if (!b) {
     throw new Error(`[paperlab] Unknown behavior "${id}". Registered: ${[...registry.keys()].join(', ')}`)

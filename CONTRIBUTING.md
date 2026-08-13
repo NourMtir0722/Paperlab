@@ -68,3 +68,4 @@ Fragment-side effects in `src/surface/compose.ts`: add a chunk (uniform-namespac
 - GSAP owns values, `useFrame` owns geometry/uniform writes — never both on one property.
 - The editor consumes the library only through its public API.
 - Run `pnpm test && pnpm typecheck` before opening a PR; run `pnpm test:parity` if you touched a deformer.
+- The linter is Biome, not ESLint. Hot-path hooks deliberately depend on serialized keys (`resolveConfigKey`, `JSON.stringify(...)`) because the objects behind them are new every render — widening those lists rebuilds geometry and re-parses schemas per frame. Silence the rule with `// biome-ignore lint/correctness/useExhaustiveDependencies: <why>`; an `eslint-disable` comment suppresses nothing here.

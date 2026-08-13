@@ -33,11 +33,11 @@ export function BackingSheet({
   const texture = useMemo(() => (canvas ? new THREE.CanvasTexture(canvas) : null), [canvas])
 
   const removedKey = [...removed].sort((a, b) => a - b).join(',')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — options and the removed set are fresh objects every render.
   useEffect(() => {
     if (!canvas || !texture) return
     drawBacking(canvas, { options, count, tint: BACKING_TINT, removed })
     texture.needsUpdate = true
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvas, texture, JSON.stringify(options), count, removedKey])
   useEffect(() => () => texture?.dispose(), [texture])
 

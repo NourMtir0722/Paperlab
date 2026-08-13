@@ -133,11 +133,8 @@ export function PaperLighting({
     }
   }, [scene, p.fog])
 
-  const goboMap = useMemo(
-    () => (p.gobo ? makeGoboTexture(p.gobo.kind) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [p.gobo?.kind],
-  )
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only the gobo kind rebuilds the texture — drift and intensity animate in place.
+  const goboMap = useMemo(() => (p.gobo ? makeGoboTexture(p.gobo.kind) : null), [p.gobo?.kind])
   useEffect(() => () => goboMap?.dispose(), [goboMap])
 
   const driftRef = useRef(0)

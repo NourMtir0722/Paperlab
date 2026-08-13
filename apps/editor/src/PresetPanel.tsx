@@ -56,6 +56,7 @@ export function PresetPanel() {
   }
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: drop is a pointer-only enhancement; the Import button below opens the same file picker for keyboards.
     <div
       className={dropping ? 'preset-panel dropping' : 'preset-panel'}
       onDragOver={(e) => {

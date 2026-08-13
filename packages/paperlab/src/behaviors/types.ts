@@ -1,9 +1,9 @@
 import type { z } from 'zod'
-import type { DeformerInstance, SheetDims } from '../deformers/types'
+import type { AnyOptions, DeformerInstance, SheetDims } from '../deformers/types'
 import type { AeroPose } from '../physics/aero'
 
 /** A draggable 3D grab point; drags write back to behavior params. */
-export interface HandleSpec<O = any> {
+export interface HandleSpec<O = AnyOptions> {
   id: string
   /** UV-space (0..1) anchor of the grab point on the flat sheet. */
   anchor(o: O, sheet: SheetDims): [number, number]
@@ -18,7 +18,7 @@ export interface HandleSpec<O = any> {
  * underneath is an Advanced disclosure. New behaviors are the community
  * on-ramp: ~50 lines over existing deformers.
  */
-export interface Behavior<O = any> {
+export interface Behavior<O = AnyOptions> {
   id: string
   label: string
   defaults: O

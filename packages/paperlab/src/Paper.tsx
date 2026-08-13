@@ -32,7 +32,7 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
 ) {
   // Keyed on every prop resolveConfig reads — a content/stock/behavior change
   // must refresh the fallback, mirror, and lighting, not just the mesh.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resolveConfigKey serializes every prop resolveConfig reads — the props object itself is new each render.
   const config = useMemo(() => resolveConfig(meshProps), [resolveConfigKey(meshProps)])
   const webgl = useMemo(() => (typeof window === 'undefined' ? true : supportsWebGL()), [])
 

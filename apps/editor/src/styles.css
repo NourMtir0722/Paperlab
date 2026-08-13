@@ -226,6 +226,15 @@ h2 .row-action {
   padding: 3px 0;
 }
 
+.slot-select {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 3px 2px;
+  cursor: pointer;
+}
+
 .slot-index {
   color: #55554f;
   font-size: 11px;
@@ -743,6 +752,8 @@ button.export:hover {
   margin-bottom: 8px;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
+   matches the same element as the .export-dropdown rule above. */
 .guide-head strong {
   font-size: 12px;
   letter-spacing: 0.02em;
@@ -854,6 +865,8 @@ button.export:hover {
   margin: 0 0 10px;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
+   matches the same element as the .export-dropdown rule above. */
 .stage-note strong {
   color: #c9c6c0;
   font-weight: 600;
@@ -891,11 +904,15 @@ button.export:hover {
   background: #23262f;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
+   matches the same element as the .export-dropdown rule above. */
 .stage-preset strong {
   font-size: 13px;
   font-weight: 600;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
+   matches the same element as the .export-dropdown rule above. */
 .stage-preset span {
   color: #8b8a86;
   font-size: 11px;
