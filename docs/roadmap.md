@@ -160,6 +160,13 @@ be a code problem after all — see the npm entry.
         the decision that picked GitHub Pages for having zero credentials and
         no third-party account.
 
+      The workflow no longer fails while it waits. It had mailed a failed
+      "Deploy site" on every push since it landed — build fine, `deploy-pages`
+      404 — so both jobs are now guarded on `has_pages` from the push payload
+      (measured, not assumed: it arrives as `false`, not `null`). **Enable
+      Pages and the next push deploys on its own; there is nothing to
+      un-disable and no variable to set.**
+
       Worth stating plainly, since it now gates the launch: a 3D library whose
       pitch is *real geometry that bends* currently has no place to try it.
       `npm i paperlab` works; "see it move" does not.
