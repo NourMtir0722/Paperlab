@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Deformer } from './types'
+import { segmentsForSine, spanAlong } from '../core/tessellation'
 
 export const waveOptionsSchema = z.object({
   amplitude: z.number().min(0).max(0.3).default(0.04),
@@ -27,7 +28,20 @@ export const wave: Deformer<WaveOptions> = {
   label: 'Wave',
   defaults: waveOptionsSchema.parse({}),
   optionsSchema: waveOptionsSchema,
-  geometry: { minSegments: 32 },
+  geometry: {
+    minSegments: 32,
+    // `displace` is sin(phase) + 0.35·sin(2.7·phase). The harmonic is a
+    // third the amplitude but curvature carries the SQUARE of the frequency,
+    // so 0.35 × 2.7² ≈ 2.6 — the quiet term is the one that sets the grid,
+    // by a factor of two and a half. Take whichever asks for more anyway.
+    autoSegments: (o, sheet) => {
+      const span = spanAlong(sheet, o.angle)
+      return Math.max(
+        segmentsForSine(span, o.amplitude, o.wavelength),
+        segmentsForSine(span, o.amplitude * 0.35, o.wavelength / 2.7),
+      )
+    },
+  },
   animated: true,
   displace(out, uv, o, ctx) {
     if (o.amplitude === 0) return

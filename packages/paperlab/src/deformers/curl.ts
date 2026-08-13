@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Deformer } from './types'
+import { segmentsForArc } from '../core/tessellation'
 
 export const cornerNames = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const
 
@@ -37,7 +38,13 @@ export const curl: Deformer<CurlOptions> = {
   label: 'Curl',
   defaults: curlOptionsSchema.parse({}),
   optionsSchema: curlOptionsSchema,
-  geometry: { minSegments: 48 },
+  geometry: {
+    minSegments: 48,
+    // Curl rolls the corner region around `radius`, travelling inward along
+    // the diagonal as `amount` rises. The diagonal is the span the arc can
+    // reach across, and `radius` is its curvature throughout.
+    autoSegments: (o, sheet) => segmentsForArc(Math.hypot(sheet.width, sheet.height), o.radius),
+  },
   displace(out, _uv, o, ctx) {
     const [sx, sy] = CORNER_SIGNS[o.corner]
     const { width, height } = ctx.sheet

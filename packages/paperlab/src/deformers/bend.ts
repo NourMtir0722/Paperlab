@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Deformer } from './types'
+import { segmentsForArc, spanAlong } from '../core/tessellation'
 
 export const bendOptionsSchema = z.object({
   /** 1/radius in world units; sign flips the arc direction. 0 = flat. */
@@ -46,7 +47,13 @@ export const bend: Deformer<BendOptions> = {
   label: 'Bend',
   defaults: bendOptionsSchema.parse({}),
   optionsSchema: bendOptionsSchema,
-  geometry: { minSegments: 16 },
+  geometry: {
+    minSegments: 16,
+    // A pure circular arc of radius 1/curvature, so the sagitta form answers
+    // this exactly. This is the deformer the old flat 72 over-served most:
+    // at the default 0.6 it wants 24, and the field starter preset is a bend.
+    autoSegments: (o, sheet) => segmentsForArc(spanAlong(sheet, o.angle), 1 / Math.abs(o.curvature)),
+  },
   displace(out, _uv, o) {
     if (Math.abs(o.curvature) < EPS) return
     const dirX = Math.cos(o.angle * DEG)

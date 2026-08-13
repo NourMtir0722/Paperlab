@@ -48,7 +48,7 @@ If a feature can't serialize into a preset, it doesn't ship.
 - **13 paper presets**, **5 stage presets**, **7 stocks**.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **414 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+- **442 tests** + a 37-case GPU/CPU parity gate, all green in CI.
 
 ---
 
@@ -267,18 +267,19 @@ they turned into:
 - ~~Nobody has measured a field of crumples.~~ **Closed, and it corrected
   something we believed.** See below.
 
-### `segments: 'auto'` does not adapt to anything
+### ~~`segments: 'auto'` does not adapt to anything~~ — *done*
 
 Found by building `pnpm perf:field` (`tools/field-perf.mjs` + the
 `field.html` entry, same shape as the stage harness behind `pnpm perf`).
 
 **The schema said `'auto'` "sizes the grid from the active deformers' needs".
-It does not.** It gives the long side a flat 72 segments whatever is on the
-sheet; a deformer's `minSegments` is only a floor and nothing ever lowers it.
-So a blank sheet is tessellated exactly as finely as a crumpled one, and
+It did not.** It gave the long side a flat 72 segments whatever was on the
+sheet; a deformer's `minSegments` was only a floor and nothing ever lowered
+it. So a blank sheet was tessellated exactly as finely as a crumpled one, and
 `crumple`'s `minSegments: 72` — which the changeset first described as asking
-for more geometry than anything else in the set — is a no-op unless a preset
-hand-picks a coarser grid. The comment is corrected; the behaviour is not.
+for more geometry than anything else in the set — was a no-op unless a preset
+hand-picked a coarser grid. The comment was corrected first; the behaviour
+below.
 
 Measured, at 20 papers in a ring (**SwiftShader**, which is what headless
 Chromium actually runs — a weak-machine floor, not a GPU number):
@@ -296,11 +297,53 @@ normal), not the grid. **Nobody has run this on a real GPU** — headless
 Chromium won't give one — so the absolute numbers are a floor and the ratio
 is the useful part.
 
-The open question is what `'auto'` should be. Lowering it is a real
-performance win for every simple preset and a visible regression risk for
-every smooth deformer (a `bend` at 16 segments is visibly faceted where 72 is
-not), across every preset and every recorded asset. That is a change with
-library-wide visual consequences and it wants a decision, not a tidy-up.
+**Answered. `'auto'` now sizes the grid from the active deformers.**
+
+The decision that unlocked it: `minSegments` is a correctness FLOOR, and what
+`'auto'` needed is a quality TARGET — which has to depend on the options,
+because a bend at `curvature: 0.05` and a roll at `radius: 0.02` are not the
+same request and one constant per deformer cannot answer for both. Deformers
+now declare `geometry.autoSegments(options, sheet)` beside their floor, and
+six of the seven derive it from one formula: a mesh is a piecewise-linear
+stand-in for a curved surface, the error is the sagitta `h²/8r`, and
+inverting that turns "how many segments?" into arithmetic on the radius the
+options imply.
+
+The regression risk named above is handled by **calibration rather than
+nerve**. At the old flat 72 the default `roll` already ran at a sagitta of
+3.9e-4, so that is the tolerance: the tightest configuration in common use
+keeps the density it ships with, everything gentler stops overpaying, and
+`'auto'` is capped at 72 so it can only ever subdivide *less* than before.
+The specific worry — "a `bend` at 16 segments is visibly faceted" — turns out
+to be about tight bends: 16 is only handed out when the arc is gentle enough
+to earn it, and a `curvature: 4` bend resolves to 64. Measured, not argued:
+`core/tessellation.test.ts` compares the deformed chord midpoint against the
+deformer's own answer at that midpoint for every edge of the resolved grid,
+across each deformer's real option range, and proves the measure has teeth by
+forcing a tight bend onto the coarsest grid and requiring it to fail.
+
+Worth (`pnpm perf:field --soft`): `typed-note` ×60 goes 261.5 ms → 37.7 ms a
+frame, 4 fps → 27, at 1.3% of the triangles. `photo-print`, the field
+starter, drops 93%. `receipt-unroll`, `letter-fold` and `hanging-poster` are
+untouched, because they were the ones actually using the density.
+
+**Two things it turned up, neither of them fixed here.**
+
+- **`fold`, `wave` and `drape` are under-tessellated at their tighter
+  settings, and always have been.** They ask for 127, 165 and more; the
+  ceiling is 72, so they are pinned there and carry a sagitta several times
+  what `roll` does. That is why the faceting test passes them on a
+  "no worse than the 72 it replaced" clause rather than on tolerance — the
+  clause is documenting a real gap, not creating slack. Raising the ceiling
+  would fix it and would make those presets more expensive and slightly
+  different-looking, which is its own decision with its own evidence.
+- **`FIELD_SEGMENT_CAP` was a no-op for `'auto'` sheets, exactly as
+  `minSegments` was.** Field mode capped the deformer floor at 48 and then
+  `'auto'` handed out 72 regardless. It now caps the target too, so a field
+  of crumples renders 48 × 48 instead of 57 × 72 — a third off the frame time,
+  and visibly slightly coarser creases in field mode only. Hero mode is
+  untouched. Flagged because it is a visual change nobody asked for, arrived
+  at by making an existing policy work.
 
 ### 4. Smaller things worth doing
 

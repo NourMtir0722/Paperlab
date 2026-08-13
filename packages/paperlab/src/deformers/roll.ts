@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Deformer } from './types'
+import { segmentsForArc, spanAlong } from '../core/tessellation'
 
 export const rollOptionsSchema = z.object({
   /** Direction of rolling in the sheet plane, degrees. 0 = +x, 90 = +y. */
@@ -29,7 +30,13 @@ export const roll: Deformer<RollOptions> = {
   label: 'Roll',
   defaults: rollOptionsSchema.parse({}),
   optionsSchema: rollOptionsSchema,
-  geometry: { minSegments: 48 },
+  geometry: {
+    minSegments: 48,
+    // The winding radius is the tightest curvature on the sheet — `spiral`
+    // only grows it as the roll winds outward, so the first turn is the one
+    // that sets the density.
+    autoSegments: (o, sheet) => segmentsForArc(spanAlong(sheet, o.angle), o.radius),
+  },
   displace(out, _uv, o) {
     const dirX = Math.cos(o.angle * DEG)
     const dirY = Math.sin(o.angle * DEG)
