@@ -6,7 +6,7 @@
 > sells the product, `AGENTS.md` documents the API, and this file explains the
 > *intent* behind both.
 >
-> Last updated 2026-08-12 · library at `0.1.0`
+> Last updated 2026-08-13 · library at `0.2.0`, published
 
 ---
 
@@ -105,16 +105,66 @@ twin; `pnpm test:parity` is a hard gate, not a suggestion.
 
 ## Now — the launch runway
 
-Nothing here is a code problem. It's all distribution.
+This was filed as pure distribution, no code. One of the two turned out to
+be a code problem after all — see the npm entry.
 
-- [ ] **Publish `0.1.0` to npm.** Push, then merge the changesets release PR.
-      The published `0.0.1` predates stage mode entirely, so today `npm i
-      paperlab` gives people a library that can't do what the README shows.
-      *(Everything downstream points at this — do it first.)*
-- [ ] **Turn on the demo.** Settings → Pages → Source: "GitHub Actions". The
-      workflow is written and verified; the playground goes live at the root,
-      the editor at `/editor`.
-- [ ] Product Hunt / launch posts, once both of the above are true.
+- [x] **Published to npm — `0.2.0`, not `0.1.0`.** Done 2026-08-13. The
+      registry had served `0.0.1` since July; `main` carried a `0.1.0` that npm
+      never saw, because the release workflow only ever *opened* the version PR
+      while unconsumed changesets existed — `changeset publish` had never run
+      once. Merging that PR consumed five changesets, one of them a minor
+      (`crumple`), so the published version is **`0.2.0`** and `0.1.0` is a
+      version that will never exist on the registry. Verified by installing the
+      tarball: stage mode, `crumple`, the registries and the generated README
+      are all in it.
+
+      **Two things it cost, both worth keeping:**
+
+      - **The publish failed the first time, after the version bump had already
+        landed on `main`.** `EUNKNOWNCONFIG Unknown cli flag: --git-checks`.
+        Changesets publishes through pnpm, pnpm hands its own `--no-git-checks`
+        down to npm, and npm had always ignored flags it didn't recognise.
+        npm 11 warns "*this will stop working in the next major version of
+        npm*"; npm 12 is that major and rejects it. The workflow asked for
+        `npm@latest` to clear trusted publishing's `>= 11.5.1` floor, so it got
+        12 on the day 12 shipped. Now pinned to `npm@11`, and **the pin is
+        load-bearing** — unpin only when pnpm or changesets stops passing that
+        flag. The general shape: `@latest` in a release path is a dependency on
+        a version that does not exist yet.
+      - **There is no provenance, and the workflow comment claiming otherwise
+        was wrong.** Trusted publishing over OIDC authenticated fine, but the
+        published version carries no attestations — npm will not attest a build
+        from a private repository. Provenance arrives free if the repo ever
+        goes public, and not before.
+
+- [ ] **Turn on the demo — blocked, and not by the workflow.** `pages.yml` is
+      written and correct (playground at the root, editor at `/editor`, docs at
+      `/docs`). **The repo is private, and GitHub Pages will not serve a private
+      repo on the free plan** — the API refuses with "Your current plan does not
+      support GitHub Pages for this repository." Nothing here or in the launch
+      notes had ever recorded that the repo was private; the plan assumed Pages
+      would simply switch on.
+
+      Asked and answered 2026-08-13: **stay private, demo stays off for now.**
+      The three ways out, for whenever it is picked up again:
+
+      - **Make the repo public.** Free, switches Pages on immediately, and
+        brings provenance with it. It is also what the rest of this project
+        already assumes — Apache-2.0, a `CONTRIBUTING.md` contribution ladder,
+        a community gallery whose v1 is *"a PR adds a `.paper` file"*, and a
+        goal that reads "from the community to the community". None of those
+        can land against a private repo.
+      - **GitHub Pro** (~$4/mo) keeps the source closed and the demo live, but
+        leaves the contribution ladder with nowhere to land.
+      - **Host the demo elsewhere** (Cloudflare Pages, Netlify), which re-opens
+        the decision that picked GitHub Pages for having zero credentials and
+        no third-party account.
+
+      Worth stating plainly, since it now gates the launch: a 3D library whose
+      pitch is *real geometry that bends* currently has no place to try it.
+      `npm i paperlab` works; "see it move" does not.
+- [ ] Product Hunt / launch posts. npm is live; the demo is not, and a
+      launch post with nothing to click is the weaker half of this.
 
 ---
 

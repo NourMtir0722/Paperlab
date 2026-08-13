@@ -43,7 +43,10 @@ jobs:
         run: pnpm build
 
       # No NPM_TOKEN: npm authenticates this workflow via OIDC, configured as a
-      # trusted publisher on the package. Provenance is automatic.
+      # trusted publisher on the package. Note that provenance is NOT automatic
+      # here — 0.2.0 published clean over OIDC and carries no attestations,
+      # because npm will not attest a build from a private repository. If the
+      # repo ever goes public, provenance starts arriving on its own.
       - name: Create release PR or publish to npm
         uses: changesets/action@v1
         with:
