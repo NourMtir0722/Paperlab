@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Deformer } from './types'
+import { segmentsForArc, spanAlong } from '../core/tessellation'
 
 export const foldOptionsSchema = z.object({
   /** Direction of the fold travel in the sheet plane, degrees (the crease line runs perpendicular). */
@@ -27,7 +28,13 @@ export const fold: Deformer<FoldOptions> = {
   label: 'Fold',
   defaults: foldOptionsSchema.parse({}),
   optionsSchema: foldOptionsSchema,
-  geometry: { minSegments: 48 },
+  geometry: {
+    minSegments: 48,
+    // The fillet is an arc of `radius`; everything either side of it is flat.
+    // The crease is small, but the grid is uniform, so the density it needs
+    // is the density the whole sheet gets.
+    autoSegments: (o, sheet) => segmentsForArc(spanAlong(sheet, o.angle), o.radius),
+  },
   displace(out, _uv, o) {
     const phi = o.foldAngle * DEG
     if (Math.abs(phi) < 1e-6) return

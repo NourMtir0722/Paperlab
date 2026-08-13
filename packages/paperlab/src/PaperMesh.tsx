@@ -19,10 +19,11 @@ import type {
 import { paperConfigSchema } from './config/schema'
 import { mergeConfig, parsePreset, serializePreset } from './config/serialize'
 import { createSheetGeometry, resolveSegments } from './core/sheet'
+import { FLAT_SEGMENTS } from './core/tessellation'
 import { getStock } from './core/stock'
 import { getPreset } from './config/presets'
 import { useContentTexture } from './content/texture'
-import { applyDeformerStack, displacePoint, stackMinSegments } from './deformers/compose'
+import { applyDeformerStack, displacePoint, stackAutoSegments, stackMinSegments } from './deformers/compose'
 import { stackIsAnimated } from './deformers/registry'
 import type { DeformerInstance } from './deformers/types'
 import { getBehavior } from './behaviors/registry'
@@ -150,6 +151,10 @@ export function resolveConfig(props: PaperMeshProps): PaperConfig {
 /** Cloth grids cap their resolution — 5k verlet particles is the budget ceiling. */
 const CLOTH_MAX_SEGMENTS = 28
 
+/** Where `'auto'` probes a behavior's sweep. Endpoints matter most — a play
+ *  usually starts or ends at its tightest. */
+const PROGRESS_SAMPLES = [0, 0.25, 0.5, 0.75, 1] as const
+
 const dragPlane = new THREE.Plane()
 const dragPoint = new THREE.Vector3()
 const planeNormal = new THREE.Vector3()
@@ -220,19 +225,37 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   }, [behaviorKey, deformersKey, sheetKey, physicsKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the stack shape — the probe reads config off a ref.
-  const minSegments = useMemo(() => {
-    const probe = buildStack(configRef.current, {})
-    return probe ? stackMinSegments(probe) : 2
+  const [minSegments, autoSegments] = useMemo((): [number, number] => {
+    const cfg = configRef.current
+    const probe = buildStack(cfg, {})
+    if (!probe) return [2, FLAT_SEGMENTS]
+
+    // The grid is built once; a behavior's stack is not the same shape all
+    // the way through. An unroll is a tight roll at one end of its progress
+    // and a flat sheet at the other, so sizing to the configured moment
+    // would leave the sheet under-tessellated for the rest of the play.
+    // Sample the sweep and keep the densest answer. Every behavior's
+    // progressParam is a 0..1 number — pinned by behaviors.test.ts, because
+    // this loop silently samples the wrong range if that ever stops holding.
+    let want = stackAutoSegments(probe, cfg.sheet)
+    if (cfg.behavior && !cfg.deformers) {
+      const param = getBehavior(cfg.behavior.type).progressParam
+      for (const p of PROGRESS_SAMPLES) {
+        const at = buildStack(cfg, { [param]: p })
+        if (at) want = Math.max(want, stackAutoSegments(at, cfg.sheet))
+      }
+    }
+    return [stackMinSegments(probe), want]
   }, [behaviorKey, deformersKey, physicsKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the sheet — rebuilding geometry on identity would orphan GPU buffers every render.
   const geometry = useMemo(() => {
-    if (!isCloth) return createSheetGeometry(config.sheet, minSegments)
+    if (!isCloth) return createSheetGeometry(config.sheet, minSegments, autoSegments)
     // Cloth: explicit capped grid so sim particles == mesh vertices.
     const [sx, sy] = resolveSegments(config.sheet, 2)
     const capped = Math.min(Math.max(sx, sy), CLOTH_MAX_SEGMENTS)
     return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, capped, capped)
-  }, [sheetKey, minSegments, isCloth])
+  }, [sheetKey, minSegments, autoSegments, isCloth])
 
   // Imperatively-created geometry is ours to free — R3F only auto-disposes
   // JSX-created objects, so a sheet change would otherwise orphan GPU buffers.

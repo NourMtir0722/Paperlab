@@ -108,7 +108,12 @@ export {
   listDeformers,
   resolveDeformerStack,
 } from './deformers/registry'
-export { applyDeformerStack, displacePoint, stackMinSegments } from './deformers/compose'
+export {
+  applyDeformerStack,
+  displacePoint,
+  stackAutoSegments,
+  stackMinSegments,
+} from './deformers/compose'
 export { roll, rollOptionsSchema, type RollOptions } from './deformers/roll'
 export { curl, curlOptionsSchema, cornerNames, type CurlOptions } from './deformers/curl'
 export { bend, bendOptionsSchema, type BendOptions } from './deformers/bend'
@@ -257,4 +262,17 @@ export {
 } from './config/presets'
 export { stocks, getStock, type Stock } from './core/stock'
 export { createSheetGeometry, resolveSegments } from './core/sheet'
+// The arithmetic behind `geometry.autoSegments`. Public because
+// `registerDeformer` is: a deformer someone else writes has to be able to
+// answer the same question the built-in seven answer, and the answer should
+// be the same formula rather than a guess at what the library does.
+export {
+  AUTO_CEILING,
+  FLAT_SEGMENTS,
+  quantizeSegments,
+  SAG_TOL,
+  segmentsForArc,
+  segmentsForSine,
+  spanAlong,
+} from './core/tessellation'
 export { resolveMode, type PaperMode, type PaperModeRequest } from './core/modes'

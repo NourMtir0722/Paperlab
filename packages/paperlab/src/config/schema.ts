@@ -34,10 +34,19 @@ export const sheetSchema = z.object({
   /** Visual thickness in mm-ish units; drives edge/shadow treatment, not geometry (yet). */
   thickness: z.number().min(0).max(2).default(0.2),
   /**
-   * `'auto'` gives the LONG side 72 segments, whatever is on the sheet — a
-   * deformer's `minSegments` can only raise that floor, never lower it, so in
-   * practice a blank sheet is tessellated exactly as finely as a crumpled
-   * one. Set a number to take the decision yourself.
+   * `'auto'` sizes the grid from the active deformers' needs — genuinely, as
+   * of 0.3.0. It asks each one what these options require (a gentle bend and
+   * a tight roll are not the same request), takes the densest answer, and
+   * snaps it to a ladder so dragging a slider does not rebuild the mesh.
+   *
+   * It is capped at 72, which is what it used to hand out flat regardless of
+   * what was on the sheet, so `'auto'` can only ever subdivide LESS than it
+   * did before — a blank sheet drops from 72 a side to 8, and stops being
+   * tessellated as finely as a crumpled one.
+   *
+   * Set a number to take the decision yourself; a deformer's `minSegments`
+   * still raises it, because that is a correctness floor rather than a
+   * preference.
    */
   segments: z.union([z.literal('auto'), z.number().int().min(2).max(256)]).default('auto'),
   cornerRadius: z.number().min(0).max(0.5).default(0),

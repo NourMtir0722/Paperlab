@@ -85,10 +85,15 @@ function cellSign(cx: number, cy: number, seed: number): number {
  * over a dense grid, the field path probes two tangents a hundredth of a
  * sheet apart. Both need facets several segments wide.
  *
- * Cost, measured rather than assumed: a field of these runs about 45% longer
- * per frame than the same field of an undeformed preset, and almost none of
- * that is geometry — `segments: 'auto'` already gives every sheet 72 a side.
- * It is the nine cell lookups per probe, three probes deep for the normal.
+ * Cost, measured rather than assumed (`pnpm perf:field --soft`): a field of
+ * these runs about four times longer per frame at ×20, and six at ×60, than
+ * the same field of an undeformed preset. That ratio used to read 45%, and it
+ * grew without this deformer getting one instruction slower — `'auto'` now
+ * sizes the grid to the work, so the undeformed sheet it is measured against
+ * went from 72 segments a side to 8 and got very cheap, while crumple keeps
+ * the density its creases need. Which makes the point sharper than before:
+ * almost none of this cost is geometry. It is the nine cell lookups per
+ * probe, three probes deep for the normal.
  */
 export const crumple: Deformer<CrumpleOptions> = {
   id: 'crumple',
@@ -96,11 +101,18 @@ export const crumple: Deformer<CrumpleOptions> = {
   defaults: crumpleOptionsSchema.parse({}),
   optionsSchema: crumpleOptionsSchema,
   // A crease the grid cannot resolve is a smooth bump, and a sheet of smooth
-  // bumps is not a crumple. Note this is a FLOOR, and `segments: 'auto'`
-  // already hands the long side 72 — so this only bites when a preset asks
-  // for a coarser grid by hand. Measured (`pnpm perf:field`), the real cost
-  // of this deformer is not geometry at all: it is nine cell evaluations per
+  // bumps is not a crumple. Measured (`pnpm perf:field`), the real cost of
+  // this deformer is not geometry at all: it is nine cell evaluations per
   // probe and three probes per vertex for the normal.
+  //
+  // No `autoSegments` here, and that is the honest answer rather than an
+  // omission. Every other deformer approximates a smooth surface, so its
+  // density falls out of a radius; a crumple's creases are where the gradient
+  // is MEANT to break, so there is no sagitta to bound. What it wants is
+  // segments per cell, and at the default `scale: 3` across a 1.4 span that
+  // works out to the 72 this floor already asks for. So crumple is the one
+  // deformer `'auto'` does not make cheaper — its floor was never the no-op
+  // the others' were.
   geometry: { minSegments: 72 },
   displace(out, _uv, o) {
     if (o.amount === 0) return

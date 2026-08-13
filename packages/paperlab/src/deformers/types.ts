@@ -52,7 +52,24 @@ export interface Deformer<O = Record<string, unknown>> {
      */
     strength?: keyof O & string
   }
-  geometry?: { minSegments?: number }
+  geometry?: {
+    /**
+     * Correctness floor: the density below which this deformer stops working,
+     * whatever the options. Never lowered by anything.
+     */
+    minSegments?: number
+    /**
+     * Quality target for `segments: 'auto'` — how much subdivision THESE
+     * options need to read as a surface rather than as facets. Depends on the
+     * options because it has to: a gentle bend and a tight roll want an order
+     * of magnitude apart from the same deformer. See `core/tessellation.ts`
+     * for the sagitta argument the implementations share.
+     *
+     * Omit it and `'auto'` falls back to `minSegments`, which is the honest
+     * answer for a deformer whose cost does not vary with its options.
+     */
+    autoSegments?(options: O, sheet: SheetDims): number
+  }
   /** Time-driven: stacks containing this deformer re-deform every frame. */
   animated?: boolean
 }

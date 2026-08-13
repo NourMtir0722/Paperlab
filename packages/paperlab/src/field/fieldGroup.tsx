@@ -6,7 +6,7 @@ import CustomShaderMaterial from 'three-custom-shader-material'
 import { getStock } from '../core/stock'
 import { createSheetGeometry } from '../core/sheet'
 import { getBehavior } from '../behaviors/registry'
-import { stackMinSegments } from '../deformers/compose'
+import { stackAutoSegments, stackMinSegments } from '../deformers/compose'
 import type { DeformerInstance, SheetDims } from '../deformers/types'
 import type { AeroPose } from '../physics/aero'
 import { useContentAtlas } from '../content/atlas'
@@ -24,6 +24,9 @@ import type { FieldGroupData } from './slots'
 const scratchObj = new THREE.Object3D()
 const scratchAero: AeroPose = { position: [0, 0, 0], rotation: [0, 0, 0] }
 export const FIELD_SEGMENT_CAP = 48
+
+/** Mirrors the hero path's sweep sampling — see PaperMesh. */
+const PROGRESS_SAMPLES = [0, 0.25, 0.5, 0.75, 1] as const
 
 /** Motion state shared across groups so a mixed-preset field moves as one field. */
 export interface SharedMotion {
@@ -75,6 +78,13 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
           config.sheet.segments === 'auto' ? 'auto' : Math.min(config.sheet.segments, FIELD_SEGMENT_CAP),
       },
       Math.min(stackMinSegments(initialStack), FIELD_SEGMENT_CAP),
+      // Same sweep-sampling as the hero path: one buffer serves every
+      // instance for the whole play, so it has to hold the densest moment of
+      // it, not the current one.
+      Math.min(
+        Math.max(...PROGRESS_SAMPLES.map((p) => stackAutoSegments(buildStackAt(p), config.sheet))),
+        FIELD_SEGMENT_CAP,
+      ),
     )
     const atlasIdx = new Float32Array(count)
     const phase = new Float32Array(count)

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Deformer } from './types'
+import { segmentsForSine } from '../core/tessellation'
 
 export const drapeOptionsSchema = z.object({
   /** Fold depth at the free edge, world units. */
@@ -44,7 +45,20 @@ export const drape: Deformer<DrapeOptions> = {
   label: 'Drape',
   defaults: drapeOptionsSchema.parse({}),
   optionsSchema: drapeOptionsSchema,
-  geometry: { minSegments: 48 },
+  geometry: {
+    minSegments: 48,
+    // `folds` fold across the width, so the wavelength is width/folds, and
+    // the irregular term rides at 1.7x that frequency. Same reasoning as
+    // wave: the faster term usually wins despite the smaller amplitude.
+    autoSegments: (o, sheet) => {
+      if (o.folds <= 0) return 0
+      const lambda = sheet.width / o.folds
+      return Math.max(
+        segmentsForSine(sheet.width, o.amplitude, lambda),
+        segmentsForSine(sheet.width, o.amplitude * 0.6 * o.irregular, lambda / 1.7),
+      )
+    },
+  },
   displace(out, uv, o) {
     if (o.amplitude === 0) return
     // Distance from the pinned edge, 0 at the fixing and 1 at the free end.
