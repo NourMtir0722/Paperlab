@@ -27,8 +27,14 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       # Trusted Publishing (OIDC) needs npm >= 11.5.1; Node 22 ships npm 10.
+      # Pinned to 11 rather than `latest`, and the pin is load-bearing:
+      # changesets publishes through pnpm, and pnpm hands its own
+      # `--no-git-checks` down to npm. npm 11 warns about the unknown flag and
+      # carries on; npm 12 rejects it outright (EUNKNOWNCONFIG) and the publish
+      # fails after the version bump has already landed on main. Unpin when
+      # pnpm or changesets stops passing that flag to npm.
       - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
