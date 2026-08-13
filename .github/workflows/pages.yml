@@ -42,19 +42,6 @@ env:
   BASE: /Paperlab/
 
 jobs:
-  # TEMPORARY probe — deleted in the next commit. Confirms that
-  # `github.event.repository.has_pages` is actually present in the push
-  # payload, because if it is absent the guards below read falsy forever and
-  # deploys would never resume after Pages is enabled. `null` means absent
-  # (guard is wrong); `false` means present (guard is right).
-  probe:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          echo "event:     ${{ github.event_name }}"
-          echo "has_pages: ${{ toJSON(github.event.repository.has_pages) }}"
-          echo "private:   ${{ toJSON(github.event.repository.private) }}"
-
   build:
     # Skipped while Pages is off, which also skips deploy (it `needs` this).
     # A manual run forces it anyway, so the build stays testable from the
