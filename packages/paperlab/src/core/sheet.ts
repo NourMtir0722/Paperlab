@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { SheetConfig } from '../config/schema'
-import { AUTO_CEILING, FLAT_SEGMENTS, quantizeSegments } from './tessellation'
+import { FLAT_SEGMENTS, LEGACY_FLAT_SEGMENTS, quantizeSegments } from './tessellation'
 
 /**
  * Resolve the subdivision grid for a sheet.
@@ -18,13 +18,14 @@ import { AUTO_CEILING, FLAT_SEGMENTS, quantizeSegments } from './tessellation'
  * not rebuild the mesh, and capped at what it used to give flat so this can
  * only ever subdivide less.
  *
- * Omitting `autoSegments` keeps the old flat behaviour, which is what an
- * external caller with no stack in hand should get.
+ * Omitting `autoSegments` keeps the old flat 72, which is what a caller with
+ * no deformer stack in hand should get — this helper is exported, and its
+ * answer to an unchanged call should not have changed.
  */
 export function resolveSegments(
   sheet: SheetConfig,
   minSegments = 2,
-  autoSegments = AUTO_CEILING,
+  autoSegments = LEGACY_FLAT_SEGMENTS,
 ): [number, number] {
   if (sheet.segments !== 'auto') {
     const s = Math.max(sheet.segments, minSegments)
@@ -45,7 +46,7 @@ export function resolveSegments(
 export function createSheetGeometry(
   sheet: SheetConfig,
   minSegments = 2,
-  autoSegments = AUTO_CEILING,
+  autoSegments = LEGACY_FLAT_SEGMENTS,
 ): THREE.PlaneGeometry {
   const [sx, sy] = resolveSegments(sheet, minSegments, autoSegments)
   return new THREE.PlaneGeometry(sheet.width, sheet.height, sx, sy)

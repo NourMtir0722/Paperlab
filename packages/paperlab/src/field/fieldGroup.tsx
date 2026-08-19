@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import CustomShaderMaterial from 'three-custom-shader-material'
 import { getStock } from '../core/stock'
 import { createSheetGeometry } from '../core/sheet'
+import { LEGACY_FLAT_SEGMENTS } from '../core/tessellation'
 import { getBehavior } from '../behaviors/registry'
 import { stackAutoSegments, stackMinSegments } from '../deformers/compose'
 import type { DeformerInstance, SheetDims } from '../deformers/types'
@@ -23,7 +24,23 @@ import type { FieldGroupData } from './slots'
 
 const scratchObj = new THREE.Object3D()
 const scratchAero: AeroPose = { position: [0, 0, 0], rotation: [0, 0, 0] }
+/**
+ * Caps the FLOOR a deformer stack can demand of a field instance. Field mode
+ * trades a deformer's stated minimum for instance count, which hero mode
+ * never does.
+ */
 export const FIELD_SEGMENT_CAP = 48
+
+/**
+ * Caps what `'auto'` may ASK for in a field, as distinct from the floor above.
+ *
+ * The old flat value, because that is what a field effectively always got:
+ * `'auto'` handed out 72 and `FIELD_SEGMENT_CAP` never reached it. Holding it
+ * there keeps field geometry exactly where it has always been while the hero
+ * ceiling rises to 128 — and the asymmetry is the point, since a field draws
+ * this buffer once per instance and sixty of them is the measured case.
+ */
+const FIELD_AUTO_CEILING = LEGACY_FLAT_SEGMENTS
 
 /** Mirrors the hero path's sweep sampling — see PaperMesh. */
 const PROGRESS_SAMPLES = [0, 0.25, 0.5, 0.75, 1] as const
@@ -81,9 +98,16 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
       // Same sweep-sampling as the hero path: one buffer serves every
       // instance for the whole play, so it has to hold the densest moment of
       // it, not the current one.
+      //
+      // Bounded by FIELD_AUTO_CEILING and NOT by FIELD_SEGMENT_CAP, which is
+      // a floor cap and stays one. Capping the target at 48 as well looked
+      // tidy and was a visual regression: it is the only thing that could
+      // have held `crumple` — whose creases have no target, only a floor of
+      // 72 — down to 48 in a field, which is coarser than the deformer says
+      // it needs to look like a crumple at all.
       Math.min(
         Math.max(...PROGRESS_SAMPLES.map((p) => stackAutoSegments(buildStackAt(p), config.sheet))),
-        FIELD_SEGMENT_CAP,
+        FIELD_AUTO_CEILING,
       ),
     )
     const atlasIdx = new Float32Array(count)
