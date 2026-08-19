@@ -8,6 +8,7 @@ import { resolveSegments } from './sheet'
 import {
   AUTO_CEILING,
   FLAT_SEGMENTS,
+  LEGACY_FLAT_SEGMENTS,
   quantizeSegments,
   SAG_TOL,
   segmentsForArc,
@@ -17,13 +18,18 @@ import {
 
 const SHEET = { width: 1, height: 1.4 }
 
+/** What `'auto'` handed out flat before it adapted — the baseline every
+ *  "is this worse than it was?" question is asked against. */
+const LEGACY_FLAT = LEGACY_FLAT_SEGMENTS
+
 describe('quantizeSegments', () => {
   it('snaps up to the next ladder step, never down', () => {
     expect(quantizeSegments(1)).toBe(FLAT_SEGMENTS)
     expect(quantizeSegments(FLAT_SEGMENTS)).toBe(FLAT_SEGMENTS)
     expect(quantizeSegments(13)).toBe(16)
     expect(quantizeSegments(25)).toBe(32)
-    expect(quantizeSegments(65)).toBe(AUTO_CEILING)
+    expect(quantizeSegments(65)).toBe(LEGACY_FLAT)
+    expect(quantizeSegments(100)).toBe(AUTO_CEILING)
   })
 
   it('clamps at the ceiling rather than growing without bound', () => {
@@ -132,7 +138,7 @@ function autoGridFor(type: string, options: Record<string, unknown>): [number, n
 
 /** The grid the old flat-72 `'auto'` would have produced for the same sheet. */
 function legacyGridFor(type: string): [number, number] {
-  return resolveSegments(AS_SHEET, getDeformer(type).geometry?.minSegments ?? 2, AUTO_CEILING)
+  return resolveSegments(AS_SHEET, getDeformer(type).geometry?.minSegments ?? 2, LEGACY_FLAT)
 }
 
 describe("the grid 'auto' picks holds the surface", () => {
@@ -237,8 +243,8 @@ describe("the grid 'auto' picks holds the surface", () => {
   })
 })
 
-describe("'auto' only ever subdivides less than it used to", () => {
-  it('no deformer resolves above the flat 72 it replaced', () => {
+describe("'auto' stays inside its budget", () => {
+  it('no deformer at its defaults resolves above the ceiling', () => {
     for (const id of listDeformers()) {
       const deformer = getDeformer(id)
       const options = deformer.defaults as Record<string, unknown>

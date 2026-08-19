@@ -35,17 +35,34 @@ import type { SheetDims } from '../deformers/types'
 export const SAG_TOL = 4e-4
 
 /**
- * Ceiling for `'auto'`, and deliberately the value `'auto'` used to hand out
- * flat: **this change only ever subdivides less, never more.**
+ * Ceiling for `'auto'` in hero mode, and it is a CPU budget rather than a
+ * round number.
  *
- * The arithmetic below asks for more than this in the tight cases (a
- * `radius: 0.01` roll wants ~350), and it may well be right — but raising the
- * ceiling changes how every existing preset looks and costs, which is a
- * separate decision with its own evidence. Capping here keeps this change to
- * the half that is provably safe: nothing gets coarser than it needs, nothing
- * gets finer than it already was. Set `segments` to a number to go past it.
+ * Hero mode re-deforms every vertex in JS on the main thread, every frame,
+ * for any animated stack — and `wave` is animated, so a hanging poster pays
+ * it forever rather than only while something plays. Measured, one sheet,
+ * one re-deform (`drape + wave`, and `crumple` tracks it within 5%):
+ *
+ * |  grid |  verts |    ms |
+ * | ----: | -----: | ----: |
+ * |    72 |  3,796 |  0.67 |
+ * |   128 | 11,868 |  2.05 |
+ * |   192 | 26,634 |  4.53 |
+ * |   256 | 47,288 |  7.89 |
+ *
+ * 256 is half a 60 fps frame spent in JS on a single sheet, on a fast
+ * machine; 192 is a quarter of one. 128 is roughly 2 ms here and the last
+ * step that still leaves room for a scene around it, so that is the line.
+ *
+ * It is deliberately NOT high enough for everything the arithmetic asks: a
+ * `radius: 0.01` roll wants ~350, and `drape` at its deepest wants 165. Those
+ * stay capped, and the gap is real rather than hidden — see docs/roadmap.md.
+ * Set `segments` to a number (up to the schema's 256) to go past it.
+ *
+ * A field is capped far lower and separately, because a field draws this
+ * geometry N times — see `FIELD_AUTO_CEILING`.
  */
-export const AUTO_CEILING = 72
+export const AUTO_CEILING = 128
 
 /**
  * What a sheet gets when nothing deforms it. A flat plane is exact at one
@@ -55,13 +72,23 @@ export const AUTO_CEILING = 72
 export const FLAT_SEGMENTS = 8
 
 /**
+ * What `'auto'` handed out flat, on every sheet, before it learned to adapt.
+ *
+ * Still load-bearing in two places: it is what `resolveSegments` assumes when
+ * a caller has no deformer stack to ask (so the exported helper answers today
+ * exactly what it answered before), and it is what a field is allowed to ask
+ * for, since a field draws its buffer once per instance.
+ */
+export const LEGACY_FLAT_SEGMENTS = 72
+
+/**
  * Resolved counts are snapped to this ladder. Without it the grid would be a
  * continuous function of the options, so dragging a curvature slider would
  * rebuild the geometry — a new `PlaneGeometry`, a fresh base-position copy,
  * and a disposed buffer — on every tick. Snapped, a drag crosses a step
  * rarely and holds one buffer the rest of the time.
  */
-const LADDER = [FLAT_SEGMENTS, 12, 16, 24, 32, 48, 64, AUTO_CEILING] as const
+const LADDER = [FLAT_SEGMENTS, 12, 16, 24, 32, 48, 64, LEGACY_FLAT_SEGMENTS, 96, AUTO_CEILING] as const
 
 /** Smallest ladder step at or above `n`, clamped to the ceiling. */
 export function quantizeSegments(n: number): number {

@@ -312,38 +312,62 @@ options imply.
 The regression risk named above is handled by **calibration rather than
 nerve**. At the old flat 72 the default `roll` already ran at a sagitta of
 3.9e-4, so that is the tolerance: the tightest configuration in common use
-keeps the density it ships with, everything gentler stops overpaying, and
-`'auto'` is capped at 72 so it can only ever subdivide *less* than before.
-The specific worry — "a `bend` at 16 segments is visibly faceted" — turns out
-to be about tight bends: 16 is only handed out when the arc is gentle enough
-to earn it, and a `curvature: 4` bend resolves to 64. Measured, not argued:
+keeps the density it ships with, and everything gentler stops overpaying. The
+specific worry — "a `bend` at 16 segments is visibly faceted" — turns out to
+be about tight bends: 16 is only handed out when the arc is gentle enough to
+earn it, and a `curvature: 4` bend resolves to 48. Measured, not argued:
 `core/tessellation.test.ts` compares the deformed chord midpoint against the
 deformer's own answer at that midpoint for every edge of the resolved grid,
 across each deformer's real option range, and proves the measure has teeth by
 forcing a tight bend onto the coarsest grid and requiring it to fail.
 
-Worth (`pnpm perf:field --soft`): `typed-note` ×60 goes 261.5 ms → 37.7 ms a
-frame, 4 fps → 27, at 1.3% of the triangles. `photo-print`, the field
-starter, drops 93%. `receipt-unroll`, `letter-fold` and `hanging-poster` are
-untouched, because they were the ones actually using the density.
+**It subdivides both ways, which is the part worth remembering.** The first
+version capped `'auto'` at the old 72 so it could only ever get cheaper. That
+was the safe half, and it left the library's actual fidelity gap in place: a
+`fold` at `radius: 0.04` wants 124 segments and a flat 72 cannot give it one
+more. The ceiling is now **128**, and it is a measured CPU budget rather than
+a round number — hero mode re-deforms every vertex in JS every frame for any
+animated stack, and `wave` is animated, so a hanging poster pays it forever:
 
-**Two things it turned up, neither of them fixed here.**
+| grid | verts | ms per re-deform (`drape + wave`) |
+| ---: | ---: | ---: |
+| 72 | 3,796 | 0.67 |
+| 128 | 11,868 | 2.05 |
+| 192 | 26,634 | 4.53 |
+| 256 | 47,288 | 7.89 |
 
-- **`fold`, `wave` and `drape` are under-tessellated at their tighter
-  settings, and always have been.** They ask for 127, 165 and more; the
-  ceiling is 72, so they are pinned there and carry a sagitta several times
-  what `roll` does. That is why the faceting test passes them on a
-  "no worse than the 72 it replaced" clause rather than on tolerance — the
-  clause is documenting a real gap, not creating slack. Raising the ceiling
-  would fix it and would make those presets more expensive and slightly
-  different-looking, which is its own decision with its own evidence.
-- **`FIELD_SEGMENT_CAP` was a no-op for `'auto'` sheets, exactly as
-  `minSegments` was.** Field mode capped the deformer floor at 48 and then
-  `'auto'` handed out 72 regardless. It now caps the target too, so a field
-  of crumples renders 48 × 48 instead of 57 × 72 — a third off the frame time,
-  and visibly slightly coarser creases in field mode only. Hero mode is
-  untouched. Flagged because it is a visual change nobody asked for, arrived
-  at by making an existing policy work.
+256 is half a 60 fps frame on one sheet on a fast machine. 128 is the last
+step with room for a scene around it.
+
+Worth, in hero mode: `typed-note` and `blank-sheet` −99%, `photo-print` (the
+field starter) −93%, `page-flip` −37%, `postage-stamp` −20% — against
+`letter-fold` and `hanging-poster` at +217% and three others at +78–81%.
+Across every preset, +24% triangles. In a field (`pnpm perf:field --soft`),
+`typed-note` ×60 goes 261.5 ms → 37.8 ms a frame, 4 fps → 26, at 1.3% of the
+triangles; `crumpled-note` is unchanged to the triangle.
+
+**What is still open, and it is a smaller version of the same gap.** `wave` at
+`amplitude: 0.3` asks for 272 and `drape` at its default depth asks for 154,
+against the 128 ceiling. They are the two cases the faceting test still passes
+on its "no worse than the flat 72 this replaced" clause rather than on
+tolerance — the clause documents this gap rather than creating slack. Closing
+it means buying CPU per frame at the rates in the table above, for presets
+that pay it permanently. Worth revisiting if hero deformation ever moves off
+the main thread, which would change the price and therefore the answer.
+
+**A cap that had never actually applied, found on the way.**
+`FIELD_SEGMENT_CAP` was a no-op for `'auto'` sheets in exactly the way
+`minSegments` was: field mode capped the deformer floor at 48 and then
+`'auto'` handed out 72 regardless. Making it cap the target as well looked
+like the tidy fix and was a visual regression — it is the one thing that could
+hold `crumple`, which has no target and only a floor of 72, down to 48 in a
+field, coarser than the deformer says it needs to read as a crumple at all.
+So the cap keeps its original and only job of capping the floor, and a
+separate `FIELD_AUTO_CEILING` holds the field's target at the old 72 while the
+hero ceiling rises to 128. The asymmetry is the point: a field draws that
+buffer once per instance. **The lesson worth keeping is that "make the
+existing policy actually apply" is not automatically a fix** — a cap nobody
+had ever felt is a cap nobody had ever validated.
 
 ### 4. Smaller things worth doing
 
