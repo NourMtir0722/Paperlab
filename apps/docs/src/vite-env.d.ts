@@ -1,13 +1,10 @@
 /**
  * Vite injects `import.meta.env` at build time. Declaring the shape we use
  * here (rather than relying on `vite/client` resolving through pnpm) keeps
- * the editor's typecheck self-contained.
+ * this app's typecheck self-contained — the same choice the editor made.
  */
 interface ImportMetaEnv {
-  readonly DEV: boolean
-  readonly PROD: boolean
-  readonly MODE: string
-  /** Deploy base, `/` in dev and `/editor/` under project pages. */
+  /** Deploy base, `/` in dev and the project-pages subpath in production. */
   readonly BASE_URL: string
 }
 

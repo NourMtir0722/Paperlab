@@ -584,7 +584,7 @@ Constraints:
   showing blank backs — one shared texture is what makes a gallery look like a
   carousel.
 
-### ~~A figure with a body~~ — *the motion half is done*
+### ~~A figure with a body~~ — *done*
 
 For stage mode, where the walker is capsules and a sphere. Replace it with a
 rigged GLB — free/CC0, so it can live in the repo without a license problem.
@@ -654,9 +654,28 @@ bounding box, and a freshly cloned scene has stale world matrices, so `Box3`
 measured untransformed geometry and produced an enormous scale — the figure
 filled the frame. Reading the code was never going to show that.
 
-**Still open:** no asset is shipped. The Universal Animation Library needs a
-human to download it, and the apps have nowhere to host a file while the demo
-is dark, so the capsules are still what anybody sees.
+**An asset ships now, so the figure is a person.** All three apps point
+`figure.model` at Khronos's Cesium Man (CC-BY 4.0, attributed in `NOTICE`),
+served from each app's own `public/` and URL-built off `BASE_URL` so it
+survives the `/editor/` and `/docs/` subpaths. Verified in all three: 200 on
+the model, a person on screen, no console errors.
+
+It is not the first pick aesthetically, and the reason is licensing rather
+than taste. CC0 (Quaternius' Universal Animation Library, Kenney) would be
+better and is gated behind itch/Patreon, so it cannot be fetched unattended;
+Mixamo is out entirely. Cesium Man is the only properly-proportioned human
+with a walk cycle that can be both obtained and lawfully redistributed.
+**Swapping it is one file and one line** — if someone downloads a CC0 rig,
+drop it in `apps/*/public/figure/` and the change is the filename.
+
+Two limits: it carries a single unnamed clip, so `gait: 'run'` reuses the walk
+(`pickClip` falls back rather than failing), and it is 438 KB including a
+texture that never renders, since the figure is drawn as a silhouette.
+
+**The boundary held and is now enforced rather than intended:** `pnpm pack` is
+ten files with no `.glb`. The library ships no assets, no stage preset names a
+URL, and anyone installing `paperlab` gets the capsules and brings their own
+model.
 
 **One invariant was narrowed to get here** and it is worth knowing about: the
 gait promised "same ground covered = same pose, whatever pace", and now

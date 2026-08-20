@@ -33,6 +33,19 @@ import { DEMO_IMAGES } from './demoAssets'
 import { UIHost, promptDialog, toast } from './ui'
 import { useEditor, zoneToConfig } from './store'
 
+/**
+ * The walking figure's model, served from this app's own `public/`.
+ *
+ * Built off BASE_URL rather than hardcoded, because the editor deploys under
+ * `/editor/` and the docs under `/docs/` — an absolute `/figure/...` would
+ * resolve to the site root and 404 for two apps out of three.
+ *
+ * It lives here rather than in a stage preset because the library ships no
+ * assets: a preset naming a URL would be a promise the npm package cannot
+ * keep. The app hosts the file, the app points at it.
+ */
+const FIGURE_MODEL = `${import.meta.env.BASE_URL}figure/walking-figure.glb`
+
 export function App() {
   const presetName = useEditor((s) => s.presetName)
   const importSharedPaper = useEditor((s) => s.importSharedPaper)
@@ -318,7 +331,11 @@ export function App() {
           {mode === 'stage' ? (
             <PaperStageScene
               key={`stage:${stage.preset}:${stage.walk}:${stage.layout}:${stage.count}`}
-              stage={{ ...stage.config, path: getWalk(stage.walk) }}
+              stage={{
+                ...stage.config,
+                path: getWalk(stage.walk),
+                figure: { ...stage.config.figure, model: FIGURE_MODEL },
+              }}
               preset={stage.paper}
               layout={stage.layout}
               layoutOptions={stage.layoutOptions}
