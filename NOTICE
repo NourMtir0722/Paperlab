@@ -8,3 +8,26 @@ https://github.com/NourMtir0722/Paperlab
 This product includes software developed by Noor Mtir.
 Redistributions of this software, with or without modification, must
 reproduce this NOTICE file per Section 4(d) of the Apache License 2.0.
+
+
+────────────────────────────────────────────────────────────────────────
+Third-party assets
+────────────────────────────────────────────────────────────────────────
+
+The walking figure used by the demo apps — `apps/*/public/figure/
+walking-figure.glb` — is "Cesium Man":
+
+    © 2017 Cesium (https://cesium.com)
+    Licensed under Creative Commons Attribution 4.0 International
+    https://creativecommons.org/licenses/by/4.0/
+    Source: https://github.com/KhronosGroup/glTF-Sample-Assets
+
+Unmodified. It is rendered as an unlit silhouette, so its texture never
+appears on screen, but the file ships as authored.
+
+This asset belongs to the demo apps ONLY. It is not part of the `paperlab`
+npm package, is not referenced by any stage preset in the library, and does
+not appear in the published tarball — the library takes a `figure.model`
+URL and the apps host the file. Anyone consuming the library brings their
+own asset and their own licence obligations.
+
