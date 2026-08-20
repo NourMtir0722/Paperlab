@@ -48,7 +48,7 @@ If a feature can't serialize into a preset, it doesn't ship.
 - **13 paper presets**, **5 stage presets**, **7 stocks**.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **442 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+- **460 tests** + a 37-case GPU/CPU parity gate, all green in CI.
 
 ---
 
@@ -584,7 +584,7 @@ Constraints:
   showing blank backs — one shared texture is what makes a gallery look like a
   carousel.
 
-### A figure with a body
+### ~~A figure with a body~~ — *the motion half is done*
 
 For stage mode, where the walker is capsules and a sphere. Replace it with a
 rigged GLB — free/CC0, so it can live in the repo without a license problem.
@@ -604,8 +604,34 @@ looks good or cheap:
   distance**, not played on a mixer clock, and its rate matched to stride
   length or the feet skate. This is the part that gets skipped.
 
-Constraint: the asset does not ship in the npm tarball. The library takes a
-`figure.model` URL (which serializes fine); the apps host the file.
+**Done, and the two things above are exactly what it turned on.**
+
+`figure.model` exists now and takes a rigged glTF/GLB URL; the asset stays the
+app's to host and never enters the npm tarball. The clip is scrubbed by
+DISTANCE rather than played on a mixer clock, which was the part flagged above
+as the bit that gets skipped — one gait cycle maps to one pass of the clip, and
+`stride` syncs a given asset. It is cloned through `SkeletonUtils` (a plain
+clone shares the skeleton, so two figures on one URL would drive each other),
+scaled to `figure.height` off its own bounds, drawn as a silhouette, and
+falls back to the capsules on any failure.
+
+And the motion quality — the actual win, per the note above — went into the
+procedural gait, so it lands whether or not anyone ever supplies an asset:
+pelvis rotation, chest counter-rotation against it, lateral sway over the
+stance foot, pelvic obliquity, elbows, and a real run with a Froude-derived
+transition that moves with the figure's height. The bounce inverts between the
+two gaits, which is the tell: a walk vaults and never rises above standing, a
+run compresses and then leaves the ground.
+
+**Still open, deliberately:** no asset has been chosen or licence-verified.
+Quaternius and Kenney remain the candidates and remain unchecked, and the
+apps have nowhere to host a file while the demo is dark. So the capsules are
+still what anybody sees; what exists is the road in.
+
+**One invariant was narrowed to get here** and it is worth knowing about: the
+gait promised "same ground covered = same pose, whatever pace", and now
+promises it *within a gait*, since crossing into a run changes the stride. The
+old wording was never quite true — `lean` has always read `speed`.
 
 ### Hands — paper you touch
 
