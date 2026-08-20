@@ -1,6 +1,7 @@
 import * as THREE from 'three'
-import { useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RiggedFigure } from './RiggedFigure'
 import { usePrefersReducedMotion } from '../a11y'
 import { getWalkPath, walkPathSchema, type WalkPathOptions } from './path'
 import { PROPORTIONS, figureSchema, placeFigure, type FigureOptions } from './gait'
@@ -49,13 +50,20 @@ export function Figure({ path, figure, distance, frozen }: FigureProps) {
   const walk = useMemo(() => getWalkPath(walkPathSchema.parse(path ?? {})), [path])
 
   const root = useRef<THREE.Group>(null)
+  // Shared with the rigged figure, which scrubs its clip off the same number
+  // the capsules pose from — so swapping a model in cannot desynchronise the
+  // walk from the ground it covers.
+  const walkedRef = useRef(0)
   const hips = useRef<THREE.Group>(null)
+  const chest = useRef<THREE.Group>(null)
   const legL = useRef<THREE.Group>(null)
   const legR = useRef<THREE.Group>(null)
   const kneeL = useRef<THREE.Group>(null)
   const kneeR = useRef<THREE.Group>(null)
   const armL = useRef<THREE.Group>(null)
   const armR = useRef<THREE.Group>(null)
+  const elbowL = useRef<THREE.Group>(null)
+  const elbowR = useRef<THREE.Group>(null)
 
   // One material for the whole body: a silhouette is a single shape, and an
   // unlit one survives a scene lit from behind, where a shaded figure would
@@ -74,14 +82,30 @@ export function Figure({ path, figure, distance, frozen }: FigureProps) {
     // A frozen figure still stands wherever `distance` puts it — it stops
     // stepping, it does not teleport to the start of the walk.
     const walked = distance ?? (still ? 0 : state.clock.elapsedTime * options.speed)
+    walkedRef.current = walked
     const { position, yaw, pose } = placeFigure(walk, walked, options)
 
     root.current?.position.set(position[0], position[1], position[2])
     if (root.current) root.current.rotation.y = yaw
 
+    // The pelvis carries the legs, so its turn and its tilt travel down them —
+    // which is the point: that is how a step gets longer than the leg is.
     if (hips.current) {
       hips.current.position.y = p.hip * h + (still ? 0 : pose.bob)
-      hips.current.rotation.x = pose.lean
+      hips.current.rotation.y = still ? 0 : pose.pelvis
+      hips.current.rotation.z = still ? 0 : pose.hipDrop
+    }
+    // The trunk's rotations are absolute — given against the direction of
+    // travel, not against the pelvis — so the nested group applies the
+    // difference. Do this wrong and the counter-rotation reads as the chest
+    // going along with the hips at half strength, which looks like nothing.
+    //
+    // The lean lives here rather than on the hips: a body leans from the
+    // waist, and hanging it off the pelvis tips the legs with it.
+    if (chest.current) {
+      chest.current.rotation.x = pose.lean
+      chest.current.rotation.y = still ? 0 : pose.chest - pose.pelvis
+      chest.current.rotation.z = still ? 0 : pose.sway - pose.hipDrop
     }
     // Limbs hang downward, so a forward swing is a NEGATIVE rotation about X.
     if (legL.current) legL.current.rotation.x = still ? 0 : -pose.leftThigh
@@ -90,11 +114,27 @@ export function Figure({ path, figure, distance, frozen }: FigureProps) {
     if (kneeR.current) kneeR.current.rotation.x = still ? 0 : -pose.rightKnee
     if (armL.current) armL.current.rotation.x = still ? 0 : -pose.leftArm
     if (armR.current) armR.current.rotation.x = still ? 0 : -pose.rightArm
+    if (elbowL.current) elbowL.current.rotation.x = still ? 0 : -pose.leftElbow
+    if (elbowR.current) elbowR.current.rotation.x = still ? 0 : -pose.rightElbow
   })
 
-  return (
-    <group ref={root}>
-      <group ref={hips}>
+  const capsules = (
+    <group ref={hips}>
+      {[-1, 1].map((side) => {
+        const leg = side < 0 ? legL : legR
+        const knee = side < 0 ? kneeL : kneeR
+        return (
+          <group key={`leg${side}`} ref={leg} position={[(side * p.hipWidth * h) / 2, 0, 0]}>
+            <Segment length={p.thigh * h} radius={p.limbRadius * h} material={material} />
+            <group ref={knee} position={[0, -p.thigh * h, 0]}>
+              <Segment length={p.shin * h} radius={p.limbRadius * h * 0.9} material={material} />
+            </group>
+          </group>
+        )
+      })}
+
+      {/* Everything above the waist turns, leans and sways as one piece. */}
+      <group ref={chest}>
         <mesh position={[0, torso / 2, 0]} material={material} castShadow>
           <capsuleGeometry args={[(p.torsoWidth * h) / 2, torso * 0.72, 4, 12]} />
         </mesh>
@@ -102,33 +142,40 @@ export function Figure({ path, figure, distance, frozen }: FigureProps) {
           <sphereGeometry args={[p.headRadius * h, 14, 12]} />
         </mesh>
 
-        {[-1, 1].map((side) => {
-          const leg = side < 0 ? legL : legR
-          const knee = side < 0 ? kneeL : kneeR
-          return (
-            <group key={`leg${side}`} ref={leg} position={[(side * p.hipWidth * h) / 2, 0, 0]}>
-              <Segment length={p.thigh * h} radius={p.limbRadius * h} material={material} />
-              <group ref={knee} position={[0, -p.thigh * h, 0]}>
-                <Segment length={p.shin * h} radius={p.limbRadius * h * 0.9} material={material} />
-              </group>
-            </group>
-          )
-        })}
-
         {[-1, 1].map((side) => (
           <group
             key={`arm${side}`}
             ref={side < 0 ? armL : armR}
             position={[(side * p.torsoWidth * h) / 2, torso, 0]}
           >
-            <Segment
-              length={(p.upperArm + p.foreArm) * h}
-              radius={p.limbRadius * h * 0.8}
-              material={material}
-            />
+            <Segment length={p.upperArm * h} radius={p.limbRadius * h * 0.8} material={material} />
+            <group ref={side < 0 ? elbowL : elbowR} position={[0, -p.upperArm * h, 0]}>
+              <Segment length={p.foreArm * h} radius={p.limbRadius * h * 0.72} material={material} />
+            </group>
           </group>
         ))}
       </group>
+    </group>
+  )
+
+  return (
+    <group ref={root}>
+      {options.model ? (
+        // The capsules are both the fallback and the thing being replaced, so
+        // a model that is still downloading shows a walking figure rather than
+        // a hole, and one that never arrives leaves the stage as it was.
+        <Suspense fallback={capsules}>
+          <RiggedFigure
+            url={options.model}
+            options={options}
+            distance={walkedRef}
+            frozen={still}
+            fallback={capsules}
+          />
+        </Suspense>
+      ) : (
+        capsules
+      )}
     </group>
   )
 }
