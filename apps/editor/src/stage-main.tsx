@@ -85,6 +85,21 @@ createRoot(document.getElementById('root')!).render(
     reducedMotion={false}
     stage={{
       ...preset.stage,
+      // ?model=<url> swaps the capsule silhouette for a rigged glTF and
+      // ?gait= forces walk or run — the only way to exercise either path
+      // without shipping an asset. Built as ONE figure object: two spreads
+      // each rebuilding `figure` would mean passing both silently dropped
+      // whichever came first.
+      ...(has('model') || has('gait')
+        ? {
+            showFigure: true,
+            figure: {
+              ...preset.stage.figure,
+              ...(has('model') ? { model: query.get('model')! } : {}),
+              ...(has('gait') ? { gait: query.get('gait') as never } : {}),
+            },
+          }
+        : {}),
       ...(query.get('shadows') === '0' ? { shadows: false } : {}),
       ...(query.get('surround') === '0' ? { source: { ...preset.stage.source, surround: false } } : {}),
       shot: {

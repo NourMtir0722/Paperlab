@@ -84,6 +84,11 @@ function Rigged({ url, options, distance, frozen }: RiggedFigureProps) {
         mesh.receiveShadow = false
       }
     })
+    // updateMatrixWorld first, and it is load-bearing: a freshly cloned scene
+    // has stale world matrices, so Box3 measures the root's untransformed
+    // geometry, reports a model far smaller than it is, and the scale that
+    // falls out of it is correspondingly enormous.
+    scene.updateMatrixWorld(true)
     const box = new THREE.Box3().setFromObject(scene)
     const height = box.max.y - box.min.y
     return height > 0 ? options.height / height : 1

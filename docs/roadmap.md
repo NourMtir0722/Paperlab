@@ -623,10 +623,40 @@ transition that moves with the figure's height. The bounce inverts between the
 two gaits, which is the tell: a walk vaults and never rises above standing, a
 run compresses and then leaves the ground.
 
-**Still open, deliberately:** no asset has been chosen or licence-verified.
-Quaternius and Kenney remain the candidates and remain unchecked, and the
-apps have nowhere to host a file while the demo is dark. So the capsules are
-still what anybody sees; what exists is the road in.
+**The licences are checked now, and the answer changes which source to use.**
+
+- **Quaternius — CC0, and it ships glTF.** The pack pages link the CC0 deed
+  directly. Note *which* pack: the Ultimate Animated Character Pack is
+  Blend/FBX/OBJ only and would need a Blender pass, while the **Universal
+  Animation Library** (1 and 2) ships GLB and glTF with root motion on the
+  locomotion clips. That is the one to take. Downloads are itch/Patreon-gated,
+  so a human has to fetch it.
+- **Kenney — CC0**, same story, smaller and blockier characters.
+- **Mixamo — no, and not for the usual reason.** The commercial terms are
+  fine: royalty-free, any project. But the prohibited list includes, verbatim,
+  *"Any type of free distribution of character or animation raw files"*, and
+  that is exactly the shape of what we would do — `figure.model` is a URL, so
+  the file has to be publicly served, and the plan puts it in the repo. For a
+  closed web app, serving a Mixamo character to browsers is a grey area
+  thousands of projects live in. An open repo with the raw file in the tree,
+  whose whole purpose is that other people copy the pattern, is not that grey
+  area. **CC0 is not merely more convenient here, it is the permission this
+  architecture actually requires.** Mixamo is still fine as motion *reference*
+  for tuning the numbers in `gait.ts`, since nothing ships.
+
+**Verified against a real asset**, which is the part that mattered: pointing
+`figure.model` at Khronos's `CesiumMan` loads, scales correctly against the
+banners, silhouettes, casts its shadow and changes pose with `progress`. The
+editor's stage harness takes `?model=<url>` and `?gait=walk|run`, so the path
+is re-runnable against any URL without committing a binary. That exercise
+found a bug that would have hit **every** model: the rig is scaled off its own
+bounding box, and a freshly cloned scene has stale world matrices, so `Box3`
+measured untransformed geometry and produced an enormous scale — the figure
+filled the frame. Reading the code was never going to show that.
+
+**Still open:** no asset is shipped. The Universal Animation Library needs a
+human to download it, and the apps have nowhere to host a file while the demo
+is dark, so the capsules are still what anybody sees.
 
 **One invariant was narrowed to get here** and it is worth knowing about: the
 gait promised "same ground covered = same pose, whatever pace", and now
