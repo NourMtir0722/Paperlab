@@ -15,18 +15,18 @@ Third-party assets
 ────────────────────────────────────────────────────────────────────────
 
 The walking figure used by the demo apps — `apps/*/public/figure/
-walking-figure.glb` — is "Man in Suit" from the Animated Men Pack:
+walking-figure.glb` — is "Business Man" from the Ultimate Modular Men Pack:
 
     By Quaternius (https://quaternius.com)
     Dedicated to the public domain under Creative Commons Zero v1.0
     https://creativecommons.org/publicdomain/zero/1.0/
-    Source: https://poly.pizza/m/mQnGoME1ez
+    Source: https://poly.pizza/m/JFrLIKqvCH
 
 Unmodified, and carried here as a convenience rather than an obligation:
 CC0 waives attribution, and this entry exists because saying where a file
 came from is the honest thing to do, not because the licence asks for it.
-The file holds eleven animation clips; the stage plays three of them (walk,
-run, idle) and the rest ride along.
+The file holds twenty-four animation clips; the stage plays three of them
+(walk, run, idle) and the rest ride along.
 
 This asset belongs to the demo apps ONLY. It is not part of the `paperlab`
 npm package, is not referenced by any stage preset in the library, and does
