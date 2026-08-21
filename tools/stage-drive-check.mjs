@@ -191,15 +191,31 @@ try {
   await check('and the other one goes back', back < stepped, `${stepped.toFixed(3)} → ${back.toFixed(3)}`)
 
   // ── Clicking a banner travels to it ──────────────────────────────────────
-  // Swept across the frame rather than aimed at one pixel: which columns hold
-  // paper depends on the viewport's aspect, and the claim under test is that
-  // banners are clickable, not that one of them is at 13%.
-  const before = await walk()
+  // Park the walk somewhere banners flank the camera before aiming at one.
+  // WHERE you are standing decides what is on screen, and until this existed
+  // the check inherited wherever the previous ones happened to finish: in CI
+  // that was 0.095, right at the mouth of the aisle, where the camera is
+  // extrapolated back BEHIND the first banners and the frame holds no paper
+  // at all. It failed with "nothing was hit anywhere across the frame", which
+  // was true and was not the library's fault.
+  for (let i = 0; i < 20 && (await walk()) < 0.45; i++) {
+    await page.mouse.wheel(0, 400)
+    await page.waitForTimeout(60)
+  }
+  const before = await settle()
+
+  // Swept across the frame rather than aimed at one pixel, and across it in
+  // BOTH directions: which columns hold paper depends on the viewport's
+  // aspect and which rows do depends on the shot's tilt. The claim under test
+  // is that banners are clickable, not that one of them is at 13% by 45%.
   let visited
-  for (let f = 0.05; f <= 0.95 && visited === undefined; f += 0.05) {
-    await page.mouse.click(box.x + box.width * f, box.y + box.height * 0.45)
-    await page.waitForTimeout(80)
-    visited = await page.evaluate(() => window.__STAGE__.visited)
+  for (const row of [0.45, 0.32, 0.6, 0.72]) {
+    for (let f = 0.05; f <= 0.95 && visited === undefined; f += 0.05) {
+      await page.mouse.click(box.x + box.width * f, box.y + box.height * row)
+      await page.waitForTimeout(60)
+      visited = await page.evaluate(() => window.__STAGE__.visited)
+    }
+    if (visited !== undefined) break
   }
   const after = await settle()
   await check(
