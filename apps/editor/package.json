@@ -29,7 +29,7 @@
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^4.3.0",
-    "typescript": "^5.7.0",
+    "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
   }
