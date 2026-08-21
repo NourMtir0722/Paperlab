@@ -151,7 +151,17 @@ be a code problem after all — see the npm entry.
         from a private repository. Provenance arrives free if the repo ever
         goes public, and not before.
 
-- [ ] **Turn on the demo — blocked, and not by the workflow.** `pages.yml` is
+- [x] **The demo is live — 2026-08-22.** https://nourmtir0722.github.io/Paperlab/
+      (playground), `/editor`, `/docs`. Two steps, and the second was the
+      surprise: making the repo public was **necessary but not sufficient**.
+      `has_pages` stayed false and the workflow reported `skipped` on every
+      push until Pages was switched on in Settings → Pages → Source: "GitHub
+      Actions". Even then nothing had built, because the workflow triggers on
+      push and there had been none since — `gh workflow run pages.yml --ref
+      main` deployed it in 46 seconds. The original entry, which was correct
+      about the cause and wrong about the remedy being one step, follows.
+
+  - [x] ~~**Turn on the demo — blocked, and not by the workflow.**~~ `pages.yml` is
       written and correct (playground at the root, editor at `/editor`, docs at
       `/docs`). **The repo is private, and GitHub Pages will not serve a private
       repo on the free plan** — the API refuses with "Your current plan does not
