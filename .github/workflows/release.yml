@@ -3,6 +3,26 @@ name: Release
 on:
   push:
     branches: [main]
+  # A DRY RUN of the release path, on demand.
+  #
+  # This exists because of a specific hole: every other workflow is validated
+  # by CI on a pull request, and this one is not — it only runs on a push to
+  # main, which means the first time anybody finds out whether a change broke
+  # the release is after that change has already been merged. That is not
+  # hypothetical here. 0.2.0's publish failed with `EUNKNOWNCONFIG` AFTER the
+  # version bump had landed on main, and `0.1.0` is now a version that will
+  # never exist on the registry.
+  #
+  # Dispatching this from a branch runs THAT branch's copy of this file, so a
+  # dependency bump touching `checkout`, `setup-node` or `pnpm/action-setup`
+  # can be exercised on its own branch before it is merged — which is the
+  # only way to review one of those honestly.
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Actually publish. Leave off to exercise the path without releasing."
+        type: boolean
+        default: false
 
 concurrency: release-${{ github.ref }}
 
@@ -42,12 +62,40 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Everything above this line is the release PATH — the setup, the pin,
+      # the install and the build. Everything below is the release ITSELF.
+      # A dry run stops here, having proved the half that keeps breaking.
+      - name: Dry run — report what the release would have used
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish
+        run: |
+          echo "node    $(node --version)"
+          echo "npm     $(npm --version)   # must be 11.x — 12 rejects --no-git-checks"
+          echo "pnpm    $(pnpm --version)  # must match packageManager in package.json"
+          echo
+          npm --version | grep -q '^11\.' || {
+            echo "::error::npm is not 11.x. The pin above is load-bearing: pnpm hands"
+            echo "::error::--no-git-checks down to npm, and npm 12 rejects it outright."
+            exit 1
+          }
+          want=$(node -p "(require('./package.json').packageManager||'@').split('@')[1]||''")
+          got=$(pnpm --version)
+          if [ -n "$want" ] && [ "${want%%.*}" != "${got%%.*}" ]; then
+            echo "::error::pnpm major mismatch: packageManager wants $want, runner has $got."
+            echo "::error::pnpm/action-setup resolves the version FROM packageManager when"
+            echo "::error::no version input is given, so a disagreement here means the"
+            echo "::error::action changed how it reads that field."
+            exit 1
+          fi
+          echo
+          echo "--- what would be released ---"
+          pnpm exec changeset status
+
       # No NPM_TOKEN: npm authenticates this workflow via OIDC, configured as a
-      # trusted publisher on the package. Note that provenance is NOT automatic
-      # here — 0.2.0 published clean over OIDC and carries no attestations,
-      # because npm will not attest a build from a private repository. If the
-      # repo ever goes public, provenance starts arriving on its own.
+      # trusted publisher on the package. Provenance should now arrive on its
+      # own — npm would not attest a build from a private repo, which is why
+      # 0.2.0 carries no attestations, and this repo went public 2026-08-21.
       - name: Create release PR or publish to npm
+        if: github.event_name == 'push' || inputs.publish
         uses: changesets/action@v1
         with:
           publish: pnpm exec changeset publish
