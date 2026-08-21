@@ -147,6 +147,25 @@ createRoot(document.getElementById('root')!).render(
         ...(has('grain') ? { grain: num('grain', 0.022) } : {}),
         ...(has('depth') ? { depth: num('depth', 0) } : {}),
       },
+      // The architecture, sweepable like the light and the print.
+      ...(has('ceiling') || query.get('room') === '0'
+        ? {
+            room: {
+              ...preset.stage.room,
+              ...(has('ceiling') ? { height: num('ceiling', 1.35) } : {}),
+              ...(query.get('room') === '0' ? { enabled: false } : {}),
+            },
+          }
+        : {}),
+      ...(has('slab') || has('floor')
+        ? {
+            ground: {
+              ...preset.stage.ground,
+              ...(has('slab') ? { slab: num('slab', 2.4) } : {}),
+              ...(has('floor') ? { color: `#${query.get('floor')}` } : {}),
+            },
+          }
+        : {}),
       ...(has('spread') || query.get('surround') === '0'
         ? {
             source: {

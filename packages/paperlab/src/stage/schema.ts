@@ -42,7 +42,48 @@ export const stageSourceSchema = z.object({
 export const stageGroundSchema = z.object({
   /** The floor. Without something to catch the shadows there is no ground and no scale. */
   enabled: z.boolean().default(true),
-  color: z.string().default('#0e0b09'),
+  /**
+   * Lifted off near-black (`#0e0b09`). A floor dark enough to disappear
+   * cannot show its own seams, and the seams are the scale cue — the hall
+   * kept its contrast against the source and gained a surface you can read
+   * the size of the room from.
+   */
+  color: z.string().default('#241e19'),
+  /**
+   * Width of one poured slab, in world units. 0 leaves the floor unseamed.
+   *
+   * The cheapest scale cue there is, and the one this scene most lacked. A
+   * concrete floor is poured in bays of roughly two and a half metres, and a
+   * viewer knows that without being told — so a floor with seams in it
+   * states the size of the room, while a floor without them is a gradient
+   * that happens to be horizontal.
+   */
+  slab: z.number().min(0).max(20).default(2.4),
+})
+
+/**
+ * The room the walk is in.
+ *
+ * Stage mode was a void with a horizon: a graded dome, a flat plane, and a
+ * bright rectangle at the end, none of it a knowable size. That is why the
+ * walking figure was carrying the whole scale burden by itself — and why
+ * simply removing the figure would have left an abstraction rather than a
+ * hall. Architecture is the better answer: objects whose size the viewer
+ * already knows, made of flat surfaces under good light, which is the one
+ * thing a renderer never gets wrong.
+ */
+export const stageRoomSchema = z.object({
+  enabled: z.boolean().default(true),
+  /**
+   * Ceiling height, as a multiple of the paper's own height.
+   *
+   * Relative rather than absolute because the banners ARE the architecture
+   * here: a hall whose ceiling sits just above its hangings reads as built
+   * for them, and one at a fixed world height reads as whatever the paper
+   * happened to be scaled to that day.
+   */
+  height: z.number().min(1).max(6).default(2.2),
+  color: z.string().default('#171310'),
 })
 
 /**
@@ -121,9 +162,28 @@ export const stageSchema = z.object({
    * shared stage carries the sliders that were moved and nothing else.
    */
   light: lightSchema.default({}),
-  showFigure: z.boolean().default(true),
+  /**
+   * OFF by default now.
+   *
+   * The figure existed to say "this is a room at gallery scale", which is a
+   * real job and the right instinct. A rendered human is simply the most
+   * expensive and least reliable way to do it: it is the one thing in frame
+   * every viewer appraises, and a low-polygon one reads as an asset-store
+   * placeholder no matter how good the hall around it is.
+   *
+   * `stageRoomSchema` does the job instead, with objects whose size the
+   * viewer already knows. And the deciding argument is that the stage is
+   * NAVIGABLE — drag, wheel, arrow-step, click-to-approach — so there is
+   * already a person in the hall and it is the viewer. A second one walking
+   * the same aisle on its own clock competes for that role.
+   *
+   * Still one flag away for anyone who wants it.
+   */
+  showFigure: z.boolean().default(false),
   source: stageSourceSchema.default({}),
   ground: stageGroundSchema.default({}),
+  /** Ceiling and the architecture around the walk — see `stageRoomSchema`. */
+  room: stageRoomSchema.default({}),
   /**
    * The print — bloom, vignette, grain.
    *

@@ -30,6 +30,7 @@ export { SOURCE_INTENSITY } from './stage/Surround'
 export {
   stageSchema,
   stageGradeSchema,
+  stageRoomSchema,
   type StageConfig,
   type StageConfigInput,
   type StageGradeConfig,

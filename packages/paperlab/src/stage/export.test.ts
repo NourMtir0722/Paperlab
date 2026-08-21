@@ -111,8 +111,12 @@ describe('describeStage', () => {
     const described = describeStage(base())
     expect(described).toContain('18 tall paper banners')
     expect(described).toContain('column of your text')
-    expect(described).toContain('figure walking between them')
     expect(described).toContain('lit from behind')
+    // The room is what carries scale now that the figure is off by default.
+    expect(described).toContain('knowable size')
+    // And no figure is claimed when none is drawn — a brief that promises a
+    // walking person the render does not contain is worse than a terse one.
+    expect(described).not.toContain('figure walking between them')
   })
 
   it('names the walk shape, and says when scroll drives it', () => {
@@ -121,8 +125,9 @@ describe('describeStage', () => {
     expect(describeStage(base({ scroll: true }))).toContain('scrolling the page walks the figure')
   })
 
-  it('drops the figure from the description when it is turned off', () => {
+  it('mentions the figure only when one is actually drawn', () => {
     expect(describeStage(base({ stage: { showFigure: false } }))).not.toContain('figure walking')
+    expect(describeStage(base({ stage: { showFigure: true } }))).toContain('figure walking')
   })
 
   it('names the shot, because that is what the reader is looking at', () => {

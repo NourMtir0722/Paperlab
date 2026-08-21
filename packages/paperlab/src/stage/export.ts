@@ -120,8 +120,16 @@ export function describeStage(input: StageExportInput): string {
   if (input.text?.trim()) {
     parts.push('each printed with a column of your text running down it')
   }
+  // The shot is named whether or not anyone is walking. It used to ride
+  // along inside the figure's clause, so turning the figure off silently
+  // took the CAMERA out of the description too — and the camera is what the
+  // reader is actually looking through.
+  parts.push(`seen ${SHOT_PHRASES[stage.shot.shot]}`)
   if (stage.showFigure) {
-    parts.push(`a small dark figure walking between them, seen ${SHOT_PHRASES[stage.shot.shot]}`)
+    parts.push('a small dark figure walking between them')
+  }
+  if (stage.room.enabled) {
+    parts.push('a ceiling overhead and seams in the poured floor, so the hall has a knowable size')
   }
   parts.push(
     stage.lighting === 'nave'
