@@ -6,7 +6,7 @@ import {
   translucencyValues,
   translucencyVertexChunk,
 } from './translucency'
-import { getLightingPreset, lightingPresets } from '../scene/lighting'
+import { getLightingPreset, lightingPresets, resolveLighting } from '../scene/lighting'
 import { stocks } from '../core/stock'
 import { lightingNames, paperConfigSchema, surfaceSchema } from '../config/schema'
 import { buildDisplacementGLSL, buildFieldFragmentShader, buildFieldVertexShader } from '../field/compose'
@@ -24,9 +24,11 @@ describe('translucency values', () => {
     // The default walk heads down -Z, so a backlight has to sit at -Z too.
     expect(getLightingPreset('nave').key.position[2]).toBeLessThan(0)
     expect(translucencyValues(1, 'nave').direction.z).toBeLessThan(0)
-    // Dim room, bright source: nothing else in frame competes with it.
+    // Dim room, bright source: nothing else in frame competes with it. Stated
+    // as a RATIO rather than as two numbers, because both are tuning knobs and
+    // the thing that must hold is their relationship.
     expect(lightingPresets.nave.ambient).toBeLessThan(0.12)
-    expect(lightingPresets.nave.key.intensity).toBeGreaterThan(3)
+    expect(lightingPresets.nave.key.intensity / lightingPresets.nave.ambient).toBeGreaterThan(20)
   })
 
   it('transmitted color scales with the lamp it comes from', () => {
@@ -134,5 +136,25 @@ describe('translucency as a paper property', () => {
   it('nave is a real lighting name the schema accepts', () => {
     expect(lightingNames).toContain('nave')
     expect(paperConfigSchema.parse({ scene: { lighting: 'nave' } }).scene.lighting).toBe('nave')
+  })
+})
+
+describe('transmission reads the rig, not the preset name', () => {
+  it('a resolved rig gives the same values as its name when nothing was overridden', () => {
+    const byName = translucencyValues(0.5, 'nave')
+    const byRig = translucencyValues(0.5, resolveLighting('nave', {}))
+    expect(byRig.direction.toArray()).toEqual(byName.direction.toArray())
+    expect(byRig.color.getHex()).toEqual(byName.color.getHex())
+  })
+
+  it('and follows the lamp once it has been moved', () => {
+    // This is the bug the light rig exists to prevent: a banner glowing as if
+    // backlit while the lamp actually stands in front of it. Swing the key
+    // round to the front and the sheet must stop being backlit.
+    const front = translucencyValues(1, resolveLighting('nave', { direction: 0 }))
+    expect(front.direction.z).toBeGreaterThan(0)
+    // Turning the lamp down turns the glow down with it.
+    const dim = translucencyValues(1, resolveLighting('nave', { key: 0.5 }))
+    expect(dim.color.r).toBeLessThan(translucencyValues(1, 'nave').color.r)
   })
 })

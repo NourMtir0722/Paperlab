@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createWalkPath, walkPathSchema } from './path'
-import { clipTimeFor, cycleLength, figureGait, figureSchema, isRunning, pickClip, placeFigure } from './gait'
+import {
+  clipTimeFor,
+  cycleLength,
+  figureGait,
+  figureSchema,
+  isRunning,
+  pickClip,
+  pickStillClip,
+  placeFigure,
+} from './gait'
 
 const options = (o: Record<string, unknown> = {}) => figureSchema.parse(o)
 const path = (o: Record<string, unknown> = {}) => createWalkPath(walkPathSchema.parse(o))
@@ -295,5 +304,41 @@ describe('driving a rigged model', () => {
 
   it('survives a clip with no duration rather than dividing by it', () => {
     expect(clipTimeFor(5, options(), 0)).toBe(0)
+  })
+})
+
+describe('choosing a clip out of a real pack', () => {
+  // Verbatim from the asset the demo apps ship — the case that made the
+  // shortest-name rule necessary, since `Man_RunningJump` also matches /run/.
+  const PACK = [
+    'HumanArmature|Man_Clapping',
+    'HumanArmature|Man_Death',
+    'HumanArmature|Man_Idle',
+    'HumanArmature|Man_Jump',
+    'HumanArmature|Man_Punch',
+    'HumanArmature|Man_Run',
+    'HumanArmature|Man_RunningJump',
+    'HumanArmature|Man_Sitting',
+    'HumanArmature|Man_Standing',
+    'HumanArmature|Man_SwordSlash',
+    'HumanArmature|Man_Walk',
+  ]
+
+  it('takes the gait, not the trick that happens to be named after it', () => {
+    expect(pickClip(PACK, false)).toBe('HumanArmature|Man_Walk')
+    expect(pickClip(PACK, true)).toBe('HumanArmature|Man_Run')
+  })
+
+  it('stands still rather than freezing mid-stride', () => {
+    expect(pickStillClip(PACK)).toBe('HumanArmature|Man_Idle')
+    // No idle in the pack: standing will do, and a walk is the last resort.
+    expect(pickStillClip(['Armature|Standing', 'Armature|Walk'])).toBe('Armature|Standing')
+    expect(pickStillClip(['Armature|Walk'])).toBe('Armature|Walk')
+    expect(pickStillClip([])).toBeUndefined()
+  })
+
+  it('a figure is shaded by default, and can be flattened back to a silhouette', () => {
+    expect(figureSchema.parse({}).finish).toBe('shaded')
+    expect(figureSchema.parse({ finish: 'silhouette' }).finish).toBe('silhouette')
   })
 })

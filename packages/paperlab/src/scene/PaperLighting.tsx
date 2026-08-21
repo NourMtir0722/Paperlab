@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows } from '@react-three/drei'
 import type { LightingName } from '../config/schema'
-import { getLightingPreset } from './lighting'
+import { buildEnvironment } from './environment'
+import { resolveLighting, type LightingPreset, type LightOverrides } from './lighting'
 import { usePrefersReducedMotion } from '../a11y'
 
 /** Deterministic PRNG so gobos render identically everywhere. */
@@ -76,8 +77,65 @@ export function makeGoboTexture(kind: 'blinds' | 'leaves'): THREE.CanvasTexture 
   return texture
 }
 
+/**
+ * The studio light: the room, prefiltered, hung on the scene.
+ *
+ * Mounted as its own component so the PMREM pass runs when the RIG changes
+ * and not when anything else in the lighting rerenders — it is a render
+ * target and a chain of blur passes, which is cheap once and silly sixty
+ * times a second.
+ */
+function StudioLight({ rig }: { rig: LightingPreset }) {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+
+  // Only the colours and the key's placement change the image; intensity is
+  // applied by the scene, so dragging that slider must not rebuild anything.
+  const sky = `${rig.sky.zenith}|${rig.sky.horizon}|${rig.sky.ground}|${rig.key.color}|${rig.key.intensity}|${rig.key.position.join()}`
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `sky` is the digest of everything the image is built from.
+  useEffect(() => {
+    const environment = buildEnvironment(gl, rig)
+    const previous = scene.environment
+    scene.environment = environment.texture
+    return () => {
+      scene.environment = previous
+      environment.dispose()
+    }
+  }, [gl, scene, sky])
+
+  useEffect(() => {
+    const previous = scene.environmentIntensity
+    scene.environmentIntensity = rig.studio
+    return () => {
+      scene.environmentIntensity = previous
+    }
+  }, [scene, rig.studio])
+
+  return null
+}
+
+/**
+ * How bright the hemisphere stand-in runs against the environment it
+ * replaces. Prefiltered irradiance integrates the whole sky, and a
+ * hemisphere light is one cosine term, so matching them by eye means
+ * pushing the cheap one up.
+ */
+const HEMISPHERE_STAND_IN = 1.6
+
 export interface PaperLightingProps {
   preset?: LightingName
+  /**
+   * Overrides on the preset — exposure, key, direction, height, ambient,
+   * studio, haze. See `lightSchema`.
+   */
+  light?: LightOverrides
+  /**
+   * An already-resolved rig, which wins over `preset`/`light`. Stage mode
+   * resolves once and hands the same object to the lamps and to the paper,
+   * so the two cannot be resolved differently.
+   */
+  rig?: LightingPreset
   /** Local y of the ground the contact shadow sits on. */
   floor?: number
   /** Contact shadow footprint. */
@@ -92,22 +150,34 @@ export interface PaperLightingProps {
   shadowMapSize?: number
   /** Draw the soft contact shadow. It is its own render pass. */
   contactShadow?: boolean
+  /**
+   * Light the scene with the room as well as with the lamp. Off is one
+   * fewer texture read per fragment and a flatter picture; it is a quality
+   * knob, not an art-direction one — turn the studio light DOWN with
+   * `light.studio` if you want less of it.
+   */
+  environment?: boolean
 }
 
 /**
- * A scene's lighting rig from one serialized name: key light (spot with a
- * procedural gobo, or directional), ambient fill, tone-mapping exposure,
- * and the contact shadow. Swap presets to restyle the same paper.
+ * A scene's lighting rig from one serialized name plus whatever the author
+ * overrode: key light (spot with a procedural gobo, or directional), the
+ * room as an environment map, ambient fill, tone-mapping exposure, distance
+ * haze, and the contact shadow. Swap presets to restyle the same paper;
+ * move the sliders to light it yourself.
  */
 export function PaperLighting({
   preset = 'studio',
+  light,
+  rig,
   floor = -1.2,
   scale = 10,
   reducedMotion,
   shadowMapSize,
   contactShadow = true,
+  environment = true,
 }: PaperLightingProps) {
-  const p = getLightingPreset(preset)
+  const p = useMemo(() => rig ?? resolveLighting(preset, light), [rig, preset, light])
   const mapSize = shadowMapSize ?? p.shadow.mapSize
   const castShadow = mapSize > 0
   const reduced = usePrefersReducedMotion(reducedMotion)
@@ -146,6 +216,21 @@ export function PaperLighting({
 
   return (
     <>
+      {p.studio > 0 &&
+        (environment ? (
+          <StudioLight rig={p} />
+        ) : (
+          // The studio light degrades rather than disappearing. A hemisphere
+          // is the cheap half of what the room does — light from above, a
+          // different colour from below — so a machine that cannot pay for
+          // the environment still gets a lit figure with a top and a bottom
+          // instead of a flat cut-out.
+          <hemisphereLight
+            color={p.sky.horizon}
+            groundColor={p.sky.ground}
+            intensity={p.studio * HEMISPHERE_STAND_IN}
+          />
+        ))}
       <ambientLight intensity={p.ambient} />
       {p.gobo && goboMap ? (
         <spotLight

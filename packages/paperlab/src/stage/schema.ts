@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { lightingNames } from '../config/schema'
+import { lightSchema } from '../scene/lighting'
 import { walkPathSchema } from './path'
 import { shotSchema } from './camera'
 import { figureSchema } from './gait'
@@ -26,8 +27,16 @@ export const stageSourceSchema = z.object({
   surround: z.boolean().default(true),
   /** Colour overhead. The horizon takes the source's own colour. */
   zenith: z.string().default('#241c17'),
-  /** Size, as a multiple of the PAPER height — it only has to out-fill the frame. */
-  spread: z.number().min(1).max(60).default(5),
+  /**
+   * Size, as a multiple of the PAPER height.
+   *
+   * It is an OPENING, not a wall. At 5 the plane was 100 units across and
+   * filled the entire frame behind the colonnade, so the hall had no dark
+   * end to resolve toward and the whole picture sat at one value. Sized to
+   * roughly the height of the paper it stands behind, it reads as the way
+   * out — which is what the figure is walking toward.
+   */
+  spread: z.number().min(0.2).max(60).default(2),
 })
 
 export const stageGroundSchema = z.object({
@@ -42,6 +51,12 @@ export const stageSchema = z.object({
   figure: figureSchema.default({}),
   /** Stage mode is built for `nave`; the others are all front-lit. */
   lighting: z.enum(lightingNames).default('nave'),
+  /**
+   * The light, by hand: exposure, key, direction, height, ambient, studio,
+   * haze. Overrides on `lighting` rather than a replacement for it, so a
+   * shared stage carries the sliders that were moved and nothing else.
+   */
+  light: lightSchema.default({}),
   showFigure: z.boolean().default(true),
   source: stageSourceSchema.default({}),
   ground: stageGroundSchema.default({}),

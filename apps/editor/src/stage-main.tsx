@@ -82,7 +82,10 @@ createRoot(document.getElementById('root')!).render(
     layout={preset.layout}
     layoutOptions={preset.layoutOptions}
     progress={num('progress', 0.42)}
-    reducedMotion={false}
+    // Forced off so a shot is deterministic wherever it runs — and forceable
+    // ON, because the reduced-motion scene is a thing we ship and nothing
+    // could look at it: `?reduced=1` freezes the walk and stands the figure.
+    reducedMotion={has('reduced')}
     stage={{
       ...preset.stage,
       // ?model=<url> swaps the capsule silhouette for a rigged glTF and
@@ -90,18 +93,38 @@ createRoot(document.getElementById('root')!).render(
       // without shipping an asset. Built as ONE figure object: two spreads
       // each rebuilding `figure` would mean passing both silently dropped
       // whichever came first.
-      ...(has('model') || has('gait')
+      ...(has('model') || has('gait') || has('finish')
         ? {
             showFigure: true,
             figure: {
               ...preset.stage.figure,
               ...(has('model') ? { model: query.get('model')! } : {}),
               ...(has('gait') ? { gait: query.get('gait') as never } : {}),
+              ...(has('finish') ? { finish: query.get('finish') as never } : {}),
             },
           }
         : {}),
-      ...(query.get('shadows') === '0' ? { shadows: false } : {}),
-      ...(query.get('surround') === '0' ? { source: { ...preset.stage.source, surround: false } } : {}),
+      // The light, one query param per slider, so a look can be swept from
+      // the shell before it is written into a preset.
+      light: {
+        ...preset.stage.light,
+        ...(has('exposure') ? { exposure: num('exposure', 1) } : {}),
+        ...(has('key') ? { key: num('key', 3.4) } : {}),
+        ...(has('direction') ? { direction: num('direction', 180) } : {}),
+        ...(has('height') ? { height: num('height', 24) } : {}),
+        ...(has('ambient') ? { ambient: num('ambient', 0.03) } : {}),
+        ...(has('studio') ? { studio: num('studio', 0.55) } : {}),
+        ...(has('haze') ? { haze: num('haze', 1) } : {}),
+      },
+      ...(has('spread') || query.get('surround') === '0'
+        ? {
+            source: {
+              ...preset.stage.source,
+              ...(has('spread') ? { spread: num('spread', 2) } : {}),
+              ...(query.get('surround') === '0' ? { surround: false } : {}),
+            },
+          }
+        : {}),
       shot: {
         ...preset.stage.shot,
         ...(has('shot') ? { shot: query.get('shot') as ShotName } : {}),

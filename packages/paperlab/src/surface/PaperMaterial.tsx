@@ -4,6 +4,7 @@ import CustomShaderMaterial from 'three-custom-shader-material'
 import type { LightingName, SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { composeSurface } from './compose'
+import { useLightRig } from '../scene/rig'
 
 export interface PaperMaterialProps {
   stock: Stock
@@ -14,7 +15,11 @@ export interface PaperMaterialProps {
   thickness: number
   /** World dims — perforation holes are sized in world units. */
   sheet?: { width: number; height: number }
-  /** Scene lighting — transmission is measured against its key light. */
+  /**
+   * Scene lighting — transmission is measured against its key light. A
+   * `<LightRig>` above this material wins over it: in a stage the paper is
+   * lit by the hall, not by the preset it was authored with.
+   */
   lighting?: LightingName
 }
 
@@ -34,6 +39,7 @@ export function PaperMaterial({
   sheet,
   lighting = 'studio',
 }: PaperMaterialProps) {
+  const rig = useLightRig(lighting)
   const composed = composeSurface(
     surface,
     stock,
@@ -43,7 +49,7 @@ export function PaperMaterial({
       hasBackMap: Boolean(backTexture),
     },
     sheet,
-    lighting,
+    rig,
   )
 
   // Uniform objects bound to the current program; stable per structure.

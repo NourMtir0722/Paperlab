@@ -405,7 +405,7 @@ a shape for.
 
 Grouped by what they touch, not by priority.
 
-### Lighting is the only part of the engine that isn't data
+### ~~Lighting is the only part of the engine that isn't data~~ — *mostly done*
 
 For anyone using this as a procedural asset tool — which is what it is.
 
@@ -460,6 +460,59 @@ Two constraints that decide the shape of this:
   field modes stop matching. That is the same rule that kept
   `MeshPhysicalMaterial` out (see the transmitting-stock entry).
 
+**Done: the light is authorable, and the room lights the room.**
+
+`stage.light` is a block of OVERRIDES on the named preset — exposure, key,
+colour, direction, height, ambient, studio, haze — every field optional, so
+a shared stage carries the sliders that were moved and nothing else. The
+preset stayed the starting point rather than becoming a frozen copy, which
+is also the shape the "Looks" entry below wanted. Direction and height are
+**degrees around the room and degrees above the horizon**, not a position
+vector: `lightAngles` / `lightPosition` are exact inverses, which is what
+lets a slider read the resolved rig and write back one field without
+drifting. The editor's Light panel is built by hand for exactly that reason —
+an unset override has no value for a generated slider to show, so the
+sliders show the RESOLVED number and touching one claims that field.
+
+Three of the specific gaps above are closed:
+
+- **An environment map exists** — `studio`. Procedurally built from the same
+  three colours as the cyclorama (zenith, horizon, floor) plus a soft disc
+  of the key's own colour where the key stands, prefiltered through PMREM.
+  No HDRI, nothing fetched.
+- **The surround dome lights the scene now**, which the entry called
+  "probably the best single idea in here" and it was. The stage overrides
+  the preset's `sky` with its own source colours, so the room you can see
+  and the room that lights you are one thing.
+- **Flat ambient stopped carrying the fill.** Every preset's `ambient` came
+  down and the studio light took over. That is the whole difference between
+  the figure reading as a cut-out and reading as a body.
+
+**And it exposed a real bug, which is the reason the coupling constraint was
+written down in the first place.** `translucencyValues()` reads the key
+light's position so a sheet's backlit glow can never disagree with the lamp
+casting its shadow — but it read it from *the paper's own* `scene.lighting`,
+and no stage banner ever carried one. **Every banner in every stage computed
+its glow from `studio`, a lamp up and to the right, while the hall was lit by
+`nave` from behind.** The coupling was correct and the wire was missing. The
+fix is a `<LightRig>` context: the scene publishes the rig it actually
+resolved and the paper reads that in preference to its own name. It moves
+four uniforms in place rather than rebuilding the program, so a slider drag
+does not recompile a shader per frame.
+
+**What it cost, measured** (`pnpm perf`, native GPU, nave at medium): 44ms →
+68ms a frame, and a case was added to the harness so the trade stays visible.
+It is the environment sampling in a scene with heavy overdraw, not the PMREM
+build, which runs once per rig. `low` drops it for a hemisphere light instead
+of nothing, so a weak machine still gets light with a top and a bottom;
+`light.studio: 0` turns it off at any tier without moving the tier.
+
+**Still open, and unchanged by any of this:** area lights, PCSS-style contact
+hardening, shadow cascades over the whole walk, bounce, kelvin instead of hex,
+and **more than one light** — which is still the hard one, because
+transmission has to answer "which lamp is this sheet backlit by" the moment
+there are two.
+
 ### The scene has no grade
 
 For anyone who looks at it. There is no post-processing anywhere in this repo
@@ -476,6 +529,14 @@ Constraint: this is a peer-dependency question, and it may belong to the apps
 rather than the library — same reasoning as the share-link decision. A grade
 is also not obviously serializable into a `.paper`, which by our own rule
 means it waits or it lives outside.
+
+**Partly bought without post-processing**, and worth knowing before anyone
+reaches for an EffectComposer. The source plane's falloff now runs from a
+held core into a long tail, which is what bloom around an opening looks like
+from the outside; `exposure` is a slider; and the nave prints a stop under so
+the banners hold their folds instead of clipping to flat white. What is still
+genuinely missing is a grade with a curve, real bloom on the highlights, and
+a vignette.
 
 ### A stock that transmits
 
@@ -671,6 +732,41 @@ drop it in `apps/*/public/figure/` and the change is the filename.
 Two limits: it carries a single unnamed clip, so `gait: 'run'` reuses the walk
 (`pickClip` falls back rather than failing), and it is 438 KB including a
 texture that never renders, since the figure is drawn as a silhouette.
+
+**The CC0 blocker was wrong, and the figure is a Quaternius rig now.**
+Quaternius' packs are gated behind itch and Patreon *on quaternius.com* — but
+**poly.pizza mirrors them with direct, ungated GLB links**, which is the fact
+the last pass was missing. So the asset is "Man in Suit" from the Animated
+Men Pack: CC0, properly proportioned, and carrying **eleven named clips**
+including Walk, Run and Idle — which closes both of the limits above. It has
+no textures at all, so the 583 KB is geometry and animation rather than an
+image that never renders.
+
+Three things came out of using it:
+
+- **`pickClip` took the wrong clip.** `Man_Run` and `Man_RunningJump` both
+  match `/run/i`, and it took the first — so a pack that happened to list the
+  jump first would have put the figure into it for the length of the walk.
+  It now takes the SHORTEST matching name, on the reasoning that the clip
+  that IS the thing carries the least name around it.
+- **A frozen figure stood mid-stride.** `frozen` sat the mixer at frame 0 of
+  the walk, which is one leg out — and reduced motion, which is what freezes
+  it, is exactly when nobody gets to see the next frame explain it. There is
+  a `pickStillClip` now, and it stands.
+- **`finish: 'silhouette' | 'shaded'`, defaulting to shaded.** The old entry
+  said seeing the model meant a different lighting preset and was therefore a
+  different idea. The studio light IS that idea, so it landed: the rig keeps
+  its own materials and takes the room, which in a backlit hall is a rim down
+  one edge and fill on the other. Measured at under 2ms — the seven materials
+  on the rig cost far less than the environment that lights them.
+
+**Two things still missing, recorded rather than fixed.** There is no facing
+correction: the library documents that a model faces +Z at yaw 0, this asset
+happens to, and the next one may not — a `figure.modelYaw` in degrees is the
+obvious answer and it is one field. And eight of the eleven clips (clapping,
+death, punch, sword slash…) ride along unplayed; pruning them needs a glTF
+rewriter (`@gltf-transform`) as a dev dependency, which is more machinery
+than ~300 KB of an app-hosted asset is worth today.
 
 **The boundary held and is now enforced rather than intended:** `pnpm pack` is
 ten files with no `.glb`. The library ships no assets, no stage preset names a

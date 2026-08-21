@@ -64,13 +64,21 @@ export function Stages() {
   stage={{
     path: getWalk('straight'),   // straight | bend | ess | ring | spiral
     shot: { shot: 'follow' },    // follow | lead | low | wide
-    lighting: 'nave',
+    lighting: 'nave',            // the preset — the starting point, not the ceiling
+    light: { exposure: 0.9, direction: 180, height: 24, studio: 0.6 },
+    figure: { model: '/figure/walking.glb' },   // your asset, your URL
     showFigure: true,
   }}
   progress={scrollProgress}      // omit it and the figure walks on its own clock
   quality="auto"
 />`}
       />
+      <p className="note">
+        <code>light</code> is a set of <em>overrides</em> on the named preset, in the terms a person would say
+        them in: <code>direction</code> and <code>height</code> are degrees around the room and degrees above
+        the horizon, and <code>studio</code> is the room itself as an environment map — the directional fill
+        that gives paper form and something for its sheen to reflect. Only the fields you move are serialized.
+      </p>
       <p className="note">
         <code>quality</code> is deliberately not part of <code>stageSchema</code> — it describes the{' '}
         <em>device</em>, not the artwork, so it never travels in a preset or a shared link.

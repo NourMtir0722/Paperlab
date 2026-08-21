@@ -104,7 +104,7 @@ export const stagePresets: Record<string, StagePreset> = {
       shot: { shot: 'follow', distance: 6.5, lookAhead: 9, offset: 0.9 },
       lighting: 'nave',
       figure: { speed: 0.85 },
-      source: { spread: 4 },
+      source: { spread: 1.1 },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 2.4, twist: 14, breathe: 0.18, margin: 0.12, rise: 0.2 },
@@ -123,6 +123,10 @@ export const stagePresets: Record<string, StagePreset> = {
       shot: { shot: 'low', distance: 8, lookAhead: 13, offset: 0.5 },
       lighting: 'nave',
       ground: { color: '#0b0908' },
+      // Its banners are eleven units tall and `spread` is a multiple of that,
+      // so the default opening would be fifty units across — a wall, on a
+      // walk whose whole point is that it is narrow.
+      source: { spread: 1.1 },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 1.7, twist: 44, breathe: 0.5, drape: 0.75, rise: 0.4 },

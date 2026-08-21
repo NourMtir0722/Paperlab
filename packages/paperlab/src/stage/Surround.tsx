@@ -12,8 +12,16 @@ import { useEffect, useMemo } from 'react'
  * distance on the same side of the frame as the source.
  */
 
-/** Procedural, so the repo carries no binary and the grade stays editable. */
-export function makeSkyTexture(horizon: string, zenith: string): THREE.CanvasTexture {
+/**
+ * Procedural, so the repo carries no binary and the grade stays editable.
+ *
+ * Three stops, not two. The grade used to run zenith → horizon and stop
+ * there, which put the brightest colour in the room on the floor line and
+ * below it — so the space had no bottom and the ground plane sat on a band
+ * of light instead of in a room. Below the horizon it now falls to the
+ * floor's own colour, and the picture gains a lower half.
+ */
+export function makeSkyTexture(sky: SkyColors): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = 4
   canvas.height = 256
@@ -22,15 +30,23 @@ export function makeSkyTexture(horizon: string, zenith: string): THREE.CanvasTex
   // Canvas row 0 is the top of the sphere. The grade has to travel most of
   // the way down: held flat until near the horizon it reads as a dark lid
   // over a bright slot, which is the black void this is here to remove.
-  grade.addColorStop(0, zenith)
-  grade.addColorStop(0.35, zenith)
-  grade.addColorStop(0.92, horizon)
-  grade.addColorStop(1, horizon)
+  grade.addColorStop(0, sky.zenith)
+  grade.addColorStop(0.3, sky.zenith)
+  grade.addColorStop(0.62, sky.horizon)
+  grade.addColorStop(0.7, sky.horizon)
+  grade.addColorStop(1, sky.ground)
   ctx.fillStyle = grade
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
+}
+
+/** Zenith, horizon and floor — the same three the studio light is built from. */
+export interface SkyColors {
+  zenith: string
+  horizon: string
+  ground: string
 }
 
 /**
@@ -47,10 +63,27 @@ export function makeGlowTexture(color: string): THREE.CanvasTexture {
   canvas.width = canvas.height = size
   const ctx = canvas.getContext('2d')!
   const glow = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  glow.addColorStop(0, color)
-  glow.addColorStop(0.55, color)
+  const c = new THREE.Color(color)
+  const rgb = `${(c.r * 255) | 0}, ${(c.g * 255) | 0}, ${(c.b * 255) | 0}`
   // Same colour throughout — only the alpha falls, so the fade never tints.
-  glow.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  //
+  // A held core and then a long tail. The core has to stay — it is the one
+  // thing in frame brighter than the paper, and a falloff that starts at the
+  // centre gives a soft warm haze with nothing to walk toward. What changed
+  // is the tail: dropping from full to nothing over the last 45% put a
+  // visible RIM on the plane, a disc of light with an edge hanging in the
+  // room like a moon, and light does not have an edge.
+  for (const [stop, alpha] of [
+    [0, 1],
+    [0.5, 1],
+    [0.62, 0.66],
+    [0.74, 0.34],
+    [0.86, 0.11],
+    [0.94, 0.03],
+    [1, 0],
+  ] as const) {
+    glow.addColorStop(stop, `rgba(${rgb}, ${alpha})`)
+  }
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, size, size)
   const texture = new THREE.CanvasTexture(canvas)
@@ -86,8 +119,13 @@ export function Source({
   )
 }
 
-export function Surround({ radius, horizon, zenith }: { radius: number; horizon: string; zenith: string }) {
-  const texture = useMemo(() => makeSkyTexture(horizon, zenith), [horizon, zenith])
+export function Surround({ radius, sky }: { radius: number; sky: SkyColors }) {
+  // Destructured so the memo depends on the three colours rather than on the
+  // identity of the object carrying them — the rig is rebuilt whenever any
+  // light slider moves, and repainting the dome for a change in exposure is
+  // a canvas and a texture upload for nothing.
+  const { zenith, horizon, ground } = sky
+  const texture = useMemo(() => makeSkyTexture({ zenith, horizon, ground }), [zenith, horizon, ground])
   useEffect(() => () => texture.dispose(), [texture])
 
   return (
