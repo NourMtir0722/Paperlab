@@ -15,6 +15,7 @@ import { getWalkPath } from './path'
 import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
+import { Ceiling, Floor } from './Room'
 import { Grade } from './Grade'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
 import { stageMotionSchema, type StageMotionInput } from './navigate'
@@ -389,13 +390,22 @@ export function PaperStageScene({
         <Source size={source.size} position={source.position} yaw={source.yaw} color={rig.sky.horizon} />
       )}
 
+      {/* A square of side s has corners at s·0.707 — keep them inside the
+          surround, or the floor punches out through the sky. */}
       {stage.ground.enabled && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          {/* A square of side s has corners at s·0.707 — keep them inside the
-              surround, or the floor punches out through the sky. */}
-          <planeGeometry args={[surroundRadius * 1.3, surroundRadius * 1.3]} />
-          <meshStandardMaterial color={stage.ground.color} roughness={1} />
-        </mesh>
+        <Floor size={surroundRadius * 1.3} color={stage.ground.color} slab={stage.ground.slab} />
+      )}
+
+      {/* The lid. It gives the haze a far surface to settle on — fog against
+          an open sky has none, which is why the top of frame used to grade to
+          nothing — and it puts a plane above the walk for the source to spill
+          onto, which is how every reference installation reads as interior. */}
+      {stage.room.enabled && (
+        <Ceiling
+          size={surroundRadius * 1.3}
+          height={paperHeight * stage.room.height}
+          color={stage.room.color}
+        />
       )}
 
       <PaperFieldMesh

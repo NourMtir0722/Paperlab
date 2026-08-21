@@ -153,6 +153,32 @@ guarantee; `<PaperStage>` does it for you.
 exactly, which is what lets a slider read the rig and write an override
 without drifting.
 
+### The room, and why there is no figure in it
+
+`stage.room` is `{ enabled, height, color }` — a ceiling — and
+`stage.ground.slab` is the width of one poured floor slab. Together they are
+the scale of the hall.
+
+Stage mode used to be a void with a horizon: a graded dome, a flat plane, and
+a bright rectangle at the end, none of it a knowable size. That is why the
+walking figure was carrying the entire scale burden alone. Architecture does
+the job better — a concrete bay is about two and a half metres and a ceiling
+is about three up, and a viewer knows both without being told. They are also
+flat surfaces under good light, which is the one thing a renderer never gets
+wrong, where a human mesh is the one thing it always does.
+
+**`showFigure` therefore defaults to `false`.** The deciding argument is not
+that the model looked cheap; it is that the stage is NAVIGABLE — drag, wheel,
+arrow-step, click-to-approach — so there is already a person in the hall and
+it is the viewer. A second one walking the same aisle on its own clock
+competes for that role. Pass `showFigure: true` to bring it back.
+
+`threshold` is the one preset with a colour in its room. White paper against
+warm neutral is white paper against nothing; against a saturated ground it
+sings, and `source.color` / `source.zenith` / `ground.color` are the same
+three stops that build the environment map, so the bounce is the room's own
+colour and cannot disagree with the walls in shot.
+
 ### The print (stage mode only)
 
 `stage.grade` is what happens to the frame after the scene is drawn:

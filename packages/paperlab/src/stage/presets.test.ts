@@ -99,6 +99,48 @@ describe('stage presets', () => {
     expect(stageSchema.parse({}).grade.threshold).toBeGreaterThan(0.9)
   })
 
+  it('every stage is a room: a ceiling above and seams in the floor', () => {
+    for (const preset of presets()) {
+      const stage = stageSchema.parse(preset.stage)
+      expect(stage.room.enabled).toBe(true)
+      // A ceiling clear of the paper hanging under it — one that cuts the
+      // banners, or the lit opening at the end of the walk, is a lid rather
+      // than a room.
+      expect(stage.room.height).toBeGreaterThan(1)
+      // The scale cue. A floor without seams is a gradient that happens to
+      // be horizontal.
+      expect(stage.ground.slab).toBeGreaterThan(0)
+    }
+  })
+
+  it('the floor is light enough to show its own seams', () => {
+    // It used to be #0e0b09 — dark enough to disappear, and a floor that
+    // disappears cannot carry the one cue it exists to carry.
+    const floor = stageSchema.parse({}).ground.color
+    const luma = Number.parseInt(floor.slice(1, 3), 16)
+    expect(luma).toBeGreaterThan(0x18)
+  })
+
+  it('no stage draws a figure unless it is asked to', () => {
+    for (const preset of presets()) {
+      expect(stageSchema.parse(preset.stage).showFigure).toBe(false)
+    }
+    // Still one flag away.
+    expect(stageSchema.parse({ showFigure: true }).showFigure).toBe(true)
+  })
+
+  it('exactly one stage is a coloured room, and it is a real colour', () => {
+    // White paper against warm neutral is white paper against nothing. The
+    // set needs at least one room with a hue in it, and `threshold` — a few
+    // enormous sheets you walk between — is the one built to be stood inside.
+    const coloured = presets().filter((p) => {
+      const stage = stageSchema.parse(p.stage)
+      const [r, , b] = [1, 3, 5].map((i) => Number.parseInt(stage.ground.color.slice(i, i + 2), 16))
+      return r! - b! > 0x20
+    })
+    expect(coloured.map((p) => p.id)).toContain('threshold')
+  })
+
   it('depth falloff is OFF by default, and that is the considered answer', () => {
     // Haze already stages depth here, at one fragment instruction. Optical
     // blur is a second full-screen pass and the effect most likely to read
