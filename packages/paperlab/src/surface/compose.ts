@@ -6,6 +6,7 @@ import {
   type SurfaceConfig,
 } from '../config/schema'
 import type { Stock } from '../core/stock'
+import type { LightingPreset } from '../scene/lighting'
 import {
   TRANSLUCENCY_FRAGMENT,
   TRANSLUCENCY_VARYINGS,
@@ -216,8 +217,8 @@ export function composeSurface(
   maps: SurfaceMaps = { hasFrontMap: false, hasBackMap: false },
   /** World dims — perforation holes are sized in world units. */
   sheet: { width: number; height: number } = { width: 1, height: 1.4 },
-  /** Whose key light transmission is measured against. */
-  lighting: LightingName = 'studio',
+  /** Whose key light transmission is measured against — a preset name or the scene's resolved rig. */
+  lighting: LightingName | LightingPreset = 'studio',
 ): ComposedSurface {
   const grain = surface.grain ?? stock.defaultSurface.grain
   const aging = surface.aging ?? stock.defaultSurface.aging

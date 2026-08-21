@@ -65,12 +65,59 @@ import { PaperStage } from 'paperlab'
     path: getWalk('straight'),   // straight | bend | ess | ring | spiral
     shot: { shot: 'follow' },    // follow | lead | low | wide
     lighting: 'nave',            // stage mode is built for this one; the rest are front-lit
+    light: { exposure: 0.9, direction: 180, height: 24, studio: 0.55 },  // overrides on the preset
+    figure: { model: '/figure/walking.glb', finish: 'shaded' },          // your asset, your URL
     showFigure: true,
   }}
   progress={scrollProgress}      // 0..1 — omit it and the figure walks on its own clock
   quality="auto"                 // auto | low | medium | high — auto adapts to the machine
 />
 ```
+
+### Lighting is data, not an enum
+
+`lighting` names a preset; `light` moves it. Every field is optional and
+means "leave this one alone", so a stage serializes the sliders you moved
+and nothing else:
+
+| field | what it is |
+|---|---|
+| `exposure` | tone-mapping exposure — the stop the whole picture is printed at |
+| `key` | key light intensity |
+| `color` | key light colour |
+| `direction` | degrees around the room. 0° in front of the paper (+Z), 90° right, ±180° behind — which is what makes `nave` backlit |
+| `height` | degrees above the horizon |
+| `ambient` | flat fill from everywhere. Cheap, and it kills form — reach for `studio` first |
+| `studio` | the room itself, as an environment map. Directional fill, and the only thing paper's sheen has to reflect |
+| `haze` | distance haze, as a multiple of the preset's own |
+
+The rig resolves ONCE per scene and everything reads that one object — the
+lamps, the environment, the cyclorama, and the transmission through every
+sheet. That last one is the point: `translucencyValues()` measures a sheet's
+backlit glow against the key light's own position, so a hand-moved lamp
+moves the glow with it. Inside your own R3F scene, wrap the paper in
+`<LightRig rig={resolveLighting('nave', { direction: 40 })}>` to get the same
+guarantee; `<PaperStage>` does it for you.
+
+`resolveLighting(name, overrides)`, `lightAngles(position)` and
+`lightPosition(angles)` are exported and pure — the angles round-trip
+exactly, which is what lets a slider read the rig and write an override
+without drifting.
+
+### The figure
+
+`stage.figure` takes `height`, `speed`, `stride`, `swing`, `gait`, `color`,
+`finish`, and `model`. Without `model` it is procedural capsules with a real
+gait; with one it is a rigged glTF whose clip is **scrubbed by distance
+walked**, not played on a clock, so the feet cannot skate however the walk is
+paced. `finish: 'shaded'` (the default) hands the rig to the scene's light —
+in a backlit hall that means a rim down one edge and the studio light filling
+the other; `'silhouette'` flattens it to one unlit colour.
+
+**The library ships no asset.** `model` is a URL your app hosts. The demo apps
+serve a CC0 rig from their own `public/`; installing `paperlab` gets the
+capsules and you bring your own. Clips are matched by name — walk, run, idle —
+and the shortest matching name wins, so `Man_Run` beats `Man_RunningJump`.
 
 The load-bearing invariant: **every part of the scene reads the same walk.**
 The layout arranges along it, the figure follows it, the camera is stationed

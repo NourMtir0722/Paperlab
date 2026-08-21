@@ -19,6 +19,10 @@
  * - `dpr` — fragment cost scales with the square of it, and this scene is
  *   fragment-heavy (translucency, fog, a full-screen backdrop).
  * - `surround` — one more full-screen draw; cheap, but free to drop.
+ * - `environment` — the studio light. One prefiltered cube built once, then
+ *   a texture read per fragment for every lit surface in the scene. Cheap on
+ *   anything with a GPU and not free on a software rasterizer, so the bottom
+ *   tier falls back to the flat ambient it replaced.
  */
 
 export const qualityNames = ['auto', 'low', 'medium', 'high'] as const
@@ -36,19 +40,28 @@ export interface QualitySettings {
   surround: boolean
   /** Soft contact shadow under the scene — its own render pass. */
   contactShadow: boolean
+  /** Light surfaces with the room (an environment map) as well as with the lamp. */
+  environment: boolean
 }
 
 export const qualityTiers: Record<QualityTier, QualitySettings> = {
   /** Anything with a GPU. */
-  high: { dpr: 2, shadowMapSize: 2048, segments: 72, surround: true, contactShadow: true },
+  high: { dpr: 2, shadowMapSize: 2048, segments: 72, surround: true, contactShadow: true, environment: true },
   /** The default worth aiming at: an integrated laptop GPU from the last few years. */
-  medium: { dpr: 1.5, shadowMapSize: 1024, segments: 48, surround: true, contactShadow: false },
+  medium: {
+    dpr: 1.5,
+    shadowMapSize: 1024,
+    segments: 48,
+    surround: true,
+    contactShadow: false,
+    environment: true,
+  },
   /**
    * Old integrated graphics, a throttled phone, a software rasterizer. The
    * scene still READS — banners, figure, backlight, walk — it just stops
    * paying for the parts nobody would miss at this framerate.
    */
-  low: { dpr: 1, shadowMapSize: 0, segments: 28, surround: true, contactShadow: false },
+  low: { dpr: 1, shadowMapSize: 0, segments: 28, surround: true, contactShadow: false, environment: false },
 }
 
 /** The tier to start `auto` from before anything has been measured. */

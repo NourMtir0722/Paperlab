@@ -188,6 +188,22 @@ function unwrap(field: z.ZodTypeAny): z.ZodTypeAny {
   return f
 }
 
+/**
+ * A field's slider range, straight off the schema.
+ *
+ * Exported because a few panels have to build a control by hand — the light
+ * ones, whose fields are optional overrides and so have no value of their
+ * own to show — and the range is still the schema's fact to state, not
+ * theirs to restate.
+ */
+export function numberRange(schema: z.ZodTypeAny, key: string): { min: number; max: number } {
+  const field =
+    schema instanceof z.ZodObject ? (schema.shape as Record<string, z.ZodTypeAny>)[key] : undefined
+  const inner = field ? unwrap(field) : undefined
+  if (!(inner instanceof z.ZodNumber)) return { min: 0, max: 1 }
+  return { min: checkValue(inner, 'min') ?? 0, max: checkValue(inner, 'max') ?? 1 }
+}
+
 function checkValue(num: z.ZodNumber, kind: 'min' | 'max'): number | undefined {
   const check = num._def.checks.find((c) => c.kind === kind)
   return check && 'value' in check ? check.value : undefined

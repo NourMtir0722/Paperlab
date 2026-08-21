@@ -128,6 +128,13 @@ export function describeStage(input: StageExportInput): string {
       ? 'the whole space dim and lit from behind, so the paper glows and the far end of the walk is a bright void'
       : `lit with the "${stage.lighting}" preset`,
   )
+  // The description is what someone checks the render against, so a light
+  // that was moved by hand has to appear in it — otherwise the sentence
+  // describes the preset and the screen shows something else.
+  const moved = Object.entries(stage.light)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key)
+  if (moved.length > 0) parts.push(`with its ${moved.join(', ')} set by hand`)
   if (input.scroll) parts.push('and scrolling the page walks the figure deeper into it')
   return parts.join(', ')
 }

@@ -184,3 +184,27 @@ describe('the banner travels with the export', () => {
     expect(source).not.toContain('PaperConfigInput')
   })
 })
+
+describe('the light travels with the stage', () => {
+  it('an untouched light exports nothing at all', () => {
+    expect(diffStage({})).not.toHaveProperty('light')
+    expect(diffStage({ light: {} })).not.toHaveProperty('light')
+  })
+
+  it('and a moved one exports only what moved', () => {
+    expect(diffStage({ light: { exposure: 1.6, direction: 40 } }).light).toEqual({
+      exposure: 1.6,
+      direction: 40,
+    })
+  })
+
+  it('survives the round-trip every shared stage takes', () => {
+    const stage = stageSchema.parse({ light: { studio: 1.4, haze: 0.5 } })
+    expect(stageSchema.parse(JSON.parse(JSON.stringify(stage)))).toEqual(stage)
+  })
+
+  it('the description says the light was set by hand, so it still matches the render', () => {
+    expect(describeStage(base())).not.toContain('by hand')
+    expect(describeStage(base({ stage: { light: { exposure: 2 } } }))).toContain('its exposure set by hand')
+  })
+})

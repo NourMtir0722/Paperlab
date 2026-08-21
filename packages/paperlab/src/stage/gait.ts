@@ -26,6 +26,21 @@ export const figureSchema = z.object({
   /** Silhouette color. Near-black by default: it should read as an absence, not an object. */
   color: z.string().default('#0a0a0c'),
   /**
+   * How the figure takes light.
+   *
+   * `silhouette` is the flat unlit shape this mode was built around: the
+   * nave is lit from behind, and a shape that reads as an absence never
+   * competes with the paper for attention.
+   *
+   * `shaded` hands the figure to the rig instead — its own materials, lit
+   * by the key and the studio light, so a backlit hall gives it a rim down
+   * one edge and the room fills the other. It costs nothing extra and it is
+   * the reason to bring a good model: at `silhouette` any two rigs with the
+   * same outline are the same picture. Ignored by the capsule figure, which
+   * has no materials worth lighting.
+   */
+  finish: z.enum(['silhouette', 'shaded']).default('shaded'),
+  /**
    * Walk or run. `'auto'` decides from `speed` and leg length, at the point
    * people actually break into a run — see `isRunning`.
    */
@@ -298,10 +313,37 @@ export function figureGait(distance: number, o: FigureOptions): FigurePose {
  * nothing. A model with a single unnamed clip still animates.
  */
 export function pickClip(names: readonly string[], running: boolean): string | undefined {
-  const find = (re: RegExp) => names.find((n) => re.test(n))
-  const wanted = running ? /run|jog|sprint/i : /walk/i
-  const other = running ? /walk/i : /run|jog|sprint/i
-  return find(wanted) ?? find(other) ?? names[0]
+  return matchClip(names, running ? RUN_CLIP : WALK_CLIP, running ? WALK_CLIP : RUN_CLIP)
+}
+
+/**
+ * The clip a figure that is not going anywhere should be in.
+ *
+ * A rig frozen on frame 0 of its walk stands with one leg out, which reads
+ * as a person paused mid-step rather than a person standing — and reduced
+ * motion, which is what freezes it, is exactly when nobody gets to see the
+ * next frame explain it. Anything named idle or standing beats that; if the
+ * asset carries neither, frame 0 of the walk is still the fallback.
+ */
+export function pickStillClip(names: readonly string[]): string | undefined {
+  return matchClip(names, IDLE_CLIP, WALK_CLIP)
+}
+
+const WALK_CLIP = /walk/i
+const RUN_CLIP = /run|jog|sprint/i
+const IDLE_CLIP = /idle|stand/i
+
+/**
+ * The shortest matching name wins, which is not arbitrary: `Man_Run` and
+ * `Man_RunningJump` both contain "run", and the clip that IS the thing
+ * carries the least name around it. Taking the first match instead meant a
+ * pack that happened to list the jump first put the figure into it for the
+ * length of the walk — the sort of thing that reads as a physics bug for an
+ * hour before anyone thinks to print the clip name.
+ */
+function matchClip(names: readonly string[], wanted: RegExp, fallback: RegExp): string | undefined {
+  const best = (re: RegExp) => names.filter((n) => re.test(n)).sort((a, b) => a.length - b.length)[0]
+  return best(wanted) ?? best(fallback) ?? names[0]
 }
 
 /**

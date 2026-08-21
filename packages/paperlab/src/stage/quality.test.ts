@@ -22,6 +22,7 @@ describe('quality tiers', () => {
       expect(worse.dpr).toBeLessThanOrEqual(better.dpr)
       expect(worse.shadowMapSize).toBeLessThanOrEqual(better.shadowMapSize)
       expect(worse.segments).toBeLessThanOrEqual(better.segments)
+      expect(Number(worse.environment)).toBeLessThanOrEqual(Number(better.environment))
     }
   })
 
@@ -35,6 +36,11 @@ describe('quality tiers', () => {
   it('drops the shadow pass only at the bottom', () => {
     expect(qualityTiers.low.shadowMapSize).toBe(0)
     expect(qualityTiers.medium.shadowMapSize).toBeGreaterThan(0)
+  })
+
+  it('drops the studio light only at the bottom, where a texture read per fragment is not free', () => {
+    expect(qualityTiers.low.environment).toBe(false)
+    expect(qualityTiers.medium.environment).toBe(true)
   })
 
   it('auto resolves to a tier that exists, and starts in the middle', () => {

@@ -18,7 +18,8 @@ import {
   stackUniformValues,
 } from './compose'
 import { getLayout, type PaperPose } from './layouts'
-import { translucencyUniforms } from '../surface/translucency'
+import { translucencyUniforms, translucencyValues } from '../surface/translucency'
+import { useLightRig } from '../scene/rig'
 import { fieldShapeStack } from './stack'
 import type { FieldGroupData } from './slots'
 
@@ -66,6 +67,9 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
   const { config, indices, contents } = group
   const count = indices.length
   const stock = getStock(config.stock)
+  // The scene's rig if it publishes one — in a stage the banners are lit by
+  // the hall, not by the preset each one happens to carry.
+  const rig = useLightRig(config.scene.lighting)
   // A raw deformer stack is the Advanced fork of a behavior and wins over one
   // — the same precedence the hero path's buildStack applies. Field mode used
   // to read `behavior` only, so a preset shaped by `deformers` rendered flat.
@@ -149,10 +153,7 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     uniforms.uShowThrough = { value: config.surface.showThrough ?? stock.showThrough }
     // Transmission reads the scene's own key light, so a backlit sheet can
     // never disagree with the lamp casting its shadow.
-    Object.assign(
-      uniforms,
-      translucencyUniforms(config.surface.translucency ?? stock.translucency, config.scene.lighting),
-    )
+    Object.assign(uniforms, translucencyUniforms(config.surface.translucency ?? stock.translucency, rig))
     return {
       vertexShader: buildFieldVertexShader(composed),
       fragmentShader: buildFieldFragmentShader(),
@@ -164,8 +165,18 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
     stock.id,
     config.surface.showThrough,
     config.surface.translucency,
-    config.scene.lighting,
   ])
+
+  // Moving a light writes four uniforms; it must never recompile a program,
+  // which is what putting the rig in the memo above would have done on every
+  // frame of a slider drag.
+  useEffect(() => {
+    const values = translucencyValues(config.surface.translucency ?? stock.translucency, rig)
+    shader.uniforms.uTranslucency!.value = values.translucency
+    ;(shader.uniforms.uBackLightDir!.value as THREE.Vector3).copy(values.direction)
+    ;(shader.uniforms.uBackLightColor!.value as THREE.Color).copy(values.color)
+    shader.uniforms.uAmbientTransmission!.value = values.ambient
+  }, [shader, rig, config.surface.translucency, stock.translucency])
 
   useEffect(() => {
     if (!atlas) return

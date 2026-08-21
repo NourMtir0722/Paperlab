@@ -9,6 +9,8 @@ import { resolveConfig } from '../PaperMesh'
 import type { FieldPaperSlot } from '../field/slots'
 import { getLayout } from '../field/layouts'
 import { PaperLighting } from '../scene/PaperLighting'
+import { resolveLighting } from '../scene/lighting'
+import { LightRig } from '../scene/rig'
 import { getWalkPath } from './path'
 import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
@@ -250,6 +252,22 @@ export function PaperStageScene({
 
   const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageInput])
   const path = useMemo(() => getWalkPath(stage.path), [stage.path])
+
+  /**
+   * The rig, resolved ONCE and handed to everything that has to agree with
+   * it — the lamps, the environment, the cyclorama, and the transmission
+   * through every banner. The room's own colours override the preset's,
+   * because in this mode the sky is not a backdrop the light happens to sit
+   * in front of: it IS the light, so a stage whose source is warm cannot
+   * have a cold room.
+   */
+  const rig = useMemo(() => {
+    const resolved = resolveLighting(stage.lighting, stage.light)
+    return {
+      ...resolved,
+      sky: { zenith: stage.source.zenith, horizon: stage.source.color, ground: stage.ground.color },
+    }
+  }, [stage.lighting, stage.light, stage.source.zenith, stage.source.color, stage.ground.color])
   // The shot frames the ARCHITECTURE, so it has to know how tall the paper
   // is — read from the preset in play rather than assumed.
   const paperHeight = useMemo(() => resolveConfig({ preset: preset ?? BANNER }).sheet.height, [preset])
@@ -314,24 +332,23 @@ export function PaperStageScene({
   }, [path, stage.source.beyond, stage.source.spread, paperHeight])
 
   return (
-    <>
+    <LightRig rig={rig}>
       <ShotRig stage={stage} paperHeight={paperHeight} progress={progress} still={still} />
       <PaperLighting
-        preset={stage.lighting}
+        rig={rig}
         floor={0}
         scale={60}
         reducedMotion={reducedMotion}
         shadowMapSize={settings.shadowMapSize}
         contactShadow={settings.contactShadow}
+        environment={settings.environment}
       />
       {quality === 'auto' && <QualityWatch tier={tier} onChange={setTier} />}
 
-      {stage.source.surround && settings.surround && (
-        <Surround radius={surroundRadius} horizon={stage.source.color} zenith={stage.source.zenith} />
-      )}
+      {stage.source.surround && settings.surround && <Surround radius={surroundRadius} sky={rig.sky} />}
 
       {stage.source.enabled && (
-        <Source size={source.size} position={source.position} yaw={source.yaw} color={stage.source.color} />
+        <Source size={source.size} position={source.position} yaw={source.yaw} color={rig.sky.horizon} />
       )}
 
       {stage.ground.enabled && (
@@ -357,7 +374,7 @@ export function PaperStageScene({
       {stage.showFigure && (
         <Figure path={stage.path} figure={stage.figure} distance={figureDistance} frozen={reducedMotion} />
       )}
-    </>
+    </LightRig>
   )
 }
 

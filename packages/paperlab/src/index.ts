@@ -98,8 +98,20 @@ export {
   lightingPresets,
   getLightingPreset,
   type LightingPreset,
+  // Lighting as data: a preset is the starting point and these are the
+  // overrides that ride on it.
+  lightSchema,
+  resolveLighting,
+  lightAngles,
+  lightPosition,
+  type LightAngles,
+  type LightOverrides,
+  type LightOverridesInput,
 } from './scene/lighting'
 export { PaperLighting, makeGoboTexture, type PaperLightingProps } from './scene/PaperLighting'
+// Publish a resolved rig to the paper under it, so a hand-lit scene's
+// transmission agrees with its lamps. `<PaperStage>` does this for you.
+export { LightRig } from './scene/rig'
 
 export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
 export {

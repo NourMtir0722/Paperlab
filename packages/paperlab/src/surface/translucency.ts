@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { LightingName } from '../config/schema'
-import { getLightingPreset } from '../scene/lighting'
+import { getLightingPreset, type LightingPreset } from '../scene/lighting'
 
 /**
  * Light passing THROUGH the paper.
@@ -93,11 +93,19 @@ export interface TranslucencyValues {
 
 /**
  * Resolve the transmission uniforms from the paper and the scene's lighting
- * preset — the key light's own position and color, so translucency can never
+ * — the key light's own position and color, so translucency can never
  * disagree with the lamp casting the shadows.
+ *
+ * It takes a resolved rig as well as a name because a rig is no longer
+ * always a preset: once the light can be moved, the lamp this sheet is
+ * backlit by is the one the SCENE ended up with, not the one the paper was
+ * authored against.
  */
-export function translucencyValues(translucency: number, lighting: LightingName): TranslucencyValues {
-  const preset = getLightingPreset(lighting)
+export function translucencyValues(
+  translucency: number,
+  lighting: LightingName | LightingPreset,
+): TranslucencyValues {
+  const preset = typeof lighting === 'string' ? getLightingPreset(lighting) : lighting
   const [x, y, z] = preset.key.position
   const direction = new THREE.Vector3(x, y, z)
   // A key light at the origin has no direction to give; treat it as overhead.
@@ -110,7 +118,7 @@ export function translucencyValues(translucency: number, lighting: LightingName)
 /** Ready-to-bind uniform objects for a shader program. */
 export function translucencyUniforms(
   translucency: number,
-  lighting: LightingName,
+  lighting: LightingName | LightingPreset,
 ): Record<string, { value: unknown }> {
   const values = translucencyValues(translucency, lighting)
   return {

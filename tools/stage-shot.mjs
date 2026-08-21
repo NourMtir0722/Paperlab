@@ -16,9 +16,15 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const args = new URLSearchParams()
 let out = resolve(root, '.shots/stage.png')
+// Composition is a function of the frame it is composed in: a stage that
+// reads in a tall panel can be all empty sky in a 16:9 hero. Default stays
+// portrait so old shots stay comparable; `--w=1600 --h=900` judges the other.
+const viewport = { width: 1280, height: 1600 }
 for (const arg of process.argv.slice(2)) {
   const [key, value = ''] = arg.replace(/^--/, '').split('=')
   if (key === 'out') out = resolve(root, value)
+  else if (key === 'w') viewport.width = Number(value)
+  else if (key === 'h') viewport.height = Number(value)
   else args.set(key, value)
 }
 
@@ -43,7 +49,7 @@ const browser = await chromium.launch({
   args: process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
 })
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 1600 } })
+  const page = await browser.newPage({ viewport })
   // Shader compile failures surface as console errors, not exceptions —
   // a silently black canvas is exactly the bug this harness has to catch.
   const problems = []

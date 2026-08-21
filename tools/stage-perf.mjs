@@ -43,7 +43,12 @@ const CASES = [
   ['high', '?preset=nave&quality=high'],
   ['medium', '?preset=nave&quality=medium'],
   ['low', '?preset=nave&quality=low'],
-  ['low, no shadow pass', '?preset=nave&quality=low&shadows=0'],
+  // What the two new costs are worth, so the trade is a measurement rather
+  // than a feeling: the studio light is a texture read per lit fragment, and
+  // a shaded figure is one draw call per material on the rig instead of one
+  // for the whole silhouette.
+  ['medium, no studio light', '?preset=nave&quality=medium&studio=0'],
+  ['medium, silhouette figure', '?preset=nave&quality=medium&finish=silhouette'],
   ['archive (44 banners), high', '?preset=archive&quality=high'],
   ['archive (44 banners), low', '?preset=archive&quality=low'],
   ['nave, quality=auto', '?preset=nave&quality=auto'],
