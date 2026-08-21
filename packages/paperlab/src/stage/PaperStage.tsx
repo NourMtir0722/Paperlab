@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
 import { usePrefersReducedMotion } from '../a11y'
-import type { ContentConfig, PaperConfigInput } from '../config/schema'
+import type { ContentConfigInput, PaperConfigInput } from '../config/schema'
 import { PaperFieldMesh } from '../PaperField'
 import { resolveConfig } from '../PaperMesh'
 import type { FieldPaperSlot } from '../field/slots'
@@ -15,6 +15,7 @@ import { getWalkPath } from './path'
 import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
+import { Grade } from './Grade'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
 import { stageMotionSchema, type StageMotionInput } from './navigate'
 import { useWalk } from './useWalk'
@@ -318,7 +319,7 @@ export function PaperStageScene({
           font: 'Georgia, "Times New Roman", serif',
           weight: 400,
           padding: 0.06,
-        } satisfies ContentConfig,
+        } satisfies ContentConfigInput,
       }))
     }
     return Array.from({ length: count }, () => ({}))
@@ -440,6 +441,14 @@ export function PaperStageScene({
           frozen={reducedMotion}
         />
       )}
+
+      {/*
+        Last, and outside everything else, because it is not part of the
+        scene — it is what happens to the frame after the scene is drawn.
+        `settings.grade` is the tier's switch: the bottom tier skips the
+        whole composer rather than running it cheaply.
+      */}
+      {settings.grade && <Grade grade={stage.grade} film={rig.film} />}
     </LightRig>
   )
 }
@@ -456,8 +465,12 @@ export function PaperStage({ children, className, style, ...sceneProps }: PaperS
         shadows
         dpr={[1, dpr]}
         camera={{ fov: 38, near: 0.05, far: 400 }}
-        onCreated={({ gl, scene }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping
+        onCreated={({ scene }) => {
+          // Tone mapping is NOT set here. It is part of the lighting rig —
+          // `light.film`, resolved with everything else — so that a stage
+          // and a lone <Paper> under the same preset are printed on the same
+          // film. Pinning it on the canvas meant stage mode silently
+          // overrode whatever the rig asked for.
           scene.background = new THREE.Color('#0c0a0b')
         }}
       >

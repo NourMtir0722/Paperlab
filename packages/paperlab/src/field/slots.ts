@@ -1,6 +1,8 @@
 import {
+  contentSchema,
   paperConfigSchema,
   type ContentConfig,
+  type ContentConfigInput,
   type PaperConfig,
   type PaperConfigInput,
   type PaperStatesInput,
@@ -12,7 +14,14 @@ import { outwardCorner, sheetLayoutSchema } from './sheetGrid'
 /** A field slot references a preset — the spec's component/instance model. */
 export interface FieldPaperSlot {
   preset?: string | PaperConfigInput
-  content?: ContentConfig
+  /**
+   * INPUT type, not the parsed one. A slot's content is written by a caller,
+   * and the parsed type demands every default be supplied — which turned a
+   * two-line content literal into a type error and is exactly the failure
+   * `config/props.test.ts` was added to catch on the props. Parsed here
+   * (`contentSchema.parse`) so consumers downstream still get a full config.
+   */
+  content?: ContentConfigInput
   /** Per-instance state overrides, merged over the preset's states (spec M6 §1.1). */
   states?: PaperStatesInput
 }
@@ -57,7 +66,7 @@ export function groupFieldPapers(
       groups.set(key, group)
     }
     group.indices.push(i)
-    group.contents.push(slot.content ?? config.content)
+    group.contents.push(slot.content ? contentSchema.parse(slot.content) : config.content)
   })
   return [...groups.values()]
 }

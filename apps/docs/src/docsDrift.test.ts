@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { idleNames, listBehaviors, listLayouts, listPresets, listStagePresets, stockNames } from 'paperlab'
-
+import { idleNames, listBehaviors, listLayouts, listPresets, stockNames } from 'paperlab'
+import { listStagePresets } from 'paperlab/stage'
 /**
  * The docs enumerate what the library has. Nothing used to check that.
  *

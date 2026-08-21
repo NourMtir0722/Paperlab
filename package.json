@@ -18,7 +18,8 @@
     "perf:field": "node tools/field-perf.mjs",
     "media": "node tools/media.mjs",
     "test:share": "node tools/share-loop-check.mjs",
-    "test:drive": "node tools/stage-drive-check.mjs"
+    "test:drive": "node tools/stage-drive-check.mjs",
+    "shot:light": "node tools/light-shot.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

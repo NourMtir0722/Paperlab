@@ -91,16 +91,46 @@ export function makeGlowTexture(color: string): THREE.CanvasTexture {
   return texture
 }
 
+/**
+ * The source's default burn, in linear light.
+ *
+ * Chosen by matching: at 3.4 the tone-mapped source lands on the same read
+ * as the un-mapped plane it replaces, so a stage that never mounts a
+ * composer looks the way it always did, and one that does gets a source
+ * that blooms instead of a rectangle that clips.
+ */
+export const SOURCE_INTENSITY = 3.4
+
 export function Source({
   size,
   position,
   yaw,
   color,
+  intensity = SOURCE_INTENSITY,
 }: {
   size: number
   position: readonly [number, number, number]
   yaw: number
   color: string
+  /**
+   * How many times brighter than white the source burns, in linear light.
+   *
+   * This used to be `toneMapped: false` — the source wrote its colour
+   * straight to the frame and no curve ever touched it. That is a workaround
+   * for not having a post chain, and it stops working the moment there is
+   * one: a composer tone-maps the whole framebuffer at the end, so a
+   * material that opted out of the renderer's curve is not exempt from the
+   * composer's, and the source came out crushed to a flat grey panel — the
+   * one thing in the scene that must never look like a panel.
+   *
+   * Authoring it as a genuine HDR emitter is both the fix and the more
+   * honest description: light IS brighter than white, that is what makes it
+   * light, and a tone curve rolling off a value above 1.0 is exactly what
+   * gives a source its falloff instead of an edge. It is also the only thing
+   * bloom can key off, since a threshold near 1.0 means "brighter than
+   * paper" and paper is the brightest thing here that is not the source.
+   */
+  intensity?: number
 }) {
   const texture = useMemo(() => makeGlowTexture(color), [color])
   useEffect(() => () => texture.dispose(), [texture])
@@ -110,9 +140,12 @@ export function Source({
       <meshBasicMaterial
         map={texture}
         transparent
-        // It is light, not an object: it must not occlude, tone-map or fog.
+        // `color` multiplies the map, and a THREE.Color is not clamped to 1,
+        // so this is how a basic material carries HDR.
+        color={new THREE.Color(intensity, intensity, intensity)}
+        // It is light, not an object: it must not occlude or fog. It IS
+        // tone-mapped now — see `intensity`.
         depthWrite={false}
-        toneMapped={false}
         fog={false}
       />
     </mesh>

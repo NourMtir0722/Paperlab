@@ -4,17 +4,18 @@ import {
   buildFieldAgentPayload,
   buildFieldComponentSource,
   buildJsxSnippet,
-  buildStageAgentPayload,
-  buildStageComponentSource,
   diffConfig,
   diffFieldProps,
-  diffStage,
   type FieldExportInput,
-  type StageExportInput,
   type PaperConfig,
   type PaperHandle,
 } from 'paperlab'
-
+import {
+  buildStageAgentPayload,
+  buildStageComponentSource,
+  diffStage,
+  type StageExportInput,
+} from 'paperlab/stage'
 /**
  * The tool's job ends in someone's codebase. Export serializes the ACTIVE
  * editor mode: a <Paper> in Paper mode, a <PaperField> (with every

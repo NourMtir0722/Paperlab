@@ -1,8 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { PaperStage, getStagePreset, type ShotName } from 'paperlab'
-
+import { PaperStage, getStagePreset, type ShotName } from 'paperlab/stage'
 /**
  * One frame of stage mode through the public component and the real stage
  * presets, on its own entry point so it can be booted headless and
@@ -128,12 +127,25 @@ createRoot(document.getElementById('root')!).render(
       light: {
         ...preset.stage.light,
         ...(has('exposure') ? { exposure: num('exposure', 1) } : {}),
+        // `?film=filmic` prints the same frame on the old ACES curve, which
+        // is the only way to compare the two without editing a preset.
+        ...(has('film') ? { film: query.get('film') as never } : {}),
         ...(has('key') ? { key: num('key', 3.4) } : {}),
         ...(has('direction') ? { direction: num('direction', 180) } : {}),
         ...(has('height') ? { height: num('height', 24) } : {}),
         ...(has('ambient') ? { ambient: num('ambient', 0.03) } : {}),
         ...(has('studio') ? { studio: num('studio', 0.55) } : {}),
         ...(has('haze') ? { haze: num('haze', 1) } : {}),
+      },
+      // The print, one query param per knob — same reason as the light:
+      // a grade has to be swept before it is written into a default.
+      grade: {
+        ...preset.stage.grade,
+        ...(has('bloom') ? { bloom: num('bloom', 0.45) } : {}),
+        ...(has('threshold') ? { threshold: num('threshold', 0.96) } : {}),
+        ...(has('vignette') ? { vignette: num('vignette', 0.34) } : {}),
+        ...(has('grain') ? { grain: num('grain', 0.022) } : {}),
+        ...(has('depth') ? { depth: num('depth', 0) } : {}),
       },
       ...(has('spread') || query.get('surround') === '0'
         ? {

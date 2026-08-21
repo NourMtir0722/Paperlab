@@ -7,7 +7,7 @@ import {
   lightingPresets,
   resolveLighting,
 } from './lighting'
-import { lightingNames, paperConfigSchema } from '../config/schema'
+import { filmNames, lightingNames, paperConfigSchema } from '../config/schema'
 import { diffConfig } from '../config/diff'
 import { buildAgentPayload } from '../config/agent-payload'
 
@@ -53,6 +53,78 @@ describe('lighting presets', () => {
     const noir = paperConfigSchema.parse({ scene: { lighting: 'noir' } })
     expect(diffConfig(noir)).toMatchObject({ scene: { lighting: 'noir' } })
     expect(buildAgentPayload(noir)).toContain('"lighting": "noir"')
+  })
+})
+
+describe('the film', () => {
+  it('every preset names a film, and they all print on neutral', () => {
+    for (const name of lightingNames) {
+      const preset = getLightingPreset(name)
+      expect(filmNames).toContain(preset.film)
+      // Not a stylistic default, and measured rather than assumed: rendered
+      // through all three on `nave`, `neutral` is the only one that keeps a
+      // clipping warm source WARM. `agx` and `filmic` both bleach it toward
+      // grey-white, which on a hall whose subject is light through paper is
+      // the one thing that must not happen.
+      expect(preset.film).toBe('neutral')
+    }
+  })
+
+  it('film is an override like any other, and an unset one keeps the preset', () => {
+    expect(resolveLighting('nave').film).toBe('neutral')
+    expect(resolveLighting('nave', {}).film).toBe('neutral')
+    expect(resolveLighting('nave', { film: 'filmic' }).film).toBe('filmic')
+    // Overriding the film must not disturb the stop, and vice versa.
+    expect(resolveLighting('nave', { film: 'filmic' }).exposure).toBe(lightingPresets.nave.exposure)
+    expect(resolveLighting('nave', { exposure: 1.4 }).film).toBe('neutral')
+  })
+
+  it('film round-trips through the override schema and stays optional', () => {
+    expect(lightSchema.parse({})).not.toHaveProperty('film')
+    expect(lightSchema.parse({ film: 'agx' }).film).toBe('agx')
+    expect(lightSchema.safeParse({ film: 'aces' }).success).toBe(false)
+  })
+})
+
+describe('the two presets built for paper itself', () => {
+  it('raking skims the surface: low, hard, and barely filled', () => {
+    const raking = lightingPresets.raking
+    // Eight degrees. The whole preset is that number — a key any higher
+    // lands ON the sheet instead of skimming across it, and the relief goes.
+    expect(lightAngles(raking.key.position).elevation).toBeLessThan(12)
+    expect(lightAngles(raking.key.position).elevation).toBeGreaterThan(0)
+    // Well off to one side, so the shadows run ACROSS the sheet.
+    expect(Math.abs(lightAngles(raking.key.position).azimuth)).toBeGreaterThan(60)
+    // Raking light works by the shadows it casts, and fill is the thing that
+    // fills them in. Both fills stay below every front-lit preset's.
+    expect(raking.ambient).toBeLessThan(lightingPresets.studio.ambient)
+    expect(raking.studio).toBeLessThan(lightingPresets.studio.studio)
+    // A hard source: the shadow edge is the subject.
+    expect(raking.contactShadowBlur).toBeLessThan(lightingPresets.goldenhour.contactShadowBlur)
+  })
+
+  it('lightbox is backlit, strong, and printed a stop under', () => {
+    const box = lightingPresets.lightbox
+    // Behind the paper — which is what `translucencyValues` reads to decide
+    // how much light comes THROUGH rather than off.
+    expect(box.key.position[2]).toBeLessThan(0)
+    expect(Math.abs(lightAngles(box.key.position).azimuth)).toBeCloseTo(180)
+    // Level with the sheet, not above it: a lightbox is a panel, not a sun.
+    expect(Math.abs(lightAngles(box.key.position).elevation)).toBeLessThan(15)
+    expect(box.key.intensity).toBeGreaterThan(lightingPresets.studio.key.intensity)
+    // Same lesson `nave` learned: a backlit sheet carries the lamp's whole
+    // intensity as transmission and clips to white at 1.0.
+    expect(box.exposure).toBeLessThan(1)
+    // A sheet standing on a lit panel has almost nothing to cast onto.
+    expect(box.contactShadowOpacity).toBeLessThan(lightingPresets.studio.contactShadowOpacity)
+  })
+
+  it('both are backlit-or-grazing, so neither is just another front key', () => {
+    for (const name of ['raking', 'lightbox'] as const) {
+      const angles = lightAngles(lightingPresets[name].key.position)
+      // Every pre-existing front-lit preset stands well above the horizon.
+      expect(angles.elevation).toBeLessThan(20)
+    }
   })
 })
 

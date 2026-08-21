@@ -31,9 +31,21 @@ export function Stocks() {
         {Object.values(stocks).map((stock) => (
           <article className="card" key={stock.id}>
             <Live idle={stock.id}>
+              {/*
+                A specimen card under a RAKING key — the light a paper
+                merchant photographs a swatch book under. It skims across the
+                sheet instead of landing on it, which is the only way a
+                stock's own character reads as material rather than as tint.
+              */}
               <Paper
                 stock={stock.id}
-                content={{ type: 'text', text: `${stock.label}\n\nthe quick brown fox`, size: 44 }}
+                scene={{ lighting: 'raking' }}
+                content={{
+                  type: 'card',
+                  title: stock.id,
+                  body: 'The quick brown fox\njumps over the lazy dog.',
+                  note: `roughness ${stock.roughness} · translucency ${stock.translucency}`,
+                }}
                 physics="float"
               />
             </Live>

@@ -56,7 +56,7 @@ a figure walking down it. It is the one mode where the paper is the room
 rather than the object, and it is what the playground is built on.
 
 ```tsx
-import { PaperStage } from 'paperlab'
+import { PaperStage } from 'paperlab/stage'
 
 <PaperStage
   text="the paper remembers every hand that folded it"   // split across banners, a line each
@@ -74,7 +74,55 @@ import { PaperStage } from 'paperlab'
 />
 ```
 
+### Content types
+
+`blank`, `image`, `text`, `card`, `receipt` — and any of them can also sit on
+the reverse via `content.back`.
+
+**`card` is the paper-artifact type.** One composition — a tracked label, a
+hairline rule, a body, and a line of small print — covering the index card,
+the library due-date card, the museum wall label, the telegram slip and the
+gallery quote sheet, because those are the same object with different parts
+present. `{ title, body, note, rule, ruled, align, size, font, color,
+padding }`. It exists because `text` sets a block of prose in one size and
+one weight, and every artifact above is a *hierarchy*; composing one out of
+plain text meant hand-placing newlines and hoping.
+
+**`text` gained `tracking` and `valign`.** Tracking is the control display
+type cannot do without — a line set to be read across a room needs it pulled
+in, small uppercase needs it pushed out, and neither is reachable by changing
+the size. `valign: 'center'` optically centres the block instead of hanging
+it from the top edge, which is what a label or a poster wants and what a
+letter does not.
+
+**`image.src` may be empty**, and empty renders as bare stock rather than as
+a failure. That is what lets `photo-print` and `postage-stamp` be image
+presets without the library shipping — or fetching — a photograph; both are
+containers for the caller's own art. **No built-in preset touches the network.**
+
 ### Lighting is data, not an enum
+
+Eight rigs: `studio`, `window`, `leaves`, `goldenhour`, `noir`, `nave`, and
+two built for paper as a material rather than as a surface to print on —
+
+- **`raking`** — a hard key eight degrees above the horizon and well off to
+  one side, so it skims ACROSS the sheet instead of landing on it. This is
+  how paper is photographed for a swatch book, and it is the only rig that
+  turns a crease, a fold or a crumple into relief rather than shading.
+  Ambient and studio are deliberately the lowest in the set: raking light
+  works by the shadows it casts, and fill is what erases them.
+- **`lightbox`** — the lamp behind the sheet and level with it. Every other
+  front-lit rig shows you ink ON paper; this one shows light THROUGH it,
+  which is what `translucency` has always been able to render and what no
+  preset ever made the subject. Printed a stop under for the same reason
+  `nave` is.
+
+**Caveat worth knowing before reaching for `raking`:** the surface effects
+(`grain`, `aging`, `deckle`, `creaseLines`) are albedo and alpha, not normal
+perturbation — there is no bump map. So raking light reveals *geometry*
+beautifully and reveals *surface texture* not at all. Making grain read as
+fibre under a grazing key needs the shader to perturb normals, which it does
+not yet do.
 
 `lighting` names a preset; `light` moves it. Every field is optional and
 means "leave this one alone", so a stage serializes the sliders you moved
@@ -83,6 +131,7 @@ and nothing else:
 | field | what it is |
 |---|---|
 | `exposure` | tone-mapping exposure — the stop the whole picture is printed at |
+| `film` | the tone curve — the *film*, where `exposure` is the stop. `neutral` (**default** — Khronos PBR Neutral, the only one that keeps a clipping warm source warm), `agx` (long graceful roll-off, but desaturates hard toward white), `filmic` (ACES: high contrast, drifts bright neutrals toward yellow-green) |
 | `key` | key light intensity |
 | `color` | key light colour |
 | `direction` | degrees around the room. 0° in front of the paper (+Z), 90° right, ±180° behind — which is what makes `nave` backlit |
@@ -103,6 +152,37 @@ guarantee; `<PaperStage>` does it for you.
 `lightPosition(angles)` are exported and pure — the angles round-trip
 exactly, which is what lets a slider read the rig and write an override
 without drifting.
+
+### The print (stage mode only)
+
+`stage.grade` is what happens to the frame after the scene is drawn:
+`{ bloom, threshold, vignette, grain }`. It lives on the stage rather than on
+the lighting rig because `<Paper>` has no composer, and a grade in the rig
+would be a promise one of the two modes could not keep.
+
+It needs `@react-three/postprocessing` and `postprocessing`, declared as
+**optional peer dependencies** — and that is only honest because stage mode
+is its own entry point. `import { PaperStage } from 'paperlab/stage'`. The
+main entry never names those modules, so a consumer who imports only
+`<Paper>` neither ships their bytes nor has to resolve them. Tree-shaking
+alone was not enough: it removes the code but not the import specifier.
+
+`threshold` is in **linear light and defaults to 1.6**, above 1.0 on purpose.
+Bloom reads the scene BEFORE the tone curve, so 1.0 means "as bright as
+white" rather than "the brightest thing on screen". Lit near-white stock
+sits near 1.0 by itself; the source burns several times that. A threshold
+under 1 blooms the paper, fogs the hall, and costs the sheets their edges.
+
+**A composer mounts without a tone curve, so `Grade` supplies one.**
+`<EffectComposer>` sets `gl.toneMapping = NoToneMapping` while mounted —
+tone mapping belongs at the end of a post chain, not the end of the scene
+pass — so the chain ends `Bloom → ToneMapping → Vignette → Noise` and reads
+`light.film`. Without that effect the whole `high` tier would render
+untone-mapped and `light.film` would silently do nothing.
+
+The grade runs on the `high` quality tier only. Measured on the SwiftShader
+floor: switching it on at `medium` took the frame 51.0 ms → 92.2 ms (20 fps
+→ 11) while `low`, which never had it, held at 26.1 → 28.4 ms.
 
 ### Moving through it
 

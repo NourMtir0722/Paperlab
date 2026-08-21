@@ -19,6 +19,8 @@ import {
   type PaperConfigInput,
   type PaperStatesInput,
   type SurfaceConfig,
+} from 'paperlab'
+import {
   type StageConfigInput,
   type WalkName,
   getStagePreset,
@@ -26,7 +28,7 @@ import {
   walks,
   type QualityName,
   type QualityTier,
-} from 'paperlab'
+} from 'paperlab/stage'
 import type { PaperShare } from './paperShare'
 import { readSession } from './session'
 import {
@@ -242,7 +244,10 @@ const DEFAULT_FIELD: FieldState = {
   driver: 'autoplay',
   speed: 0.5,
   entrance: 'rise',
-  slots: Array.from({ length: 14 }, () => 'photo-print'),
+  // `blank-sheet`, not `photo-print`: the slot pool fills these with card
+  // content, and a museum label printed on gloss photo stock is the wrong
+  // material. Matte printer stock is what a card is cut from.
+  slots: Array.from({ length: 14 }, () => 'blank-sheet'),
   slotStates: {},
   zones: [],
 }

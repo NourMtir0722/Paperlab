@@ -4,13 +4,11 @@ import {
   lightSchema,
   lightingNames,
   listLayouts,
-  qualityNames,
   resolveLighting,
-  stageSchema,
-  walkNames,
   type LightOverrides,
   type LightingName,
 } from 'paperlab'
+import { qualityNames, stageSchema, walkNames } from 'paperlab/stage'
 import {
   button,
   folder,
