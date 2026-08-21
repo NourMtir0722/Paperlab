@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@paperlab/editor"]
+  "ignore": ["@paperlab/editor", "@paperlab/playground", "@paperlab/docs"]
 }
