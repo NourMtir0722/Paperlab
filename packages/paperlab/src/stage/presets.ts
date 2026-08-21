@@ -104,7 +104,23 @@ export const stagePresets: Record<string, StagePreset> = {
       shot: { shot: 'follow', distance: 6.5, lookAhead: 9, offset: 0.9 },
       lighting: 'nave',
       figure: { speed: 0.85 },
-      source: { spread: 1.1 },
+      /**
+       * The one room in the set with a COLOUR in it.
+       *
+       * Every other stage is a warm neutral corridor, and white paper against
+       * warm neutral is white paper against nothing — the sheets and the room
+       * sit at the same temperature and the picture flattens. Against a
+       * saturated ground the paper sings, which is why the installations
+       * worth copying are shot in rooms painted terracotta and washed with
+       * gels rather than in white boxes.
+       *
+       * `source.color` is the horizon and `ground.color` the floor of the
+       * same three-stop sky that builds the environment map, so the light
+       * bouncing onto the sheets is the room's own colour and cannot
+       * disagree with the walls the viewer can see.
+       */
+      source: { spread: 1.1, color: '#ffd7a8', zenith: '#3d1c12' },
+      ground: { color: '#6b2f1d' },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 2.4, twist: 14, breathe: 0.18, margin: 0.12, rise: 0.2 },
