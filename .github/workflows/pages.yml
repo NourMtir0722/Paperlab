@@ -102,7 +102,7 @@ jobs:
           # .nojekyll keeps Pages from eating asset dirs that start with _.
           touch site/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
