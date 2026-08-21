@@ -1,16 +1,47 @@
 version: 2
+
+# Nine open dependency PRs is not nine decisions — it is one decision taken
+# nine times, and a public repo carrying that many stale branches reads as
+# unmaintained to anyone who looks. The grouping below exists so that a bump
+# arrives as a REVIEW, not as a queue.
 updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
+    # Majors stay ungrouped ON PURPOSE. `typescript 5.9.3 -> 7.0.2` is not a
+    # bump, it is a compiler replacement, and it fails CI today — exactly the
+    # thing that must arrive on its own branch with its own red check rather
+    # than buried in a group of thirteen.
     groups:
       minor-and-patch:
         update-types:
           - minor
           - patch
+    open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
     directory: "/"
+    # Monthly. Actions move slowly and every bump here costs a full CI run to
+    # evaluate; weekly produced five separate open PRs in three weeks, none of
+    # which anybody was ever going to review individually.
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      # ONE pull request for all of them. They are five lines of YAML in the
+      # same three workflows, and reviewing them together is both faster and
+      # more honest than reviewing them apart — the risk is not in any single
+      # bump, it is in what the set does to `release.yml`.
+      #
+      # Which is the thing to actually check before merging this group:
+      # `checkout`, `setup-node` and `pnpm/action-setup` all run in
+      # release.yml, and **CI cannot validate release.yml** — that workflow
+      # only runs on a push to main. It has already failed once in a way that
+      # burned a version number (`EUNKNOWNCONFIG --git-checks`, npm 12), and
+      # the `npm install -g npm@11` pin guarding against that is load-bearing.
+      # A green check on the PR means the build works, not that the release
+      # does.
+      actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 3
