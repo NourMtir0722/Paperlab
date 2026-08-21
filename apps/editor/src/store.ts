@@ -221,7 +221,11 @@ function stageStateFrom(id: string): StageState {
     text: preset.text ?? '',
     count: preset.count,
     progress: 0.42,
-    playing: false,
+    // Opens walking. A stage that opens as a still photograph of itself is
+    // the mode's whole point missed — and the scrubber no longer needs the
+    // pause, because touching it takes over, the way the Paper tab's
+    // timeline already behaves.
+    playing: true,
     config,
     paper: preset.paper,
     quality: 'auto',

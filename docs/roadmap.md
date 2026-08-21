@@ -791,6 +791,58 @@ gait promised "same ground covered = same pose, whatever pace", and now
 promises it *within a gait*, since crossing into a run changes the stride. The
 old wording was never quite true — `lean` has always read `speed`.
 
+### ~~A stage you can only watch~~ — *done*
+
+For anyone who opened one. Stage mode had exactly one input — `progress` —
+and if nobody supplied it the walk ran on a clock. There was nothing to
+touch: no drag, no wheel, no keyboard, no way to stop in front of a banner
+and read it. Field mode has had `motion={{ driver }}` since it shipped, and
+the stage — the mode most likely to be somebody's whole homepage — had
+nothing.
+
+**Done, as the same contract a field uses.** `motion={{ driver, speed,
+capture }}` with the same three driver names, defaulting to `drag`: pointer
+with inertia, wheel, arrow keys, and clicking a paper to travel to it.
+
+Four things it turned up that are worth keeping:
+
+- **One driver, not two.** `drag` DRIFTS on the clock until the first touch
+  and is the viewer's from then on. Splitting that into "autoplay" and
+  "interactive" makes both halves wrong: a stage that only autoplays cannot
+  be touched, and one that only waits opens as a still photograph of itself.
+- **The stops have to come from the layout.** `Layout.walkStops(n, o)` is
+  optional and only a layout that arranges along a path can answer it;
+  `colonnade` computes it from the same helper `pose` places banners with,
+  because a stop that is not where the paper is would be a navigation that
+  misses everything it aims at.
+- **`capture` is a real axis, not a detail.** A full-bleed stage IS the page
+  and should take the wheel; a 340px card in a column of prose that eats a
+  reader's scroll and traps a finger on a phone is hostile. The docs cards
+  set `capture: false` and stay draggable and steppable. Even when captured,
+  the wheel is handed back at the ends of an open walk.
+- **A drag is not a click.** Letting go over a banner fired its click handler
+  and teleported you to whatever was under the cursor when you stopped
+  pulling. Five pixels of slop settles it.
+
+**It needed a browser to test, so it got one.** `pnpm test:drive` drives a
+real canvas — drift, drag, flick, wheel, arrow keys, click, and a controlled
+stage refusing all of it — and is in CI beside the parity gate. It earned its
+keep immediately: it caught the raycast prop being set to `undefined` rather
+than left alone, which silently disabled every click.
+
+And it caught the check itself being wrong in an instructive way. `count` is
+a REQUEST: the text is split one column per banner, so a fifteen-word line
+against `count: 18` renders fifteen banners, and the stops correctly follow
+the fifteen. Worth knowing before debugging a stage that has fewer banners
+than it was asked for.
+
+**Still open:** there is no snap-on-release — letting go mid-aisle leaves you
+mid-aisle, which is right for a walk and arguably wrong for a gallery, and
+`nearestStop` is written and unused against the day someone wants the other
+behaviour. There is also no touch-flick velocity separate from the mouse's,
+and no way to name a banner in the URL so a link opens standing in front of
+it — which is the obvious next thing the playground wants.
+
 ### Hands — paper you touch
 
 For the demo that would actually spread. MediaPipe's `HandLandmarker` gives 21

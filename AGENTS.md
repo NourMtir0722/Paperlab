@@ -104,6 +104,40 @@ guarantee; `<PaperStage>` does it for you.
 exactly, which is what lets a slider read the rig and write an override
 without drifting.
 
+### Moving through it
+
+The stage was a picture you watched. `motion` is who drives the walk:
+
+```tsx
+<PaperStage
+  motion={{ driver: 'drag', speed: 1, capture: true }}   // the default
+  onVisit={(paper) => console.log('standing at banner', paper)}
+  onProgress={(walk) => { scrubRef.current.value = String(walk) }}
+/>
+```
+
+| driver | who moves it |
+|---|---|
+| `drag` (default) | the viewer — pointer drag with inertia, wheel, arrow keys, or a click on a paper. **Drifts on the clock until the first time they touch it**, then it is theirs for good |
+| `autoplay` | the clock, and only the clock |
+| `none` | nobody |
+
+`capture` (default true) is whether the walk takes the WHEEL and TOUCH away
+from the page. True for a stage that fills the screen; **false for one
+sitting in a column of prose**, where capturing them eats a reader's scroll
+and traps a finger on a phone. Mouse drag and arrow keys work either way.
+Even when captured, the wheel is handed back at the ends of an open walk.
+
+Arrow keys / PageUp / PageDown step between the papers, Home and End go to
+the ends. The stops come from the layout — `Layout.walkStops(n, options)`,
+which only a layout that arranges along a path can answer — so a step lands
+on a banner rather than near one. The canvas is made focusable and labelled
+when a driver is listening.
+
+**Supplying `progress` outranks `motion` entirely.** A stage bound to page
+scroll is a controlled component, and a driver writing the same number the
+page is writing is a fight rather than a feature.
+
 ### The figure
 
 `stage.figure` takes `height`, `speed`, `stride`, `swing`, `gait`, `color`,

@@ -194,6 +194,8 @@ export {
   type PaperStageSceneProps,
 } from './stage/PaperStage'
 export { stageSchema, type StageConfig, type StageConfigInput } from './stage/schema'
+// Who drives the walk — the same three names a field's motion uses.
+export { stageMotionSchema, type StageMotion, type StageMotionInput } from './stage/navigate'
 export { stagePresets, getStagePreset, listStagePresets, type StagePreset } from './stage/presets'
 export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
 export { createWalkPath, type Ground, type WalkPath, type WalkPathOptions } from './stage/path'

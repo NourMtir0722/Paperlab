@@ -16,8 +16,6 @@ import { readStageShare, stageShareUrl, type StageShare } from './share'
  */
 
 const DEFAULT_PRESET = 'nave'
-/** How long the figure takes to walk the whole stage, seconds. */
-const WALK_SECONDS = 42
 
 function shareFrom(preset: string, text: string): StageShare {
   const base = getStagePreset(preset)
@@ -51,22 +49,16 @@ export function App() {
 
   const stage = getStagePreset(preset)
 
-  // The walk runs on a clock the page owns rather than the scene's, so the
-  // scrubber stays live and the loop can restart at the far end — an open
-  // walk otherwise arrives and stands there.
-  const frame = useRef(0)
-  useEffect(() => {
-    if (!walking) return
-    let last = performance.now()
-    const tick = (now: number) => {
-      const delta = (now - last) / 1000
-      last = now
-      setProgress((p) => (p + delta / WALK_SECONDS) % 1)
-      frame.current = requestAnimationFrame(tick)
-    }
-    frame.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame.current)
-  }, [walking])
+  // The scene owns the walk now. The page used to run its own clock because
+  // an autoplaying walk ran off the end of an open path and stood there in
+  // the dark; it wraps on its own, and handing the walk back is what lets the
+  // visitor DRAG it — a page writing `progress` every frame is a controlled
+  // component, and the driver would have been fighting it for the same number.
+  //
+  // The scrubber is written to directly rather than through state, so
+  // following the walk costs no re-renders. Same trick as the editor's
+  // timeline.
+  const scrubRef = useRef<HTMLInputElement>(null)
 
   // The address bar is the save file. Replace rather than push, so the back
   // button still leaves the page instead of walking edit history.
@@ -100,7 +92,12 @@ export function App() {
           preset={stage.paper}
           text={text.trim() ? text : undefined}
           count={stage.count}
-          progress={progress}
+          // Uncontrolled while walking, so the visitor can take it; controlled
+          // the moment they scrub, so the slider wins while it is being held.
+          progress={walking ? undefined : progress}
+          onProgress={(walk) => {
+            if (scrubRef.current) scrubRef.current.value = String(walk)
+          }}
         />
       </div>
 
@@ -148,6 +145,8 @@ export function App() {
           />
         </label>
 
+        <p className="walkhint">drag the scene to walk it · ← → step between banners</p>
+
         <div className="rail">
           <div className="presets">
             {listStagePresets().map((id) => (
@@ -162,15 +161,28 @@ export function App() {
             ))}
           </div>
           <div className="transport">
-            <button type="button" className="chip" onClick={() => setWalking((w) => !w)}>
+            <button
+              type="button"
+              className="chip"
+              onClick={() =>
+                setWalking((w) => {
+                  // Coming back from a scrub, hand the scene the position the
+                  // slider left it at rather than the one it stopped at.
+                  if (!w) setProgress(Number(scrubRef.current?.value ?? progress))
+                  return !w
+                })
+              }
+            >
               {walking ? 'Pause' : 'Walk'}
             </button>
             <input
+              ref={scrubRef}
               type="range"
               min={0}
               max={1}
               step={0.001}
-              value={progress}
+              defaultValue={progress}
+              onPointerDown={() => setWalking(false)}
               onChange={(e) => {
                 setWalking(false)
                 setProgress(Number(e.target.value))
