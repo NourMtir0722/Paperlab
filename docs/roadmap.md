@@ -736,11 +736,14 @@ texture that never renders, since the figure is drawn as a silhouette.
 **The CC0 blocker was wrong, and the figure is a Quaternius rig now.**
 Quaternius' packs are gated behind itch and Patreon *on quaternius.com* — but
 **poly.pizza mirrors them with direct, ungated GLB links**, which is the fact
-the last pass was missing. So the asset is "Man in Suit" from the Animated
-Men Pack: CC0, properly proportioned, and carrying **eleven named clips**
-including Walk, Run and Idle — which closes both of the limits above. It has
-no textures at all, so the 583 KB is geometry and animation rather than an
-image that never renders.
+the last pass was missing. So the asset is "Business Man" from the Ultimate
+Modular Men Pack: CC0, properly proportioned, and carrying **twenty-four
+named clips** including Walk, Run and Idle — which closes both of the limits
+above. It has no textures at all, so the 1.5 MB is geometry and animation
+rather than an image that never renders, and it is four skinned meshes on one
+armature (the pack is modular), which `SkeletonUtils.clone` and a single
+mixer on the root handle without a change. Measured: it costs nothing over
+the single-mesh rig it replaced.
 
 Three things came out of using it:
 
@@ -763,10 +766,20 @@ Three things came out of using it:
 **Two things still missing, recorded rather than fixed.** There is no facing
 correction: the library documents that a model faces +Z at yaw 0, this asset
 happens to, and the next one may not — a `figure.modelYaw` in degrees is the
-obvious answer and it is one field. And eight of the eleven clips (clapping,
-death, punch, sword slash…) ride along unplayed; pruning them needs a glTF
-rewriter (`@gltf-transform`) as a dev dependency, which is more machinery
-than ~300 KB of an app-hosted asset is worth today.
+obvious answer and it is one field. And twenty-one of the twenty-four clips
+(gun poses, sword slash, rolls, four directions of run…) ride along unplayed;
+pruning them needs a glTF rewriter (`@gltf-transform`) as a dev dependency.
+At 1.5 MB for an app-hosted demo asset that is now worth costing out, where
+at 583 KB it was not — recorded rather than done.
+
+**One asset was tried and rejected, and the reason generalises.** Sketchfab's
+"CC0 - Free Rigged Character" looks the part and cannot do the job: all three
+of its clips are ZERO-DURATION single-keyframe poses, so it is a rig with no
+motion in it, and `figure.model` would slide a T-pose down the aisle — worse
+than the capsules it replaces. Its third clip is named `mixamo.com`, which
+also puts the skeleton inside the licence this project already ruled out.
+**Rigged is not animated**, and for this component the clip is the asset —
+worth checking `animations[].duration` before anything else about a candidate.
 
 **The boundary held and is now enforced rather than intended:** `pnpm pack` is
 ten files with no `.glb`. The library ships no assets, no stage preset names a
