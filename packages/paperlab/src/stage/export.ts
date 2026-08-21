@@ -171,7 +171,7 @@ export function buildStageComponentSource(input: StageExportInput): string {
   const textConst = input.text?.trim() ? `\n\nconst text = ${JSON.stringify(input.text)}` : ''
 
   if (!input.scroll) {
-    return `import { PaperStage, type StageConfigInput${input.paper ? ', type PaperConfigInput' : ''} } from 'paperlab'
+    return `import { PaperStage, type StageConfigInput } from 'paperlab/stage'${input.paper ? "\nimport type { PaperConfigInput } from 'paperlab'" : ''}
 
 ${stageConst}${bannerConst}${textConst}
 
@@ -185,7 +185,7 @@ ${propLines(input, '      ')}
   }
 
   return `import { useEffect, useRef, useState } from 'react'
-import { PaperStage, type StageConfigInput${input.paper ? ', type PaperConfigInput' : ''} } from 'paperlab'
+import { PaperStage, type StageConfigInput } from 'paperlab/stage'${input.paper ? "\nimport type { PaperConfigInput } from 'paperlab'" : ''}
 
 ${stageConst}${bannerConst}${textConst}
 
@@ -239,7 +239,11 @@ export function buildStageAgentPayload(input: StageExportInput): string {
 
 1. Install the dependencies:
 
-   npm i paperlab three @react-three/fiber gsap
+   npm i paperlab three @react-three/fiber gsap @react-three/postprocessing postprocessing
+
+   The last two are only needed by stage mode — <Paper> and <PaperField> do
+   not use them — but <PaperStage> imports the print pass (bloom, tone curve,
+   vignette, grain), so a stage will not build without them.
 
 2. Create the component below as \`components/${name}.tsx\` (or the project's
    component convention). It is self-contained — it owns its own <Canvas>,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PaperStage, buildStageAgentPayload, getStagePreset, listStagePresets } from 'paperlab'
+import { PaperStage, buildStageAgentPayload, getStagePreset, listStagePresets } from 'paperlab/stage'
 import { readStageShare, stageShareUrl, type StageShare } from './share'
 
 /**

@@ -18,6 +18,16 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./stage": {
+      "import": {
+        "types": "./dist/stage.d.ts",
+        "default": "./dist/stage.js"
+      },
+      "require": {
+        "types": "./dist/stage.d.cts",
+        "default": "./dist/stage.cjs"
+      }
     }
   },
   "files": [
@@ -37,7 +47,9 @@
     "@react-three/fiber": ">=9",
     "gsap": ">=3.12",
     "react": ">=19",
-    "three": ">=0.160"
+    "three": ">=0.162",
+    "@react-three/postprocessing": ">=3",
+    "postprocessing": ">=6.36"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",
@@ -46,10 +58,12 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@react-three/fiber": "^9.0.0",
+    "@react-three/fiber": "^9.7.0",
+    "@react-three/postprocessing": "^3.0.5",
     "@types/react": "^19.0.0",
     "@types/three": "^0.185.1",
     "gsap": "^3.12.0",
+    "postprocessing": "^6.36.0",
     "publint": "^0.3.22",
     "react": "^19.2.8",
     "three": "^0.185.1",
@@ -81,5 +95,20 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "@react-three/postprocessing": {
+      "optional": true
+    },
+    "postprocessing": {
+      "optional": true
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "stage": [
+        "./dist/stage.d.ts"
+      ]
+    }
   }
 }

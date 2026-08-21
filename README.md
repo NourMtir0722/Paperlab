@@ -19,6 +19,14 @@ Every frame above is real geometry — no video, no sprite sheet. Type a sentenc
 npm i paperlab three @react-three/fiber gsap
 ```
 
+Stage mode lives at `paperlab/stage` and needs two more:
+
+```sh
+npm i @react-three/postprocessing postprocessing
+```
+
+They are optional peers — `<Paper>` and `<PaperField>` never reach them, so a bundle that does not import `paperlab/stage` contains none of it.
+
 ```tsx
 import { Paper } from 'paperlab'
 
@@ -51,7 +59,7 @@ import { PaperField } from 'paperlab'
 Or build a space out of a sentence and walk through it:
 
 ```tsx
-import { PaperStage } from 'paperlab'
+import { PaperStage } from 'paperlab/stage'
 
 <PaperStage text="the paper remembers every hand that folded it" progress={scroll} />
 ```
@@ -64,7 +72,7 @@ import { PaperStage } from 'paperlab'
 - **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU (parity-tested against the CPU path), arranged by pure layout functions. Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners arranged along a walk, for stage mode), plus `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl. Each pose carries a **bias** — how strongly that one sheet takes the deformation — so the top of a pile curls while the sheets pressed underneath lie flat, in the same draw call. The camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
 - **Stage mode** — paper as *architecture*: banners hung along a walk, a figure walking down it, light coming through the paper from the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk. Every part of the scene — the arrangement, the figure, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own.
 - **A stage you can walk** — stage mode is navigable, not a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll; binding `progress` to page scroll still wins over all of it.
-- **Lighting you can actually light with** — a preset is the starting point, not the ceiling. `light={{ exposure, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in (degrees around the room, degrees above the horizon), and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. Overrides serialize as overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
+- **Lighting you can actually light with** — a preset is the starting point, not the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in (degrees around the room, degrees above the horizon), and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. Overrides serialize as overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
 - **Presets** — everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
 - **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into Claude Code (or any coding agent): install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md).
 - **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose, a hidden DOM mirror carries the content for screen readers, and a flat DOM fallback renders when WebGL isn't available.

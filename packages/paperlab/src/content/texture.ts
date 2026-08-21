@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import type { BackContentConfig, ContentConfig, SheetConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { paintReceipt } from './receipt'
+import { paintCard } from './card'
+import { ensureFont, wrapLines } from './type'
 
 /**
  * All content is composited onto a canvas and applied as a texture — content
@@ -47,33 +49,38 @@ function paintText(
 ) {
   const size = content.size * DPR
   const pad = content.padding * Math.min(w, h)
-  ctx.font = `${content.weight} ${size}px ${content.font}`
+  const font = `${content.weight} ${size}px ${content.font}`
+  ctx.font = font
   ctx.fillStyle = content.color === '#2b2620' ? stock.inkColor : content.color
   ctx.textBaseline = 'top'
   ctx.textAlign = content.align
+  // Tracking is set before measuring, not after: `measureText` honours
+  // `letterSpacing`, so wrapping against the untracked width would break
+  // lines to a measure the painted line does not have.
+  ctx.letterSpacing = `${content.tracking}em`
 
   const maxWidth = w - pad * 2
   const x = content.align === 'left' ? pad : content.align === 'right' ? w - pad : w / 2
   const lineStep = size * content.lineHeight
 
-  // Word-wrap each paragraph (explicit \n preserved).
-  let y = pad
-  for (const paragraph of content.text.split('\n')) {
-    let line = ''
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      const attempt = line ? `${line} ${word}` : word
-      if (line && ctx.measureText(attempt).width > maxWidth) {
-        ctx.fillText(line, x, y)
-        y += lineStep
-        line = word
-      } else {
-        line = attempt
-      }
-    }
+  const lines = wrapLines(ctx, content.text, maxWidth, font)
+  // Re-assert: wrapLines restores the font it was handed, which drops the
+  // spacing the measure was taken with.
+  ctx.font = font
+  ctx.letterSpacing = `${content.tracking}em`
+
+  // `center` optically centres the whole block rather than hanging it from
+  // the top edge — what a label or a poster wants, where `top` is what a
+  // letter wants because a letter starts at the top of the page.
+  const block = lines.length * lineStep
+  let y = content.valign === 'center' ? Math.max(pad, (h - block) / 2) : pad
+
+  for (const line of lines) {
+    if (y > h - pad) break
     ctx.fillText(line, x, y)
     y += lineStep
-    if (y > h - pad) return
   }
+  ctx.letterSpacing = '0em'
 }
 
 /**
@@ -92,9 +99,10 @@ export function renderContentToCanvas(
   canvas.height = h
   const ctx = canvas.getContext('2d')!
   paintBackground(ctx, w, h, stock)
-  if (content.type === 'image' && image) paintImage(ctx, w, h, image, content.fit)
+  if (content.type === 'image' && image && content.src) paintImage(ctx, w, h, image, content.fit)
   if (content.type === 'text') paintText(ctx, w, h, content, stock)
   if (content.type === 'receipt') paintReceipt(ctx, w, h, content, stock)
+  if (content.type === 'card') paintCard(ctx, w, h, content, stock, DPR)
   return canvas
 }
 
@@ -134,13 +142,24 @@ export function useContentTexture(
       setTexture(tex)
     }
 
-    if (content.type === 'image') {
+    if (content.type === 'image' && content.src) {
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => commit(renderContentToCanvas(content, sheet, stock, img))
+      // A URL that never loads must not leave the sheet textureless — it
+      // still has stock, and bare stock is the honest picture of "no image".
+      img.onerror = () => commit(renderContentToCanvas(content, sheet, stock))
       img.src = content.src
-    } else if (content.type === 'text' || content.type === 'receipt') {
-      // Fonts may still be loading on first paint; render after they settle.
+    } else if (content.type === 'text' || content.type === 'card') {
+      // Ask for the face BY NAME. `document.fonts.ready` alone only waits for
+      // what the document already requested, and a family named inside a
+      // canvas font string was never requested by anything — so on a page
+      // with no DOM element using it, `ready` resolves at once and the sheet
+      // paints in the fallback.
+      void ensureFont(content.font, content.size * DPR).then(() =>
+        commit(renderContentToCanvas(content, sheet, stock)),
+      )
+    } else if (content.type === 'receipt') {
       document.fonts.ready.then(() => commit(renderContentToCanvas(content, sheet, stock)))
     } else {
       commit(renderContentToCanvas(content, sheet, stock))

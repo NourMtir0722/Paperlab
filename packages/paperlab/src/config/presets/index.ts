@@ -49,13 +49,20 @@ const builtins: Record<string, PaperConfigInput> = {
     surface: { aging: 0.55, grain: 0.6, deckle: { edges: ['top', 'bottom'], roughness: 0.4 } },
   },
   'hero-peel': {
-    meta: { name: 'Hero peel', tags: ['peel', 'image', 'hero'] },
+    meta: { name: 'Hero peel', tags: ['peel', 'card', 'hero'] },
     sheet: { width: 1.5, height: 1 },
     stock: 'photo-gloss',
+    // Was a live Unsplash URL — a third-party network fetch inside one of
+    // the first things anybody renders, which fails offline, behind a proxy,
+    // under a strict CSP, and on the day the URL changes. The demo here is
+    // the PEEL; the photograph was incidental, and a typeset card is both
+    // self-contained and more on-brand for a paper library.
     content: {
-      type: 'image',
-      src: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
-      fit: 'cover',
+      type: 'card',
+      title: 'Print no. 4',
+      body: 'Lift the corner.',
+      note: 'Gloss, 240gsm',
+      align: 'center',
     },
     behavior: { type: 'peel', progress: 0.35, corner: 'bottom-right', radius: 0.16 },
   },
@@ -70,13 +77,20 @@ const builtins: Record<string, PaperConfigInput> = {
     behavior: { type: 'flip', progress: 0.3, spine: 'left', radius: 0.3 },
   },
   'hanging-poster': {
-    meta: { name: 'Hanging poster', tags: ['hang', 'image', 'wind'] },
+    meta: { name: 'Hanging poster', tags: ['hang', 'text', 'wind'] },
     sheet: { width: 1.1, height: 1.55 },
     stock: 'printer',
+    // Also de-Unsplashed. A poster is a typographic object anyway — every
+    // paper installation worth the name hangs WORDS — so this shows off the
+    // tracking and the optical centring rather than someone else's photo.
     content: {
-      type: 'image',
-      src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80',
-      fit: 'cover',
+      type: 'text',
+      text: 'THE\nPAPER\nSHOW',
+      size: 96,
+      align: 'center',
+      valign: 'center',
+      tracking: 0.08,
+      lineHeight: 1.15,
     },
     behavior: { type: 'hang', wind: 0.45, sag: 0.3 },
   },
@@ -116,12 +130,11 @@ const builtins: Record<string, PaperConfigInput> = {
     meta: { name: 'Postage stamp', tags: ['sticker', 'stamp', 'states', 'sheet'] },
     sheet: { width: 0.64, height: 0.78, thickness: 0.08 },
     stock: 'sticker',
-    content: {
-      type: 'image',
-      src: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&q=80',
-      fit: 'cover',
-      alt: 'A forest stamp',
-    },
+    // No `src`: a stamp's art is the caller's, and the library ships no
+    // assets and fetches none. The perforation, the sticker stock and the
+    // peel — which is what this preset is actually here to demonstrate —
+    // all read perfectly well on bare stock.
+    content: { type: 'image', fit: 'cover', alt: 'A postage stamp' },
     behavior: { type: 'peel', progress: 0, corner: 'auto', radius: 0.12 },
     surface: { perforation: { edges: 'all', holeRadius: 0.014, spacing: 0.05 } },
     states: {
@@ -146,11 +159,10 @@ const builtins: Record<string, PaperConfigInput> = {
     meta: { name: 'Photo print', tags: ['image', 'starter'] },
     sheet: { width: 1.2, height: 0.9 },
     stock: 'photo-gloss',
-    content: {
-      type: 'image',
-      src: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
-      fit: 'cover',
-    },
+    // Same: the field starter is a CONTAINER. Its whole documented use is
+    // `<PaperField images={photos} preset="photo-print" />`, where the
+    // photographs are the caller's.
+    content: { type: 'image', fit: 'cover', alt: 'A photographic print' },
     // No print lies perfectly flat. A shade of bow is the whole difference
     // between a sheet of paper and a rectangle — and since this is the field
     // starter, it is what a layout's per-sheet bias has to scale.

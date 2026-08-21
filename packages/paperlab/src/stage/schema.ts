@@ -45,6 +45,70 @@ export const stageGroundSchema = z.object({
   color: z.string().default('#0e0b09'),
 })
 
+/**
+ * The print: what happens to the frame after the scene is drawn.
+ *
+ * This lives on the stage rather than on the lighting rig, even though it
+ * belongs to the same family as `exposure` and `film`, because the rig is
+ * read by `<Paper>` too and `<Paper>` has no composer. A grade in the rig
+ * would be a promise one of the two modes could not keep.
+ *
+ * Every value defaults to a real look rather than to zero — a stage that
+ * asks for nothing should still be graded, and `grade: { bloom: 0 }` is how
+ * you say you want it raw.
+ */
+export const stageGradeSchema = z.object({
+  /**
+   * How far light bleeds past what is emitting it.
+   *
+   * This is the one that matters most in a backlit hall, because the source
+   * plane is drawn with `toneMapped: false` — it is light, not an object, so
+   * no tone curve ever rolls it off. Bloom is the only thing that gives it
+   * an edge that behaves like light instead of like a lit rectangle.
+   */
+  bloom: z.number().min(0).max(3).default(0.45),
+  /**
+   * How bright a pixel has to be before it blooms at all, in LINEAR light.
+   *
+   * Above 1.0 is not only legal, it is the useful range — and that is the
+   * whole reason the bound is 4 rather than 1. Bloom reads the scene before
+   * the tone curve, while values are still unbounded, so "1.0" means "as
+   * bright as white" rather than "as bright as the brightest pixel on
+   * screen". Lit near-white paper sits close to 1.0 all by itself; the
+   * source burns at `SOURCE_INTENSITY`, several times that. A threshold
+   * under 1 therefore blooms the PAPER, which fogs the hall and costs the
+   * sheets their edges — the exact failure this default is set to avoid.
+   */
+  threshold: z.number().min(0).max(4).default(1.6),
+  /**
+   * Depth falloff — how much the near and far ends of the walk go soft.
+   *
+   * **Defaults to 0, and that is a considered default rather than a stub.**
+   * Depth in this scene is already staged by haze, which is how a real hall
+   * does it and which costs one fragment instruction; optical blur is a
+   * second full-screen pass with a circle-of-confusion buffer behind it, and
+   * it is the effect most likely to read as a video game rather than as a
+   * photograph. Every paper installation worth copying is shot deep — an
+   * f/11 room where the sheets at the far end are as sharp as the ones you
+   * can touch.
+   *
+   * It is here because a shallow frame is a legitimate look and the schema
+   * is the only place a look is allowed to live. Turn it up for a close shot
+   * on one banner; leave it alone for a hall.
+   */
+  depth: z.number().min(0).max(1).default(0),
+  /** How far the corners fall off. A frame with no edge reads as a viewport rather than a photograph. */
+  vignette: z.number().min(0).max(1).default(0.34),
+  /**
+   * Film grain.
+   *
+   * Worth more here than in most scenes: grain is the one texture shared
+   * between the render and the thing being rendered. Keep it under ~0.05 —
+   * past that it stops reading as stock and starts reading as noise.
+   */
+  grain: z.number().min(0).max(0.5).default(0.022),
+})
+
 export const stageSchema = z.object({
   path: walkPathSchema.default({}),
   shot: shotSchema.default({}),
@@ -60,7 +124,20 @@ export const stageSchema = z.object({
   showFigure: z.boolean().default(true),
   source: stageSourceSchema.default({}),
   ground: stageGroundSchema.default({}),
+  /**
+   * The print — bloom, vignette, grain.
+   *
+   * Needs `@react-three/postprocessing` and `postprocessing`. They are
+   * declared OPTIONAL peers, which means `<Paper>` never pulls them in and a
+   * bundle that only imports `<Paper>` never contains them — not that a
+   * stage renders without them. A bundler asked to resolve `<PaperStage>`
+   * without them installed fails at build time, and that is the intended
+   * behaviour: a stage silently losing its grade would be worse than a
+   * missing-module error that names the package.
+   */
+  grade: stageGradeSchema.default({}),
 })
 
 export type StageConfig = z.infer<typeof stageSchema>
 export type StageConfigInput = z.input<typeof stageSchema>
+export type StageGradeConfig = z.infer<typeof stageGradeSchema>

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { LightingName } from '../config/schema'
+import { filmNames, type FilmName, type LightingName } from '../config/schema'
 
 /**
  * Lighting presets: each is a key light + ambient level + contact shadow +
@@ -23,6 +23,16 @@ export interface LightingPreset {
   contactShadowBlur: number
   /** Renderer tone-mapping exposure while active. */
   exposure: number
+  /**
+   * The tone curve the picture is printed through.
+   *
+   * `exposure` picks the stop; this picks the FILM, and on a subject that is
+   * almost white the film is the louder of the two. Every preset ships
+   * `neutral` — Khronos PBR Neutral — because it is the only one of the
+   * three that keeps a clipping sheet BOTH bright and the colour it actually
+   * is. See the note on `filmNames` for what the other two do to warm light.
+   */
+  film: FilmName
   shadow: { mapSize: number; radius: number }
   gobo?: { kind: 'blinds' | 'leaves'; drift: number; angle: number }
   /**
@@ -59,6 +69,7 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     contactShadowOpacity: 0.3,
     contactShadowBlur: 2.4,
     exposure: 1,
+    film: 'neutral',
     shadow: { mapSize: 1024, radius: 4 },
     studio: 0.9,
     sky: { zenith: '#f6f7f9', horizon: '#e2e2e4', ground: '#b4b1ad' },
@@ -71,6 +82,7 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     contactShadowOpacity: 0.35,
     contactShadowBlur: 2.6,
     exposure: 1,
+    film: 'neutral',
     shadow: { mapSize: 1024, radius: 5 },
     gobo: { kind: 'blinds', drift: 0.004, angle: 0.62 },
     studio: 0.8,
@@ -84,6 +96,7 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     contactShadowOpacity: 0.4,
     contactShadowBlur: 2.8,
     exposure: 1,
+    film: 'neutral',
     shadow: { mapSize: 1024, radius: 6 },
     gobo: { kind: 'leaves', drift: 0.012, angle: 0.7 },
     studio: 0.85,
@@ -97,6 +110,7 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     contactShadowOpacity: 0.45,
     contactShadowBlur: 3.2,
     exposure: 1.15,
+    film: 'neutral',
     shadow: { mapSize: 1024, radius: 7 },
     studio: 0.7,
     sky: { zenith: '#5d6f96', horizon: '#ffbe86', ground: '#4a3a2e' },
@@ -109,9 +123,71 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     contactShadowOpacity: 0.7,
     contactShadowBlur: 1.1,
     exposure: 1.05,
+    film: 'neutral',
     shadow: { mapSize: 2048, radius: 1 },
     studio: 0.16,
     sky: { zenith: '#0d0d10', horizon: '#26262c', ground: '#050506' },
+  },
+  /**
+   * A hard key at a grazing angle — the light paper is photographed under.
+   *
+   * This is the only preset in the set whose subject is the SURFACE rather
+   * than the sheet. At eight degrees above the horizon the key skims across
+   * the stock instead of landing on it, so every fibre, deckle tooth and
+   * crease casts a shadow the length of itself and reads as RELIEF. It is
+   * how a paper merchant shoots a swatch book, and it is the only way the
+   * surface effects this library ships — grain, deckle, creaseLines, aging —
+   * are visible as texture rather than as tint.
+   *
+   * Ambient and studio are both held down on purpose. Raking light works by
+   * the shadows it casts, and fill is exactly the thing that fills those in;
+   * turning `studio` up here does not brighten the picture so much as erase
+   * the subject.
+   */
+  raking: {
+    id: 'raking',
+    label: 'Raking',
+    // Lifted from 0.06/0.25 after looking at it: at the floor the shadow
+    // side of a crumple went to near-black and the relief stopped reading as
+    // relief and started reading as holes. This is the least fill that still
+    // leaves a facet turned away from the key legible.
+    ambient: 0.09,
+    key: { color: '#fff6ea', intensity: 3.2, position: [5.81, 0.84, 1.24] },
+    contactShadowOpacity: 0.6,
+    contactShadowBlur: 1.6,
+    exposure: 1,
+    film: 'neutral',
+    shadow: { mapSize: 2048, radius: 2 },
+    studio: 0.32,
+    sky: { zenith: '#2a2a2e', horizon: '#4a4844', ground: '#141314' },
+  },
+  /**
+   * The sheet on a lightbox: the lamp is behind the paper and level with it.
+   *
+   * Every other front-lit preset shows you ink ON paper. This one shows you
+   * light THROUGH it — which is the most beautiful thing paper does, and
+   * which the library has been able to render since `translucency` became a
+   * per-stock number without a single preset ever making it the subject.
+   * Vellum glows, newsprint turns to a grey lantern with its fibres showing,
+   * and a printed sheet reads backwards through itself.
+   *
+   * Printed a stop under for the same reason `nave` is: a backlit sheet
+   * carries the lamp's whole intensity as transmission, so at 1.0 the paper
+   * clips to flat white and takes its own texture with it.
+   */
+  lightbox: {
+    id: 'lightbox',
+    label: 'Lightbox',
+    ambient: 0.05,
+    key: { color: '#fdfdff', intensity: 4.5, position: [0, 0.7, -7.97] },
+    // A sheet standing on a lit panel has almost nothing to cast onto.
+    contactShadowOpacity: 0.15,
+    contactShadowBlur: 4,
+    exposure: 0.85,
+    film: 'neutral',
+    shadow: { mapSize: 1024, radius: 4 },
+    studio: 0.35,
+    sky: { zenith: '#dfe4ec', horizon: '#f6f8fc', ground: '#b9bec8' },
   },
   nave: {
     id: 'nave',
@@ -129,6 +205,7 @@ export const lightingPresets: Record<LightingName, LightingPreset> = {
     // to flat white and the folds — the entire reason the paper is draped —
     // vanished into the highlight.
     exposure: 0.8,
+    film: 'neutral',
     shadow: { mapSize: 2048, radius: 6 },
     // Warm and light, not black: distance in a backlit hall washes TOWARD
     // the source, which is what separates haze from murk. It has to reach
@@ -158,6 +235,15 @@ export function getLightingPreset(name: LightingName): LightingPreset {
 export const lightSchema = z.object({
   /** Tone-mapping exposure — the stop the whole picture is printed at. */
   exposure: z.number().min(0.1).max(4).optional(),
+  /**
+   * The tone curve — the film, where `exposure` is the stop.
+   *
+   * `filmic` is ACES, which is what every preset used to be pinned to and is
+   * kept so a scene tuned against it can say so. On near-white paper it is
+   * the wrong film: it desaturates and drags bright neutrals toward
+   * yellow-green, which is the sepia cast a lit sheet used to pick up.
+   */
+  film: z.enum(filmNames).optional(),
   /** Key light strength. */
   key: z.number().min(0).max(12).optional(),
   /** Key light colour. */
@@ -238,7 +324,7 @@ export function resolveLighting(
   const preset = typeof base === 'string' ? getLightingPreset(base) : base
   if (!overrides) return preset
 
-  const { exposure, key, color, direction, height, ambient, studio, haze } = overrides
+  const { exposure, film, key, color, direction, height, ambient, studio, haze } = overrides
   const moved = direction !== undefined || height !== undefined
   const angles = moved ? lightAngles(preset.key.position) : null
 
@@ -247,6 +333,7 @@ export function resolveLighting(
     ambient: ambient ?? preset.ambient,
     studio: studio ?? preset.studio,
     exposure: exposure ?? preset.exposure,
+    film: film ?? preset.film,
     key: {
       color: color ?? preset.key.color,
       intensity: key ?? preset.key.intensity,

@@ -84,6 +84,20 @@ was done instead: the scene's internals are un-exported (`<PaperStage>` is the
 composition; its guts are free to change), and the playground's share-link code
 was moved out of the library entirely.
 
+> **REVISED 2026-08-21 — stage now IS a subpath, `paperlab/stage`.** The
+> paragraph above stays because its reasoning was correct and is still
+> correct: tree-shaking keeps stage code out of a `<Paper>` bundle, and a
+> subpath saves nobody a byte. What changed is that bytes stopped being the
+> only question. Stage mode gained a print pass (bloom, tone curve, vignette,
+> grain) built on `@react-three/postprocessing`, and those peers can only be
+> declared **optional** if the main entry never names the module — because
+> tree-shaking removes the code but not the import specifier, and a
+> `<Paper>`-only consumer who has not installed them otherwise cannot
+> resolve `paperlab` at all. Verified on the built package: `postprocessing`
+> appears 0 times in `dist/index.js` and `dist/index.cjs`, 4 times in
+> `dist/stage.js`, and a `<Paper>` bundle builds with both packages
+> uninstalled. Resolvability, not size, is the new information.
+
 **App infrastructure does not live in the library.** URL-share encoding is the
 test case: the payload shape belongs to the app, and the library's contribution
 is the schema the untrusted half gets validated against. Stage share lives in
@@ -1151,7 +1165,7 @@ and should not have to.
 
 A **look** bundles lighting + grade + camera the way a film stock names a
 whole response: one word, art-directed, with the parameters underneath for
-anyone who wants them. The six lighting presets become the first six looks
+anyone who wants them. The eight lighting presets become the first eight looks
 rather than the ceiling. This is what keeps "lighting is data" from being a
 downgrade in practice.
 

@@ -60,7 +60,11 @@ describe('walkNameFor', () => {
 describe('stage component source', () => {
   it('inlines the stage and the words — receivers have neither', () => {
     const source = buildStageComponentSource(base())
-    expect(source).toContain("import { PaperStage, type StageConfigInput } from 'paperlab'")
+    // Stage mode is its own entry point — it is the half that needs the
+    // postprocessing peers, and naming it from the main entry is what made
+    // those peers impossible to declare as optional.
+    expect(source).toContain("import { PaperStage, type StageConfigInput } from 'paperlab/stage'")
+    expect(source).not.toContain("from 'paperlab'\n")
     expect(source).toContain('satisfies StageConfigInput')
     expect(source).toContain('the paper remembers every hand that folded it')
     expect(source).toContain('count={18}')
@@ -129,7 +133,9 @@ describe('describeStage', () => {
 describe('stage agent payload', () => {
   it('carries install, component, placement and a verification step', () => {
     const payload = buildStageAgentPayload(base())
-    expect(payload).toContain('npm i paperlab three @react-three/fiber gsap')
+    expect(payload).toContain(
+      'npm i paperlab three @react-three/fiber gsap @react-three/postprocessing postprocessing',
+    )
     expect(payload).toContain('components/PaperNave.tsx')
     expect(payload).toContain('You should see')
     // The mistake a receiving agent would otherwise make.
@@ -173,7 +179,8 @@ describe('the banner travels with the export', () => {
       base({ paper: { sheet: { width: 0.9, height: 11 }, stock: 'vellum' } }),
     )
     expect(source).toContain('const banner =')
-    expect(source).toContain('type PaperConfigInput')
+    // The paper type comes from the MAIN entry, the stage from the subpath.
+    expect(source).toContain("import type { PaperConfigInput } from 'paperlab'")
     expect(source).toContain('preset={banner}')
     expect(source).toContain('"height": 11')
   })

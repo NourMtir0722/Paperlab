@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "paperlab": ["../../packages/paperlab/src/index.ts"]
+      "paperlab": ["../../packages/paperlab/src/index.ts"],
+      "paperlab/stage": ["../../packages/paperlab/src/stage.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

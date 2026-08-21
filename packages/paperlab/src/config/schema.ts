@@ -76,7 +76,14 @@ const blankContentBase = z.object({
 
 const imageContentBase = z.object({
   type: z.literal('image'),
-  src: z.string(),
+  /**
+   * Empty means "no picture yet", and renders as bare stock rather than as
+   * a failure. That is what lets a built-in preset be an image preset
+   * without shipping — or fetching — a photograph: `photo-print` and
+   * `postage-stamp` are containers for the caller's own art, handed over via
+   * `<PaperField images={...} />` or `content.src`.
+   */
+  src: z.string().default(''),
   fit: z.enum(['cover', 'contain']).default('cover'),
   /** Read by the hidden DOM mirror and the no-WebGL fallback. */
   alt: z.string().optional(),
@@ -94,6 +101,68 @@ const textContentBase = z.object({
   /** Fraction of the short edge. */
   padding: z.number().min(0).max(0.4).default(0.09),
   lineHeight: z.number().min(0.8).max(3).default(1.45),
+  /**
+   * Letter-spacing, in em. The one control display type cannot do without:
+   * a line set large enough to be read across a room needs its tracking
+   * pulled IN, and a small line of uppercase small-print needs it pushed
+   * out, and neither is achievable by changing the size.
+   */
+  tracking: z.number().min(-0.1).max(0.6).default(0),
+  /**
+   * Where the block sits down the sheet.
+   *
+   * `top` is the old behaviour and stays the default, because a letter
+   * starts at the top of the page. `center` is what a card, a label or a
+   * poster wants — a block of type optically centred in the sheet rather
+   * than hung from its top edge.
+   */
+  valign: z.enum(['top', 'center']).default('top'),
+})
+
+/**
+ * A card: the small stiff printed thing paper is most often cut into.
+ *
+ * One type covers the index card, the library due-date card, the museum
+ * wall label, the telegram slip and the gallery quote sheet, because they
+ * are the same object — a tracked label, a rule, a body, and a line of small
+ * print — differing only in which parts are present.
+ *
+ * It exists because `text` could not make any of them. `text` sets a block
+ * of prose in one size and one weight; every artifact above is a
+ * COMPOSITION, with a hierarchy and a rule in it, and composing one out of
+ * plain text meant hand-placing newlines and hoping.
+ */
+const cardContentBase = z.object({
+  type: z.literal('card'),
+  /** Small, tracked, uppercase by convention — the label at the top. */
+  title: z.string().default(''),
+  /** The card's reason for existing. */
+  body: z.string().default(''),
+  /** Attribution, catalogue number, date — the line in small print at the foot. */
+  note: z.string().default(''),
+  /** A hairline under the title. What separates a label from a paragraph. */
+  rule: z.boolean().default(true),
+  /**
+   * Ruled writing lines behind the body, as on an index card.
+   *
+   * Drawn UNDER the type and in the stock's own ink at low alpha, so they
+   * read as printed on the card rather than as underlines on the words.
+   */
+  ruled: z.boolean().default(false),
+  font: z.string().default('Georgia, "Times New Roman", serif'),
+  /**
+   * Body size, px at texture resolution. Title and note derive from it.
+   *
+   * Set larger than the `text` default on purpose. A card is a small object
+   * read close up, so its type is LARGE relative to the sheet; at the text
+   * block's 42 the composition floated in the middle of the card with a
+   * third of the stock empty above and below it, which reads as a page that
+   * was cropped rather than as a card that was set.
+   */
+  size: z.number().min(8).max(256).default(58),
+  color: z.string().default('#2b2620'),
+  align: z.enum(['left', 'center']).default('left'),
+  padding: z.number().min(0).max(0.4).default(0.1),
 })
 
 const receiptContentBase = z.object({
@@ -117,6 +186,7 @@ export const backContentSchema = z.discriminatedUnion('type', [
   blankContentBase,
   imageContentBase,
   textContentBase,
+  cardContentBase,
   receiptContentBase,
 ])
 
@@ -127,12 +197,14 @@ const withBack = { back: backContentSchema.optional() }
 export const blankContentSchema = blankContentBase.extend(withBack)
 export const imageContentSchema = imageContentBase.extend(withBack)
 export const textContentSchema = textContentBase.extend(withBack)
+export const cardContentSchema = cardContentBase.extend(withBack)
 export const receiptContentSchema = receiptContentBase.extend(withBack)
 
 export const contentSchema = z.discriminatedUnion('type', [
   blankContentSchema,
   imageContentSchema,
   textContentSchema,
+  cardContentSchema,
   receiptContentSchema,
 ])
 
@@ -259,7 +331,41 @@ export type PhysicsConfigInput = z.input<typeof physicsSchema>
 
 // ── Scene ────────────────────────────────────────────────────────────────────
 
-export const lightingNames = ['studio', 'window', 'leaves', 'goldenhour', 'noir', 'nave'] as const
+export const lightingNames = [
+  'studio',
+  'window',
+  'leaves',
+  'goldenhour',
+  'noir',
+  'nave',
+  'raking',
+  'lightbox',
+] as const
+
+/**
+ * The film the picture is printed on — the tone curve that maps unbounded
+ * scene light onto a screen.
+ *
+ * This matters more here than in most 3D work because the subject is almost
+ * white. A sheet of printer stock sits at `#fbfaf7`, and a lit one runs past
+ * 1.0 constantly, so the whole image lives in the part of the curve where
+ * tone mappers disagree most.
+ *
+ * - `neutral` — **the default.** Khronos PBR Neutral, built specifically to
+ *   preserve hue and saturation through the highlight roll-off. On a warm
+ *   backlit hall it is the only one of the three that keeps the light warm.
+ * - `agx` — filmic, with a long, very graceful roll-off. It also desaturates
+ *   hard as it approaches white, which is a look; on a scene whose subject
+ *   IS warm light through paper it bleaches the thing you came for.
+ * - `filmic` — ACES. High contrast, drifts bright neutrals toward
+ *   yellow-green, and washes out badly once a source is bright enough to
+ *   clip. This is what every preset was pinned to before.
+ *
+ * Measured on `nave` rather than argued: rendered through all three with the
+ * source authored as a real HDR emitter, `neutral` holds the cream glow,
+ * `agx` and `filmic` both bleach it to grey-white.
+ */
+export const filmNames = ['agx', 'neutral', 'filmic'] as const
 
 /** Scene-level presentation, serialized with the paper. */
 export const sceneSchema = z.object({
@@ -269,6 +375,7 @@ export const sceneSchema = z.object({
 export type SceneConfig = z.infer<typeof sceneSchema>
 export type SceneConfigInput = z.input<typeof sceneSchema>
 export type LightingName = (typeof lightingNames)[number]
+export type FilmName = (typeof filmNames)[number]
 
 // ── Interaction states ───────────────────────────────────────────────────────
 

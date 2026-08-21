@@ -1,6 +1,5 @@
 import { z } from 'zod'
-import { listStagePresets, stageSchema, type StageConfigInput } from 'paperlab'
-
+import { listStagePresets, stageSchema, type StageConfigInput } from 'paperlab/stage'
 /**
  * A stage in a URL.
  *
