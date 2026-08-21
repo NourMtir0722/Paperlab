@@ -2,10 +2,24 @@ import * as THREE from 'three'
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows } from '@react-three/drei'
-import type { LightingName } from '../config/schema'
+import type { FilmName, LightingName } from '../config/schema'
 import { buildEnvironment } from './environment'
 import { resolveLighting, type LightingPreset, type LightOverrides } from './lighting'
 import { usePrefersReducedMotion } from '../a11y'
+
+/**
+ * The rig's film name, as a three constant.
+ *
+ * The mapping lives here rather than beside the presets because
+ * `lighting.ts` is deliberately pure — it is the half that runs in node
+ * under vitest, and importing three into it to name three integers would
+ * trade that for nothing.
+ */
+const toneMappings: Record<FilmName, THREE.ToneMapping> = {
+  agx: THREE.AgXToneMapping,
+  neutral: THREE.NeutralToneMapping,
+  filmic: THREE.ACESFilmicToneMapping,
+}
 
 /** Deterministic PRNG so gobos render identically everywhere. */
 function mulberry32(seed: number) {
@@ -185,12 +199,15 @@ export function PaperLighting({
   const scene = useThree((s) => s.scene)
 
   useEffect(() => {
-    const previous = gl.toneMappingExposure
+    const previousExposure = gl.toneMappingExposure
+    const previousFilm = gl.toneMapping
     gl.toneMappingExposure = p.exposure
+    gl.toneMapping = toneMappings[p.film]
     return () => {
-      gl.toneMappingExposure = previous
+      gl.toneMappingExposure = previousExposure
+      gl.toneMapping = previousFilm
     }
-  }, [gl, p.exposure])
+  }, [gl, p.exposure, p.film])
 
   // Set imperatively rather than via <fog attach="fog" />, which would bind
   // to whatever group this rig happens to be mounted under instead of the scene.

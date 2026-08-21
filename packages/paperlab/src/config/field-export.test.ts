@@ -166,7 +166,10 @@ describe('groupFieldPapers', () => {
       { preset: photo },
     ])
     expect(groups[0]!.contents[0]).toMatchObject({ src: '/x.jpg' })
-    expect(groups[0]!.contents[1]).toMatchObject({ src: expect.stringContaining('unsplash') })
+    // The preset's own content, which for an image preset is now an EMPTY
+    // src — a container awaiting the caller's art rather than a photo the
+    // library fetches from a CDN on first render.
+    expect(groups[0]!.contents[1]).toMatchObject({ type: 'image', src: '' })
   })
 
   it('slots without a preset use the shared fallback', () => {

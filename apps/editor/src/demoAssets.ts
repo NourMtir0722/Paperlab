@@ -1,48 +1,82 @@
-/**
- * Procedural demo fill for the Field Composer's image slots.
- *
- * These replace the old hardcoded Unsplash URLs: they render offline, never
- * rate-limit, and — since they're generated locally — there's nothing to leak
- * if the fill ever escaped into an export. (It doesn't: this pool is
- * PREVIEW-only; see App.tsx `fieldExportInput`.)
- *
- * Each tile is a soft two-tone gradient in paper's 4:5 portrait aspect, spun
- * once at module load so slots stay stable across re-renders.
- */
-
-const TILE_W = 512
-const TILE_H = 640
-const COUNT = 8
-
-/** Evenly-spaced hues so a full ring of slots reads as distinct cards. */
-function tile(index: number): string {
-  const canvas = document.createElement('canvas')
-  canvas.width = TILE_W
-  canvas.height = TILE_H
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-
-  const hue = (index / COUNT) * 360
-  const g = ctx.createLinearGradient(0, 0, TILE_W, TILE_H)
-  g.addColorStop(0, `hsl(${hue} 55% 62%)`)
-  g.addColorStop(1, `hsl(${(hue + 40) % 360} 50% 38%)`)
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, TILE_W, TILE_H)
-
-  // A faint offset disc keeps each tile from reading as a flat swatch.
-  ctx.globalAlpha = 0.12
-  ctx.fillStyle = '#fff'
-  ctx.beginPath()
-  ctx.arc(TILE_W * 0.68, TILE_H * 0.32, TILE_W * 0.42, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.globalAlpha = 1
-
-  return canvas.toDataURL('image/jpeg', 0.82)
-}
+import type { ContentConfigInput } from 'paperlab'
 
 /**
- * Data-URI placeholders, generated once. Falls back to an empty pool when no
- * DOM canvas is available (SSR / tests) — callers already guard for that.
+ * What fills an empty slot in the Field composer.
+ *
+ * This used to be eight HSL gradient tiles with a translucent white disc on
+ * each — generated locally, which was the right instinct (offline, no rate
+ * limit, nothing to leak into an export) attached to the wrong art
+ * direction. A library about PAPER greeted every visitor who clicked
+ * **Field** with a carousel of app-icon swatches, and that screenshot did
+ * more damage than any missing feature.
+ *
+ * The technique is unchanged; only what it draws is different. These are
+ * paper artifacts — the small printed things paper actually gets cut into —
+ * so the default field reads as a drawer of records rather than a colour
+ * picker. They are `card` content rather than images, which means they are
+ * not photographs OF paper: they are typeset by the same painter that sets
+ * every other sheet, on the slot's own stock, and they curl with the mesh.
+ *
+ * PREVIEW-only, exactly as before: this pool never reaches an export.
+ * See App.tsx `fieldExportInput`.
  */
-export const DEMO_IMAGES: string[] =
-  typeof document === 'undefined' ? [] : Array.from({ length: COUNT }, (_, i) => tile(i))
+export const DEMO_CARDS: ContentConfigInput[] = [
+  {
+    type: 'card',
+    title: 'Specimen',
+    body: 'Wove, 120gsm.\nDeckle on two edges.',
+    note: 'Mill no. 14 · 1954',
+    ruled: false,
+  },
+  {
+    type: 'card',
+    title: 'Return by',
+    body: '12 MAR\n19 MAR\n2 APR',
+    note: 'Fines accrue daily',
+    ruled: true,
+  },
+  {
+    type: 'card',
+    title: 'Telegram',
+    body: 'ARRIVED SAFELY STOP\nPAPER HOLDS STOP',
+    note: 'Received 04:12',
+    ruled: false,
+  },
+  {
+    type: 'card',
+    title: 'Catalogue',
+    body: 'Study of a folded sheet',
+    note: 'Graphite on card, 1971',
+    ruled: false,
+  },
+  {
+    type: 'card',
+    title: 'Index',
+    body: 'Everything that can be\nfolded remembers it.',
+    note: 'card 07 of 40',
+    ruled: true,
+  },
+  {
+    type: 'card',
+    title: 'Admit one',
+    body: 'ROW G\nSEAT 14',
+    note: 'No re-entry',
+    ruled: false,
+    align: 'center',
+  },
+  {
+    type: 'card',
+    title: 'Note to self',
+    body: 'Buy more paper.\nThe good kind.',
+    note: '',
+    ruled: true,
+  },
+  {
+    type: 'card',
+    title: 'Label',
+    body: 'Handle at the edges',
+    note: 'Archive box 3',
+    ruled: false,
+    align: 'center',
+  },
+]

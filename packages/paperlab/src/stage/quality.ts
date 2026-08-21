@@ -53,6 +53,25 @@ export interface QualitySettings {
   contactShadow: boolean
   /** Light surfaces with the room (an environment map) as well as with the lamp. */
   environment: boolean
+  /**
+   * Run the print pass — bloom, vignette, grain.
+   *
+   * A composer is a render target plus a second walk over every pixel, and
+   * bloom's mipmap chain is several more — all of it pure fragment work,
+   * which is the most expensive kind on exactly the machines that have the
+   * least of it.
+   *
+   * **`high` only, and that is measured rather than cautious.** Switched on
+   * at `medium` the software floor went 51.0 ms → 92.2 ms a frame, 20 fps to
+   * 11, while `low` (which never had it) stayed put at 26.1 → 28.4 ms — so
+   * the control says the ~40 ms is the grade and not the weather. `medium`
+   * is the tier `auto` STARTS at, so paying that there pushes weak machines
+   * down to `low`, where they lose the environment light and the shadow map
+   * to buy a bloom. `high` is only ever reached by a machine that measured
+   * 55 fps to get there, and it is where `contactShadow` already lives for
+   * the same reason.
+   */
+  grade: boolean
 }
 
 export const qualityTiers: Record<QualityTier, QualitySettings> = {
@@ -72,6 +91,7 @@ export const qualityTiers: Record<QualityTier, QualitySettings> = {
     surround: true,
     contactShadow: true,
     environment: true,
+    grade: true,
   },
   /** The default worth aiming at: an integrated laptop GPU from the last few years. */
   medium: {
@@ -81,13 +101,22 @@ export const qualityTiers: Record<QualityTier, QualitySettings> = {
     surround: true,
     contactShadow: false,
     environment: true,
+    grade: false,
   },
   /**
    * Old integrated graphics, a throttled phone, a software rasterizer. The
    * scene still READS — banners, figure, backlight, walk — it just stops
    * paying for the parts nobody would miss at this framerate.
    */
-  low: { dpr: 1, shadowMapSize: 0, segments: 28, surround: true, contactShadow: false, environment: false },
+  low: {
+    dpr: 1,
+    shadowMapSize: 0,
+    segments: 28,
+    surround: true,
+    contactShadow: false,
+    environment: false,
+    grade: false,
+  },
 }
 
 /** The tier to start `auto` from before anything has been measured. */

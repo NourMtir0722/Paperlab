@@ -3,14 +3,11 @@ import {
   diffConfig,
   listLayouts,
   listPresets,
-  listStagePresets,
   paperConfigSchema,
   paperStatesSchema,
-  qualityNames,
-  stageSchema,
-  walkNames,
   type PaperStatesInput,
 } from 'paperlab'
+import { listStagePresets, qualityNames, stageSchema, walkNames } from 'paperlab/stage'
 import type { EditorMode, EditorZone, FieldState, StageState } from './store'
 
 /**

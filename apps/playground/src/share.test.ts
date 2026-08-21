@@ -8,8 +8,7 @@ import {
   stageShareUrl,
   type StageShare,
 } from './share'
-import { walks } from 'paperlab'
-
+import { walks } from 'paperlab/stage'
 const round = (share: StageShare) => decodeStageShare(encodeStageShare(share))
 
 describe('encoding a stage into a link', () => {

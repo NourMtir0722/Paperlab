@@ -79,4 +79,46 @@ describe('stage presets', () => {
     expect(getStagePreset('nave').id).toBe('nave')
     expect(() => getStagePreset('cathedral')).toThrow(/Unknown stage preset/)
   })
+
+  it('every stage is graded, and a stage that asks for nothing still is', () => {
+    for (const preset of presets()) {
+      const grade = stageSchema.parse(preset.stage).grade
+      expect(grade.bloom).toBeGreaterThan(0)
+      expect(grade.vignette).toBeGreaterThan(0)
+    }
+    // The default is a real look rather than zeroes — a stage config with no
+    // `grade` key at all still comes out printed.
+    expect(stageSchema.parse({}).grade.bloom).toBeGreaterThan(0)
+  })
+
+  it('the bloom threshold clears the paper, not just the black', () => {
+    // A lit sheet of near-white stock is ALREADY bright. At 0.72 the banners
+    // bloomed along with the source and the whole hall fogged over, which is
+    // the opposite of the point: the source is the one thing in frame that
+    // is light rather than a lit object.
+    expect(stageSchema.parse({}).grade.threshold).toBeGreaterThan(0.9)
+  })
+
+  it('depth falloff is OFF by default, and that is the considered answer', () => {
+    // Haze already stages depth here, at one fragment instruction. Optical
+    // blur is a second full-screen pass and the effect most likely to read
+    // as a video game; every paper installation worth copying is shot deep.
+    expect(stageSchema.parse({}).grade.depth).toBe(0)
+    for (const preset of presets()) {
+      expect(stageSchema.parse(preset.stage).grade.depth).toBe(0)
+    }
+    // Still sayable, because a shallow frame is a legitimate look.
+    expect(stageSchema.parse({ grade: { depth: 0.6 } }).grade.depth).toBe(0.6)
+  })
+
+  it('grain stays under the level where it stops reading as stock', () => {
+    expect(stageSchema.parse({}).grade.grain).toBeLessThan(0.05)
+  })
+
+  it('a raw print is sayable, and asks for no composer at all', () => {
+    const raw = stageSchema.parse({ grade: { bloom: 0, vignette: 0, grain: 0 } }).grade
+    expect(raw.bloom).toBe(0)
+    expect(raw.vignette).toBe(0)
+    expect(raw.grain).toBe(0)
+  })
 })

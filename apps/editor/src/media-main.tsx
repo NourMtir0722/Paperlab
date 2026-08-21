@@ -2,14 +2,15 @@ import { createRoot } from 'react-dom/client'
 import { useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import {
+  LightRig,
   PaperFieldMesh,
   PaperLighting,
   PaperMesh,
-  PaperStageScene,
-  getStagePreset,
+  resolveLighting,
+  type LightingName,
   type PaperHandle,
 } from 'paperlab'
-
+import { PaperStageScene, getStagePreset } from 'paperlab/stage'
 /**
  * The frame server behind `pnpm media`.
  *
@@ -45,6 +46,31 @@ const numbers = (key: string, fallback: number[]) => {
 }
 const fov = Number(query.get('fov')) || 40
 
+/**
+ * `?lighting=` and `?film=` exist so the light can be JUDGED headless.
+ *
+ * Calibrating a preset means looking at it, and every rig in this file used
+ * to be pinned to `studio` — so the only way to see what `raking` or
+ * `lightbox` actually does to a sheet was to open the editor and click. The
+ * whole point of a preset is that it is data; this makes it data you can
+ * take a photograph of.
+ */
+const lighting = (query.get('lighting') ?? 'studio') as LightingName
+const light = query.has('film') ? { film: query.get('film') as never } : undefined
+
+/**
+ * The rig has to be PUBLISHED, not just drawn.
+ *
+ * `<PaperLighting>` places the lamps; `<LightRig>` is what tells the paper
+ * which lamps those are. Without the provider a sheet falls back to its own
+ * `scene.lighting` — `studio` for almost every preset — so it computes its
+ * backlit transmission against a lamp in FRONT of it while the actual key
+ * stands behind. That is precisely the disagreement `resolveLighting` exists
+ * to prevent, and this harness reproduced it: `lightbox` rendered as a flat
+ * grey sheet because the paper never heard about the lamp behind it.
+ */
+const rig = resolveLighting(lighting, light)
+
 function PaperFrames() {
   const ref = useRef<PaperHandle>(null)
   useEffect(() => {
@@ -60,8 +86,10 @@ function PaperFrames() {
       gl={{ preserveDrawingBuffer: true, antialias: true }}
     >
       <color attach="background" args={[background]} />
-      <PaperLighting preset="studio" floor={-1.5} scale={10} />
-      <PaperMesh ref={ref} preset={preset} />
+      <LightRig rig={rig}>
+        <PaperLighting rig={rig} floor={-1.5} scale={10} />
+        <PaperMesh ref={ref} preset={preset} />
+      </LightRig>
     </Canvas>
   )
 }
@@ -78,15 +106,17 @@ function FieldFrames() {
       gl={{ preserveDrawingBuffer: true }}
     >
       <color attach="background" args={[background]} />
-      <PaperLighting preset="studio" floor={-2.4} scale={14} />
-      <group rotation={[0, phase * Math.PI * 2, 0]}>
-        <PaperFieldMesh
-          papers={Array.from({ length: 12 }, () => ({ preset }))}
-          layout={query.get('layout') ?? 'ring'}
-          motion={{ driver: 'none' }}
-          entrance={{ type: 'none' }}
-        />
-      </group>
+      <LightRig rig={rig}>
+        <PaperLighting rig={rig} floor={-2.4} scale={14} />
+        <group rotation={[0, phase * Math.PI * 2, 0]}>
+          <PaperFieldMesh
+            papers={Array.from({ length: 12 }, () => ({ preset }))}
+            layout={query.get('layout') ?? 'ring'}
+            motion={{ driver: 'none' }}
+            entrance={{ type: 'none' }}
+          />
+        </group>
+      </LightRig>
     </Canvas>
   )
 }

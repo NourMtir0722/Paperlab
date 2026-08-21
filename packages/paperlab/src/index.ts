@@ -30,12 +30,14 @@ export {
   behaviorConfigSchema,
   deformerInstanceSchema,
   surfaceSchema,
+  cardContentSchema,
   receiptContentSchema,
   physicsSchema,
   clothConfigSchema,
   physicsNames,
   sceneSchema,
   lightingNames,
+  filmNames,
   stockNames,
   paperEdges,
   coreStateNames,
@@ -62,6 +64,7 @@ export {
   type SceneConfig,
   type SceneConfigInput,
   type LightingName,
+  type FilmName,
   type CoreStateName,
   type StateName,
   type StateDef,
@@ -182,36 +185,6 @@ export {
   type PaperPose,
 } from './field/layouts'
 export { fieldBounds, fitCamera, type FieldBounds } from './field/framing'
-// ── Stage ───────────────────────────────────────────────────────────────────
-// The scene's own parts — the figure, the surround, the gait and camera math,
-// the quality ladder — are deliberately NOT exported. They are the inside of
-// one composition, and `<PaperStage>` is the composition. What is public here
-// is what you need to configure a stage, name one, or serialize one.
-export {
-  PaperStage,
-  PaperStageScene,
-  type PaperStageProps,
-  type PaperStageSceneProps,
-} from './stage/PaperStage'
-export { stageSchema, type StageConfig, type StageConfigInput } from './stage/schema'
-// Who drives the walk — the same three names a field's motion uses.
-export { stageMotionSchema, type StageMotion, type StageMotionInput } from './stage/navigate'
-export { stagePresets, getStagePreset, listStagePresets, type StagePreset } from './stage/presets'
-export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
-export { createWalkPath, type Ground, type WalkPath, type WalkPathOptions } from './stage/path'
-// QualityTier is the argument `onQualityChange` hands back — a consumer
-// cannot type that handler without it.
-export { qualityNames, type QualityName, type QualityTier } from './stage/quality'
-export { shotNames, type ShotName, type ShotOptions, type StageScale, type StageShot } from './stage/camera'
-export {
-  buildStageAgentPayload,
-  buildStageComponentSource,
-  describeStage,
-  diffStage,
-  walkNameFor,
-  stringifyStage,
-  type StageExportInput,
-} from './stage/export'
 export {
   translucencyUniforms,
   translucencyValues,
@@ -240,6 +213,11 @@ export {
 export { composeSurface, type ComposedSurface, type SurfaceMaps } from './surface/compose'
 export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'
 export { receiptTotals, barcodeBars, type ReceiptContent } from './content/receipt'
+export type { CardContent } from './content/card'
+// Line breaking is exported because it is the answer to "where does this
+// wrap", and a caller measuring a block of type before laying a sheet out
+// has to get the same answer the painter will.
+export { wrapLines } from './content/type'
 
 export { parsePreset, serializePreset, mergeConfig, mergeWithDeletes } from './config/serialize'
 export { diffConfig, buildJsxSnippet } from './config/diff'

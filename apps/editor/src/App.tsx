@@ -5,20 +5,22 @@ import {
   PaperFieldMesh,
   PaperLighting,
   PaperMesh,
-  PaperStageScene,
-  getStagePreset,
-  getWalk,
-  listStagePresets,
   getPreset,
   isBuiltinPreset,
   listPresets,
   resolveStateConfig,
-  type ContentConfig,
+  type ContentConfigInput,
   type FieldExportInput,
   type PaperConfig,
   type PaperHandle,
-  type StageExportInput,
 } from 'paperlab'
+import {
+  PaperStageScene,
+  getStagePreset,
+  getWalk,
+  listStagePresets,
+  type StageExportInput,
+} from 'paperlab/stage'
 import { Inspector } from './Inspector'
 import { FieldInspector } from './FieldInspector'
 import { StageInspector } from './StageInspector'
@@ -29,7 +31,7 @@ import { PresetPanel } from './PresetPanel'
 import { ViewportGuide } from './ViewportGuide'
 import { captureThumbnail } from './userPresets'
 import { SHARE_PARAM, paperShareUrl, readPaperShare } from './paperShare'
-import { DEMO_IMAGES } from './demoAssets'
+import { DEMO_CARDS } from './demoAssets'
 import { UIHost, promptDialog, toast } from './ui'
 import { useEditor, zoneToConfig } from './store'
 
@@ -96,10 +98,10 @@ export function App() {
 
   // Presets are components: the field renders the live edit of its preset.
   const resolvePresetByName = (name: string): PaperConfig => (name === presetName ? config : getPreset(name))
-  const slotContent = (i: number): ContentConfig =>
-    DEMO_IMAGES.length === 0
-      ? { type: 'blank' }
-      : { type: 'image', src: DEMO_IMAGES[i % DEMO_IMAGES.length]!, fit: 'cover' }
+  // Every slot gets a DIFFERENT card, so fourteen sheets read as a drawer of
+  // records rather than as one card printed fourteen times.
+  const slotContent = (i: number): ContentConfigInput =>
+    DEMO_CARDS[i % DEMO_CARDS.length] ?? { type: 'blank' }
   const fieldPapers = field.slots.map((name, i) => {
     const preset = resolvePresetByName(name)
     return {

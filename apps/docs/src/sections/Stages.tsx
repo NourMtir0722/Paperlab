@@ -1,4 +1,4 @@
-import { PaperStage, getStagePreset, listStagePresets } from 'paperlab'
+import { PaperStage, getStagePreset, listStagePresets } from 'paperlab/stage'
 import { LiveOnDemand } from '../Live'
 import { Snippet } from '../Snippet'
 

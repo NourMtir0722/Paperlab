@@ -24,7 +24,21 @@ describe('quality tiers', () => {
       expect(worse.shadowMapSize).toBeLessThanOrEqual(better.shadowMapSize)
       expect(worse.segments).toBeLessThanOrEqual(better.segments)
       expect(Number(worse.environment)).toBeLessThanOrEqual(Number(better.environment))
+      expect(Number(worse.grade)).toBeLessThanOrEqual(Number(better.grade))
     }
+  })
+
+  it('the print pass is high-only, and that is a measured budget', () => {
+    // Measured on the SwiftShader floor (`pnpm perf --soft`): switching the
+    // grade on at `medium` took the frame 51.0 ms → 92.2 ms, 20 fps to 11,
+    // while `low` — which never had it — held at 26.1 → 28.4 ms. `medium` is
+    // where `auto` STARTS, so paying it there demotes weak machines to `low`
+    // and costs them the environment light and the shadow map.
+    expect(qualityTiers.high.grade).toBe(true)
+    expect(qualityTiers.medium.grade).toBe(false)
+    expect(qualityTiers.low.grade).toBe(false)
+    // The same tier that already pays for the other full-screen pass.
+    expect(qualityTiers.high.contactShadow).toBe(true)
   })
 
   it('the cheapest tier still draws a readable scene', () => {

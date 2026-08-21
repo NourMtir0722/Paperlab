@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { contentText } from '../a11y'
+import { contentSchema } from '../config/schema'
 import { resolveConfig } from '../PaperMesh'
 import type { FieldA11yController } from './interactiveField'
 import type { FieldPaperSlot } from './slots'
@@ -91,7 +92,8 @@ export function FieldKeyboardMirror({
   const paperLabel = (slot: FieldPaperSlot, i: number): string => {
     try {
       const config = resolveConfig({ preset: slot.preset })
-      return `Paper ${i + 1}: ${contentText({ ...config, content: slot.content ?? config.content })}`
+      const content = slot.content ? contentSchema.parse(slot.content) : config.content
+      return `Paper ${i + 1}: ${contentText({ ...config, content })}`
     } catch {
       return `Paper ${i + 1}`
     }
