@@ -13,7 +13,7 @@ import { PaperStage, getStagePreset, type ShotName } from 'paperlab'
 declare global {
   interface Window {
     __STAGE__?: { ready: boolean; errors: string[]; walk?: number; visited?: number }
-    __PERF__?: { frames: number[]; done: boolean; tier?: string }
+    __PERF__?: { frames: number[]; done: boolean; tier?: string; renderer?: string }
   }
 }
 
@@ -54,10 +54,20 @@ function Ready() {
         programs: gl.info.programs?.length ?? 0,
         textures: gl.info.memory.textures,
         geometries: gl.info.memory.geometries,
+        // What ACTUALLY drew it, not what was asked for. Headless Chromium
+        // hands out a software rasterizer far more often than the launch
+        // flags suggest, and a number read as a GPU number when SwiftShader
+        // produced it is worse than no number.
+        renderer: rendererName(gl.getContext()),
       })
     }
   })
   return null
+}
+
+function rendererName(ctx: WebGLRenderingContext | WebGL2RenderingContext): string {
+  const ext = ctx.getExtension('WEBGL_debug_renderer_info')
+  return ext ? String(ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'unknown'
 }
 
 const preset = getStagePreset(query.get('preset') ?? 'nave')

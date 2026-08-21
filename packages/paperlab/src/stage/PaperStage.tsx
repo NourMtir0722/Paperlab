@@ -25,8 +25,7 @@ import {
   STEADY_WINDOW,
   qualityFor,
   qualityTiers,
-  tierDown,
-  tierUp,
+  settleTier,
   type QualityName,
   type QualityTier,
 } from './quality'
@@ -182,10 +181,6 @@ function ShotRig({
   return null
 }
 
-/** Below this, step down. Above the upper one, step up. */
-const FLOOR_FPS = 26
-const CEILING_FPS = 55
-
 /**
  * Watches the real frame rate and moves the tier.
  *
@@ -194,12 +189,23 @@ const CEILING_FPS = 55
  * reacts fast oscillates — dropping quality raises the frame rate, which
  * immediately argues for raising quality again, and the scene visibly
  * pumps. A machine that cannot hold the floor should sink once and stay.
+ *
+ * "And stay" is now enforced rather than hoped for. **A tier that has
+ * already failed is never offered again**, because the thresholds alone
+ * cannot prevent the pump: promotion needs 55 fps and demotion needs 26, so
+ * any machine where the next tier up costs more than about 2.1× the current
+ * one can satisfy both forever, rising until it stalls and sinking until it
+ * is comfortable. That ratio is not hypothetical — `high` runs 2.1× the cost
+ * of `medium` on a software rasterizer, which is exactly the machine this
+ * watcher exists for. One latch, and the ladder can only ever settle.
  */
 function QualityWatch({ tier, onChange }: { tier: QualityTier; onChange: (tier: QualityTier) => void }) {
   const samples = useRef<number[]>([])
   const settle = useRef(SETTLE_FRAMES)
   // The first verdict comes quickly; later ones are measured carefully.
   const window = useRef(FIRST_WINDOW)
+  /** The lowest tier that has already proved too expensive here. */
+  const failed = useRef<QualityTier | null>(null)
 
   const settled = useCallback((next: QualityTier) => {
     samples.current = []
@@ -226,13 +232,9 @@ function QualityWatch({ tier, onChange }: { tier: QualityTier; onChange: (tier: 
     // Even if the tier does not move, stop judging on the short window.
     window.current = STEADY_WINDOW
 
-    if (fps < FLOOR_FPS) {
-      const next = tierDown(tier)
-      if (next !== tier) onChange(settled(next))
-    } else if (fps > CEILING_FPS) {
-      const next = tierUp(tier)
-      if (next !== tier) onChange(settled(next))
-    }
+    const verdict = settleTier(tier, fps, failed.current)
+    failed.current = verdict.failed
+    if (verdict.tier !== tier) onChange(settled(verdict.tier))
   })
   return null
 }
@@ -287,14 +289,7 @@ export function PaperStageScene({
   // is — read from the preset in play rather than assumed.
   const paperHeight = useMemo(() => resolveConfig({ preset: preset ?? BANNER }).sheet.height, [preset])
 
-  // Subdivision is the biggest single cost and the easiest to scale: every
-  // sheet is a grid, so halving it quarters the vertex work.
-  const paper = useMemo(() => {
-    const base = (preset ?? BANNER) as Record<string, unknown>
-    if (typeof base !== 'object') return preset ?? BANNER
-    const sheet = (base.sheet ?? {}) as Record<string, unknown>
-    return { ...base, sheet: { ...sheet, segments: settings.segments } } as typeof BANNER
-  }, [preset, settings.segments])
+  const paper = preset ?? BANNER
 
   // The walk reaches the layout too. A layout that arranges along a path and
   // a figure that walks a different one is the one bug this whole component
@@ -404,6 +399,13 @@ export function PaperStageScene({
 
       <PaperFieldMesh
         preset={paper}
+        // Subdivision is the biggest single cost in this scene and the tier's
+        // one geometry lever. It is a CEILING on what `'auto'` may ask for,
+        // not a replacement for it — overwriting `segments` with a number was
+        // this component's own bug: a number applies to BOTH axes, and a
+        // deformer's floor then raised it straight back, so every tier drew
+        // the identical 48 × 48 banner and the knob did nothing at all.
+        segmentCeiling={settings.segments}
         papers={slots}
         images={images}
         layout={layout}

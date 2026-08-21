@@ -36,6 +36,7 @@ export const roll: Deformer<RollOptions> = {
     // only grows it as the roll winds outward, so the first turn is the one
     // that sets the density.
     autoSegments: (o, sheet) => segmentsForArc(spanAlong(sheet, o.angle), o.radius),
+    axis: (o) => o.angle,
   },
   displace(out, _uv, o) {
     const dirX = Math.cos(o.angle * DEG)

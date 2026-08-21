@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { getBehavior, listBehaviors } from '../behaviors/registry'
-import { displacePoint } from '../deformers/compose'
+import { displacePoint, stackAutoSegments, stackMinSegments } from '../deformers/compose'
 import { getDeformer, listDeformers } from '../deformers/registry'
 import type { DeformerInstance, SheetDims } from '../deformers/types'
 import { resolveSegments } from './sheet'
@@ -29,7 +29,8 @@ describe('quantizeSegments', () => {
     expect(quantizeSegments(13)).toBe(16)
     expect(quantizeSegments(25)).toBe(32)
     expect(quantizeSegments(65)).toBe(LEGACY_FLAT)
-    expect(quantizeSegments(100)).toBe(AUTO_CEILING)
+    expect(quantizeSegments(100)).toBe(128)
+    expect(quantizeSegments(130)).toBe(AUTO_CEILING)
   })
 
   it('clamps at the ceiling rather than growing without bound', () => {
@@ -127,13 +128,16 @@ function maxSagitta(stack: DeformerInstance[], sheet: SheetDims, segments: [numb
 
 const AS_SHEET = { ...SHEET, segments: 'auto', thickness: 0.2, cornerRadius: 0 } as const
 
-/** Grid `'auto'` resolves to for a single deformer carrying these options. */
+/**
+ * Grid `'auto'` resolves to for a single deformer carrying these options —
+ * through the same two helpers the renderers use, so what is measured here is
+ * the grid a sheet actually gets, projection included. Reading
+ * `autoSegments` directly instead would test the arithmetic and skip the part
+ * that turns it into a grid, which is where the axes are decided.
+ */
 function autoGridFor(type: string, options: Record<string, unknown>): [number, number] {
-  const deformer = getDeformer(type)
-  const want = deformer.geometry?.autoSegments
-    ? deformer.geometry.autoSegments(options as never, SHEET)
-    : (deformer.geometry?.minSegments ?? 0)
-  return resolveSegments(AS_SHEET, deformer.geometry?.minSegments ?? 2, want)
+  const stack = [{ type, options }]
+  return resolveSegments(AS_SHEET, stackMinSegments(stack, SHEET), stackAutoSegments(stack, SHEET))
 }
 
 /** The grid the old flat-72 `'auto'` would have produced for the same sheet. */

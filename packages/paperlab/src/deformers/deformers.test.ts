@@ -238,8 +238,23 @@ describe('compose', () => {
     expect(maxTilt).toBeGreaterThan(0.01)
   })
 
-  it('stackMinSegments takes the densest requirement', () => {
-    expect(stackMinSegments(bendFirst)).toBe(48) // roll wants 48, bend 16
-    expect(stackMinSegments([{ type: 'bend', options: {} }])).toBe(16)
+  it('stackMinSegments takes the densest requirement, on the axis that asks', () => {
+    const sheet = { width: 1, height: 1.4 }
+    // bend across x wants 16 and roll up y wants 48 — and they want them in
+    // different DIRECTIONS, so neither pays for the other's floor. The old
+    // answer was a single 48 spent on both axes.
+    const [x, y] = stackMinSegments(bendFirst, sheet)
+    expect(Math.round(x)).toBe(16)
+    expect(Math.round(y)).toBe(48)
+
+    // A bend asks nothing of the axis it does not bend.
+    const bendOnly = stackMinSegments([{ type: 'bend', options: { curvature: 0.6, angle: 0 } }], sheet)
+    expect(Math.round(bendOnly[0])).toBe(16)
+    expect(bendOnly[1]).toBe(2)
+
+    // An instance carrying no options cannot say which way it bends, so the
+    // floor is spread over both axes rather than dropped on one of them.
+    const unresolved = stackMinSegments([{ type: 'bend', options: {} }], sheet)
+    expect(Math.min(...unresolved)).toBeGreaterThan(2)
   })
 })

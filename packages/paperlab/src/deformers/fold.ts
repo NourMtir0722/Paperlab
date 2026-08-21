@@ -34,6 +34,7 @@ export const fold: Deformer<FoldOptions> = {
     // The crease is small, but the grid is uniform, so the density it needs
     // is the density the whole sheet gets.
     autoSegments: (o, sheet) => segmentsForArc(spanAlong(sheet, o.angle), o.radius),
+    axis: (o) => o.angle,
   },
   displace(out, _uv, o) {
     const phi = o.foldAngle * DEG
