@@ -18,8 +18,9 @@ import type {
 } from './config/schema'
 import { paperConfigSchema } from './config/schema'
 import { mergeConfig, parsePreset, serializePreset } from './config/serialize'
+import { computeSheetNormals } from './core/normals'
 import { createSheetGeometry, resolveSegments } from './core/sheet'
-import { FLAT_SEGMENTS } from './core/tessellation'
+import { FLAT_SEGMENTS, type SegmentPair } from './core/tessellation'
 import { getStock } from './core/stock'
 import { getPreset } from './config/presets'
 import { useContentTexture } from './content/texture'
@@ -225,10 +226,16 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   }, [behaviorKey, deformersKey, sheetKey, physicsKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the stack shape — the probe reads config off a ref.
-  const [minSegments, autoSegments] = useMemo((): [number, number] => {
+  const { minSegments, autoSegments, animatedStack } = useMemo(() => {
     const cfg = configRef.current
     const probe = buildStack(cfg, {})
-    if (!probe) return [2, FLAT_SEGMENTS]
+    if (!probe) {
+      return {
+        minSegments: [2, 2] as SegmentPair,
+        autoSegments: [FLAT_SEGMENTS, FLAT_SEGMENTS] as SegmentPair,
+        animatedStack: false,
+      }
+    }
 
     // The grid is built once; a behavior's stack is not the same shape all
     // the way through. An unroll is a tight roll at one end of its progress
@@ -237,15 +244,29 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     // Sample the sweep and keep the densest answer. Every behavior's
     // progressParam is a 0..1 number — pinned by behaviors.test.ts, because
     // this loop silently samples the wrong range if that ever stops holding.
-    let want = stackAutoSegments(probe, cfg.sheet)
+    //
+    // Whether the stack is TIME-DRIVEN is answered off the same sweep, and
+    // for the same reason: it is a property of the stack's shape, not of the
+    // moment it happens to be at, and the frame loop needs it before it has
+    // built anything — see `useFrame` below.
+    const want = stackAutoSegments(probe, cfg.sheet)
+    let animated = stackIsAnimated(probe)
     if (cfg.behavior && !cfg.deformers) {
       const param = getBehavior(cfg.behavior.type).progressParam
       for (const p of PROGRESS_SAMPLES) {
         const at = buildStack(cfg, { [param]: p })
-        if (at) want = Math.max(want, stackAutoSegments(at, cfg.sheet))
+        if (!at) continue
+        const [x, y] = stackAutoSegments(at, cfg.sheet)
+        if (x > want[0]) want[0] = x
+        if (y > want[1]) want[1] = y
+        animated ||= stackIsAnimated(at)
       }
     }
-    return [stackMinSegments(probe), want]
+    return {
+      minSegments: stackMinSegments(probe, cfg.sheet),
+      autoSegments: want,
+      animatedStack: animated,
+    }
   }, [behaviorKey, deformersKey, physicsKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the sheet — rebuilding geometry on identity would orphan GPU buffers every render.
@@ -428,20 +449,27 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         const position = geometry.attributes.position as THREE.BufferAttribute
         ;(position.array as Float32Array).set(sim.positions)
         position.needsUpdate = true
-        geometry.computeVertexNormals()
+        computeSheetNormals(geometry)
       }
       return
     }
 
     // Shape path: the deformer stack.
-    const stack = buildStack(cfg, overridesRef.current, behavior, now)
-    if (!stack) return
-    const animated = !reduced && stackIsAnimated(stack)
+    //
+    // Decide whether there is anything to do BEFORE building it. A resting
+    // sheet — no loop, no time-driven deformer, no transition, nothing
+    // dirtied — used to expand its whole stack every frame and throw it
+    // away, which is a behavior's `stack()` call and its deformer objects
+    // sixty times a second for a picture that does not move.
+    const animated = !reduced && animatedStack
     const hasLoop = !reduced && Boolean(cfg.behavior && behavior?.loop)
     // A state transition tweens numeric leaves off the React path, so the
     // stack must re-apply every frame while the machine is transitioning.
     const machineAnimating = Boolean(machineRef.current?.transitioning)
     if (!dirtyRef.current && !hasLoop && !animated && !machineAnimating) return
+
+    const stack = buildStack(cfg, overridesRef.current, behavior, now)
+    if (!stack) return
     dirtyRef.current = false
 
     const ctx = { t: now, sheet: cfg.sheet }

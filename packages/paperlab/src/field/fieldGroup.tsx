@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef } from 'react'
 import CustomShaderMaterial from 'three-custom-shader-material'
 import { getStock } from '../core/stock'
 import { createSheetGeometry } from '../core/sheet'
-import { LEGACY_FLAT_SEGMENTS } from '../core/tessellation'
 import { getBehavior } from '../behaviors/registry'
 import { stackAutoSegments, stackMinSegments } from '../deformers/compose'
+import type { SegmentPair } from '../core/tessellation'
 import type { DeformerInstance, SheetDims } from '../deformers/types'
 import type { AeroPose } from '../physics/aero'
 import { useContentAtlas } from '../content/atlas'
@@ -35,13 +35,21 @@ export const FIELD_SEGMENT_CAP = 48
 /**
  * Caps what `'auto'` may ASK for in a field, as distinct from the floor above.
  *
- * The old flat value, because that is what a field effectively always got:
- * `'auto'` handed out 72 and `FIELD_SEGMENT_CAP` never reached it. Holding it
- * there keeps field geometry exactly where it has always been while the hero
- * ceiling rises to 128 — and the asymmetry is the point, since a field draws
- * this buffer once per instance and sixty of them is the measured case.
+ * It used to sit at the old flat 72 on the grounds that a field draws this
+ * buffer once per instance — a real argument, made when nothing else could
+ * hold the count down. Two things changed. The demand now lands on the axis
+ * that bends rather than being spread over both, so a banner asking 128
+ * across asks 8 down and the buffer grows on one side only. And
+ * `segmentCeiling` gives the caller a working lever, which is what the
+ * quality tiers now use: `low` and `medium` cap themselves well below this
+ * line, so raising it only raises what a machine that measured fast enough
+ * is allowed to ask for.
+ *
+ * 128, matching what a hero sheet was allowed before the hero ceiling moved
+ * to 192. A field still asks for less than one sheet does, which is the
+ * asymmetry worth keeping.
  */
-const FIELD_AUTO_CEILING = LEGACY_FLAT_SEGMENTS
+export const FIELD_AUTO_CEILING = 128
 
 /** Mirrors the hero path's sweep sampling — see PaperMesh. */
 const PROGRESS_SAMPLES = [0, 0.25, 0.5, 0.75, 1] as const
@@ -70,12 +78,16 @@ export function FieldGroup({
   group,
   shared,
   onSelect,
+  segmentCeiling,
 }: {
   group: FieldGroupData
   shared: SharedMotion
   /** Called with the paper's GLOBAL index — a group only holds the slots that share its preset. */
   onSelect?: (paper: number) => void
+  /** Lowers what `'auto'` may ask for on this group's sheet. Never raises it. */
+  segmentCeiling?: number
 }) {
+  const autoCeiling = Math.min(segmentCeiling ?? FIELD_AUTO_CEILING, FIELD_AUTO_CEILING)
   const { config, indices, contents } = group
   const count = indices.length
   const stock = getStock(config.stock)
@@ -102,29 +114,32 @@ export function FieldGroup({
   )
   const structureKey = initialStack.map((i) => i.type).join('|')
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on sheet, stack structure and count — the only things that change the buffer.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on sheet, stack structure, count and the ceiling — the only things that change the buffer.
   const geometry = useMemo(() => {
+    const floor = stackMinSegments(initialStack, config.sheet)
+    // Same sweep-sampling as the hero path: one buffer serves every instance
+    // for the whole play, so it has to hold the densest moment of it, not the
+    // current one.
+    const want: SegmentPair = [0, 0]
+    for (const p of PROGRESS_SAMPLES) {
+      const [x, y] = stackAutoSegments(buildStackAt(p), config.sheet)
+      if (x > want[0]) want[0] = x
+      if (y > want[1]) want[1] = y
+    }
     const geo = createSheetGeometry(
       {
         ...config.sheet,
         segments:
           config.sheet.segments === 'auto' ? 'auto' : Math.min(config.sheet.segments, FIELD_SEGMENT_CAP),
       },
-      Math.min(stackMinSegments(initialStack), FIELD_SEGMENT_CAP),
-      // Same sweep-sampling as the hero path: one buffer serves every
-      // instance for the whole play, so it has to hold the densest moment of
-      // it, not the current one.
-      //
-      // Bounded by FIELD_AUTO_CEILING and NOT by FIELD_SEGMENT_CAP, which is
-      // a floor cap and stays one. Capping the target at 48 as well looked
-      // tidy and was a visual regression: it is the only thing that could
-      // have held `crumple` — whose creases have no target, only a floor of
-      // 72 — down to 48 in a field, which is coarser than the deformer says
-      // it needs to look like a crumple at all.
-      Math.min(
-        Math.max(...PROGRESS_SAMPLES.map((p) => stackAutoSegments(buildStackAt(p), config.sheet))),
-        FIELD_AUTO_CEILING,
-      ),
+      [Math.min(floor[0], FIELD_SEGMENT_CAP), Math.min(floor[1], FIELD_SEGMENT_CAP)],
+      // Bounded by the auto ceiling and NOT by FIELD_SEGMENT_CAP, which is a
+      // floor cap and stays one. Capping the target as well looked tidy and
+      // was a visual regression: it is the only thing that could have held
+      // `crumple` — whose creases have no target, only a floor of 72 — down
+      // to 48 in a field, which is coarser than the deformer says it needs to
+      // look like a crumple at all.
+      [Math.min(want[0], autoCeiling), Math.min(want[1], autoCeiling)],
     )
     const atlasIdx = new Float32Array(count)
     const phase = new Float32Array(count)
@@ -139,7 +154,7 @@ export function FieldGroup({
     // frame — how a single instanced draw call bends every sheet differently.
     geo.setAttribute('aBias', new THREE.InstancedBufferAttribute(bias, 1))
     return geo
-  }, [JSON.stringify(config.sheet), structureKey, count])
+  }, [JSON.stringify(config.sheet), structureKey, count, autoCeiling])
 
   // Imperatively created — R3F won't auto-dispose a geometry passed via args.
   useEffect(() => () => geometry.dispose(), [geometry])

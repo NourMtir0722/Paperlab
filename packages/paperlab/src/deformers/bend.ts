@@ -53,6 +53,7 @@ export const bend: Deformer<BendOptions> = {
     // this exactly. This is the deformer the old flat 72 over-served most:
     // at the default 0.6 it wants 24, and the field starter preset is a bend.
     autoSegments: (o, sheet) => segmentsForArc(spanAlong(sheet, o.angle), 1 / Math.abs(o.curvature)),
+    axis: (o) => o.angle,
   },
   displace(out, _uv, o) {
     if (Math.abs(o.curvature) < EPS) return

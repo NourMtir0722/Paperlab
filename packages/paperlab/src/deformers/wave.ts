@@ -41,6 +41,7 @@ export const wave: Deformer<WaveOptions> = {
         segmentsForSine(span, o.amplitude * 0.35, o.wavelength / 2.7),
       )
     },
+    axis: (o) => o.angle,
   },
   animated: true,
   displace(out, uv, o, ctx) {

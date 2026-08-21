@@ -44,6 +44,12 @@ export const curl: Deformer<CurlOptions> = {
     // the diagonal as `amount` rises. The diagonal is the span the arc can
     // reach across, and `radius` is its curvature throughout.
     autoSegments: (o, sheet) => segmentsForArc(Math.hypot(sheet.width, sheet.height), o.radius),
+    // The corner diagonal, plus whatever `skew` turns it by — the same
+    // direction `displace` builds below, and the one the wrap runs along.
+    axis: (o, sheet) => {
+      const [sx, sy] = CORNER_SIGNS[o.corner]
+      return Math.atan2(sy * sheet.height, sx * sheet.width) / DEG + o.skew
+    },
   },
   displace(out, _uv, o, ctx) {
     const [sx, sy] = CORNER_SIGNS[o.corner]

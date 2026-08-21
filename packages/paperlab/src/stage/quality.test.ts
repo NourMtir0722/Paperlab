@@ -8,6 +8,7 @@ import {
   qualityFor,
   qualityNames,
   qualityTiers,
+  settleTier,
   tierDown,
   tierUp,
   type QualityTier,
@@ -83,5 +84,65 @@ describe('how fast auto reacts', () => {
     expect(SETTLE_FRAMES).toBeGreaterThan(20)
     // But never so long that a second correction takes longer than the first.
     expect(SETTLE_FRAMES).toBeLessThan(STEADY_WINDOW)
+  })
+})
+
+describe('settleTier — the ladder can only settle', () => {
+  it('sinks when the floor is missed, and remembers what failed', () => {
+    expect(settleTier('high', 10, null)).toEqual({ tier: 'medium', failed: 'high' })
+    expect(settleTier('medium', 10, null)).toEqual({ tier: 'low', failed: 'medium' })
+  })
+
+  it('cannot sink below the bottom, and does not blame a tier it stayed on', () => {
+    expect(settleTier('low', 4, null)).toEqual({ tier: 'low', failed: null })
+  })
+
+  it('rises when there is headroom', () => {
+    expect(settleTier('low', 120, null)).toEqual({ tier: 'medium', failed: null })
+    expect(settleTier('medium', 120, null)).toEqual({ tier: 'high', failed: null })
+  })
+
+  it('holds still between the thresholds', () => {
+    for (const tier of ['low', 'medium', 'high'] as const) {
+      expect(settleTier(tier, 40, null)).toEqual({ tier, failed: null })
+    }
+  })
+
+  /**
+   * The one this function exists for. A machine where the next tier costs
+   * more than CEILING/FLOOR (~2.1×) satisfies "promote" at one tier and
+   * "demote" at the next, forever — and `high` really is 2.1× `medium` on a
+   * software rasterizer. Without the latch this walks up and down until the
+   * tab closes, changing the picture every few seconds.
+   */
+  it('never re-offers a tier that already failed', () => {
+    // Comfortable at medium, stalls at high — the pumping machine.
+    const fpsAt = (tier: QualityTier) => (tier === 'high' ? 20 : tier === 'medium' ? 60 : 90)
+
+    let tier: QualityTier = 'medium'
+    let failed: QualityTier | null = null
+    const visited: QualityTier[] = [tier]
+    for (let i = 0; i < 40; i++) {
+      const verdict = settleTier(tier, fpsAt(tier), failed)
+      failed = verdict.failed
+      if (verdict.tier !== tier) {
+        tier = verdict.tier
+        visited.push(tier)
+      }
+    }
+    // It is allowed to try `high` exactly once and fall back for good.
+    expect(visited).toEqual(['medium', 'high', 'medium'])
+    expect(tier).toBe('medium')
+  })
+
+  it('a machine that can hold the top stays there', () => {
+    let tier: QualityTier = INITIAL_TIER
+    let failed: QualityTier | null = null
+    for (let i = 0; i < 20; i++) {
+      const verdict = settleTier(tier, 120, failed)
+      failed = verdict.failed
+      tier = verdict.tier
+    }
+    expect(tier).toBe('high')
   })
 })

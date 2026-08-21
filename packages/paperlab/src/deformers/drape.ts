@@ -58,6 +58,10 @@ export const drape: Deformer<DrapeOptions> = {
         segmentsForSine(sheet.width, o.amplitude * 0.6 * o.irregular, lambda / 1.7),
       )
     },
+    // Across the width, always. `pinnedEdge` picks which end of the DROP the
+    // folds grow from; it never turns the folds themselves, which run with
+    // the drop and therefore vary across `uv.x`.
+    axis: () => 0,
   },
   displace(out, uv, o) {
     if (o.amplitude === 0) return

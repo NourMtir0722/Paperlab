@@ -9,7 +9,8 @@
  * probes per vertex for the normal. This is the harness that turns that from
  * an argument into a number.
  *
- *   pnpm perf:field           # native GPU
+ *   pnpm perf:field           # whatever Chromium picks (usually SwiftShader)
+ *   pnpm perf:field --gpu     # the real platform GPU
  *   pnpm perf:field --soft    # SwiftShader: the weak-machine floor
  */
 import { spawn } from 'node:child_process'
@@ -38,9 +39,38 @@ for (let i = 0; i < 60; i++) {
   }
 }
 
-const browser = await chromium.launch({
-  args: soft ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
-})
+/**
+ * Which renderer to ask for.
+ *
+ * The default was never a choice anyone made: bare headless Chromium hands
+ * out **SwiftShader**, its CPU rasterizer, and this harness used to label
+ * that "native GPU" because it was reporting the flag it had been given
+ * rather than the driver that answered. Every stage number this repo has
+ * ever recorded came from a software rasterizer.
+ *
+ * `--gpu` asks ANGLE for the platform backend and actually gets it, headless
+ * — Metal on macOS, and the equivalent elsewhere. Both are worth having:
+ * `--soft` is the weak-machine floor to design against, `--gpu` is what a
+ * visitor with a laptop will see. The line at the end of the run says which
+ * one answered, so a number can never be read as the other again.
+ */
+const renderer = process.argv.includes('--gpu')
+  ? [
+      '--use-angle=metal',
+      '--enable-gpu',
+      '--ignore-gpu-blocklist',
+      // Without these the frame time IS the refresh interval and every case
+      // reads 8.3 ms on a 120 Hz panel, which measures the display rather
+      // than the scene. Uncapped, the number is what the frame actually
+      // costs — which is the only form of it worth comparing anything to.
+      '--disable-gpu-vsync',
+      '--disable-frame-rate-limit',
+    ]
+  : soft
+    ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+    : []
+
+const browser = await chromium.launch({ args: renderer })
 
 // photo-print is the field starter (a bend, 16 segments); crumpled-note is the
 // new expensive one (72). Same layout and counts, so the difference is the
@@ -58,7 +88,7 @@ const CASES = [
 ]
 
 console.log(
-  `requested: ${soft ? 'swiftshader (CPU — weak-machine floor)' : 'default (whatever Chromium picks)'}\n`,
+  `requested: ${process.argv.includes('--gpu') ? 'the platform GPU' : soft ? 'swiftshader (CPU — weak-machine floor)' : 'default (whatever Chromium picks — usually SwiftShader)'}\n`,
 )
 console.log(
   'case'.padEnd(30),

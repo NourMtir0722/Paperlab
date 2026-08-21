@@ -6,7 +6,7 @@
 > sells the product, `AGENTS.md` documents the API, and this file explains the
 > *intent* behind both.
 >
-> Last updated 2026-08-13 · library at `0.2.0`, published
+> Last updated 2026-08-21 · library at `0.2.0`, published
 
 ---
 
@@ -48,7 +48,7 @@ If a feature can't serialize into a preset, it doesn't ship.
 - **13 paper presets**, **5 stage presets**, **7 stocks**.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **460 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+- **508 tests** + a 37-case GPU/CPU parity gate, all green in CI.
 
 ---
 
@@ -368,6 +368,195 @@ hero ceiling rises to 128. The asymmetry is the point: a field draws that
 buffer once per instance. **The lesson worth keeping is that "make the
 existing policy actually apply" is not automatically a fix** — a cap nobody
 had ever felt is a cap nobody had ever validated.
+
+### ~~A grid is one number, and a sheet has two directions~~ — *done, 2026-08-21*
+
+A performance pass that turned into a correctness one. Three findings, in the
+order they were measured.
+
+**1. `segments: 'auto'` asked along the direction a deformer curves and then
+spread the answer by aspect ratio.** `segmentsForArc(spanAlong(sheet, angle),
+r)` has always meant "this many segments along `angle`" — and `resolveSegments`
+threw the direction away, distributed the number over the long edge, and gave
+the short edge the remainder. On a square-ish sheet nobody could see it. On a
+banner it is the whole picture: the stage's 1.5 × 8.5 banner is draped in folds
+that run across its **width**, the arithmetic asks for 133 segments across, and
+what it got was 48 across and 48 down a drop that needs eight.
+
+A deformer now declares `geometry.axis(options, sheet)` beside its floor and
+its target, and `axialSegments` projects the demand onto the sheet's two axes
+by it (`width·|cos θ|·density`, `height·|sin θ|·density`). `stackMinSegments`
+and `stackAutoSegments` return a pair; `resolveSegments` takes one. A bare
+number still means what it always meant, so the exported helper answers an
+unchanged call unchanged. `crumple` returns `null` — its creases run every way
+at once — and keeps the aspect spread, which for it is the honest answer.
+
+Every preset, before → after, with the chord error the faceting test measures:
+
+| preset | grid | triangles | sagitta |
+| --- | --- | --- | --- |
+| `receipt-unroll` | 49×128 → 8×128 | 12,544 → 2,048 | unchanged |
+| `letter-fold` | 91×128 → 8×128 | 23,296 → 2,048 | unchanged |
+| `hanging-poster` | 91×128 → 24×96 | 23,296 → 4,608 | 2.8e-4 → 4.8e-4 |
+| `page-flip` | 48×48 → 48×8 | 4,608 → 768 | unchanged |
+| `photo-print` | 16×16 → 16×8 | 512 → 256 | unchanged |
+| `postage-stamp` | 53×64 → 24×32 | 6,784 → 1,536 | unchanged |
+| the stage banner | 48×128 → 128×8 | 12,288 → 2,048 | **5.3e-3 → 7.7e-4** |
+
+The banner row is the one to read: six times fewer triangles **and seven times
+less faceting**, because the density finally lands on the axis that bends.
+Verified by rendering all six hero presets and both stage presets before and
+after — indistinguishable.
+
+**2. The quality tier's `segments` did nothing.** `<PaperStage>` wrote it
+straight over the sheet's `segments` as a number. A number applies to both
+axes; field mode caps it at `FIELD_SEGMENT_CAP` on the way down; and
+`drape`'s floor of 48 raised it back on the way up. So `low`, `medium` and
+`high` all drew the identical 48 × 48 banner — measured at 143,644 triangles
+per frame whatever the tier said, while the file describing it called
+subdivision "the biggest single cost and the easiest to scale". It is now a
+`segmentCeiling` on what `'auto'` may ask for, which can lower the grid and
+never raise it.
+
+**3. The hero re-deform loop was half normals and half lookups.** Measured on
+one `drape + wave` sheet at the 128 ceiling: 2.30 ms a frame, of which 1.44 ms
+was `BufferGeometry.computeVertexNormals()`. `core/normals.ts` does the same
+arithmetic over the typed arrays and is **bit-identical** to three's answer —
+`core/normals.test.ts` asserts exact equality, not a tolerance — at about an
+eighth of the cost. The deformer loop itself now runs one deformer over every
+vertex rather than every deformer over one vertex, which puts a single
+function behind the inner call site instead of a registry lookup and a
+megamorphic call per vertex per deformer.
+
+| grid | verts | was | now |
+| ---: | ---: | ---: | ---: |
+| 72 | 3,796 | 0.74 ms | 0.27 ms |
+| 128 | 11,868 | 2.30 ms | 0.84 ms |
+| 192 | 26,634 | 5.01 ms | 1.89 ms |
+| 256 | 47,288 | 8.74 ms | 3.38 ms |
+
+**What it bought, end to end** (`pnpm perf`):
+
+| case | before | after |
+| --- | --- | --- |
+| nave, `high` | 86.8 ms · 12 fps | 79.1 ms · 13 fps |
+| nave, `medium` | 65.8 ms · 15 fps | 51.0 ms · 20 fps |
+| nave, `low` | 36.2 ms · 28 fps | 26.1 ms · 38 fps |
+| archive (44 banners), `low` | 34.4 ms · 29 fps | 26.0 ms · 38 fps |
+
+`high` barely moves because its ceiling keeps 72 across the folds and its
+frame is dominated by the contact-shadow pass and dpr 2, neither of which this
+touched.
+
+**Read those as a software-rasterizer floor, not as frame rates.** `pnpm perf`
+printed `renderer: native GPU` whenever `--soft` was absent — and it was
+printing the flag it had been given, not the driver that answered. Asked
+properly (`WEBGL_debug_renderer_info`, which `pnpm perf:field` had been
+reporting all along), headless Chromium draws those cases through
+**ANGLE/SwiftShader** whether `--soft` is passed or not. Both harnesses now
+print what actually drew the frame.
+
+### …and then it ran on a GPU, which answered two of the three
+
+`--use-angle=metal --enable-gpu --ignore-gpu-blocklist` gets the real platform
+renderer in headless Chromium. **`pnpm perf --gpu` / `pnpm perf:field --gpu`
+now do that**, which closes a gap this file has carried since stage mode
+landed: *nobody has ever run this on a real GPU.* Somebody has now.
+
+On an Apple M4 Pro, every tier of every stage preset pins to the panel:
+
+| load | frame | fps |
+| --- | --- | --- |
+| nave, `high`, 1280×800 | 8.3 ms | 120 (vsync) |
+| nave, `high`, 2560×1600 at dpr 2 — **16 megapixels** | 8.3 ms | 120 (vsync) |
+| archive, `high`, **120 banners** at 16 MPix | 8.4 ms | 119 |
+
+Uncapped (`--disable-gpu-vsync`) the frame loop costs **0.1–0.3 ms**, which is
+the JS side: the GPU never backpressures rAF, so the harness cannot resolve
+the GPU cost at all. That is the finding. **The stage is not GPU-bound on real
+hardware, by a margin too wide to measure this way.** `quality=auto` settles
+on `high` there, where on SwiftShader it sinks to `low` — the ladder is doing
+exactly its job.
+
+Which retires two of the three open questions above, and it is worth being
+plain that both were **artifacts of the rasterizer, not properties of the
+scene**:
+
+- ~~*A grid of slivers rasterizes worse than a grid of squares*~~ — 30% of a
+  SwiftShader frame, and nothing measurable on Metal. Real: the shape still
+  matters for the machines `low` exists for. Not real: as a reason to change
+  how the grid is chosen.
+- ~~*The studio environment map is a third of the stage frame*~~ — same
+  story. A prefiltered cube lookup is exactly what a software rasterizer
+  punishes and a GPU does not notice. **Do not spend a week on it.**
+
+The honest shape of the whole thing: SwiftShader is the weak-machine floor and
+worth designing against, but it over-reports fragment work by enough that
+optimising *for it* would have bought nothing for anyone with a GPU. Anything
+this file records from `pnpm perf` without `--gpu` should be read that way,
+including everything above the line.
+
+**Three things this leaves open, all measured rather than suspected:**
+
+- ~~**A grid of slivers rasterizes worse than a grid of squares.**~~
+  **Closed by the GPU run.** On SwiftShader, holding the triangle count
+  *identical* and only swapping which axis carries the density costs 30% of
+  the frame (48 × 8 → 51.0 ms, 8 × 48 → 36.0 ms). On Metal it is not
+  measurable. Kept here because it is true of the rasterizer `low` is aimed
+  at, and because "same triangle count, different cost" is worth knowing —
+  but it is not a reason to choose the grid differently.
+- ~~**The `AUTO_CEILING` of 128 is now cheap enough to raise.**~~ **Raised,
+  and so were the two ceilings under it.** The measurement that decided it:
+  after the axis split, *no shipped preset reaches even 128*, so the ceiling
+  had stopped binding anything the library hands out — it only bound people
+  asking for a tighter crease than any preset uses (`drape` at its own
+  defaults wants 154, `roll`/`fold` at `radius: 0.02` want 175, `curl` at
+  0.02 wants 142). And because a demand now lands on one axis, satisfying
+  them costs ~0.02 ms rather than the 1.89 ms a square 192 grid implies.
+
+  Three numbers moved:
+
+  | | was | now | who feels it |
+  | --- | --- | --- | --- |
+  | `AUTO_CEILING` (hero) | 128 | **192** | hand-authored tight creases. No preset changes. |
+  | `FIELD_AUTO_CEILING` | 72 | **128** | only a field with no `segmentCeiling`; the tiers cap themselves lower. |
+  | `qualityTiers.high.segments` | 72 | **128** | the stage's folds, on machines that measured fast enough to earn them. |
+
+  The third is the one you can see. A banner's drape asks for 133 across and
+  had been getting 72 for every version of this file; at `high` it now gets
+  128, and the sagitta on a banner goes 2e-3 → 7.7e-4 — the difference
+  between fold highlights that step and fold highlights that roll.
+
+  **What makes this safe rather than brave** is that the tier ladder is now a
+  working lever, which it was not when 72 was chosen: `medium` (48) and `low`
+  (28) cap themselves well under the new line and measure *identically* to
+  before — 51.9 ms and 27.9 ms on SwiftShader, unchanged. Explicit `high`
+  there costs 109 ms, up from 79, and no machine that cannot hold it is ever
+  promoted to it. `quality=auto` still settles `low` on SwiftShader and
+  `high` on Metal. Field presets are unaffected to the triangle
+  (`pnpm perf:field` before and after: 34.5/69.2/219.0 ms against
+  34.6/69.0/217.4).
+
+  Still capped, and still honest: `wave` at `amplitude: 0.3` wants 272 and a
+  16-fold `drape` at full depth wants 1377. `segments: <number>` remains the
+  way past.
+
+- **The quality ladder could pump, and now cannot.** Found while raising
+  `high`: promotion needs 55 fps and demotion fires under 26, so any machine
+  where the next tier up costs more than ~2.1× the current one satisfies both
+  conditions forever — rising until it stalls, sinking until it is
+  comfortable, changing the picture every few seconds. Not hypothetical:
+  `high` measures 2.1× `medium` on a software rasterizer, and raising `high`
+  is what put it there. The policy is now a pure `settleTier(tier, fps,
+  failed)` in `quality.ts` — testable rather than watchable — and **a tier
+  that has once failed is never offered again**, so the ladder can try the
+  top exactly once and settle. The comment always said "a machine that cannot
+  hold the floor should sink once and stay"; it is enforced now instead of
+  hoped for.
+- ~~**The studio environment map is a third of the stage frame.**~~
+  **Closed by the GPU run.** 51.0 ms with it and 32.7 ms without at `medium`
+  on SwiftShader; free on Metal. `low` already drops it for a hemisphere
+  stand-in, and that is the whole of what needs doing about it.
 
 ### 4. Smaller things worth doing
 

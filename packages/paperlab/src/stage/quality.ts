@@ -9,20 +9,31 @@
  * link. Two people opening the same link should see the same scene at
  * whatever fidelity their hardware can hold.
  *
- * The four knobs, in the order they actually cost:
+ * The five knobs, in the order they actually cost:
  *
- * - `segments` — subdivisions along a banner's long edge. Quadratic: every
- *   sheet is a grid, so halving this quarters the vertex work.
+ * - `segments` — a CEILING on what `segments: 'auto'` may ask for along the
+ *   direction a banner's folds run. Quadratic in principle, though a
+ *   deformer's own floor holds the bottom: `drape` states it needs 48 across
+ *   its folds, so `low` cannot take the banners below that and should not.
+ *
+ *   It used to be written straight over the sheet's `segments` as a number,
+ *   and that made it **do nothing at all**. A number applies to BOTH axes,
+ *   the field caps it at 48 on the way down, and the deformer floor raised
+ *   it back to 48 on the way up — so every tier drew the identical 48 × 48
+ *   banner. Measured before the fix: 143,644 triangles at `medium` whatever
+ *   the tier said. Worth remembering as a shape of bug — a knob nobody had
+ *   measured, in the file that exists to describe what things cost.
  * - `shadowMapSize` — the shadow pass re-renders the scene's geometry. 0
  *   turns shadows off, which on a weak machine is the difference between
  *   moving and not.
  * - `dpr` — fragment cost scales with the square of it, and this scene is
  *   fragment-heavy (translucency, fog, a full-screen backdrop).
- * - `surround` — one more full-screen draw; cheap, but free to drop.
  * - `environment` — the studio light. One prefiltered cube built once, then
- *   a texture read per fragment for every lit surface in the scene. Cheap on
- *   anything with a GPU and not free on a software rasterizer, so the bottom
- *   tier falls back to the flat ambient it replaced.
+ *   a texture read per fragment for every lit surface in the scene. Measured
+ *   at a third of the frame at `medium` (51 ms → 33 ms with it off), which
+ *   makes it the most expensive single thing here after the geometry, so the
+ *   bottom tier falls back to the flat ambient it replaced.
+ * - `surround` — one more full-screen draw; cheap, but free to drop.
  */
 
 export const qualityNames = ['auto', 'low', 'medium', 'high'] as const
@@ -45,8 +56,23 @@ export interface QualitySettings {
 }
 
 export const qualityTiers: Record<QualityTier, QualitySettings> = {
-  /** Anything with a GPU. */
-  high: { dpr: 2, shadowMapSize: 2048, segments: 72, surround: true, contactShadow: true, environment: true },
+  /**
+   * Anything with a GPU — and measured to mean it, since `auto` only arrives
+   * here after holding 55 fps. `segments: 128` is where the banners' folds
+   * actually resolve: the drape asks for 133 across and spent every previous
+   * version of this file getting 72, which is the difference between paper
+   * that bends and paper with facets. Free on hardware — an M4 Pro holds 120
+   * banners at 16 megapixels on the panel's own clock — and unreachable on
+   * anything that cannot, because the ladder never promotes a machine there.
+   */
+  high: {
+    dpr: 2,
+    shadowMapSize: 2048,
+    segments: 128,
+    surround: true,
+    contactShadow: true,
+    environment: true,
+  },
   /** The default worth aiming at: an integrated laptop GPU from the last few years. */
   medium: {
     dpr: 1.5,
@@ -96,4 +122,41 @@ export function tierUp(tier: QualityTier): QualityTier {
 /** One step worse, or the same tier if already at the bottom. */
 export function tierDown(tier: QualityTier): QualityTier {
   return TIER_ORDER[Math.max(TIER_ORDER.indexOf(tier) - 1, 0)]!
+}
+
+/** Below this, step down. Above the upper one, step up. */
+export const FLOOR_FPS = 26
+export const CEILING_FPS = 55
+
+export interface TierVerdict {
+  /** Where to go. Equal to `tier` when nothing should move. */
+  tier: QualityTier
+  /** The lowest tier now known to be too expensive here — carry it forward. */
+  failed: QualityTier | null
+}
+
+/**
+ * One verdict from one frame-rate reading: the whole of `auto`'s policy,
+ * pulled out of the component so it can be tested rather than watched.
+ *
+ * `failed` is what keeps the ladder from pumping. The two thresholds cannot
+ * do it alone: promotion asks for 55 fps and demotion fires below 26, so any
+ * machine where the next tier up costs more than ~2.1× the current one
+ * satisfies both conditions forever — rising until it stalls, sinking until
+ * it is comfortable, and visibly changing the picture every few seconds. That
+ * ratio is real: `high` measures 2.1× `medium` on a software rasterizer,
+ * which is precisely the hardware this exists for. So a tier that has once
+ * failed is never offered again, and the scene can only ever settle.
+ */
+export function settleTier(tier: QualityTier, fps: number, failed: QualityTier | null): TierVerdict {
+  if (fps < FLOOR_FPS) {
+    const next = tierDown(tier)
+    // What we were just running is what could not be held.
+    return next === tier ? { tier, failed } : { tier: next, failed: tier }
+  }
+  if (fps > CEILING_FPS) {
+    const next = tierUp(tier)
+    if (next !== tier && next !== failed) return { tier: next, failed }
+  }
+  return { tier, failed }
 }

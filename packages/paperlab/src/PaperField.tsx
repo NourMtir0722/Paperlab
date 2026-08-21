@@ -78,6 +78,15 @@ export interface PaperFieldMeshProps {
   onPlace?(paper: PlacedPaper, zone: string): void
   /** Imperative controls for the hidden keyboard flow (wired by PaperField). */
   a11yControllerRef?: React.MutableRefObject<FieldA11yController | null>
+  /**
+   * Lowers what `segments: 'auto'` may ask for, per sheet. A DEVICE knob, in
+   * the same sense `<PaperStage>`'s `quality` is one: it describes what the
+   * machine can draw, never what the artwork is, so it does not serialize
+   * into a preset or a share link. It can only ever lower the field's own
+   * ceiling; nothing here can subdivide a sheet further than the library
+   * would on its own.
+   */
+  segmentCeiling?: number
 }
 
 export interface PaperFieldProps extends PaperFieldMeshProps {
@@ -230,6 +239,7 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
             group={group}
             shared={shared}
             onSelect={props.onSelect}
+            segmentCeiling={props.segmentCeiling}
           />
         ))}
       </group>
