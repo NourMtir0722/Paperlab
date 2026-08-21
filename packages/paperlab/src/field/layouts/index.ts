@@ -38,6 +38,16 @@ export interface Layout<O = Record<string, unknown>> {
    * and a layout that ignores it may simply omit the parameter.
    */
   pose(i: number, n: number, o: O, phase: number, sheet: SheetDims): PaperPose
+  /**
+   * Where along a walk this layout put each paper, as normalized arc length,
+   * in the layout's own index order.
+   *
+   * Only layouts that arrange along a PATH can answer, which is why it is
+   * optional. Stage mode uses it to let a viewer step from one paper to the
+   * next: the stops have to be where the paper actually is, and the only
+   * thing that knows that is the function that placed it.
+   */
+  walkStops?(n: number, o: O): number[]
 }
 
 /** For the odd caller that has no papers yet to measure. */
@@ -450,19 +460,35 @@ const colonnadeSchema = z.object({
  * ahead of you presents its face, which is the whole reason to print
  * anything on it.
  */
+/**
+ * How far along the walk banner `i` stands, before any phase offset.
+ *
+ * Pulled out of `pose` because two things now need it and they must not
+ * disagree: the banner is PLACED here, and stage mode STOPS here when the
+ * viewer steps from one paper to the next. A stop that is not where the
+ * paper is would be a navigation that misses everything it aims at.
+ */
+export function colonnadeStop(i: number, n: number, margin: number): number {
+  const side = i % 2 === 0 ? 1 : -1
+  const pairs = Math.max(Math.ceil(n / 2), 1)
+  const k = Math.floor(i / 2)
+  const span = 1 - margin * 2
+  const step = pairs > 1 ? span / (pairs - 1) : 0
+  return margin + (pairs > 1 ? k * step : span / 2) + side * step * 0.25
+}
+
 export const colonnade: Layout<z.infer<typeof colonnadeSchema>> = {
   id: 'colonnade',
   label: 'Colonnade',
   defaults: colonnadeSchema.parse({}),
   optionsSchema: colonnadeSchema,
+  walkStops(n, o) {
+    return Array.from({ length: n }, (_, i) => colonnadeStop(i, n, o.margin))
+  },
   pose(i, n, o, phase, sheet) {
     const path = getWalkPath(o.path)
     const side = i % 2 === 0 ? 1 : -1
-    const pairs = Math.max(Math.ceil(n / 2), 1)
-    const k = Math.floor(i / 2)
-    const span = 1 - o.margin * 2
-    const step = pairs > 1 ? span / (pairs - 1) : 0
-    const base = o.margin + (pairs > 1 ? k * step : span / 2) + side * step * 0.25
+    const base = colonnadeStop(i, n, o.margin)
     // Only a closed walk can slide: on an open one, offsetting by phase would
     // teleport the far banner back to the near end mid-shot.
     const s = path.closed ? base + phase : base

@@ -62,8 +62,20 @@ export interface SharedMotion {
   reduced: boolean
 }
 
+/** Opting a mesh out of raycasting entirely — cheaper than testing and discarding. */
+const NO_RAYCAST = () => {}
+
 /** One instanced mesh: one preset's sheet/stock/behavior across its slots. */
-export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: SharedMotion }) {
+export function FieldGroup({
+  group,
+  shared,
+  onSelect,
+}: {
+  group: FieldGroupData
+  shared: SharedMotion
+  /** Called with the paper's GLOBAL index — a group only holds the slots that share its preset. */
+  onSelect?: (paper: number) => void
+}) {
   const { config, indices, contents } = group
   const count = indices.length
   const stock = getStock(config.stock)
@@ -286,12 +298,32 @@ export function FieldGroup({ group, shared }: { group: FieldGroupData; shared: S
   })
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: An R3F <instancedMesh> is a three.js object, not a DOM node — it has no role to give and no keyboard to receive. The keyboard route into the same action is on the canvas, which `useWalk` makes focusable and drives with the arrow keys.
     <instancedMesh
       ref={meshRef}
       args={[geometry, undefined, count]}
       frustumCulled={false}
       castShadow
       receiveShadow
+      // Only raycastable when somebody is listening: hit-testing an instanced
+      // mesh is per-instance work on every pointer move, and this is the mode
+      // that puts hundreds of instances on screen at once. Spread rather than
+      // `raycast={undefined}`, which does not mean "leave the default" — it
+      // assigns undefined over the method three is about to call.
+      {...(onSelect ? {} : { raycast: NO_RAYCAST })}
+      onClick={
+        onSelect &&
+        ((event) => {
+          if (event.instanceId === undefined) return
+          // `instanceId` counts within THIS group; the layout — and anything
+          // that wants to know which paper was clicked — counts across all of
+          // them, so the group's own index list is the translation.
+          const paper = indices[event.instanceId]
+          if (paper === undefined) return
+          event.stopPropagation()
+          onSelect(paper)
+        })
+      }
     >
       <CustomShaderMaterial
         key={`${structureKey}:${count}`}

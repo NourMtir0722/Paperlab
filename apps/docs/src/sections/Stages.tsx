@@ -26,10 +26,11 @@ export function Stages() {
     <section id="stages">
       <h2>Stages</h2>
       <p className="lede">
-        <code>&lt;PaperStage&gt;</code> builds a space out of paper: banners hung along a walk, with a figure
-        walking down it. Bind <code>progress</code> to scroll and the page scrolls the walk. The load-bearing
-        invariant is that <strong>every part reads the same walk</strong> — the layout arranges along it, the
-        figure follows it, the camera is stationed on it, and the light stands at the end of it.
+        Drag any of them to walk it yourself, or click one into focus and step banner to banner with the arrow
+        keys. <code>&lt;PaperStage&gt;</code> builds a space out of paper: banners hung along a walk, with a
+        figure walking down it. Bind <code>progress</code> to scroll and the page scrolls the walk. The
+        load-bearing invariant is that <strong>every part reads the same walk</strong> — the layout arranges
+        along it, the figure follows it, the camera is stationed on it, and the light stands at the end of it.
       </p>
 
       <div className="grid pair">
@@ -45,6 +46,10 @@ export function Stages() {
                   preset={preset.paper}
                   text={preset.text}
                   count={preset.count}
+                  // Draggable and arrow-steppable, but it does not take the
+                  // wheel: five of these sit in a scrolling column, and a card
+                  // that eats a reader's scroll on the way past is hostile.
+                  motion={{ capture: false }}
                 />
               </LiveOnDemand>
               <h3>{id}</h3>

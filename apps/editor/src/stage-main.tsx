@@ -12,7 +12,7 @@ import { PaperStage, getStagePreset, type ShotName } from 'paperlab'
 
 declare global {
   interface Window {
-    __STAGE__?: { ready: boolean; errors: string[] }
+    __STAGE__?: { ready: boolean; errors: string[]; walk?: number; visited?: number }
     __PERF__?: { frames: number[]; done: boolean; tier?: string }
   }
 }
@@ -81,7 +81,16 @@ createRoot(document.getElementById('root')!).render(
     preset={tuned}
     layout={preset.layout}
     layoutOptions={preset.layoutOptions}
-    progress={num('progress', 0.42)}
+    // Pinned by default so a shot is the same frame on any machine. `?drive=1`
+    // lets go of it, which is the only way anything can exercise the viewer
+    // driving the walk — a controlled stage never listens.
+    progress={has('drive') ? undefined : num('progress', 0.42)}
+    onProgress={(walk) => {
+      window.__STAGE__!.walk = walk
+    }}
+    onVisit={(paper) => {
+      window.__STAGE__!.visited = paper
+    }}
     // Forced off so a shot is deterministic wherever it runs — and forceable
     // ON, because the reduced-motion scene is a thing we ship and nothing
     // could look at it: `?reduced=1` freezes the walk and stands the figure.

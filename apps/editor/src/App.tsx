@@ -401,13 +401,18 @@ export function App() {
             max={1}
             step={0.001}
             value={stage.progress}
-            disabled={stage.playing}
-            onChange={(e) => patchStage({ progress: Number(e.target.value) })}
+            // Touching it takes the walk, rather than being locked out until
+            // you have found the pause button — the Paper tab's timeline has
+            // always worked this way and there was no reason this one did not.
+            onPointerDown={() => patchStage({ playing: false })}
+            onChange={(e) => patchStage({ progress: Number(e.target.value), playing: false })}
             aria-label="Distance along the walk"
           />
           <span className="transport-hint">
-            {stage.playing ? 'walking' : `${Math.round(stage.progress * 100)}% along the walk`} ·{' '}
-            {stage.count} banners · quality{' '}
+            {stage.playing
+              ? 'walking · drag the scene to walk it yourself'
+              : `${Math.round(stage.progress * 100)}% along the walk`}{' '}
+            · {stage.count} banners · quality{' '}
             {stage.quality === 'auto' ? `auto → ${stage.settled ?? '…'}` : stage.quality}
           </span>
         </footer>

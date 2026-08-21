@@ -164,6 +164,15 @@ textarea::placeholder {
   max-width: 340px;
 }
 
+/* The one instruction the mode needs. It is not obvious that a rendered
+   scene can be grabbed, and nobody discovers an arrow key by accident. */
+.walkhint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(242, 237, 230, 0.5);
+}
+
 .chip {
   padding: 6px 13px;
   font-size: 12px;

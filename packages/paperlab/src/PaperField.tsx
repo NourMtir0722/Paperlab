@@ -65,6 +65,13 @@ export interface PaperFieldMeshProps {
   interactive?: boolean
   /** Fires when any slot's state machine changes state. */
   onSlotStateChange?(slot: number, state: string): void
+  /**
+   * Fires with a paper's index when it is clicked. Supplying it is what makes
+   * the papers pickable — without a handler nothing raycasts, which matters
+   * because hit-testing an instanced mesh is per-instance work on a pointer
+   * move and a field is the mode with hundreds of instances in it.
+   */
+  onSelect?(paper: number): void
   /** Serialized drop zones (the editor's path); `<DropZone>` children also work. */
   zones?: DropZoneConfig[]
   /** Fires when a picked paper settles into any zone. */
@@ -217,8 +224,13 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
       <group ref={ref}>
         {sheetOptions?.backing && <BackingSheet options={sheetOptions} count={total} removed={EMPTY_SET} />}
         {groups.map((group, gi) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: groups are derived from the slot list in order, so position is their only identity.
-          <FieldGroup key={`${gi}:${group.indices.length}`} group={group} shared={shared} />
+          <FieldGroup
+            // biome-ignore lint/suspicious/noArrayIndexKey: groups are derived from the slot list in order, so position is their only identity.
+            key={`${gi}:${group.indices.length}`}
+            group={group}
+            shared={shared}
+            onSelect={props.onSelect}
+          />
         ))}
       </group>
     )

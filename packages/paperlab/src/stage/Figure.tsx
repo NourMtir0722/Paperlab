@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RiggedFigure } from './RiggedFigure'
 import { usePrefersReducedMotion } from '../a11y'
@@ -26,6 +26,19 @@ export interface FigureProps {
    * figure's own speed; supply it to drive the walk from scroll or a timeline.
    */
   distance?: number
+  /**
+   * The scene's live walk, normalized, shared by reference — and the length
+   * to measure it against. Outranks `distance`.
+   *
+   * A ref rather than a prop because the viewer can now drive the walk, and
+   * that number changes every frame: re-rendering a loaded skeleton sixty
+   * times a second to tell it a float is the most expensive way to say
+   * anything in React. `<PaperStage>` hands the SAME ref to the camera, which
+   * is what stops the figure and the shot from disagreeing about where along
+   * the walk we are.
+   */
+  distanceRef?: RefObject<number>
+  walkLength?: number
   /** Freeze the gait (also forced by `prefers-reduced-motion`). */
   frozen?: boolean
 }
@@ -42,7 +55,7 @@ function Segment({ length, radius, material }: { length: number; radius: number;
   )
 }
 
-export function Figure({ path, figure, distance, frozen }: FigureProps) {
+export function Figure({ path, figure, distance, distanceRef, walkLength, frozen }: FigureProps) {
   const reducedMotion = usePrefersReducedMotion()
   const still = frozen ?? reducedMotion
 
@@ -81,7 +94,10 @@ export function Figure({ path, figure, distance, frozen }: FigureProps) {
   useFrame((state) => {
     // A frozen figure still stands wherever `distance` puts it — it stops
     // stepping, it does not teleport to the start of the walk.
-    const walked = distance ?? (still ? 0 : state.clock.elapsedTime * options.speed)
+    const walked =
+      distanceRef !== undefined
+        ? distanceRef.current * (walkLength ?? walk.length)
+        : (distance ?? (still ? 0 : state.clock.elapsedTime * options.speed))
     walkedRef.current = walked
     const { position, yaw, pose } = placeFigure(walk, walked, options)
 

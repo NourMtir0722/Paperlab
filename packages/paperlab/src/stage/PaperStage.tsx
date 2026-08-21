@@ -16,6 +16,8 @@ import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
+import { stageMotionSchema, type StageMotionInput } from './navigate'
+import { useWalk } from './useWalk'
 import {
   FIRST_WINDOW,
   INITIAL_TIER,
@@ -69,9 +71,28 @@ export interface PaperStageSceneProps {
   count?: number
   /**
    * How far along the walk the figure is, 0..1. Bind it to scroll and the
-   * page scrolls the walk. Omit and it walks on the clock at its own speed.
+   * page scrolls the walk. Omit and `motion` decides who drives.
+   *
+   * Supplying it makes the stage a CONTROLLED component and outranks
+   * `motion` entirely — a driver and a page both writing the same number is
+   * a fight, not a feature.
    */
   progress?: number
+  /**
+   * Who drives the walk when `progress` does not: `drag` hands it to the
+   * viewer (pointer, wheel, arrow keys, clicking a paper), `autoplay` to the
+   * clock, `none` to nobody. Same contract as a field's `motion`.
+   */
+  motion?: StageMotionInput
+  /** Fires when the viewer moves to a paper — by clicking it, or by stepping onto it. */
+  onVisit?(paper: number): void
+  /**
+   * The live position on the walk, 0..1, every frame it changes — whoever is
+   * driving. Mirror it into an uncontrolled input to show a scrubber that
+   * follows the walk without re-rendering the scene sixty times a second;
+   * `<PaperMesh>`'s `onProgress` is the same affordance for a behavior.
+   */
+  onProgress?(walk: number): void
   reducedMotion?: boolean
   /**
    * How much the render is allowed to cost. `auto` (the default) starts in
@@ -128,17 +149,23 @@ export function bannerTextSize(lines: number): number {
   return Math.round(Math.min(150, Math.max(26, 720 / Math.max(lines, 1))))
 }
 
-/** The walk drives the camera; nothing else is allowed to move it. */
+/**
+ * The walk drives the camera; nothing else is allowed to move it.
+ *
+ * Including the viewer. Dragging moves you ALONG the walk — it does not orbit
+ * and it does not look around, because a camera the viewer can aim is a
+ * camera that can be aimed at the back of the room, and this mode is a
+ * composed shot rather than a scene you inspect.
+ */
 function ShotRig({
   stage,
   paperHeight,
-  progress,
-  still,
+  walk,
 }: {
   stage: StageConfig
   paperHeight: number
-  progress?: number
-  still: boolean
+  /** Normalized position on the walk, live — the scene's one clock. */
+  walk: React.RefObject<number>
 }) {
   const camera = useThree((s) => s.camera)
   const path = useMemo(() => getWalkPath(stage.path), [stage.path])
@@ -147,27 +174,12 @@ function ShotRig({
     [stage.figure.height, paperHeight],
   )
 
-  useFrame((state) => {
-    const walked = stageWalked(path.length, stage, progress, still ? 0 : state.clock.elapsedTime)
-    const { position, target } = stageCamera(path, walked, scale, stage.shot)
+  useFrame(() => {
+    const { position, target } = stageCamera(path, walk.current * path.length, scale, stage.shot)
     camera.position.set(position[0], position[1], position[2])
     camera.lookAt(target[0], target[1], target[2])
   })
   return null
-}
-
-/**
- * Distance walked, from whichever driver is in charge. Shared by the camera
- * and the figure so they cannot drift apart by a frame or a formula.
- */
-function stageWalked(
-  length: number,
-  stage: StageConfig,
-  progress: number | undefined,
-  elapsed: number,
-): number {
-  if (progress !== undefined) return progress * length
-  return elapsed * stage.figure.speed
 }
 
 /** Below this, step down. Above the upper one, step up. */
@@ -237,6 +249,9 @@ export function PaperStageScene({
   preset,
   count = 22,
   progress,
+  motion,
+  onVisit,
+  onProgress,
   reducedMotion,
 }: PaperStageSceneProps) {
   const still = usePrefersReducedMotion(reducedMotion)
@@ -314,7 +329,34 @@ export function PaperStageScene({
     return Array.from({ length: count }, () => ({}))
   }, [papers, images, text, count])
 
-  const figureDistance = progress !== undefined ? progress * path.length : undefined
+  const drive = stageMotionSchema.parse(motion ?? {})
+
+  /**
+   * Where the papers stand along the walk, so stepping lands ON them.
+   *
+   * Only a layout that arranges along a path can answer; anything else gets
+   * an even spread, which is still somewhere to stop and is better than an
+   * arrow key that does nothing.
+   */
+  const slotCount = slots?.length ?? images?.length ?? count
+  const stops = useMemo(() => {
+    const spec = getLayout(layout)
+    // Parsed, not passed raw: `walkStops` reads options the caller may never
+    // have named, and an undefined margin puts every stop at NaN.
+    const placed = spec.walkStops?.(slotCount, spec.optionsSchema.parse(resolvedLayoutOptions ?? {}))
+    if (placed && placed.length > 0) return placed
+    return Array.from({ length: slotCount }, (_, i) => (slotCount > 1 ? i / (slotCount - 1) : 0.5))
+  }, [layout, resolvedLayoutOptions, slotCount])
+
+  const walk = useWalk({
+    path,
+    motion: drive,
+    progress,
+    figureSpeed: stage.figure.speed,
+    stops,
+    reduced: still,
+    onProgress,
+  })
 
   // One radius for the room: the sky, the floor and the far clip all measure
   // from it, and they have to agree or the horizon tears.
@@ -333,7 +375,7 @@ export function PaperStageScene({
 
   return (
     <LightRig rig={rig}>
-      <ShotRig stage={stage} paperHeight={paperHeight} progress={progress} still={still} />
+      <ShotRig stage={stage} paperHeight={paperHeight} walk={walk.walk} />
       <PaperLighting
         rig={rig}
         floor={0}
@@ -366,13 +408,35 @@ export function PaperStageScene({
         images={images}
         layout={layout}
         layoutOptions={resolvedLayoutOptions}
+        // The field never drives itself here: the WALK is the motion, and a
+        // field turning under a camera that is also travelling is two
+        // animations of the same thing disagreeing.
         motion={{ driver: 'none' }}
         entrance={{ type: 'none' }}
         reducedMotion={reducedMotion}
+        onSelect={
+          drive.driver === 'drag' && progress === undefined
+            ? (paperIndex) => {
+                // A drag that happens to end over a banner is not a click on it.
+                if (walk.dragged.current) return
+                walk.travelTo(stops[paperIndex] ?? 0)
+                onVisit?.(paperIndex)
+              }
+            : undefined
+        }
       />
 
       {stage.showFigure && (
-        <Figure path={stage.path} figure={stage.figure} distance={figureDistance} frozen={reducedMotion} />
+        <Figure
+          path={stage.path}
+          figure={stage.figure}
+          // The same ref the camera reads. The figure and the shot are the
+          // two things that must never disagree about where along the walk
+          // we are, so they are given one number rather than two formulas.
+          distanceRef={walk.walk}
+          walkLength={path.length}
+          frozen={reducedMotion}
+        />
       )}
     </LightRig>
   )

@@ -49,3 +49,9 @@ jobs:
 
       - name: GPU parity gate
         run: pnpm test:parity
+
+      # The navigation is pointer capture, wheel and key handlers against a
+      # live canvas. The math has unit tests; only a browser can say whether
+      # the listeners are on the thing the visitor is actually touching.
+      - name: Stage navigation gate
+        run: pnpm test:drive
