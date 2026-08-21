@@ -40,22 +40,22 @@
     "three": ">=0.160"
   },
   "dependencies": {
-    "@react-three/drei": "^10.0.0",
+    "@react-three/drei": "^10.7.8",
     "three-custom-shader-material": "^6.4.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@react-three/fiber": "^9.0.0",
-    "@types/react": "^19.0.0",
-    "@types/three": "^0.185.1",
+    "@react-three/fiber": "^9.7.0",
+    "@types/react": "^19.2.18",
+    "@types/three": "^0.185.4",
     "gsap": "^3.12.0",
-    "publint": "^0.3.22",
+    "publint": "^0.3.23",
     "react": "^19.2.8",
     "three": "^0.185.1",
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "author": "Noor Mtir",
   "homepage": "https://github.com/NourMtir0722/Paperlab#readme",
