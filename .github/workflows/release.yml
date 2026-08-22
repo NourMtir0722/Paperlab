@@ -94,6 +94,26 @@ jobs:
             exit 1
           fi
           echo
+          # The pairing the dry run structurally cannot test by running it:
+          # this step stops BEFORE the publish action, so the action itself
+          # is never loaded. changesets/action v1 requires CLI v2 and v2
+          # requires CLI v3, and taking one without the other fails at the
+          # very last step of a real release — after the version bump has
+          # landed. Assert the pairing instead of exercising it.
+          action=$(grep -oE 'changesets/action@v[0-9]+' .github/workflows/release.yml | head -1 | sed 's/.*@v//')
+          cli=$(node -p "require('./package.json').devDependencies['@changesets/cli'].replace(/[^0-9]*/,'').split('.')[0]")
+          echo "changesets action v$action  <->  CLI v$cli"
+          if [ "$action" = "1" ] && [ "$cli" != "2" ]; then
+            echo "::error::changesets/action v1 requires CLI v2, found v$cli."; exit 1
+          fi
+          if [ "$action" = "2" ] && [ "$cli" != "3" ]; then
+            echo "::error::changesets/action v2 requires CLI v3, found v$cli. Migrate the"
+            echo "::error::CLI first — the action fails at the publish step, which is after"
+            echo "::error::the version bump has already landed on main."
+            exit 1
+          fi
+
+          echo
           echo "--- what would be released ---"
           # Needs the full clone above: this merge-bases against main, and
           # merge-base cannot work in a shallow one. Still non-fatal — the
@@ -107,25 +127,24 @@ jobs:
       # trusted publisher on the package. Provenance should now arrive on its
       # own — npm would not attest a build from a private repo, which is why
       # 0.2.0 carries no attestations, and this repo went public 2026-08-21.
-      # changesets/action v2 RENAMED its inputs, and the old names are not
-      # aliased — they are simply unrecognised. Taking the bump without this
-      # migration would have opened the version PR and then quietly never
-      # published, with a green check on the run, which is the same shape of
-      # silent half-release that cost 0.1.0.
+      # PINNED TO v1, and it is not a stale pin — v2 is unusable here.
       #
-      #   publish  -> publish-script
+      #   "This version of the Changesets action is designed to work with
+      #    Changesets CLI v3. Changesets CLI v2 is not supported; use
+      #    Changesets action v1 instead."
       #
-      # v2 also stopped accepting the token from the environment: "custom
-      # GitHub tokens must be passed explicitly through the `github-token`
-      # input. The GITHUB_TOKEN environment variable and credentials
-      # configured by actions/checkout are not substitutes for this input."
-      # The env var below stays because `changeset publish` itself still
-      # reads it; the input is what the action needs.
+      # This repo is on `@changesets/cli ^2.31.1`. Moving to the v2 action
+      # therefore means migrating the CLI to v3 FIRST, as its own deliberate
+      # piece of work — not as a dependency bump. The step below is checked
+      # against that on every dry run; see "action and CLI majors agree".
+      #
+      # When that migration happens, v2 also renamed the inputs and stopped
+      # reading the token from the environment: `publish` -> `publish-script`,
+      # and `github-token` must be passed as an input.
       - name: Create release PR or publish to npm
         if: github.event_name == 'push' || inputs.publish
-        uses: changesets/action@v2
+        uses: changesets/action@v1
         with:
-          publish-script: pnpm exec changeset publish
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          publish: pnpm exec changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
