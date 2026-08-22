@@ -48,6 +48,13 @@ import { useEditor, zoneToConfig } from './store'
  */
 const FIGURE_MODEL = `${import.meta.env.BASE_URL}figure/walking-figure.glb`
 
+/**
+ * What a field slot falls back to when the preset it names is gone. The same
+ * built-in `deletePreset` and the session sanitizer already fall back to, so
+ * a missing preset lands in one place however it went missing.
+ */
+const FALLBACK_PRESET = 'photo-print'
+
 export function App() {
   const presetName = useEditor((s) => s.presetName)
   const importSharedPaper = useEditor((s) => s.importSharedPaper)
@@ -97,7 +104,19 @@ export function App() {
   }, [importSharedPaper, setMode])
 
   // Presets are components: the field renders the live edit of its preset.
-  const resolvePresetByName = (name: string): PaperConfig => (name === presetName ? config : getPreset(name))
+  // `getPreset` THROWS on a name it does not know, and this runs for every
+  // field slot on every render — so one stale slot name (a preset deleted in
+  // another tab, a session written by a build that had it) would take the
+  // whole editor down rather than one paper. Fall back to a built-in: a
+  // wrong-looking sheet is a bug report, a blank page is not.
+  const resolvePresetByName = (name: string): PaperConfig => {
+    if (name === presetName) return config
+    try {
+      return getPreset(name)
+    } catch {
+      return getPreset(FALLBACK_PRESET)
+    }
+  }
   // Every slot gets a DIFFERENT card, so fourteen sheets read as a drawer of
   // records rather than as one card printed fourteen times.
   const slotContent = (i: number): ContentConfigInput =>

@@ -399,7 +399,16 @@ export const useEditor = create<EditorState>((set, get) => ({
       selectedSlot: null,
       inspectorEpoch: s.inspectorEpoch + 1,
     })),
-  patchStage: (patch) => set((s) => ({ stage: { ...s.stage, ...patch } })),
+  // A patch that changes nothing returns the SAME stage object, so it does
+  // not notify. The scene reports things back up here every time it settles
+  // — the quality tier most of all — and a store that hands out a fresh
+  // object for a no-op turns each of those reports into a re-render, which
+  // is exactly the loop that made stage mode unusable.
+  patchStage: (patch) =>
+    set((s) => {
+      const changed = Object.entries(patch).some(([key, value]) => s.stage[key as keyof StageState] !== value)
+      return changed ? { stage: { ...s.stage, ...patch } } : s
+    }),
   loadStagePreset: (id) =>
     set((s) => ({
       // A preset replaces the stage wholesale rather than merging: half of
