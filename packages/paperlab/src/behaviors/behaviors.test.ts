@@ -6,6 +6,7 @@ import { carry } from './carry'
 import { flight } from './flight'
 import { getBehavior, listBehaviors } from './registry'
 import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
+import { settle } from './settle'
 
 const sheet = { width: 1, height: 2.6 }
 
@@ -22,6 +23,7 @@ describe('behavior registry', () => {
       'carry',
       'flight',
       'crumple',
+      'settle',
     ])
   })
 
@@ -150,5 +152,55 @@ describe('behavior config schema', () => {
 
   it('rejects unknown behavior types', () => {
     expect(() => paperConfigSchema.parse({ behavior: { type: 'teleport' } })).toThrow()
+  })
+})
+
+const SHEET = { width: 1.2, height: 0.9 }
+
+describe('settle — the pose after the fall', () => {
+  it('is STATIC, which is the whole behavior', () => {
+    // `fall` flutters: its wave carries speed 1.3, because it is a sheet
+    // still arguing with the air. This one is over. A settled sheet that
+    // ripples is a settled sheet nobody believes — and it also costs a
+    // per-frame re-deform forever, for motion that should not be there.
+    const wave = settle.stack(settle.defaults, SHEET).find((d) => d.type === 'wave')
+    expect(wave).toBeDefined()
+    expect((wave!.options as { speed: number }).speed).toBe(0)
+  })
+
+  it('relaxing flattens it, and stiffness is the floor under that', () => {
+    const held = (o: Partial<typeof settle.defaults>) => {
+      const stack = settle.stack({ ...settle.defaults, ...o }, SHEET)
+      return (stack.find((d) => d.type === 'curl')!.options as { amount: number }).amount
+    }
+    // Longer settled, flatter.
+    expect(held({ relax: 1 })).toBeLessThan(held({ relax: 0 }))
+    // Stiffer stock keeps more of its shape, however long it lies there.
+    expect(held({ relax: 1, lift: 1 })).toBeGreaterThan(held({ relax: 1, lift: 0.2 }))
+    // Tissue surrenders completely.
+    expect(held({ lift: 0 })).toBe(0)
+  })
+
+  it('lifts a corner harder than `fall` does, and that is deliberate', () => {
+    // The corner a settled sheet holds up is the one thing gravity could not
+    // take from it. An earlier pass scaled this BELOW fall's and rendered a
+    // flat rectangle — the one outcome this behavior exists to avoid.
+    const settled = (
+      settle.stack(settle.defaults, SHEET).find((d) => d.type === 'curl')!.options as {
+        amount: number
+      }
+    ).amount
+    expect(settled).toBeGreaterThan(0.1)
+  })
+
+  it('never animates, at any setting', () => {
+    for (const relax of [0, 0.5, 1]) {
+      for (const slack of [0, 1]) {
+        const stack = settle.stack({ ...settle.defaults, relax, slack }, SHEET)
+        for (const d of stack) {
+          expect((d.options as { speed?: number }).speed ?? 0).toBe(0)
+        }
+      }
+    }
   })
 })

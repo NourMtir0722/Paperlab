@@ -16,6 +16,7 @@ import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
 import { Ceiling, Floor } from './Room'
+import { Suspension } from './Suspension'
 import { Grade } from './Grade'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
 import { stageMotionSchema, type StageMotionInput } from './navigate'
@@ -289,7 +290,15 @@ export function PaperStageScene({
   }, [stage.lighting, stage.light, stage.source.zenith, stage.source.color, stage.ground.color])
   // The shot frames the ARCHITECTURE, so it has to know how tall the paper
   // is — read from the preset in play rather than assumed.
-  const paperHeight = useMemo(() => resolveConfig({ preset: preset ?? BANNER }).sheet.height, [preset])
+  // Both dimensions, resolved once. The suspension needs the width to size a
+  // clip off the sheet rather than in world units — a clip that is 4cm
+  // whatever it is clipped to looks like a clip on exactly one sheet size.
+  const sheetDims = useMemo(() => {
+    const { width, height } = resolveConfig({ preset: preset ?? BANNER }).sheet
+    return { width, height }
+  }, [preset])
+  const paperHeight = sheetDims.height
+  const paperWidth = sheetDims.width
 
   const paper = preset ?? BANNER
 
@@ -394,6 +403,24 @@ export function PaperStageScene({
           surround, or the floor punches out through the sky. */}
       {stage.ground.enabled && (
         <Floor size={surroundRadius * 1.3} color={stage.ground.color} slab={stage.ground.slab} />
+      )}
+
+      {/* Hardware. Drawn before the lid so it is inside the room, and it
+          anchors at the ceiling whether or not the ceiling is drawn — a
+          thread that stops in mid-air is worse than no thread. */}
+      {stage.suspension.type === 'thread' && (
+        <Suspension
+          layout={layout}
+          layoutOptions={resolvedLayoutOptions ?? {}}
+          // The slot list IS the population — same number the field draws, so
+          // threads and banners cannot disagree about how many there are.
+          count={slots?.length ?? count}
+          sheet={{ width: paperWidth, height: paperHeight }}
+          paperHeight={paperHeight}
+          ceiling={paperHeight * stage.room.height}
+          color={stage.suspension.color}
+          clips={stage.suspension.clips}
+        />
       )}
 
       {/* The lid. It gives the haze a far surface to settle on — fog against

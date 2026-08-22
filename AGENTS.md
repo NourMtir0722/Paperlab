@@ -341,6 +341,7 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 | `carry` | grab, stiffness, flutter, lag, drive | held paper drooping from its pinch point |
 | `flight` | wind [x,y,z], gustiness, tumble, path, respawn, range | free paper travelling across the scene on the wind |
 | `crumple` | progress, coarseness, ball, seed | a sheet crushed in a fist — an irregular network of creases |
+| `settle` | relax, lift, corner, slack | a sheet that has landed and relaxed. The pose AFTER `fall`, and everything in it is static — a settled sheet that ripples is one nobody believes |
 
 ### Physics
 
@@ -349,7 +350,7 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 
 ### Presets
 
-Built-ins: `receipt-unroll`, `letter-fold`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`, `crumpled-note`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
+Built-ins: `receipt-unroll`, `letter-fold`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`, `crumpled-note`, `settled-sheet`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
 
 **If the user hands you a `.paper` file** (they made it in the editor, or someone sent it to them), it is already a preset object — import the JSON and pass it straight through. Do NOT translate it into individual props; the whole point of the format is that it round-trips.
 
