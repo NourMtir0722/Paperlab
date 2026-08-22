@@ -36,11 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -102,10 +102,25 @@ jobs:
       # trusted publisher on the package. Provenance should now arrive on its
       # own — npm would not attest a build from a private repo, which is why
       # 0.2.0 carries no attestations, and this repo went public 2026-08-21.
+      # changesets/action v2 RENAMED its inputs, and the old names are not
+      # aliased — they are simply unrecognised. Taking the bump without this
+      # migration would have opened the version PR and then quietly never
+      # published, with a green check on the run, which is the same shape of
+      # silent half-release that cost 0.1.0.
+      #
+      #   publish  -> publish-script
+      #
+      # v2 also stopped accepting the token from the environment: "custom
+      # GitHub tokens must be passed explicitly through the `github-token`
+      # input. The GITHUB_TOKEN environment variable and credentials
+      # configured by actions/checkout are not substitutes for this input."
+      # The env var below stays because `changeset publish` itself still
+      # reads it; the input is what the action needs.
       - name: Create release PR or publish to npm
         if: github.event_name == 'push' || inputs.publish
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          publish: pnpm exec changeset publish
+          publish-script: pnpm exec changeset publish
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
