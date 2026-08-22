@@ -187,6 +187,30 @@ const builtins: Record<string, PaperConfigInput> = {
    * this one has stopped — which is the half of the story the library could
    * not tell, and the half every paper installation is actually made of.
    */
+  /**
+   * A strip hung the full drop of a room. Tall and narrow on purpose: the
+   * proportion IS the object, and a ribbon that is not much longer than it
+   * is wide is a poster.
+   */
+  'paper-ribbon': {
+    meta: { name: 'Paper ribbon', tags: ['ribbon', 'hang', 'text'] },
+    sheet: { width: 0.85, height: 6.4 },
+    stock: 'printer',
+    content: {
+      type: 'text',
+      // Short words, set small. The measure on a 0.85-wide strip is about
+      // 220px at texture resolution, and anything larger breaks mid-word —
+      // a ribbon reading "an d th e pa pe r" is a ribbon nobody can read.
+      text: 'the paper\nkept going\nlong after\nthe floor\nran out',
+      size: 34,
+      align: 'center',
+      valign: 'center',
+      lineHeight: 1.5,
+      tracking: 0.02,
+    },
+    behavior: { type: 'ribbon', pool: 0.17, curl: 0.42, drape: 0.55 },
+    surface: { grain: 0.18 },
+  },
   'settled-sheet': {
     meta: { name: 'Settled sheet', tags: ['settle', 'floor', 'text'] },
     sheet: { width: 1.2, height: 0.9 },

@@ -441,8 +441,20 @@ const colonnadeSchema = z.object({
   margin: z.number().min(0).max(0.45).default(0.05),
   /** Spread of banner heights, 0..1. */
   rise: z.number().min(0).max(1).default(0.28),
-  /** How far the banners lift off the floor, as a fraction of their height. 0 = they pool on it. */
-  hover: z.number().min(0).max(1).default(0),
+  /**
+   * How far the banners lift off the floor, as a fraction of their height.
+   *
+   * NEGATIVE is allowed, and it is what pooling actually requires. At 0 a
+   * banner's bottom EDGE sits on the floor — which is not the same as paper
+   * pooling on it, however much the old comment here claimed otherwise. A
+   * ribbon creases a pool-length above its bottom edge, so it has to hang
+   * that much lower for the crease to land on the ground and the slack to
+   * lie ON it rather than in mid-air parallel to it.
+   *
+   * The bound used to be 0, so the one thing this option documented itself
+   * as doing was the one thing it could not do.
+   */
+  hover: z.number().min(-0.5).max(1).default(0),
   /** Spread of deformation — no two lengths of hung paper drape alike. */
   drape: z.number().min(0).max(1).default(0.5),
   seed: z.number().int().min(0).max(9999).default(2),

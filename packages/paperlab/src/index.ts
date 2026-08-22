@@ -147,6 +147,7 @@ export { hang, hangOptionsSchema, type HangOptions } from './behaviors/hang'
 export { fly, flyOptionsSchema, type FlyOptions } from './behaviors/fly'
 export { fall, fallOptionsSchema, type FallOptions } from './behaviors/fall'
 export { settle, settleOptionsSchema, type SettleOptions } from './behaviors/settle'
+export { ribbon, ribbonOptionsSchema, type RibbonOptions } from './behaviors/ribbon'
 export { carry, carryOptionsSchema, type CarryOptions } from './behaviors/carry'
 export { flight, flightOptionsSchema, type FlightOptions } from './behaviors/flight'
 // The first behavior whose name is already taken by the deformer it drives.

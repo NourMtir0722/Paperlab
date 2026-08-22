@@ -7,6 +7,7 @@ import { flight } from './flight'
 import { getBehavior, listBehaviors } from './registry'
 import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
 import { settle } from './settle'
+import { ribbon } from './ribbon'
 
 const sheet = { width: 1, height: 2.6 }
 
@@ -24,6 +25,7 @@ describe('behavior registry', () => {
       'flight',
       'crumple',
       'settle',
+      'ribbon',
     ])
   })
 
@@ -201,6 +203,54 @@ describe('settle — the pose after the fall', () => {
           expect((d.options as { speed?: number }).speed ?? 0).toBe(0)
         }
       }
+    }
+  })
+})
+
+describe('ribbon — the strip that reaches the floor and keeps going', () => {
+  const fold = (o: Partial<typeof ribbon.defaults>, sheet = { width: 0.9, height: 8 }) =>
+    ribbon.stack({ ...ribbon.defaults, ...o }, sheet).find((d) => d.type === 'fold')!.options as {
+      offset: number
+      foldAngle: number
+      radius: number
+      angle: number
+    }
+
+  it('creases at the floor line, which it can only know from the sheet', () => {
+    // Almost every behavior takes only its options. This one cannot: "a
+    // pool-length above the bottom edge" is meaningless without a height.
+    const sheet = { width: 0.9, height: 8 }
+    // pool 0.25 of an 8-high sheet -> the crease sits 2 above the bottom
+    // edge, i.e. at y = -4 + 2 = -2, measured downward as +2.
+    expect(fold({ pool: 0.25 }, sheet).offset).toBeCloseTo(2)
+  })
+
+  it('a ribbon with no pool creases at its own bottom edge — nothing lies down', () => {
+    expect(fold({ pool: 0 }).offset).toBeCloseTo(4)
+  })
+
+  it('the crease travels DOWN the drop, not up it', () => {
+    // Pointed the other way the fold turns the whole drop from the ceiling.
+    expect(fold({}).angle).toBe(-90)
+  })
+
+  it('a longer sheet gets a softer hinge, because paper does not scale', () => {
+    const short = fold({}, { width: 0.9, height: 3 }).radius
+    const long = fold({}, { width: 0.9, height: 12 }).radius
+    expect(long).toBeGreaterThan(short)
+  })
+
+  it('curl lays the pool flatter, and never folds it back past double', () => {
+    expect(fold({ curl: 1 }).foldAngle).toBeGreaterThan(fold({ curl: 0 }).foldAngle)
+    for (const curl of [0, 0.5, 1]) {
+      expect(fold({ curl }).foldAngle).toBeLessThanOrEqual(180)
+      expect(fold({ curl }).foldAngle).toBeGreaterThan(0)
+    }
+  })
+
+  it('hangs still — a ribbon is not a flag', () => {
+    for (const d of ribbon.stack(ribbon.defaults, { width: 0.9, height: 8 })) {
+      expect((d.options as { speed?: number }).speed ?? 0).toBe(0)
     }
   })
 })
