@@ -51,6 +51,7 @@ export const carry: Behavior<CarryOptions> = {
   label: 'Carry',
   defaults: carryOptionsSchema.parse({}),
   optionsSchema: carryOptionsSchema,
+  signature: ['stiffness', 'flutter'],
   progressParam: 'drive',
   duration: 2.4,
   loopMode: 'yoyo',

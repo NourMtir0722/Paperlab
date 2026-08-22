@@ -28,6 +28,7 @@ export const peel: Behavior<PeelOptions> = {
   label: 'Peel',
   defaults: peelOptionsSchema.parse({}),
   optionsSchema: peelOptionsSchema,
+  signature: ['progress', 'corner'],
   progressParam: 'progress',
   duration: 2.2,
   loopMode: 'yoyo',

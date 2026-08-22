@@ -325,7 +325,7 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 
 ### Imperative API (`ref` on Paper/PaperMesh)
 
-`play()`, `pause()`, `playing`, `set('progress', 0.5)` (maps to any behavior's progress param), `getProgress()`, `snapshot()` (current state as a preset object), `toJSON()`.
+`play()`, `pause()`, `playing`, `set('progress', 0.5)` (maps to any behavior's progress param), `getProgress()`, `snapshot()` (current state as a preset object), `toJSON()`, `handlePoint(id?, target?)` (where a behavior's grab point is in world space this frame — it rides the deformed surface, so nothing outside the render can compute it; null when the behavior has no handles).
 
 ### Behaviors (the `behavior` prop, discriminated on `type`)
 

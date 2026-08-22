@@ -3,6 +3,7 @@ import { isBuiltinPreset, listPresets, parsePreset } from 'paperlab'
 import { useEditor } from './store'
 import { downloadPreset } from './userPresets'
 import { confirmDialog, promptDialog, toast } from './ui'
+import { Select } from './Select'
 
 /**
  * The preset library: built-ins (duplicate to fork) and user presets
@@ -72,23 +73,17 @@ export function PresetPanel() {
     >
       <h2>Presets</h2>
       <div className="preset-picker">
-        <select
+        <Select
           className="preset-select"
-          aria-label="Choose a built-in preset"
+          label="Choose a built-in preset"
+          // A user preset is open, so no built-in is selected. The list is
+          // still the built-ins; the trigger says so rather than showing a
+          // name that is not in it.
           value={builtinNames.includes(presetName) ? presetName : ''}
-          onChange={(e) => setPreset(e.target.value)}
-        >
-          {!builtinNames.includes(presetName) && (
-            <option value="" disabled>
-              Pick a preset…
-            </option>
-          )}
-          {builtinNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+          options={builtinNames.includes(presetName) ? builtinNames : ['', ...builtinNames]}
+          format={(name) => name || 'Pick a preset…'}
+          onChange={(name) => name && setPreset(name)}
+        />
         <button
           type="button"
           className="row-action"

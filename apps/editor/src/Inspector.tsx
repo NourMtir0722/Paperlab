@@ -14,7 +14,7 @@ import {
   type StockName,
   type SurfaceConfig,
 } from 'paperlab'
-import { button, folder, num, schemaControls, select, text, toggle, type Control } from './controlModel'
+import { button, folder, num, partitionSignature, select, text, toggle, type Control } from './controlModel'
 import { Panel } from './controls'
 import { useEditor } from './store'
 
@@ -38,13 +38,20 @@ export function Inspector() {
   const setPhysics = useEditor((s) => s.setPhysics)
   const patchCloth = useEditor((s) => s.patchCloth)
 
-  const behaviorFields: Control[] = config.behavior
-    ? schemaControls(
-        getBehavior(config.behavior.type).optionsSchema,
+  // The behavior's own nomination decides what gets the big controls; the
+  // rest fold into "More". A behavior that nominates nothing comes back with
+  // an empty `signature` and everything in `rest`, which is exactly the flat
+  // panel this used to draw — so no behavior loses a control, and none of
+  // them gets one hidden without saying so.
+  const behavior = config.behavior ? getBehavior(config.behavior.type) : null
+  const { signature: signatureFields, rest: moreFields } = behavior
+    ? partitionSignature(
+        behavior.optionsSchema,
+        behavior.signature,
         config.behavior as unknown as Record<string, unknown>,
         (key, value) => patchConfig({ behavior: { [key]: value } as never }),
       )
-    : []
+    : { signature: [], rest: [] }
 
   const controls: Control[] = [
     // Behavior stays open (the primary sculpt); the rest collapse so the panel
@@ -53,7 +60,12 @@ export function Inspector() {
       select('type', config.behavior?.type ?? 'none', ['none', ...listBehaviors()], (v) =>
         setBehaviorType(v === 'none' ? null : v),
       ),
-      ...behaviorFields,
+      ...signatureFields,
+      // Only a real disclosure — a "More" that opens onto nothing is a
+      // promise of depth the behavior does not have.
+      ...(moreFields.length > 0 && signatureFields.length > 0
+        ? [folder('More', moreFields, { collapsed: true, key: 'behavior-more' })]
+        : moreFields),
     ]),
     folder(
       'Sheet',

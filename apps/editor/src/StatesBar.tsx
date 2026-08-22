@@ -8,6 +8,7 @@ import {
   type StateDef,
 } from 'paperlab'
 import { numericFields } from './controlModel'
+import { Select } from './Select'
 import { useEditor } from './store'
 
 /**
@@ -57,6 +58,16 @@ function PaperStatesBar() {
 
   return (
     <div className="states-bar">
+      {/* The chips read as five unexplained words without this. Naming the
+          bar and saying what a chip DOES is the difference between a
+          control someone tries and one they leave alone. */}
+      <p className="states-bar-label">
+        States
+        <span className="states-bar-hint">
+          {' '}
+          — pick one, then edit; changes record as that state&rsquo;s diff on Rest.
+        </span>
+      </p>
       <div className="states-chips">
         {names.map((name) => {
           const recorded = overridePaths(states[name]?.overrides ?? {}).length > 0
@@ -81,34 +92,36 @@ function PaperStatesBar() {
         <button
           type="button"
           className={`state-preview${statePreview ? ' active' : ''}`}
+          aria-pressed={statePreview}
+          aria-label={statePreview ? 'Stop previewing states' : 'Preview states on the canvas'}
           onClick={() => setStatePreview(!statePreview)}
           title="Preview: hover/press the paper to feel the choreography"
         >
-          {statePreview ? '■' : '▶'}
+          <span aria-hidden="true">{statePreview ? '■' : '▶'}</span> Preview
         </button>
       </div>
       {active && (
         <div className="state-detail">
           <span className="state-detail-label">into {label(active)}:</span>
-          <input
-            type="number"
-            min={0}
-            max={5}
-            step={0.05}
-            value={activeDef?.transition.duration ?? 0.35}
-            onChange={(e) => setStateTransition(active, { duration: Number(e.target.value) })}
-          />
-          s
-          <select
+          <label className="state-duration">
+            <input
+              type="number"
+              min={0}
+              max={5}
+              step={0.05}
+              aria-label={`Seconds to transition into ${label(active)}`}
+              value={activeDef?.transition.duration ?? 0.35}
+              onChange={(e) => setStateTransition(active, { duration: Number(e.target.value) })}
+            />
+            <span>seconds</span>
+          </label>
+          <Select
+            className="state-ease"
+            label={`Easing into ${label(active)}`}
             value={activeDef?.transition.ease ?? 'power2.out'}
-            onChange={(e) => setStateTransition(active, { ease: e.target.value })}
-          >
-            {EASES.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
-            ))}
-          </select>
+            options={EASES}
+            onChange={(ease) => setStateTransition(active, { ease })}
+          />
           {paths.length > 0 && (
             <span className="state-overrides">
               {paths.map((p) => (
@@ -168,6 +181,13 @@ function FieldStatesBar() {
 
   return (
     <div className="states-bar">
+      <p className="states-bar-label">
+        States
+        <span className="states-bar-hint">
+          {' '}
+          — edits land on this slot only, unless you send them to the preset.
+        </span>
+      </p>
       <div className="states-chips">
         <span className="states-slot-label">slot {selectedSlot + 1}</span>
         {names.map((name) => {
@@ -259,6 +279,7 @@ function SlotStateControls({
         {key}
         <input
           type="range"
+          className="slot-state-slider"
           min={spec.min}
           max={spec.max}
           step={spec.step}

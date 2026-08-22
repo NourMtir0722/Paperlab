@@ -3,13 +3,16 @@ import { getBehavior } from 'paperlab'
 import { useEditor } from './store'
 
 /**
- * First-run guide for the paper editor. Sculpting is direct-manipulation
- * (drag a handle on the mesh) plus a transport, which isn't obvious cold — this
- * spells it out, keyed to the current behavior. Dismissed state is remembered;
- * the "?" affordance brings it back.
+ * The help panel: everything the viewport can do, keyed to the current
+ * behavior.
+ *
+ * It no longer opens itself on a first visit. A panel that appears unasked
+ * has to be read and dismissed before the thing it describes can be touched,
+ * and it was describing four gestures at once — so first-run teaching moved
+ * to `CoachMark`, which says ONE thing, next to the thing it is about. This
+ * stayed as what it always really was: the reference you open from "?" when
+ * you want to know what else is here.
  */
-
-const SEEN_KEY = 'paperlab.guideSeen'
 
 /** What the blue handle does for behaviors that expose one. */
 const HANDLE_GESTURE: Record<string, string> = {
@@ -22,25 +25,12 @@ const HANDLE_GESTURE: Record<string, string> = {
 export function ViewportGuide() {
   const behaviorType = useEditor((s) => s.config.behavior?.type ?? null)
   const isCloth = useEditor((s) => typeof s.config.physics === 'object')
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(SEEN_KEY) !== '1'
-    } catch {
-      return true
-    }
-  })
+  const [open, setOpen] = useState(false)
 
   const behavior = behaviorType ? getBehavior(behaviorType) : null
   const hasHandles = Boolean(behavior?.handles?.length)
 
-  const dismiss = () => {
-    setOpen(false)
-    try {
-      localStorage.setItem(SEEN_KEY, '1')
-    } catch {
-      /* private mode — fine, it just re-shows next load */
-    }
-  }
+  const dismiss = () => setOpen(false)
 
   if (!open) {
     return (
@@ -48,6 +38,7 @@ export function ViewportGuide() {
         type="button"
         className="guide-toggle"
         title="How to edit this paper"
+        aria-label="How to edit this paper"
         onClick={() => setOpen(true)}
       >
         ?
@@ -92,7 +83,7 @@ export function ViewportGuide() {
         </li>
       </ul>
       <button type="button" className="guide-got-it" onClick={dismiss}>
-        Got it
+        Close
       </button>
     </div>
   )

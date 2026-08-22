@@ -19,6 +19,7 @@ export const letterFold: Behavior<LetterFoldOptions> = {
   label: 'Letter fold',
   defaults: letterFoldOptionsSchema.parse({}),
   optionsSchema: letterFoldOptionsSchema,
+  signature: ['progress', 'crease'],
   progressParam: 'progress',
   duration: 2.6,
   loopMode: 'yoyo',

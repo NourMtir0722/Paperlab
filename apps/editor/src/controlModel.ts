@@ -17,6 +17,7 @@ export type Control =
       max: number
       step: number
       disabled?: boolean
+      emphasis?: Emphasis
       onChange: (v: number) => void
     }
   | {
@@ -25,9 +26,17 @@ export type Control =
       label: string
       value: string
       options: string[]
+      emphasis?: Emphasis
       onChange: (v: string) => void
     }
-  | { kind: 'toggle'; key: string; label: string; value: boolean; onChange: (v: boolean) => void }
+  | {
+      kind: 'toggle'
+      key: string
+      label: string
+      value: boolean
+      emphasis?: Emphasis
+      onChange: (v: boolean) => void
+    }
   | {
       kind: 'text'
       key: string
@@ -42,6 +51,14 @@ export type Control =
   | { kind: 'note'; key: string; value: string }
   | { kind: 'button'; key: string; label: string; onClick: () => void }
   | { kind: 'folder'; key: string; label: string; collapsed?: boolean; children: Control[] }
+
+/**
+ * How loudly a control is drawn. `signature` is a behavior's own nomination
+ * (see `Behavior.signature`) — the two or three options that ARE the
+ * behavior get a full-width row instead of a 88px label and a hairline
+ * slider. Nothing else about them differs: same descriptor, same write path.
+ */
+export type Emphasis = 'signature'
 
 // ── Constructors — the inspectors read better building trees from these. ────
 
@@ -106,6 +123,59 @@ export const folder = (
   children: Control[],
   opts: { collapsed?: boolean; key?: string } = {},
 ): Control => ({ kind: 'folder', key: opts.key ?? label, label, collapsed: opts.collapsed, children })
+
+/**
+ * Mark a generated run of controls as signature controls.
+ *
+ * A pass over the finished tree rather than a flag threaded through
+ * `schemaControls`: the schema walk's job is to say what a field IS, and
+ * prominence is the inspector's editorial call about the same field. Kinds
+ * that have no louder form (notes, buttons, folders, text) are returned
+ * untouched rather than being given a flag nothing reads.
+ */
+export function emphasize(controls: Control[], emphasis: Emphasis = 'signature'): Control[] {
+  return controls.map((control) =>
+    control.kind === 'number' || control.kind === 'select' || control.kind === 'toggle'
+      ? { ...control, emphasis }
+      : control,
+  )
+}
+
+/**
+ * Split a behavior's options into the ones it nominated and the rest.
+ *
+ * Each nominated key is walked SEPARATELY, skipping every other field, for
+ * two reasons: the result comes back in the order the behavior listed them
+ * (its own ranking, not the schema's declaration order), and a nominated
+ * numeric tuple still expands into its per-axis sliders, which a filter over
+ * the flat control list could not reassociate — `wind` emits `windX`,
+ * `windY`, `windZ` and none of those is the name the behavior nominated.
+ */
+export function partitionSignature(
+  schema: z.ZodTypeAny,
+  signature: readonly string[] | undefined,
+  values: Record<string, unknown>,
+  onChange: (key: string, value: unknown) => void,
+): { signature: Control[]; rest: Control[] } {
+  if (!(schema instanceof z.ZodObject) || !signature?.length) {
+    return { signature: [], rest: schemaControls(schema, values, onChange) }
+  }
+  const keys = Object.keys(schema.shape as Record<string, z.ZodTypeAny>)
+  const nominated = signature.filter((key) => keys.includes(key))
+  return {
+    signature: emphasize(
+      nominated.flatMap((key) =>
+        schemaControls(
+          schema,
+          values,
+          onChange,
+          keys.filter((k) => k !== key),
+        ),
+      ),
+    ),
+    rest: schemaControls(schema, values, onChange, nominated),
+  }
+}
 
 // ── The schema walk. ────────────────────────────────────────────────────────
 

@@ -68,8 +68,23 @@ export function FieldInspector() {
     folder(
       'Drop zones',
       [
-        button('addZone', () => addZone()),
-        ...field.zones.flatMap((zone, i) => zoneControls(zone, i, patchZone, removeZone)),
+        // This folder used to open onto a button reading "addZone" and, if
+        // you pressed it, seven bare rows with no edge between one zone and
+        // the next. Every line here is now something a stranger can read:
+        // what a drop zone is for, which zone they are editing, and what the
+        // remove button removes.
+        note(
+          'zonesNote',
+          field.zones.length === 0
+            ? 'A target a paper can be dropped onto — give it a rectangle, and say which presets it accepts.'
+            : 'Each zone is a rectangle in the scene. `accept` filters which papers it will take.',
+        ),
+        button('Add a drop zone', () => addZone(), 'addZone'),
+        ...field.zones.map((zone, i) =>
+          folder(zone.id || `zone ${i + 1}`, zoneControls(zone, i, patchZone, removeZone), {
+            key: `zone${i}`,
+          }),
+        ),
       ],
       { collapsed: true },
     ),
@@ -87,7 +102,7 @@ function zoneControls(
 ): Control[] {
   const key = (name: string) => `zone${i}_${name}`
   return [
-    text(key('id'), zone.id, (v) => patchZone(i, { id: v }), { label: `#${i + 1} id` }),
+    text(key('id'), zone.id, (v) => patchZone(i, { id: v }), { label: 'id' }),
     text(key('accept'), zone.accept, (v) => patchZone(i, { accept: v }), {
       label: 'accept',
       hint: 'comma-separated preset globs; empty = all',
@@ -111,6 +126,6 @@ function zoneControls(
       (v) => patchZone(i, { highlight: v as EditorZone['highlight'] }),
       'highlight',
     ),
-    button('remove', () => removeZone(i), key('remove')),
+    button(`Remove ${zone.id || `zone ${i + 1}`}`, () => removeZone(i), key('remove')),
   ]
 }

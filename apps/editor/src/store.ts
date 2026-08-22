@@ -374,10 +374,12 @@ export const useEditor = create<EditorState>((set, get) => ({
         size: [1.6, 1.1],
         highlight: 'glow',
       }
-      return {
-        field: { ...s.field, zones: [...s.field.zones, zone] },
-        inspectorEpoch: s.inspectorEpoch + 1,
-      }
+      // No epoch bump. The inspector derives the zone rows from this list on
+      // every render, so it needs no remount — and remounting collapses the
+      // Drop zones folder, which is the folder the button lives in. Adding a
+      // zone would close the panel on the zone you just added. Same reason
+      // the surface toggles don't bump.
+      return { field: { ...s.field, zones: [...s.field.zones, zone] } }
     }),
   patchZone: (index, patch) =>
     set((s) => ({
@@ -387,10 +389,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       },
     })),
   removeZone: (index) =>
-    set((s) => ({
-      field: { ...s.field, zones: s.field.zones.filter((_, i) => i !== index) },
-      inspectorEpoch: s.inspectorEpoch + 1,
-    })),
+    set((s) => ({ field: { ...s.field, zones: s.field.zones.filter((_, i) => i !== index) } })),
   setMode: (mode) =>
     set((s) => ({
       mode,
