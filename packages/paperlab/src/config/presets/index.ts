@@ -182,6 +182,24 @@ const builtins: Record<string, PaperConfigInput> = {
     // reading as folded plastic.
     surface: { grain: 0.5, aging: 0.18 },
   },
+  /**
+   * The second after the fall. `fall` is a sheet still arguing with the air;
+   * this one has stopped — which is the half of the story the library could
+   * not tell, and the half every paper installation is actually made of.
+   */
+  'settled-sheet': {
+    meta: { name: 'Settled sheet', tags: ['settle', 'floor', 'text'] },
+    sheet: { width: 1.2, height: 0.9 },
+    stock: 'printer',
+    content: {
+      type: 'card',
+      title: 'Found',
+      body: 'on the floor, face up,\nwhere somebody dropped it.',
+      note: 'no. 31',
+    },
+    behavior: { type: 'settle', relax: 0.6, lift: 0.5, slack: 0.45 },
+    surface: { grain: 0.2 },
+  },
   'typed-note': {
     meta: { name: 'Typed note', tags: ['text', 'starter'] },
     sheet: { width: 1, height: 1.4 },

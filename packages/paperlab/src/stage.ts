@@ -31,6 +31,7 @@ export {
   stageSchema,
   stageGradeSchema,
   stageRoomSchema,
+  stageSuspensionSchema,
   type StageConfig,
   type StageConfigInput,
   type StageGradeConfig,

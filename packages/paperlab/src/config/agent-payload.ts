@@ -26,6 +26,10 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
   hang: () => 'hanging from its top edge, rippling',
   fly: () => 'arched and fluttering like it is airborne',
   fall: () => 'rippling with one corner lifted, like a dropped sheet',
+  settle: (o) =>
+    (o as { relax: number }).relax > 0.7
+      ? 'lying where it landed, flat but for one corner the stiffness kept'
+      : 'just come to rest, still holding a little of the shape it fell in',
   carry: () => 'drooping from a pinched corner, fluttering as if being carried',
   flight: (o) =>
     o.path === 'loop' ? 'tumbling through a seamless airborne loop' : 'tumbling across the scene on the wind',
