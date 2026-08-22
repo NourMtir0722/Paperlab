@@ -199,6 +199,47 @@ be a code problem after all — see the npm entry.
 
 ---
 
+## Open bug — `drape` renders nothing on the hero path
+
+**Found 2026-08-22 while building the `ribbon` behavior. Not yet fixed.**
+
+The `drape` deformer produces an **invisible sheet** when it runs through the
+hero (CPU/JS) path. Not a faint one — the frame contains exactly one colour,
+the background.
+
+What was ruled out, in order:
+
+- **The math.** `drape.displace` was swept across its whole option range on a
+  0.85 x 6.4 sheet: every vertex finite, every value bounded. The node probe
+  is clean.
+- **Tessellation.** The stack resolves to a `[72, 8]` grid, because `drape`
+  declares `axis: 0` (its folds run across the WIDTH) and so asks for zero
+  segments down the length, where the stack floor for that axis is 2. That
+  looked like the answer and is not: pinning the sheet to an explicit
+  `segments: 96` renders the same single colour.
+- **The sheet and the content.** The identical sheet and text render fine
+  with `hang` (bend + wave) at the same camera.
+
+Isolated by bisecting the ribbon stack one deformer at a time: `roll` alone
+renders (698 colours), `drape` alone is blank, both together blank.
+
+**Why nobody had hit it.** `drape` had exactly one caller in the entire
+library — the stage banner in `stage/PaperStage.tsx` — and that goes through
+the field/GPU path, which uses the GLSL twin. No behavior and no paper preset
+had ever put `drape` on the CPU side. `ribbon` was the first, which is how a
+deformer that ships with a parity gate can still be half-broken: **parity
+proves the two implementations agree, not that either one draws.**
+
+`ribbon` therefore uses `wave` pinned at the top, which is the same picture
+by another road and is proven on both paths. That is a workaround, not a fix.
+
+Worth checking when this is picked up: whether the normals come out
+degenerate (`computeSheetNormals` over a grid that drape has pinched in x via
+`gather`), and whether any other deformer has the same never-exercised-on-CPU
+status.
+
+---
+
 ## Next — the ideas we want to build
 
 Ordered by how much each one serves the goal, not by effort.
