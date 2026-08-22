@@ -10,6 +10,7 @@ import { fall } from './fall'
 import { carry } from './carry'
 import { flight } from './flight'
 import { crumpleBehavior } from './crumple'
+import { settle } from './settle'
 
 const registry = new Map<string, Behavior<AnyOptions>>()
 
@@ -40,3 +41,4 @@ registerBehavior(fall)
 registerBehavior(carry)
 registerBehavior(flight)
 registerBehavior(crumpleBehavior)
+registerBehavior(settle)

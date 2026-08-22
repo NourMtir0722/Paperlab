@@ -72,6 +72,26 @@ export const stageGroundSchema = z.object({
  * already knows, made of flat surfaces under good light, which is the one
  * thing a renderer never gets wrong.
  */
+/**
+ * What holds the paper up.
+ *
+ * Every paper installation shows its hardware — monofilament from a ceiling
+ * grid, steel wire, bulldog clips, a rod — and in the scattered-sheet pieces
+ * the threads are half the composition. Stage mode's banners hung from
+ * nothing at all, which is a bigger realism gap than any shader in the
+ * backlog and closes for a few thin lines of geometry.
+ */
+export const stageSuspensionSchema = z.object({
+  /**
+   * `thread` is monofilament to the ceiling. `none` is the old behaviour,
+   * for a stage where the paper is meant to be impossible.
+   */
+  type: z.enum(['none', 'thread']).default('thread'),
+  color: z.string().default('#9c948a'),
+  /** A small clip where the thread meets the sheet. */
+  clips: z.boolean().default(true),
+})
+
 export const stageRoomSchema = z.object({
   enabled: z.boolean().default(true),
   /**
@@ -184,6 +204,8 @@ export const stageSchema = z.object({
   ground: stageGroundSchema.default({}),
   /** Ceiling and the architecture around the walk — see `stageRoomSchema`. */
   room: stageRoomSchema.default({}),
+  /** Thread and clips — see `stageSuspensionSchema`. */
+  suspension: stageSuspensionSchema.default({}),
   /**
    * The print — bloom, vignette, grain.
    *
