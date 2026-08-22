@@ -199,6 +199,99 @@ be a code problem after all — see the npm entry.
 
 ---
 
+## The editor, structurally — *done 2026-08-22*
+
+The review's finding was "the UX is a little bit messy", and the useful part
+of it was the diagnosis: that is a **structure** problem, not a styling one.
+A repaint would have left every cause in place. What shipped:
+
+**Behaviors nominate their own signature params.** `Behavior.signature` names
+the two or three options that ARE the behavior, in the order someone reaches
+for them; the editor gives those full-width rows and folds the rest behind
+"More". The schema still generates a control for every option — nothing is
+removed, only ranked. A behavior that nominates nothing shows all of its
+options flat, deliberately: **silence from a community behavior is not
+permission to guess**, and a library that hides a param it was not told to
+hide is worse than a long panel. All twelve built-ins nominate, and a test
+holds them to 2–3 names that exist in their own schema. It also means the
+control for `flight`'s three-slider wind vector is now one disclosure away
+instead of being the first thing you meet.
+
+**Undo / redo.** The reason to build it is not that people make mistakes — it
+is that **without it nobody will touch a slider they do not understand**, and
+most of this editor's controls are generated. Undo is what makes reading the
+panel free.
+
+It **observes the store rather than wrapping it** (`history.ts` subscribes;
+no setter calls it). Threading a record call through each setter would be a
+rule to remember for every future setter, and the failure mode of forgetting
+once is that one action silently stops being undoable forever. What is in the
+document: the paper, the field, the stage's space, and the mode you were in.
+What is out: the transport — scrubbing a timeline is looking, not editing, and
+a history full of playhead positions is a history you cannot use — plus which
+chip is active and which slot is selected. Also out on purpose: **the user
+preset library**, because an undo that silently un-saved someone's work is a
+worse promise than not offering one.
+
+Consecutive writes to the same leaf path inside 600ms collapse into one entry,
+so a slider drag is one undo and not two hundred. The same diff that does the
+collapsing also names the button: "Undo grain", not "Undo".
+
+**The native `<select>` is gone.** It is the one control a page cannot style
+below the button — the option list is drawn by the OS, in the OS's colours —
+so on a dark canvas tool it was the loudest thing saying "internal build".
+The replacement keeps the whole native keyboard contract (arrows, Home/End,
+Enter/Space, Escape, Tab, typeahead) and is portaled to `<body>`, because both
+inspector rails are `overflow-y: auto` and would otherwise clip it.
+
+Two things that cost, and are worth knowing before replacing another native
+control: the new trigger is a `<button>`, so **the Space shortcut for the
+transport had to stop testing `tagName`** — it now asks `keys.ts`, one
+predicate shared by every window-level shortcut, which also checks the ARIA
+role. And a fixed-position popup is anchored to a rect captured once, so it
+closes on scroll and resize rather than drifting away from its trigger.
+
+Sliders stayed native `<input type="range">` — the keyboard and AT behaviour
+are free there and the visual problem was solvable in CSS. They now draw a
+filled track from a `--fill` custom property, because `accent-color` paints a
+browser's slider, not this one's.
+
+**Labels where there were none.** The states bar says what it is and what a
+chip does; the transition duration and easing controls have names; the drop
+zone folder explains what a drop zone is, groups each zone under its own id,
+and its buttons read "Add a drop zone" and "Remove zone-1" rather than
+"addZone" and "remove".
+
+**The first-run panel became a coach-mark.** The old one was a four-line
+legend in the corner: it said three other things at once, sat nowhere near
+the blue dot it was describing, and the fastest way past it was the dismiss
+button. It is now **one sentence, drawn touching the handle, gone the moment
+the handle moves** — dismissal is driven by the drag itself, because a
+coach-mark that survives the gesture it was teaching is only a label. The
+old panel stayed as what it always really was: the reference behind "?".
+
+This needed one new piece of public API. The handle rides the deformed
+surface, so its position is a fact about the *frame* — nothing outside the
+render can compute it from a UV. `PaperHandle.handlePoint(id?, target?)`
+returns it in world space, and writes into `target` when given one so a
+per-frame reader does not allocate.
+
+**The FPS badge is off by default.** It was on in every dev build, which
+means it was in every screenshot and every recording. `?stats` brings it back
+where a frame budget is actually being read.
+
+### Found while building this
+
+**Adding a drop zone collapsed the folder you added it in.** `addZone` and
+`removeZone` bumped `inspectorEpoch`, which remounts the inspector, which
+resets every folder's open state — so the panel closed on the zone you had
+just created. No remount was ever needed: the inspector derives the zone rows
+from the store on every render, which `patchZone` had always relied on. Both
+bumps removed. The surface toggles already carried a comment saying exactly
+this; these two had simply never been held to it.
+
+---
+
 ## Open bug — `drape` renders nothing on the hero path
 
 **Found 2026-08-22 while building the `ribbon` behavior. Not yet fixed.**

@@ -16,6 +16,7 @@ export const hang: Behavior<HangOptions> = {
   label: 'Hang',
   defaults: hangOptionsSchema.parse({}),
   optionsSchema: hangOptionsSchema,
+  signature: ['wind', 'sag'],
   progressParam: 'wind',
   duration: 4,
   loopMode: 'yoyo',

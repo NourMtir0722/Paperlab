@@ -30,6 +30,7 @@ export const flight: Behavior<FlightOptions> = {
   label: 'Flight',
   defaults: flightOptionsSchema.parse({}),
   optionsSchema: flightOptionsSchema,
+  signature: ['gustiness', 'tumble', 'path'],
   progressParam: 'tumble',
   duration: 6,
   loopMode: 'yoyo',

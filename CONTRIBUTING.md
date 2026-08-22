@@ -38,8 +38,9 @@ A behavior is a named bundle: 3–5 **human-named** params ('tightness', not 'cy
 1. Define your zod options schema (min/max on every number — the editor generates sliders from it).
 2. Implement `stack(options, sheet)` mapping params → deformer instances.
 3. Optionally add `loop` (transient idle motion) and `handles` (direct-manipulation grab points).
-4. Register it in `behaviors/registry.ts` and add it to the union in `config/schema.ts`.
-5. Add an expansion test in `behaviors/behaviors.test.ts`.
+4. Name your `signature` — the two or three params that ARE your behavior, in the order someone reaches for them. Those get the big controls in the editor and the rest fold behind "More". Nominate nothing and every param is shown flat, because the library never hides one it was not told to hide.
+5. Register it in `behaviors/registry.ts` and add it to the union in `config/schema.ts`.
+6. Add an expansion test in `behaviors/behaviors.test.ts`.
 
 The editor UI is generated from your schema — no editor code needed.
 

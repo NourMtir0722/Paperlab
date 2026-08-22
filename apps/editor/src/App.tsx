@@ -29,11 +29,14 @@ import { Transport } from './Transport'
 import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
 import { ViewportGuide } from './ViewportGuide'
+import { CoachMark, HandleAnchor, coachMarkUsed } from './CoachMark'
 import { captureThumbnail } from './userPresets'
 import { SHARE_PARAM, paperShareUrl, readPaperShare } from './paperShare'
 import { DEMO_CARDS } from './demoAssets'
 import { UIHost, promptDialog, toast } from './ui'
 import { useEditor, zoneToConfig } from './store'
+import { Select } from './Select'
+import { useHistory, useHistoryKeys, useUndoState } from './history'
 
 /**
  * The walking figure's model, served from this app's own `public/`.
@@ -54,6 +57,9 @@ const FIGURE_MODEL = `${import.meta.env.BASE_URL}figure/walking-figure.glb`
  * a missing preset lands in one place however it went missing.
  */
 const FALLBACK_PRESET = 'photo-print'
+
+/** `?stats` turns the frame counter on — see where it's rendered. */
+const showStats = import.meta.env.DEV && new URLSearchParams(window.location.search).has('stats')
 
 export function App() {
   const presetName = useEditor((s) => s.presetName)
@@ -79,6 +85,8 @@ export function App() {
 
   const paperRef = useRef<PaperHandle>(null)
   const scrubRef = useRef<HTMLInputElement>(null)
+  const { canUndo, canRedo, undoLabel, redoLabel } = useUndoState()
+  useHistoryKeys()
 
   // A paper on the URL is adopted once, on arrival, and then the parameter
   // is cleared: it is now a preset in your library, and leaving the link in
@@ -179,6 +187,26 @@ export function App() {
           </button>
           <button type="button" className={mode === 'stage' ? 'active' : ''} onClick={() => setMode('stage')}>
             Stage
+          </button>
+        </div>
+        <div className="history">
+          <button
+            type="button"
+            disabled={!canUndo}
+            aria-label={canUndo ? `Undo ${undoLabel}` : 'Undo'}
+            title={canUndo ? `Undo ${undoLabel} (⌘Z)` : 'Nothing to undo'}
+            onClick={() => useHistory.getState().undo()}
+          >
+            ↺
+          </button>
+          <button
+            type="button"
+            disabled={!canRedo}
+            aria-label={canRedo ? `Redo ${redoLabel}` : 'Redo'}
+            title={canRedo ? `Redo ${redoLabel} (⇧⌘Z)` : 'Nothing to redo'}
+            onClick={() => useHistory.getState().redo()}
+          >
+            ↻
           </button>
         </div>
         {cameFromField && mode === 'paper' && (
@@ -299,13 +327,13 @@ export function App() {
                   >
                     <span className="slot-index">{i + 1}</span>
                   </button>
-                  <select value={name} onChange={(e) => setSlotPreset(i, e.target.value)}>
-                    {listPresets().map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    className="slot-preset"
+                    label={`Paper ${i + 1} preset`}
+                    value={name}
+                    options={listPresets()}
+                    onChange={(next) => setSlotPreset(i, next)}
+                  />
                   <button
                     type="button"
                     className="slot-edit"
@@ -378,7 +406,10 @@ export function App() {
               onProgress={(v) => {
                 if (scrubRef.current) scrubRef.current.value = String(v)
               }}
-              onBehaviorChange={(patch) => patchConfig({ behavior: patch as never }, { external: true })}
+              onBehaviorChange={(patch) => {
+                coachMarkUsed()
+                patchConfig({ behavior: patch as never }, { external: true })
+              }}
             />
           ) : (
             <PaperFieldMesh
@@ -391,9 +422,16 @@ export function App() {
               zones={fieldZones}
             />
           )}
+          {mode === 'paper' && <HandleAnchor paperRef={paperRef} />}
           {mode !== 'stage' && <OrbitControls makeDefault enableDamping />}
-          {import.meta.env.DEV && <Stats className="stats" />}
+          {/* The FPS badge is a diagnostic, not furniture: it sits over the
+              canvas in every screenshot and every recording, and it is the
+              first thing that says "someone's dev build" to a visitor. Dev
+              still gets it on `?stats`, which is where a frame budget is
+              actually being read. */}
+          {showStats && <Stats className="stats" />}
         </Canvas>
+        {mode === 'paper' && <CoachMark />}
         {mode === 'paper' && <ViewportGuide />}
       </main>
 

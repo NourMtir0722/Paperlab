@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { getBehavior, type PaperHandle } from 'paperlab'
+import { isTypingTarget } from './keys'
 import { useEditor } from './store'
 
 /** The gesture a draggable-handle behavior teaches, keyed by behavior id. */
@@ -62,8 +63,7 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (e.code !== 'Space' || /INPUT|TEXTAREA|SELECT/.test(target.tagName)) return
+      if (e.code !== 'Space' || isTypingTarget(e.target)) return
       e.preventDefault()
       toggle()
     }

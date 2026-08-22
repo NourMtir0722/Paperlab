@@ -35,6 +35,20 @@ export interface Behavior<O = AnyOptions> {
    */
   transform?(o: O, t: number, pose: AeroPose): void
   handles?: HandleSpec<O>[]
+  /**
+   * The two or three options that ARE this behavior — the ones someone
+   * reaches for first, in the order they'd reach for them.
+   *
+   * The schema still generates a control for every option; this only says
+   * which ones get the big controls and which fold away behind "More". A
+   * behavior that nominates nothing shows all of its options flat, because
+   * the library must never hide a param it was not told to hide — silence
+   * from a community behavior is not permission to guess.
+   *
+   * Every name here has to be a field of {@link optionsSchema}; the built-in
+   * behaviors are checked for that, and for staying within three.
+   */
+  signature?: (keyof O & string)[]
   /** The option the transport scrubber drives. */
   progressParam: keyof O & string
   /** Seconds for a full 0→1 play, and how play repeats. */

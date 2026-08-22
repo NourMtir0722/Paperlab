@@ -47,6 +47,7 @@ export const ribbon: Behavior<RibbonOptions> = {
    * hardest. `curl` sets the roll radius, sweeping it 0.5 -> 0.12, and the
    * tightest radius is exactly the case that demands the most segments.
    */
+  signature: ['pool', 'curl', 'drape'],
   progressParam: 'curl',
   duration: 3,
   loopMode: 'yoyo',

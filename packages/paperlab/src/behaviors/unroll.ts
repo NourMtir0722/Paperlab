@@ -22,6 +22,7 @@ export const unroll: Behavior<UnrollOptions> = {
   label: 'Unroll',
   defaults: unrollOptionsSchema.parse({}),
   optionsSchema: unrollOptionsSchema,
+  signature: ['progress', 'tightness'],
   progressParam: 'progress',
   duration: 3,
   loopMode: 'yoyo',
