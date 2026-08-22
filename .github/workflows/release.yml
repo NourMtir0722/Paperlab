@@ -36,11 +36,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      # Full history. `changeset status` finds what would be released by
+      # merge-basing against main, and merge-base does not work in a shallow
+      # clone — fetching main afterwards is not enough either, because the
+      # grafted history has no common ancestor to find. This repo is under a
+      # hundred commits; the clone costs nothing.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -88,13 +95,11 @@ jobs:
           fi
           echo
           echo "--- what would be released ---"
-          # `changeset status` diffs against main, and `actions/checkout`
-          # clones one branch at depth 1 — so on any branch but main, main
-          # simply is not there and it fails with "Failed to find where HEAD
-          # diverged". Fetch it. Non-fatal on purpose: the version assertions
-          # above are the gate, and a dry run that fails for a reason
-          # unrelated to the release is a dry run nobody will trust.
-          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main 2>/dev/null || true
+          # Needs the full clone above: this merge-bases against main, and
+          # merge-base cannot work in a shallow one. Still non-fatal — the
+          # version assertions are the gate, and a dry run that goes red for
+          # a reason unrelated to the release is one nobody will trust.
+          git fetch --no-tags origin main:refs/remotes/origin/main 2>/dev/null || true
           pnpm exec changeset status --since=origin/main \
             || echo "(could not compute — the assertions above are the gate)"
 
@@ -102,10 +107,25 @@ jobs:
       # trusted publisher on the package. Provenance should now arrive on its
       # own — npm would not attest a build from a private repo, which is why
       # 0.2.0 carries no attestations, and this repo went public 2026-08-21.
+      # changesets/action v2 RENAMED its inputs, and the old names are not
+      # aliased — they are simply unrecognised. Taking the bump without this
+      # migration would have opened the version PR and then quietly never
+      # published, with a green check on the run, which is the same shape of
+      # silent half-release that cost 0.1.0.
+      #
+      #   publish  -> publish-script
+      #
+      # v2 also stopped accepting the token from the environment: "custom
+      # GitHub tokens must be passed explicitly through the `github-token`
+      # input. The GITHUB_TOKEN environment variable and credentials
+      # configured by actions/checkout are not substitutes for this input."
+      # The env var below stays because `changeset publish` itself still
+      # reads it; the input is what the action needs.
       - name: Create release PR or publish to npm
         if: github.event_name == 'push' || inputs.publish
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          publish: pnpm exec changeset publish
+          publish-script: pnpm exec changeset publish
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
