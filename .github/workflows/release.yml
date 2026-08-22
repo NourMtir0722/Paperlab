@@ -88,7 +88,15 @@ jobs:
           fi
           echo
           echo "--- what would be released ---"
-          pnpm exec changeset status
+          # `changeset status` diffs against main, and `actions/checkout`
+          # clones one branch at depth 1 — so on any branch but main, main
+          # simply is not there and it fails with "Failed to find where HEAD
+          # diverged". Fetch it. Non-fatal on purpose: the version assertions
+          # above are the gate, and a dry run that fails for a reason
+          # unrelated to the release is a dry run nobody will trust.
+          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main 2>/dev/null || true
+          pnpm exec changeset status --since=origin/main \
+            || echo "(could not compute — the assertions above are the gate)"
 
       # No NPM_TOKEN: npm authenticates this workflow via OIDC, configured as a
       # trusted publisher on the package. Provenance should now arrive on its
