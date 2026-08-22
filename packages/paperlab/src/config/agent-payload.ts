@@ -26,6 +26,8 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
   hang: () => 'hanging from its top edge, rippling',
   fly: () => 'arched and fluttering like it is airborne',
   fall: () => 'rippling with one corner lifted, like a dropped sheet',
+  ribbon: (o) =>
+    `hanging the full drop of the room and pooling on the floor, about ${Math.round((o as { pool: number }).pool * 100)}% of its length lying over`,
   settle: (o) =>
     (o as { relax: number }).relax > 0.7
       ? 'lying where it landed, flat but for one corner the stiffness kept'

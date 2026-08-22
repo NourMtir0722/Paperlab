@@ -128,6 +128,64 @@ export const stagePresets: Record<string, StagePreset> = {
     count: 10,
     text: 'stand closer and read what it cost to write this down',
   },
+  /**
+   * The one stage that is not a colonnade of banners.
+   *
+   * A ribbon reaches the floor and keeps going, and everything built in the
+   * last four phases exists so that this reads: a room with a ceiling to
+   * hang from, hardware to hang by, type that can be set down a length
+   * without looking like a caption, and a `roll` that begins at the floor
+   * line rather than at the sheet's centre.
+   */
+  ribbon: {
+    id: 'ribbon',
+    label: 'Ribbon',
+    description: 'Printed strips falling the full drop of the room, pooling where they land.',
+    stage: {
+      path: walks.straight,
+      // Close. Ribbons are a curtain you part rather than a hall you walk
+      // down, so the camera stands nearer and looks less far ahead than any
+      // other stage in the set.
+      // Lower than the other stages. Pooled paper lies FLAT, so from
+      // standing height it foreshortens to a sliver; the shot has to get
+      // down toward the floor for the thing this stage is about to read.
+      shot: { shot: 'follow', distance: 4.6, height: 2.3, lookAhead: 3.6, offset: 0.34 },
+      lighting: 'nave',
+      // A low ceiling: the strips ARE the height of the room, so a lid far
+      // above them would leave metres of empty air and make the drop read as
+      // short. This is the stage the room proportion matters most on.
+      room: { height: 1.12 },
+      source: { spread: 1.3 },
+      suspension: { clips: true },
+    },
+    layout: 'colonnade',
+    // Packed tighter than the banner stages, barely twisted, and hung at a
+    // steady height — a rank of strips reads by its rhythm, and jitter that
+    // flatters a colonnade of banners just makes this look untidy.
+    // `hover` is NEGATIVE by exactly the pool fraction, and that is the whole
+    // trick. A colonnade hangs a sheet with its BOTTOM edge on the floor, but
+    // a ribbon's crease sits a pool-length above its bottom edge — so at
+    // hover 0 the pooled length lies flat in mid-air, parallel to a ground it
+    // never touches. Dropping the strip by the same fraction puts the crease
+    // on the floor and the pool ON it.
+    layoutOptions: {
+      aisle: 1.75,
+      twist: 5,
+      breathe: 0.1,
+      margin: 0.06,
+      rise: 0.06,
+      drape: 0.2,
+      hover: -0.22,
+    },
+    paper: {
+      sheet: { width: 1.05, height: 9, segments: 'auto' },
+      stock: 'printer',
+      surface: { grain: 0.2 },
+      behavior: { type: 'ribbon', pool: 0.22, curl: 0.34, drape: 0.6 },
+    },
+    count: 12,
+    text: 'the paper kept going long after the floor ran out from under it and nobody moved to pick it up',
+  },
   archive: {
     id: 'archive',
     label: 'Archive',
