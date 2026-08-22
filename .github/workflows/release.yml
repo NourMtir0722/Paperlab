@@ -36,7 +36,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Full history. `changeset status` finds what would be released by
+      # merge-basing against main, and merge-base does not work in a shallow
+      # clone — fetching main afterwards is not enough either, because the
+      # grafted history has no common ancestor to find. This repo is under a
+      # hundred commits; the clone costs nothing.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
 
@@ -88,13 +95,11 @@ jobs:
           fi
           echo
           echo "--- what would be released ---"
-          # `changeset status` diffs against main, and `actions/checkout`
-          # clones one branch at depth 1 — so on any branch but main, main
-          # simply is not there and it fails with "Failed to find where HEAD
-          # diverged". Fetch it. Non-fatal on purpose: the version assertions
-          # above are the gate, and a dry run that fails for a reason
-          # unrelated to the release is a dry run nobody will trust.
-          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main 2>/dev/null || true
+          # Needs the full clone above: this merge-bases against main, and
+          # merge-base cannot work in a shallow one. Still non-fatal — the
+          # version assertions are the gate, and a dry run that goes red for
+          # a reason unrelated to the release is one nobody will trust.
+          git fetch --no-tags origin main:refs/remotes/origin/main 2>/dev/null || true
           pnpm exec changeset status --since=origin/main \
             || echo "(could not compute — the assertions above are the gate)"
 
