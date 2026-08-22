@@ -7,6 +7,7 @@ import {
   type PaperConfig,
   type StateDef,
 } from 'paperlab'
+import { numericFields } from './controlModel'
 import { useEditor } from './store'
 
 /**
@@ -243,33 +244,29 @@ function SlotStateControls({
     (field.slotStates[slot]?.states?.[state]?.overrides as { behavior?: Record<string, unknown> })
       ?.behavior ?? {}
 
-  const controls: React.ReactNode[] = []
-  for (const [key, fieldSchema] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
-    let inner = fieldSchema
-    while (inner instanceof z.ZodDefault || inner instanceof z.ZodOptional) {
-      inner = inner instanceof z.ZodDefault ? inner._def.innerType : inner.unwrap()
-    }
-    if (!(inner instanceof z.ZodNumber)) continue
-    const min = inner._def.checks.find((c) => c.kind === 'min')
-    const max = inner._def.checks.find((c) => c.kind === 'max')
-    const lo = min && 'value' in min ? min.value : 0
-    const hi = max && 'value' in max ? max.value : 1
+  // The range, step and rounding come from `numericFields`, NOT from a
+  // second reading of the schema here. This panel used to do its own — and
+  // was missing `.int()`, so dragging `seed` on a crumple slot wrote a
+  // fraction into the slot's overrides, which `resolveFieldSlotConfig`
+  // re-parses during render. Same uncaught ZodError, same blank editor, in a
+  // second place. One reader now, so there is no second copy to forget.
+  const controls = numericFields(schema).map(({ key, spec }) => {
     const value =
       (slotOverrides[key] as number | undefined) ??
       ((stateView.behavior as Record<string, unknown>)[key] as number)
-    controls.push(
+    return (
       <label key={key} className="slot-state-control">
         {key}
         <input
           type="range"
-          min={lo}
-          max={hi}
-          step={(hi - lo) / 200}
+          min={spec.min}
+          max={spec.max}
+          step={spec.step}
           defaultValue={value}
-          onChange={(e) => onPatch({ behavior: { [key]: Number(e.target.value) } })}
+          onChange={(e) => onPatch({ behavior: { [key]: spec.snap(Number(e.target.value)) } })}
         />
-      </label>,
+      </label>
     )
-  }
+  })
   return <>{controls}</>
 }

@@ -17,6 +17,7 @@ import { BackingSheet } from './field/backingSheet'
 import { InteractiveField, type FieldA11yController } from './field/interactiveField'
 import { FieldKeyboardMirror } from './field/keyboardMirror'
 import { DEFAULT_SHEET, getLayout } from './field/layouts'
+import { useStable } from './core/stable'
 import type { SheetLayoutOptions } from './field/sheetGrid'
 import { fitCamera, resolveLayoutOptions } from './field/framing'
 
@@ -110,22 +111,27 @@ export const PaperFieldMesh = forwardRef<THREE.Group, PaperFieldMeshProps>(
       () => effectiveFieldPapers(props.papers, props.images),
       [props.papers, props.images],
     )
-    // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — papers and preset are fresh objects every render.
+    // Content-compared, not serialized: papers and preset are fresh objects
+    // every render, and a paper can carry a whole bitmap inline. See
+    // `useStable` for why stringifying these was the expensive half.
+    const stablePapers = useStable(papers)
+    const stablePreset = useStable(props.preset ?? null)
     const groups = useMemo(
-      () => groupFieldPapers(papers, props.preset),
-      [JSON.stringify(papers), JSON.stringify(props.preset ?? null)],
+      () => groupFieldPapers(stablePapers, stablePreset ?? undefined),
+      [stablePapers, stablePreset],
     )
     const total = papers.length
 
     const layoutId = props.layout ?? 'ring'
     const layout = getLayout(layoutId)
     const firstSheet = groups[0]?.config.sheet
-    // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — layoutOptions and the first sheet are fresh objects every render.
+    const stableLayoutOptions = useStable(props.layoutOptions ?? {})
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `layout` is derived from layoutId, and the sheet enters by its two dimensions.
     const layoutOptions = useMemo(
       // Sheet grids size their cells from the papers themselves — gutter is
       // then literally the spacing between stamps (explicit cell dims win).
-      () => resolveLayoutOptions(layoutId, layout, props.layoutOptions, firstSheet),
-      [layoutId, JSON.stringify(props.layoutOptions ?? {}), firstSheet?.width, firstSheet?.height],
+      () => resolveLayoutOptions(layoutId, layout, stableLayoutOptions, firstSheet),
+      [layoutId, stableLayoutOptions, firstSheet?.width, firstSheet?.height],
     )
 
     // ── Shared motion state: one driver phase / entrance clock / morph for
@@ -258,21 +264,20 @@ function FitCamera(meshProps: PaperFieldMeshProps) {
   const width = useThree((s) => s.size.width)
   const height = useThree((s) => s.size.height)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — the camera refits on prop *content*, not on identity.
+  // The camera refits on prop CONTENT, not on identity — compared rather
+  // than serialized, because this runs on every render of the field.
+  const papersProp = useStable(meshProps.papers ?? null)
+  const imagesProp = useStable(meshProps.images ?? null)
+  const presetProp = useStable(meshProps.preset ?? null)
+  const optionsProp = useStable(meshProps.layoutOptions ?? {})
   const field = useMemo(() => {
-    const papers = effectiveFieldPapers(meshProps.papers, meshProps.images)
+    const papers = effectiveFieldPapers(papersProp ?? undefined, imagesProp ?? undefined)
     const layoutId = meshProps.layout ?? 'ring'
     const layout = getLayout(layoutId)
-    const sheet = groupFieldPapers(papers, meshProps.preset)[0]?.config.sheet
-    const options = resolveLayoutOptions(layoutId, layout, meshProps.layoutOptions, sheet)
+    const sheet = groupFieldPapers(papers, presetProp ?? undefined)[0]?.config.sheet
+    const options = resolveLayoutOptions(layoutId, layout, optionsProp, sheet)
     return { layout, n: papers.length, options, sheet: sheet ?? DEFAULT_SHEET }
-  }, [
-    JSON.stringify(meshProps.papers ?? null),
-    JSON.stringify(meshProps.images ?? null),
-    JSON.stringify(meshProps.preset ?? null),
-    meshProps.layout,
-    JSON.stringify(meshProps.layoutOptions ?? {}),
-  ])
+  }, [papersProp, imagesProp, presetProp, meshProps.layout, optionsProp])
 
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
@@ -307,10 +312,11 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
     () => effectiveFieldPapers(meshProps.papers, meshProps.images),
     [meshProps.papers, meshProps.images],
   )
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — must match the mesh derivation above exactly.
+  const stablePapers = useStable(papers)
+  const stablePreset = useStable(meshProps.preset ?? null)
   const interactive = useMemo(
-    () => fieldIsInteractive(papers, meshProps.preset, meshProps.interactive),
-    [JSON.stringify(papers), JSON.stringify(meshProps.preset ?? null), meshProps.interactive],
+    () => fieldIsInteractive(stablePapers, stablePreset ?? undefined, meshProps.interactive),
+    [stablePapers, stablePreset, meshProps.interactive],
   )
 
   return (

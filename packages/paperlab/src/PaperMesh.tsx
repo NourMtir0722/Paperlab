@@ -19,6 +19,7 @@ import type {
 import { paperConfigSchema } from './config/schema'
 import { mergeConfig, parsePreset, serializePreset } from './config/serialize'
 import { computeSheetNormals } from './core/normals'
+import { useStable } from './core/stable'
 import { createSheetGeometry, resolveSegments } from './core/sheet'
 import { FLAT_SEGMENTS, type SegmentPair } from './core/tessellation'
 import { getStock } from './core/stock'
@@ -109,11 +110,17 @@ export interface PaperHandle {
 }
 
 /**
- * Stable memo key over every prop {@link resolveConfig} reads. Consumers that
- * cache a resolved config must key on this, not on `preset` alone.
+ * Everything {@link resolveConfig} reads, as a plain tuple.
+ *
+ * Compared with {@link useStable} rather than serialized: a dependency array
+ * is evaluated on EVERY render, and `content` can hold a whole bitmap as a
+ * data URL, so a `JSON.stringify` here was megabytes of garbage per frame of
+ * a slider drag. (There was a `resolveConfigKey` exporting the string form
+ * for consumers to key their own caches on; it was never part of the package
+ * entry, so no consumer could reach it, and nothing else uses it now.)
  */
-export function resolveConfigKey(props: PaperMeshProps): string {
-  return JSON.stringify([
+function configInputs(props: PaperMeshProps): unknown[] {
+  return [
     props.preset ?? null,
     props.sheet ?? null,
     props.stock ?? null,
@@ -124,7 +131,14 @@ export function resolveConfigKey(props: PaperMeshProps): string {
     props.scene ?? null,
     props.physics ?? null,
     props.onTwos ?? null,
-  ])
+  ]
+}
+
+/** Resolve once, and again only when the inputs actually differ. */
+export function useResolvedConfig(props: PaperMeshProps): PaperConfig {
+  const inputs = useStable(configInputs(props))
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `inputs` IS every prop resolveConfig reads; the props object itself is new each render.
+  return useMemo(() => resolveConfig(props), [inputs])
 }
 
 /** Resolve preset + prop overrides into a validated config. */
@@ -171,8 +185,7 @@ const quatScratch = new THREE.Quaternion()
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
   // Each resolveConfig call is several zod parses (superRefine re-parses every
   // state override) — memoized so a render without config-prop changes is free.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resolveConfigKey serializes every prop resolveConfig reads — the props object itself is new each render.
-  const resolved = useMemo(() => resolveConfig(props), [resolveConfigKey(props)])
+  const resolved = useResolvedConfig(props)
   // Reduced motion: behaviors freeze at their resting pose, physics is off,
   // idle motion is off. The sheet still renders fully sculpted.
   const reduced = usePrefersReducedMotion(props.reducedMotion)

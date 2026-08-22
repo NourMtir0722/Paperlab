@@ -30,6 +30,22 @@ import type { EditorMode, EditorZone, FieldState, StageState } from './store'
 
 const STORAGE_KEY = 'paperlab.session.v1'
 
+/**
+ * Forget the remembered view.
+ *
+ * The session is a convenience that is allowed to fail, and the failure that
+ * matters is a stored view this build cannot render — reloading would just
+ * restore it and break again. The crash screen offers this so there is a way
+ * back that does not involve knowing what localStorage is.
+ */
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    /* nothing to clear, or no storage at all — reloading is still worth a try */
+  }
+}
+
 /** Long enough to outlast a slider drag, short enough to survive a tab close. */
 const WRITE_DEBOUNCE_MS = 500
 
