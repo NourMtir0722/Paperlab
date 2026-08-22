@@ -16,6 +16,7 @@ export const fly: Behavior<FlyOptions> = {
   label: 'Fly',
   defaults: flyOptionsSchema.parse({}),
   optionsSchema: flyOptionsSchema,
+  signature: ['flutter', 'curve'],
   progressParam: 'flutter',
   duration: 3.5,
   loopMode: 'yoyo',

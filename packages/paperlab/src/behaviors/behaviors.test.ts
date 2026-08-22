@@ -254,3 +254,40 @@ describe('ribbon — the strip that reaches the floor and keeps going', () => {
     }
   })
 })
+
+/**
+ * `signature` is what the editor gives the big controls to, and everything
+ * unnamed folds away behind "More". Two things can go wrong and both are
+ * silent: naming an option that does not exist (the control simply never
+ * appears, and the param you meant to promote stays buried), and nominating
+ * so many that nothing is actually triaged. A built-in that ships either way
+ * teaches the wrong shape to every community behavior copying it.
+ */
+describe('signature params', () => {
+  it('every built-in nominates its two or three', () => {
+    for (const id of listBehaviors()) {
+      const behavior = getBehavior(id)
+      expect(behavior.signature, `${id} nominates no signature params`).toBeDefined()
+      expect(behavior.signature!.length, `${id} nominates ${behavior.signature!.length}`).toBeGreaterThan(1)
+      expect(behavior.signature!.length, `${id} nominates ${behavior.signature!.length}`).toBeLessThan(4)
+    }
+  })
+
+  it('nominates only options the schema actually has', () => {
+    for (const id of listBehaviors()) {
+      const behavior = getBehavior(id)
+      const schema = behavior.optionsSchema as unknown as { shape?: Record<string, unknown> }
+      const keys = Object.keys(schema.shape ?? {})
+      for (const name of behavior.signature ?? []) {
+        expect(keys, `${id}.signature names "${name}", which is not in its schema`).toContain(name)
+      }
+    }
+  })
+
+  it('names each option once', () => {
+    for (const id of listBehaviors()) {
+      const signature = getBehavior(id).signature ?? []
+      expect(new Set(signature).size, `${id} repeats a signature param`).toBe(signature.length)
+    }
+  })
+})

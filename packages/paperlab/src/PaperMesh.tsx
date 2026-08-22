@@ -94,6 +94,20 @@ export interface PaperHandle {
   snapshot(): PaperConfig
   toJSON(): string
   readonly mesh: THREE.Mesh | null
+  /**
+   * Where a behavior's grab point currently sits, in world space, or null
+   * when the behavior has no handles (or `interactive` is off).
+   *
+   * The handle is not at the corner it names: it rides the deformed surface,
+   * so its position is only known after the frame's deformer stack has run.
+   * Anything that wants to point AT the handle — a coach-mark, a tooltip,
+   * an arrow — has to ask the frame rather than compute a UV, which is why
+   * reading it is a method here and not a prop the sheet could publish.
+   *
+   * Written into `target` when one is passed, so a per-frame reader does not
+   * allocate a vector sixty times a second.
+   */
+  handlePoint(id?: string, target?: THREE.Vector3): THREE.Vector3 | null
   /** Interaction-state machine access (null when the config has no states). */
   readonly state: string
   sendState(event: StateEvent): string | null
@@ -405,6 +419,14 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     toJSON: () => serializePreset(snapshot()),
     get mesh() {
       return meshRef.current
+    },
+    handlePoint(id?: string, target?: THREE.Vector3) {
+      const handles = behavior?.handles
+      if (!handles?.length) return null
+      const index = id ? handles.findIndex((h) => h.id === id) : 0
+      const mesh = handleRefs.current[index]
+      if (!mesh) return null
+      return mesh.getWorldPosition(target ?? new THREE.Vector3())
     },
     get state() {
       return machineState

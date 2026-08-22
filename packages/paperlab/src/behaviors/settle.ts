@@ -55,6 +55,7 @@ export const settle: Behavior<SettleOptions> = {
   label: 'Settle',
   defaults: settleOptionsSchema.parse({}),
   optionsSchema: settleOptionsSchema,
+  signature: ['relax', 'lift'],
   progressParam: 'relax',
   duration: 2.4,
   loopMode: 'yoyo',

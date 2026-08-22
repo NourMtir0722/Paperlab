@@ -574,7 +574,7 @@ button.export:hover {
   color: #c9c7c2;
 }
 
-.slot-state-control input[type="range"] {
+.slot-state-slider {
   width: 90px;
 }
 
@@ -1238,4 +1238,400 @@ button.export:hover {
     monospace;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ── Undo / redo (Phase 06) ──────────────────────────────────────────────── */
+
+.history {
+  display: flex;
+  gap: 2px;
+}
+
+.history button {
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #c9c7c2;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.history button:hover:not(:disabled) {
+  background: #26272b;
+}
+
+.history button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ── The app's own select (replaces the native one) ───────────────────────── */
+
+.select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: #26272b;
+  border: 1px solid #3a3b40;
+  border-radius: 4px;
+  color: #e6e4df;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.select-trigger:hover {
+  border-color: #4a4b52;
+}
+
+.select-trigger:focus-visible,
+.select-trigger.open {
+  border-color: #4f7cff;
+  outline: none;
+}
+
+.select-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-caret {
+  color: #8b8a86;
+  font-size: 9px;
+  flex: none;
+}
+
+/* The list is portaled to <body> so the scrolling rails cannot clip it —
+   which is also why it sits above the dialog backdrop's stacking context. */
+.select-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
+.select-list {
+  position: fixed;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 4px;
+  background: #1f2024;
+  border: 1px solid #3a3b40;
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+.select-list:focus {
+  outline: none;
+}
+
+.select-option {
+  border: 0;
+  background: transparent;
+  color: #c9c7c2;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.select-option.active {
+  background: #2e2f34;
+  color: #e6e4df;
+}
+
+.select-option.selected {
+  color: #9db4ff;
+}
+
+.select-option.selected::after {
+  content: "✓";
+  float: right;
+  margin-left: 12px;
+}
+
+/* The row grid gives the select column 2; the trigger is a button, so it
+   needs the placement the native <select> had. */
+.control-row .select-trigger {
+  grid-column: 2 / -1;
+}
+
+.slot-preset {
+  min-width: 0;
+}
+
+.preset-select.select-trigger {
+  grid-column: auto;
+}
+
+/* ── The slider, drawn by this app rather than by the browser ─────────────── */
+
+.control-slider,
+.transport .scrubber,
+.slot-state-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(
+    to right,
+    #4f7cff 0,
+    #4f7cff var(--fill, 0%),
+    #303136 var(--fill, 0%),
+    #303136 100%
+  );
+  border-radius: 999px;
+  height: 4px;
+  cursor: pointer;
+}
+
+.control-slider::-webkit-slider-thumb,
+.transport .scrubber::-webkit-slider-thumb,
+.slot-state-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e6e4df;
+  border: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+
+.control-slider::-moz-range-thumb,
+.transport .scrubber::-moz-range-thumb,
+.slot-state-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e6e4df;
+  border: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+
+.control-slider:active::-webkit-slider-thumb,
+.transport .scrubber:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  background: #fff;
+}
+
+.control-slider:focus-visible,
+.transport .scrubber:focus-visible {
+  outline: 2px solid #4f7cff;
+  outline-offset: 3px;
+}
+
+.control-slider:disabled,
+.transport .scrubber:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The transport scrubber is written to imperatively by the canvas, so it has
+   no React-set --fill; it keeps a plain track. */
+.transport .scrubber {
+  background: #303136;
+  height: 5px;
+}
+
+/* ── Signature params: the two or three a behavior nominated ─────────────── */
+
+.control-row.signature {
+  grid-template-columns: 1fr 46px;
+  grid-template-areas:
+    "label value"
+    "input input";
+  gap: 4px 8px;
+  padding: 7px 0 9px;
+}
+
+.control-row.signature .control-label {
+  grid-area: label;
+  color: #d7d5d0;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.control-row.signature .control-slider {
+  grid-area: input;
+  height: 6px;
+}
+
+.control-row.signature .control-slider::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+}
+
+.control-row.signature .control-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+}
+
+.control-row.signature .control-value {
+  grid-area: value;
+}
+
+.control-row.signature .select-trigger,
+.control-row.signature .control-toggle {
+  grid-area: input;
+  grid-column: auto;
+  padding: 6px;
+}
+
+/* ── The coach-mark: one instruction, touching the handle ─────────────────── */
+
+.coach-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* `transform` is the handle's position; this offsets the card off the dot
+     so the tether has something to span. */
+  margin: -14px 0 0 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 12px;
+  max-width: 260px;
+  background: #23305c;
+  border: 1px solid #4f7cff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: #eaeefb;
+  font-size: 12.5px;
+  line-height: 1.35;
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.coach-mark.placed {
+  animation: coach-in 220ms ease-out both;
+}
+
+@keyframes coach-in {
+  from {
+    opacity: 0;
+    transform-origin: left center;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The line back to the dot — without it the card is floating near the paper
+   rather than pointing at anything. */
+.coach-mark-tether {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 22px;
+  height: 1px;
+  background: #4f7cff;
+}
+
+.coach-mark-tether::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: -3.5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid #4f7cff;
+}
+
+.coach-mark-text {
+  flex: 1;
+}
+
+.coach-mark-close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: #9db4ff;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.coach-mark-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* ── States bar: it now says what it is ──────────────────────────────────── */
+
+.states-bar-label {
+  font-size: 11px;
+  color: #a8a6a1;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.states-bar-hint {
+  color: #6b6a64;
+  font-weight: 400;
+}
+
+.state-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.state-ease.select-trigger {
+  width: auto;
+  min-width: 104px;
+}
+
+.state-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* The card takes whichever side of the dot has room. */
+.coach-mark[data-flip="left"] {
+  margin: -14px 22px 0 0;
+  transform-origin: right center;
+}
+
+.coach-mark[data-flip="left"] .coach-mark-tether {
+  right: auto;
+  left: 100%;
+}
+
+.coach-mark[data-flip="left"] .coach-mark-tether::before {
+  right: auto;
+  left: 100%;
+}
+
+.coach-mark[data-raise="true"] {
+  margin-top: -52px;
+}
+
+.coach-mark[data-raise="true"] .coach-mark-tether {
+  top: auto;
+  bottom: -19px;
+  height: 20px;
+  width: 1px;
+  right: auto;
+  left: 16px;
+}
+
+.coach-mark[data-raise="true"] .coach-mark-tether::before {
+  right: auto;
+  top: 100%;
+  left: -3.5px;
 }

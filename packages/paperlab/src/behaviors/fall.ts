@@ -16,6 +16,7 @@ export const fall: Behavior<FallOptions> = {
   label: 'Fall',
   defaults: fallOptionsSchema.parse({}),
   optionsSchema: fallOptionsSchema,
+  signature: ['flutter', 'curl'],
   progressParam: 'flutter',
   duration: 3,
   loopMode: 'yoyo',

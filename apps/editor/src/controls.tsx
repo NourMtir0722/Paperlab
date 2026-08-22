@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Control } from './controlModel'
+import { Select } from './Select'
 
 /**
  * The native control set. Renders the neutral `Control` tree from
@@ -51,6 +52,9 @@ function ControlRow({ control }: { control: Control }) {
 }
 
 type Of<K extends Control['kind']> = Extract<Control, { kind: K }>
+
+/** A behavior's nominated params get the loud row; everything else the quiet one. */
+const emphasisClass = (emphasis?: 'signature') => (emphasis ? ` ${emphasis}` : '')
 
 function Folder({ control }: { control: Of<'folder'> }) {
   const [open, setOpen] = useState(!control.collapsed)
@@ -136,8 +140,13 @@ function NumberControl({ control }: { control: Of<'number'> }) {
     setEditing(null)
   }
 
+  // The track is filled up to the value with a hard-stop gradient, because
+  // `accent-color` paints a browser's slider, not this one's — and a bar that
+  // reads as full-to-here is most of what makes a slider legible at a glance.
+  const fill = max > min ? ((value - min) / (max - min)) * 100 : 0
+
   return (
-    <div className={`control-row${disabled ? ' disabled' : ''}`}>
+    <div className={`control-row${disabled ? ' disabled' : ''}${emphasisClass(control.emphasis)}`}>
       {/* The slider below is the accessible control; this label is a pointer-only affordance. */}
       <span className="control-label scrub" onPointerDown={onPointerDown}>
         {control.label}
@@ -145,6 +154,7 @@ function NumberControl({ control }: { control: Of<'number'> }) {
       <input
         type="range"
         className="control-slider"
+        style={{ '--fill': `${fill}%` } as React.CSSProperties}
         min={min}
         max={max}
         step={step}
@@ -185,27 +195,22 @@ function NumberControl({ control }: { control: Of<'number'> }) {
 
 function SelectControl({ control }: { control: Of<'select'> }) {
   return (
-    <div className="control-row">
+    <div className={`control-row${emphasisClass(control.emphasis)}`}>
       <span className="control-label">{control.label}</span>
-      <select
+      <Select
         className="control-select"
+        label={control.label}
         value={control.value}
-        aria-label={control.label}
-        onChange={(e) => control.onChange(e.target.value)}
-      >
-        {control.options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+        options={control.options}
+        onChange={control.onChange}
+      />
     </div>
   )
 }
 
 function ToggleControl({ control }: { control: Of<'toggle'> }) {
   return (
-    <div className="control-row">
+    <div className={`control-row${emphasisClass(control.emphasis)}`}>
       <span className="control-label">{control.label}</span>
       <label className="control-toggle">
         <input

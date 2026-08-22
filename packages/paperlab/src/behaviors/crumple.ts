@@ -27,6 +27,7 @@ export const crumpleBehavior: Behavior<CrumpleBehaviorOptions> = {
   label: 'Crumple',
   defaults: crumpleBehaviorOptionsSchema.parse({}),
   optionsSchema: crumpleBehaviorOptionsSchema,
+  signature: ['progress', 'ball', 'coarseness'],
   progressParam: 'progress',
   duration: 2.6,
   loopMode: 'yoyo',

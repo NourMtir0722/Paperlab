@@ -21,6 +21,7 @@ export const flip: Behavior<FlipOptions> = {
   label: 'Flip',
   defaults: flipOptionsSchema.parse({}),
   optionsSchema: flipOptionsSchema,
+  signature: ['progress', 'spine'],
   progressParam: 'progress',
   duration: 1.8,
   loopMode: 'yoyo',
