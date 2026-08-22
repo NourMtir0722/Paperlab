@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { useEffect, useMemo } from 'react'
+import { cssColorOr } from '../scene/color'
 
 /**
  * The cyclorama: an inverted sphere graded from the source colour at the
@@ -27,14 +28,20 @@ export function makeSkyTexture(sky: SkyColors): THREE.CanvasTexture {
   canvas.height = 256
   const ctx = canvas.getContext('2d')!
   const grade = ctx.createLinearGradient(0, 0, 0, canvas.height)
+  // These three are typed into text fields, so mid-keystroke they are not
+  // colours yet — and `addColorStop` throws on what it cannot parse, from
+  // inside a render. See `cssColorOr`.
+  const zenith = cssColorOr(sky.zenith, '#241c17')
+  const horizon = cssColorOr(sky.horizon, '#fff4e2')
+  const ground = cssColorOr(sky.ground, '#141210')
   // Canvas row 0 is the top of the sphere. The grade has to travel most of
   // the way down: held flat until near the horizon it reads as a dark lid
   // over a bright slot, which is the black void this is here to remove.
-  grade.addColorStop(0, sky.zenith)
-  grade.addColorStop(0.3, sky.zenith)
-  grade.addColorStop(0.62, sky.horizon)
-  grade.addColorStop(0.7, sky.horizon)
-  grade.addColorStop(1, sky.ground)
+  grade.addColorStop(0, zenith)
+  grade.addColorStop(0.3, zenith)
+  grade.addColorStop(0.62, horizon)
+  grade.addColorStop(0.7, horizon)
+  grade.addColorStop(1, ground)
   ctx.fillStyle = grade
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   const texture = new THREE.CanvasTexture(canvas)

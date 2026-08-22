@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { LightingPreset } from './lighting'
 import { lightAngles } from './lighting'
+import { cssColorOr } from './color'
 
 /**
  * The room, drawn as an equirectangular image so it can light things.
@@ -44,7 +45,11 @@ export function skyV(elevationDeg: number): number {
  * region is the wall, not a mathematical line through it.
  */
 export function drawSky(ctx: CanvasRenderingContext2D, preset: LightingPreset): void {
-  const { zenith, horizon, ground } = preset.sky
+  // Guarded: a stage's sky colours are editable text, and `addColorStop`
+  // throws on anything it cannot parse. See `cssColorOr`.
+  const zenith = cssColorOr(preset.sky.zenith, '#241c17')
+  const horizon = cssColorOr(preset.sky.horizon, '#fff4e2')
+  const ground = cssColorOr(preset.sky.ground, '#141210')
   const grade = ctx.createLinearGradient(0, 0, 0, HEIGHT)
   grade.addColorStop(0, zenith)
   grade.addColorStop(0.32, zenith)

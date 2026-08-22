@@ -240,6 +240,178 @@ status.
 
 ---
 
+## A generated slider handed an integer field a fraction — *fixed*
+
+**Reported 2026-08-22 as "the app gets closed". It was a blank white page,
+and the cause was one missing check in the control model.**
+
+`schemaControls` built every numeric slider from two facts off the schema —
+`min` and `max` — and derived its step as `(max - min) / 200`. It never read
+zod's `.int()`. So the moment you touched `seed` on a colonnade, the editor
+wrote `2.5` into a field declared `z.number().int()`.
+
+Nothing warned. `<PaperStageScene>` re-parses its layout options **during
+render** to place the walk's stops, and a parse does not warn about a
+fraction where an integer belongs — it throws:
+
+```
+ZodError: Expected integer, received float — path: ["seed"]
+  at PaperStage.tsx:368  (the `stops` memo)
+```
+
+A throw in render with nothing above it to catch unmounts the tree, which is
+why the app appeared to close rather than to complain.
+
+**Ten fields carried `.int()`** and every one of them was a loaded gun:
+`seed` on pile, spill, accordion and colonnade, `seed` on crumple (behavior
+and deformer), `rows` and `columns` on the sheet grid, `columns` on the rack,
+`segments` on the sheet.
+
+Fixed in the control model, so all ten are covered by one rule: an int field
+gets `step: 1` **and** its emitted value is rounded. Both halves are load-
+bearing — the step is what the slider snaps to, and the rounding is what
+protects the readout you can type into, which clamps but never snaps.
+
+**Then the same question was asked of the rest of the app: where else?**
+Three answers, all now closed:
+
+1. **`StatesBar` had written the schema walk a second time** — its own
+   `min`/`max`/`step` extraction for the per-slot override sliders, missing
+   `.int()` exactly like the first one. Live, and reproduced: a slot on
+   `crumpled-note`, a state chip, drag `seed`, and
+   `resolveFieldSlotConfig` re-parses the slot overrides during render into
+   the same uncaught ZodError. Fixed by deleting the copy — both panels now
+   read `numberSpec`, which is the only thing in the editor that reads a
+   `z.ZodNumber`.
+2. **Exclusive bounds.** `.positive()` is stored as `min: 0, inclusive:
+   false` — the same shape as `.min(0)`, one boolean apart — and the reader
+   took the value and dropped the boolean. That gives a slider whose far end
+   is the one number the schema rejects. Latent rather than live (the two
+   fields carrying it, `sheet.width` and `sheet.height`, are hand-built with
+   a floor of 0.2), and now handled anyway: an excluded endpoint is moved in
+   by a step.
+3. **Hand-written control ranges drifting from their schemas** — the other
+   way this bug could appear, since nineteen controls in the editor state
+   their own min/max instead of reading one. Audited all nineteen against
+   the schema behind them: every range sits inside its schema's. Clean, and
+   worth re-checking whenever a schema bound moves.
+4. **The same shape on the free-text side, and live.** Typing anything that
+   is not a colour into a stage's `zenith` crashed the editor —
+   `addColorStop` is one of the few canvas calls that **throws** rather than
+   ignoring what it cannot parse, and the sky is built during render. Every
+   colour in a stage is a text field, and a text field emits per keystroke,
+   so the library is handed `#f` and `#ff` in the normal course of somebody
+   typing `#ffaa22`. Three.js is the forgiving one — `new THREE.Color(…)`
+   only warns — which is why the gradient was the only path that broke.
+   `cssColorOr` now asks a canvas whether a string is a colour (the canvas's
+   own opinion, not a regex — CSS colours are a bigger set than a regex
+   should be trusted with) and falls back when it is not.
+
+   Worth being explicit about why the fix is not "validate it in the
+   schema": the text control emits on every keystroke, so a `.refine()`
+   would reject `#f` and move the throw rather than remove it. **A value a
+   person is halfway through typing is expected input**, and robustness
+   belongs where it is consumed.
+
+Two things found alongside it, both kept:
+
+- **The editor had no error boundary at all.** Any render throw left a blank
+  page with no message, and reloading walked straight back in whenever the
+  cause was something the session restored. `CrashScreen` now shows the
+  error, the component stack, a copy button, and a *forget the session and
+  reload* escape. This is what turned an unreproducible report into a
+  one-line diagnosis.
+- **`App.resolvePresetByName` called `getPreset`, which throws** on an
+  unregistered name, once per slot per render — so a single stale slot name
+  took down the whole editor rather than one sheet. It now falls back to
+  `photo-print`.
+
+The rule worth keeping: **a schema is a contract in both directions.** Any UI
+generated from one has to emit what that schema accepts, because the code
+receiving it is entitled to parse strictly — and a strict parse inside a
+render is an app-level crash, not a validation message.
+
+---
+
+## Observed once, not reproduced — a renderer crash under synthetic churn
+
+**Seen 2026-08-22 by the audit harness, not by a person. Recorded so it is
+not re-derived from scratch if it ever shows up for real.**
+
+At the tail of a ten-minute scripted run — every slider in every mode, every
+behavior and every layout, driven continuously in one page without a reload —
+the browser tab died outright (Playwright `Target crashed`, which is a
+renderer-process death, not the crash screen). It happened once, at
+`field/spill`.
+
+Three hypotheses, all tested and all **ruled out**:
+
+- **Layout churn leaking.** 72 consecutive scene rebuilds: heap and listener
+  counts rise and fall back (34 → 97 → 62 MB; listeners 273 → 1861 → 561).
+  Sawtooth, not a ratchet.
+- **WebGL contexts leaking on mode switch.** The obvious suspect, since
+  `<Canvas key={mode}>` builds a fresh context every time and the console
+  does print `THREE.WebGLRenderer: Context Lost`. 30 switches: exactly one
+  such line per switch — r3f's expected teardown on unmount — canvas count
+  steady at 4, heap flat at 34–45 MB.
+- **The failing segment itself.** Every field layout × every slider, twice
+  over, 154 drags in one page: survived, heap bounded and returning to
+  ~54 MB between layouts.
+
+So: not reproduced in isolation, and the current read is accumulated pressure
+in a headless browser under a marathon no person would perform, rather than a
+defect a user can reach. Two things worth carrying forward if it recurs:
+`sheet` is by a distance the heaviest layout (223 MB peak against ~70 MB for
+the rest), and the harness that found it lives in the session notes — the
+reproduction is "drive everything for ten minutes without reloading".
+
+---
+
+## Callback props as effect dependencies — one fixed, two left
+
+**Found 2026-08-22, chasing "the whole app freezes when I interact with
+anything." The freeze is fixed; the pattern behind it is not gone.**
+
+`<PaperStageScene>` reported its settled quality tier from an effect that
+named the callback in its dependency list:
+
+```tsx
+useEffect(() => { onQualityChange?.(tier) }, [tier, onQualityChange])
+```
+
+The natural way to pass that prop is an inline arrow, which is a new function
+on every render of the page above — so the effect fired on every consumer
+render, not on every tier change. In the editor the consumer stores the tier,
+which re-renders, which makes another arrow, which fires the effect again.
+A notification had become a pump: **~6 App renders a second at rest in stage
+mode**, each one a full `stageSchema.parse` and walk resample, which is why
+every interaction felt frozen and why dragging the scrubber could take the
+tab out with an out-of-memory crash.
+
+Fixed by holding the callback in a ref and depending on `tier` alone, plus a
+store-side guard so `patchStage` returns the *same* object for a patch that
+changes nothing (`apps/editor/src/store.test.ts` covers the guard).
+
+**What is left.** Two places still have the shape, neither of them a loop
+today, both worth closing:
+
+- `field/dropZones.tsx` — the registration effect names `onPlace`, so a
+  consumer passing an inline handler re-registers the zone on every render.
+  It bumps the registry version and re-renders every `DropZoneVisual`. Churn
+  rather than a loop, because the effect's own component is not what the
+  version change re-renders — which is luck, not design.
+- `stage/PaperStage.tsx` — `stage` arrives as a fresh object literal from the
+  editor, so `stageSchema.parse` and `getWalkPath` both re-run on every
+  render. Harmless per render, and it was the reason each pump iteration cost
+  as much as it did. Serialized deps, the way `PaperFieldMesh` already does
+  it, would settle it.
+
+The general rule this earned: **a callback prop is a notification, not a
+dependency.** If an effect exists to tell the consumer something, it should
+depend on the thing being told, and reach the callback through a ref.
+
+---
+
 ## Next — the ideas we want to build
 
 Ordered by how much each one serves the goal, not by effort.

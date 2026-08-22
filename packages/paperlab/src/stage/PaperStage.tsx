@@ -265,9 +265,25 @@ export function PaperStageScene({
   useEffect(() => {
     if (quality !== 'auto') setTier(quality as QualityTier)
   }, [quality])
+  /**
+   * Report the tier when the TIER moves — never because the consumer
+   * re-rendered.
+   *
+   * Held in a ref rather than named as a dependency, because the natural way
+   * to write this prop is an inline arrow, and an inline arrow is a new
+   * function on every render of the page above. Depending on it turned a
+   * notification into a pump: report → consumer stores the tier → consumer
+   * re-renders → new callback identity → report again, forever. The editor
+   * spent every frame in stage mode servicing that loop, which is what made
+   * the whole app feel frozen the moment you touched anything.
+   */
+  const reportQuality = useRef(onQualityChange)
   useEffect(() => {
-    onQualityChange?.(tier)
-  }, [tier, onQualityChange])
+    reportQuality.current = onQualityChange
+  })
+  useEffect(() => {
+    reportQuality.current?.(tier)
+  }, [tier])
   const settings = quality === 'auto' ? qualityTiers[tier] : qualityFor(quality)
 
   const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageInput])

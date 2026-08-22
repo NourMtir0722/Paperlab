@@ -1,12 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { forwardRef, useMemo } from 'react'
-import {
-  PaperMesh,
-  resolveConfig,
-  resolveConfigKey,
-  type PaperHandle,
-  type PaperMeshProps,
-} from './PaperMesh'
+import { PaperMesh, useResolvedConfig, type PaperHandle, type PaperMeshProps } from './PaperMesh'
 import { PaperFallback, PaperMirror, supportsWebGL } from './a11y'
 import { PaperLighting } from './scene/PaperLighting'
 
@@ -32,8 +26,7 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
 ) {
   // Keyed on every prop resolveConfig reads — a content/stock/behavior change
   // must refresh the fallback, mirror, and lighting, not just the mesh.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resolveConfigKey serializes every prop resolveConfig reads — the props object itself is new each render.
-  const config = useMemo(() => resolveConfig(meshProps), [resolveConfigKey(meshProps)])
+  const config = useResolvedConfig(meshProps)
   const webgl = useMemo(() => (typeof window === 'undefined' ? true : supportsWebGL()), [])
 
   return (

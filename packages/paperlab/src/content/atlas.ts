@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { useEffect, useState } from 'react'
 import type { ContentConfig, SheetConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
+import { useStable } from '../core/stable'
 import { renderContentToCanvas } from './texture'
 
 /**
@@ -38,9 +39,13 @@ export function useContentAtlas(
   stock: Stock,
 ): ContentAtlas | null {
   const [atlas, setAtlas] = useState<ContentAtlas | null>(null)
-  const key = JSON.stringify({ contents, w: sheet.width, h: sheet.height, stock: stock.id })
+  // Compared rather than serialized. An image tile carries its bitmap inline
+  // as a data URL, and this runs on every render of the field — building a
+  // cache key out of the very thing that makes the cache worth having was
+  // costing more per render than the atlas it was protecting.
+  const stableContents = useStable(contents)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: key serializes the contents, sheet and stock the atlas draws from.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the atlas is drawn from the contents, sheet and stock named below.
   useEffect(() => {
     let disposed = false
     const aspect = sheet.height / sheet.width
@@ -92,7 +97,7 @@ export function useContentAtlas(
       disposed = true
       texture.dispose()
     }
-  }, [key])
+  }, [stableContents, sheet.width, sheet.height, stock.id])
 
   return atlas
 }

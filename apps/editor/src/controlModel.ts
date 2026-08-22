@@ -135,26 +135,24 @@ export function schemaControls(
     const value = values[key]
 
     if (inner instanceof z.ZodNumber) {
-      const min = checkValue(inner, 'min') ?? 0
-      const max = checkValue(inner, 'max') ?? 1
-      controls.push(num(key, typeof value === 'number' ? value : min, { min, max }, (v) => onChange(key, v)))
+      controls.push(numberControl(key, key, inner, value, (v) => onChange(key, v)))
     } else if (inner instanceof z.ZodTuple && isNumberTuple(inner)) {
       // Numeric tuples (flight's wind vector) → one slider per component.
       const items = inner._def.items as z.ZodNumber[]
       const current = Array.isArray(value) ? (value as number[]) : items.map(() => 0)
       items.forEach((item, axis) => {
-        const min = checkValue(item, 'min') ?? -1
-        const max = checkValue(item, 'max') ?? 1
         controls.push(
-          num(
+          numberControl(
             `${key}${'XYZW'[axis] ?? axis}`,
+            `${key} ${'xyzw'[axis] ?? axis}`,
+            item,
             current[axis] ?? 0,
-            { min, max, label: `${key} ${'xyzw'[axis] ?? axis}` },
             (v) => {
               const next = [...current]
               next[axis] = v
               onChange(key, next)
             },
+            { fallbackMin: -1 },
           ),
         )
       })
@@ -173,6 +171,87 @@ export function schemaControls(
     }
   }
   return controls
+}
+
+/**
+ * What a numeric zod field permits, in the terms a slider needs.
+ *
+ * **This is the one place that reads a `z.ZodNumber`.** It exists because
+ * the same reading was once done twice — here and by hand in `StatesBar` —
+ * and the copy that was written second was missing a check, which is a
+ * completely avoidable way to ship the same crash twice.
+ *
+ * The checks that matter, and why:
+ *
+ * - **`.int()`.** A step of `(max - min) / 200` on an integer field hands
+ *   the schema a fraction the moment you touch it, and the receiving parse
+ *   does not warn — it THROWS. Dragging `seed` on a colonnade took the whole
+ *   editor down that way: `<PaperStageScene>` re-parses its layout options
+ *   during render, so a 2.5 became an uncaught ZodError inside a render and
+ *   React unmounted everything. `snap` rounds as well as stepping, because
+ *   the readout you can type into clamps but never snaps.
+ * - **Exclusive bounds.** `.positive()` is stored as `min: 0, inclusive:
+ *   false` — the same shape as `.min(0)`, one boolean apart. Reading the
+ *   value and ignoring the boolean gives a slider whose far end is the one
+ *   number the schema rejects. Shifted by a step so the track cannot land
+ *   on it.
+ */
+export interface NumberSpec {
+  min: number
+  max: number
+  step: number
+  /** Coerce a raw slider/typed value into something the schema accepts. */
+  snap: (v: number) => number
+}
+
+export function numberSpec(schema: z.ZodNumber, fallbackMin = 0): NumberSpec {
+  const integer = schema._def.checks.some((c) => c.kind === 'int')
+  const rawMin = checkValue(schema, 'min') ?? fallbackMin
+  const rawMax = checkValue(schema, 'max') ?? 1
+  const step = integer ? 1 : (rawMax - rawMin) / 200
+  // An excluded endpoint is still a number the track could land on; move the
+  // end in by one step so it cannot.
+  const min = isExclusive(schema, 'min') ? rawMin + step : rawMin
+  const max = isExclusive(schema, 'max') ? rawMax - step : rawMax
+  return { min, max, step, snap: integer ? (v) => Math.round(v) : (v) => v }
+}
+
+/** One slider for one numeric schema field, on the spec above. */
+function numberControl(
+  key: string,
+  label: string,
+  schema: z.ZodNumber,
+  value: unknown,
+  onChange: (v: number) => void,
+  opts: { fallbackMin?: number } = {},
+): Control {
+  const spec = numberSpec(schema, opts.fallbackMin)
+  return num(
+    key,
+    typeof value === 'number' ? value : spec.min,
+    { min: spec.min, max: spec.max, step: spec.step, label },
+    (v) => onChange(spec.snap(v)),
+  )
+}
+
+/**
+ * Every numeric field of an object schema, with its spec. For panels that
+ * draw their own markup rather than going through `Control` — they still do
+ * not get to re-derive what the schema allows.
+ */
+export function numericFields(schema: z.ZodTypeAny): { key: string; spec: NumberSpec }[] {
+  if (!(schema instanceof z.ZodObject)) return []
+  const out: { key: string; spec: NumberSpec }[] = []
+  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
+    const inner = unwrap(field)
+    if (inner instanceof z.ZodNumber) out.push({ key, spec: numberSpec(inner) })
+  }
+  return out
+}
+
+function isExclusive(schema: z.ZodNumber, kind: 'min' | 'max'): boolean {
+  const check = schema._def.checks.find((c) => c.kind === kind)
+  return Boolean(check && 'inclusive' in check && check.inclusive === false)
 }
 
 function isNumberTuple(tuple: z.ZodTuple): boolean {
