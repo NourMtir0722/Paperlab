@@ -304,6 +304,10 @@ export const useEditor = create<EditorState>((set, get) => ({
         node = node[keys[i]!] as Record<string, unknown> | undefined
       }
       if (node) delete node[keys[keys.length - 1]!]
+      // No epoch bump — see `addZone`. Clearing an override changes VALUES
+      // the inspector already reads from the store on every render; it does
+      // not change the subject. Remounting for it would close every folder
+      // the person had opened to find the control they are resetting.
       return {
         config: paperConfigSchema.parse({
           ...s.config,
@@ -312,7 +316,6 @@ export const useEditor = create<EditorState>((set, get) => ({
             states: { ...s.config.states!.states, [name]: { ...def, overrides } },
           },
         }),
-        inspectorEpoch: s.inspectorEpoch + 1,
       }
     }),
   resetStateOverrides: (name) =>
@@ -327,7 +330,6 @@ export const useEditor = create<EditorState>((set, get) => ({
             states: { ...s.config.states!.states, [name]: { ...def, overrides: {} } },
           },
         }),
-        inspectorEpoch: s.inspectorEpoch + 1,
       }
     }),
   setSelectedSlot: (i) => set({ selectedSlot: i }),
@@ -356,10 +358,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       const slotStates = { ...s.field.slotStates }
       if (Object.keys(states).length === 0 && !existing.initial) delete slotStates[slot]
       else slotStates[slot] = { ...existing, states }
-      return {
-        field: { ...s.field, slotStates },
-        inspectorEpoch: s.inspectorEpoch + 1,
-      }
+      return { field: { ...s.field, slotStates } }
     }),
   addZone: () =>
     set((s) => {
