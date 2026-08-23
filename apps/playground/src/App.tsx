@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PaperStage, buildStageAgentPayload, getStagePreset, listStagePresets } from 'paperlab/stage'
-import { readStageShare, stageShareUrl, type StageShare } from './share'
+import { MAX_TEXT_LENGTH, readStageShare, stageShareUrl, type StageShare } from './share'
 
 /**
  * The playground: one screen, one input, one scene.
@@ -62,13 +62,20 @@ export function App() {
 
   // The address bar is the save file. Replace rather than push, so the back
   // button still leaves the page instead of walking edit history.
+  //
+  // A scene that will not fit in a link leaves the previous one in the bar
+  // rather than overwriting it with a URL this build cannot read back. The
+  // textarea is capped at the same length the decoder enforces, so this is
+  // the belt to that braces.
   useEffect(() => {
     const url = stageShareUrl(window.location.href, shareFrom(preset, text))
-    window.history.replaceState(null, '', url)
+    if (url) window.history.replaceState(null, '', url)
   }, [preset, text])
 
+  // An empty value is a refusal, not a copy — writing it would wipe whatever
+  // the visitor already had on their clipboard to tell them about a failure.
   const flash = useCallback((label: string, value: string) => {
-    void navigator.clipboard.writeText(value)
+    if (value) void navigator.clipboard.writeText(value)
     setCopied(label)
     setTimeout(() => setCopied((c) => (c === label ? null : c)), 1800)
   }, [])
@@ -106,9 +113,12 @@ export function App() {
         <div className="actions">
           <button
             type="button"
-            onClick={() => flash('link', stageShareUrl(window.location.href, shareFrom(preset, text)))}
+            onClick={() => {
+              const url = stageShareUrl(window.location.href, shareFrom(preset, text))
+              flash(url ? 'link' : 'too-long', url ?? '')
+            }}
           >
-            {copied === 'link' ? 'Link copied' : 'Copy link'}
+            {copied === 'link' ? 'Link copied' : copied === 'too-long' ? 'Too long to link' : 'Copy link'}
           </button>
           <button
             type="button"
@@ -139,6 +149,10 @@ export function App() {
           <textarea
             value={text}
             rows={2}
+            // The link is the save file, and the link has a ceiling. Capping
+            // here is what stops a paste from producing a scene that cannot
+            // come back — see MAX_TEXT_LENGTH.
+            maxLength={MAX_TEXT_LENGTH}
             spellCheck={false}
             placeholder="type anything — it becomes the architecture"
             onChange={(e) => setText(e.target.value)}

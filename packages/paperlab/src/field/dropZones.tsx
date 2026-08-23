@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { PaperConfig } from '../config/schema'
 
 // ── Drop zones (spec M6 §5) ──────────────────────────────────────────────────
@@ -106,11 +106,29 @@ export const zoneContains = (zone: ZoneEntry, x: number, y: number): boolean =>
 export function DropZone(props: DropZoneProps) {
   const registry = useContext(DropZoneContext)
   const { id, accept, bounds, highlight = 'glow', onPlace } = props
+
+  // `onPlace` is a notification, not a dependency. The natural way to pass
+  // one is an inline arrow, which is a new function on every render of the
+  // page above — naming it here re-registered the zone on every one of those
+  // renders, bumping the registry version and re-rendering every
+  // `DropZoneVisual` in the field. Held in a ref, the registration depends on
+  // what the zone IS, and the callback is read at the moment it fires.
+  const place = useRef(onPlace)
+  useEffect(() => {
+    place.current = onPlace
+  }, [onPlace])
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — re-registering on object identity would thrash the registry.
   useEffect(() => {
     if (!registry) return
-    return registry.register({ id, accept, bounds, highlight, onPlace })
-  }, [registry, id, JSON.stringify(accept ?? null), JSON.stringify(bounds), highlight, onPlace])
+    return registry.register({
+      id,
+      accept,
+      bounds,
+      highlight,
+      onPlace: (paper, zone) => place.current?.(paper, zone),
+    })
+  }, [registry, id, JSON.stringify(accept ?? null), JSON.stringify(bounds), highlight])
   if (!registry) return null
   return <DropZoneVisual registry={registry} config={{ id, accept, bounds, highlight }} />
 }

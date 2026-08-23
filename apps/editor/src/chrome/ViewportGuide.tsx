@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { getBehavior } from 'paperlab'
-import { useEditor } from './store'
+import { useEditor } from '../state/store'
 
 /**
  * The help panel: everything the viewport can do, keyed to the current

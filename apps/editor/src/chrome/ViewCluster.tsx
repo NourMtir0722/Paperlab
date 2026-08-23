@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { usePrefersReducedMotion } from 'paperlab'
-import { isTypingTarget } from './keys'
+import { isTypingTarget } from '../state/keys'
 
 /**
  * The camera, made visible.

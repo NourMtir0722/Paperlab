@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { getBehavior, type PaperHandle } from 'paperlab'
-import { isTypingTarget } from './keys'
-import { useEditor } from './store'
+import { isTypingTarget } from '../state/keys'
+import { useEditor } from '../state/store'
 
 /** The gesture a draggable-handle behavior teaches, keyed by behavior id. */
 const GESTURE: Record<string, string> = {

@@ -120,14 +120,19 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 | | |
 |---|---|
 | [`packages/paperlab`](packages/paperlab/) | the npm library |
-| [`apps/editor`](apps/editor/) | the editor |
+| [`apps/editor`](apps/editor/) | the editor — every knob, and the export |
 | [`apps/playground`](apps/playground/) | the playground — one input, one scene, shareable by link |
+| [`apps/docs`](apps/docs/) | the documentation site, with every behavior running live |
+| [`tools/`](tools/) | the browser harnesses — parity, perf, screenshots, the README's motion |
 | [`docs/llms.txt`](docs/llms.txt) | the agent-readable API reference |
+| [`docs/design.md`](docs/design.md) | the design rules the three apps share, enforced by a test |
 | [`docs/roadmap.md`](docs/roadmap.md) | what this is, what's decided, and what's next |
 
 ```sh
 pnpm test           # unit suite — deformer math, schema, cloth, layouts, exports
 pnpm test:parity    # GPU golden-vector gate: every deformer's GLSL twin vs its JS twin
+pnpm test:drive     # the stage really walks when you drag it
+pnpm test:share     # sculpt → link → a browser that has never seen the paper
 pnpm build
 ```
 

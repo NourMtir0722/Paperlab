@@ -290,8 +290,14 @@ be a code problem after all — see the npm entry.
       Worth stating plainly, since it now gates the launch: a 3D library whose
       pitch is *real geometry that bends* currently has no place to try it.
       `npm i paperlab` works; "see it move" does not.
-- [ ] Product Hunt / launch posts. npm is live; the demo is not, and a
-      launch post with nothing to click is the weaker half of this.
+- [ ] Product Hunt / launch posts. **Both halves of the "something to click"
+      argument are now satisfied** — npm serves the package and the demo has
+      been live since 2026-08-22 — so this is the last item on the runway and
+      nothing technical is blocking it. The entry above said "the demo is
+      not", and it went stale the same week it was written; it is corrected
+      here rather than deleted, because a runway item that quietly disagrees
+      with the two entries above it is exactly how a launch gate gets read as
+      still-blocked when it is not.
 
 ---
 
@@ -706,7 +712,7 @@ reproduction is "drive everything for ten minutes without reloading".
 
 ---
 
-## Callback props as effect dependencies — one fixed, two left
+## Callback props as effect dependencies — *all three closed, 2026-08-23*
 
 **Found 2026-08-22, chasing "the whole app freezes when I interact with
 anything." The freeze is fixed; the pattern behind it is not gone.**
@@ -729,21 +735,23 @@ tab out with an out-of-memory crash.
 
 Fixed by holding the callback in a ref and depending on `tier` alone, plus a
 store-side guard so `patchStage` returns the *same* object for a patch that
-changes nothing (`apps/editor/src/store.test.ts` covers the guard).
+changes nothing (`apps/editor/src/state/store.test.ts` covers the guard).
 
-**What is left.** Two places still have the shape, neither of them a loop
-today, both worth closing:
+**The other two, closed 2026-08-23.** Neither was a loop, and both were the
+same shape:
 
-- `field/dropZones.tsx` — the registration effect names `onPlace`, so a
-  consumer passing an inline handler re-registers the zone on every render.
-  It bumps the registry version and re-renders every `DropZoneVisual`. Churn
+- `field/dropZones.tsx` — the registration effect named `onPlace`, so a
+  consumer passing an inline handler re-registered the zone on every render.
+  It bumped the registry version and re-rendered every `DropZoneVisual`. Churn
   rather than a loop, because the effect's own component is not what the
-  version change re-renders — which is luck, not design.
-- `stage/PaperStage.tsx` — `stage` arrives as a fresh object literal from the
-  editor, so `stageSchema.parse` and `getWalkPath` both re-run on every
+  version change re-renders — which was luck, not design. Now the registration
+  stores a stable wrapper that reads the callback out of a ref, so it depends
+  on what the zone IS.
+- `stage/PaperStage.tsx` — `stage` arrived as a fresh object literal from the
+  editor, so `stageSchema.parse` and `getWalkPath` both re-ran on every
   render. Harmless per render, and it was the reason each pump iteration cost
-  as much as it did. Serialized deps, the way `PaperFieldMesh` already does
-  it, would settle it.
+  as much as it did. Now on serialized deps, the way `PaperFieldMesh` already
+  did it.
 
 The general rule this earned: **a callback prop is a notification, not a
 dependency.** If an effect exists to tell the consumer something, it should
@@ -1142,13 +1150,61 @@ including everything above the line.
 - ~~**The editor remembers nothing between sessions.**~~ **Done.** Reopening
   restores the paper that was on the canvas — the sculpt included, saved or
   not — along with the mode, the field composition, and the stage you were
-  walking. It is one validated localStorage key (`apps/editor/src/session.ts`,
+  walking. It is one validated localStorage key (`apps/editor/src/state/session.ts`,
   written debounced and flushed on `pagehide`); anything that fails the schema,
   or names a preset/layout/stage this build no longer has, is dropped and you
   land on the default, which is exactly the old behaviour rather than a broken
   editor. A `?p=` share link still outranks the remembered view — otherwise
   someone whose last session was stage mode would be told about the paper they
   opened instead of shown it.
+
+---
+
+## The public API is 283 names, and some of them are the inside of the box
+
+**Found 2026-08-12, re-measured 2026-08-23. Still open, because trimming it is
+a breaking change and that is a call to make deliberately, not in passing.**
+
+The stage boundary was drawn (71 → 33 exports) and `share.ts` was evicted to
+the playground. What was left over is the rest of the library, and the shape
+of the problem is the same: names that exist because something inside the
+repo needed to reach them, exported as though a consumer had asked for them.
+
+The candidates, grouped by what they actually are:
+
+- **Canvas painting internals** — `drawBacking`, `silhouetteRects`,
+  `lightenHex`, `barcodeBars`, `atlasGrid`, `makeGoboTexture`. Nothing about
+  these is a paper API; they are how a texture gets drawn.
+- **Shader assembly** — `buildFieldVertexShader`, `buildFieldFragmentShader`,
+  `buildDisplacementGLSL`, `stackUniformValues`. A consumer who needs these is
+  building a different renderer.
+- **Sheet-grid math** — `sheetSlotXY`, `sheetBackingSize`, `outwardCorner`,
+  `tornEdgesOnDetach`, `SHEET_LIFT`, `withSheetCellFromPaper`. All of it exists
+  to make the `sheet` layout agree with itself. (`withSheetCellFromPaper` is
+  also the worst name in the library — it reads like a helper someone gave up
+  on. `sheetCellsFromPaper` if it survives the trim.)
+- **State-machine plumbing** — `flattenNumeric`, `stripStates`,
+  `recordStateOverride`.
+- **The individual layout functions** — `ring`, `fan`, `spread`, … Twelve
+  names that `getLayout`/`listLayouts` already reach, and `registerLayout` is
+  the extension point.
+
+Two that were considered and **kept**, with the reasoning written into the
+code rather than left to be re-derived: `paperlab/stage` (see the header of
+`src/stage.ts` — resolvability, not bytes) and the parity harness (see the
+comment above its export in `src/index.ts` — it is the gate the contribution
+ladder's deformer rung stands on).
+
+**What makes this worth doing and what makes it worth waiting.** A large
+public surface is a large semver commitment, and every one of these names is
+something the project has promised not to break. Against that: none of them
+appears in the README, `llms.txt`, or any doc, so nobody has been told they
+exist. The trim is cheap *now* and expensive after the library has users.
+
+**How to do it when it is picked up.** One major, all at once, not by
+attrition — `pnpm knip` and the app builds will name everything that breaks,
+and `apps/` is the only consumer in the repo. Anything an app still needs
+after the trim is a genuine API finding, not a reason to re-export.
 
 ---
 

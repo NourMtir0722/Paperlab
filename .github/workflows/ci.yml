@@ -41,6 +41,15 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # `packages/paperlab/README.md` is GENERATED from the root one during the
+      # library build (tools/sync-readme.mjs) and committed, so npm's page
+      # cannot go stale in a published tarball. The committed copy still can,
+      # any time someone edits the root README without building — which is how
+      # it came to be a whole stage-mode rewrite behind. The build ran two
+      # steps ago; if it changed a tracked file, that file was stale.
+      - name: Generated files are up to date
+        run: git diff --exit-code
+
       - name: Package publish safety (publint + arethetypeswrong)
         run: pnpm --filter paperlab run check:package
 
@@ -55,3 +64,12 @@ jobs:
       # the listeners are on the thing the visitor is actually touching.
       - name: Stage navigation gate
         run: pnpm test:drive
+
+      # "Papers are made to be passed around" is a claim the README makes and
+      # a whole section of the product exists to keep. The loop it checks —
+      # sculpt, copy a link, open it in a browser that has never seen the
+      # paper — runs across two browser contexts and touches the clipboard,
+      # localStorage and the URL, none of which the unit suite can see. It
+      # was the one harness in the repo nothing ran.
+      - name: Share loop gate
+        run: pnpm test:share

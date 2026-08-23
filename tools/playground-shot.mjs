@@ -4,32 +4,14 @@
  * like something you'd want to share" is the only question that matters
  * about it, and only a picture answers that. Run: `pnpm shot:play`.
  */
-import { spawn } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { chromium } from 'playwright'
+import { shotsDir, startApp } from './harness.mjs'
 
 const PORT = 5206
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const outDir = resolve(root, '.shots')
+const outDir = shotsDir()
 
-const server = spawn('pnpm', ['--filter', '@paperlab/playground', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-const kill = () => server.kill('SIGTERM')
-process.on('exit', kill)
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('playground', PORT)
 
 const browser = await chromium.launch({
   args: process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
@@ -45,7 +27,6 @@ try {
   const query = process.argv.slice(2).find((a) => a.startsWith('?')) ?? ''
   await page.goto(base + query, { waitUntil: 'networkidle' })
   await page.waitForTimeout(3000)
-  mkdirSync(outDir, { recursive: true })
   await page.screenshot({ path: resolve(outDir, 'playground.png') })
   console.log(`shot → ${resolve(outDir, 'playground.png')}`)
 
@@ -63,5 +44,5 @@ try {
   }
 } finally {
   await browser.close()
-  kill()
+  stop()
 }

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { getBehavior, type PaperHandle } from 'paperlab'
-import { useEditor } from './store'
+import { useEditor } from '../state/store'
 
 /**
  * The first-run instruction.

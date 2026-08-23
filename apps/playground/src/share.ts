@@ -21,11 +21,22 @@ import { listStagePresets, stageSchema, type StageConfigInput } from 'paperlab/s
 /** Beyond this, browsers and chat apps start truncating. */
 export const MAX_SHARE_LENGTH = 8000
 
+/**
+ * The longest text a link may carry.
+ *
+ * It is a decode rule AND a writing rule, and it has to be both. The address
+ * bar is this app's save file — every keystroke rewrites it — so a limit
+ * enforced only on the way back in is a limit that silently eats the scene
+ * on reload. The writer caps at the same number, which is why the textarea
+ * imports this constant rather than restating it.
+ */
+export const MAX_TEXT_LENGTH = 4000
+
 const shareSchema = z.object({
   /** Stage preset id this scene started from. */
   p: z.string().optional(),
   /** The words the space is built from. */
-  t: z.string().max(4000).optional(),
+  t: z.string().max(MAX_TEXT_LENGTH).optional(),
   n: z.number().int().min(1).max(80).optional(),
   l: z.string().optional(),
   lo: z.record(z.unknown()).optional(),
@@ -105,9 +116,21 @@ export function decodeStageShare(encoded: string): StageShare | null {
 /** The query key a shared stage travels under. */
 export const SHARE_PARAM = 's'
 
-export function stageShareUrl(base: string, share: StageShare): string {
+/**
+ * The scene as a link, or null when it will not fit in one.
+ *
+ * Null rather than a long string, because the two halves of this file have
+ * to agree: `decodeStageShare` refuses anything past `MAX_SHARE_LENGTH`, so
+ * a writer that happily produced one would be handing out links this very
+ * build cannot open. The caller decides what to do about it — the playground
+ * leaves the last good link in the address bar rather than replacing it with
+ * one that loads an empty room.
+ */
+export function stageShareUrl(base: string, share: StageShare): string | null {
+  const encoded = encodeStageShare(share)
+  if (encoded.length > MAX_SHARE_LENGTH) return null
   const url = new URL(base)
-  url.searchParams.set(SHARE_PARAM, encodeStageShare(share))
+  url.searchParams.set(SHARE_PARAM, encoded)
   return url.toString()
 }
 

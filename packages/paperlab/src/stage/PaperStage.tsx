@@ -356,7 +356,19 @@ export function PaperStageScene({
   }, [tier])
   const settings = quality === 'auto' ? qualityTiers[tier] : qualityFor(quality)
 
-  const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageInput])
+  /**
+   * Serialized deps, the way `PaperFieldMesh` already does it.
+   *
+   * `stage` arrives from an editor or a page as a fresh object literal every
+   * render, so keying on its identity re-ran a full `stageSchema.parse` and a
+   * walk resample for a value that had not changed. Harmless once, and it was
+   * the reason each iteration of the quality-report pump above cost as much as
+   * it did. What the scene depends on is the stage's SHAPE, which is what this
+   * key is.
+   */
+  const stageKey = JSON.stringify(stageInput ?? {})
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Serialized deps — `stage` arrives as a fresh object literal every render.
+  const stage = useMemo(() => stageSchema.parse(stageInput ?? {}), [stageKey])
   const path = useMemo(() => getWalkPath(stage.path), [stage.path])
 
   /**
