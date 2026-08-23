@@ -74,7 +74,17 @@ const ASSETS = {
     cam: '0,1.1,6.8',
     play: 'loop',
   },
-  'stage-nave': { mode: 'stage', preset: 'nave', width: 1000, height: 640, play: 'loop' },
+  'stage-nave': {
+    mode: 'stage',
+    preset: 'nave',
+    width: 1000,
+    height: 640,
+    play: 'loop',
+    // See the frame-budget note in the capture loop below.
+    frames: 36,
+    gifFps: 10,
+    gifWidth: 560,
+  },
 }
 
 const argv = process.argv.slice(2)
@@ -134,9 +144,14 @@ try {
     await page.waitForFunction(() => document.fonts.ready.then(() => true), { timeout: 15_000 })
     await page.waitForTimeout(spec.mode === 'paper' ? 1500 : 4000)
 
+    // A per-asset frame budget. The nave is a slow drift through a hazy
+    // room: 48 frames of it is 3.4 MB of GIF, because haze is a gradient and
+    // a gradient is what dithering is worst at. Two thirds of the frames
+    // costs nothing anyone can see in a loop this slow, and halves the file.
+    const assetFrames = spec.frames ?? frames
     process.stdout.write(`${name} `)
-    for (let i = 0; i < frames; i++) {
-      const t = i / frames
+    for (let i = 0; i < assetFrames; i++) {
+      const t = i / assetFrames
       const progress = spec.play === 'pingpong' ? 1 - Math.abs(1 - 2 * t) : t
       await page.evaluate((p) => window.__MEDIA__.set(p), progress)
       // One rAF for React to commit and three.js to draw the new pose.
@@ -155,7 +170,7 @@ try {
     // 6 MB — which is a README nobody on a phone waits for. The MP4 of the
     // same loop is ~700 KB at full width, so quality lives there.
     const gifWidth = Math.min(spec.gifWidth ?? 640, spec.width)
-    const gifFilters = `fps=${gifFps},scale=${gifWidth}:-1:flags=lanczos`
+    const gifFilters = `fps=${spec.gifFps ?? gifFps},scale=${gifWidth}:-1:flags=lanczos`
     // Two-pass palette: one shared 256-colour palette across the whole loop,
     // because per-frame palettes make paper crawl with dither noise.
     run('ffmpeg', [...input, '-vf', `${gifFilters},palettegen=stats_mode=diff`, resolve(tmpDir, 'pal.png')])
