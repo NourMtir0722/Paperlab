@@ -145,20 +145,31 @@ export function App() {
           />
         </label>
 
-        <p className="walkhint">drag the scene to walk it · ← → step between banners</p>
+        {/* Two halves, and the browser picks. Telling a phone to press an
+            arrow key is the clearest possible signal that nobody opened this
+            on one — and the touch gesture it does have (tap a banner and the
+            walk travels to it) went unmentioned on the only device where it
+            is the primary way in. */}
+        <p className="walkhint">
+          drag the scene to walk it
+          <span className="on-keys"> · ← → step between banners</span>
+          <span className="on-touch"> · tap a banner to go to it</span>
+        </p>
 
         <div className="rail">
-          <div className="presets">
-            {listStagePresets().map((id) => (
-              <button
-                key={id}
-                type="button"
-                className={id === preset ? 'chip on' : 'chip'}
-                onClick={() => choose(id)}
-              >
-                {getStagePreset(id).label}
-              </button>
-            ))}
+          <div className="rail-scroll">
+            <div className="presets">
+              {listStagePresets().map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={id === preset ? 'chip on' : 'chip'}
+                  onClick={() => choose(id)}
+                >
+                  {getStagePreset(id).label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="transport">
             <button

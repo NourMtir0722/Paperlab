@@ -6,7 +6,7 @@
 > sells the product, `AGENTS.md` documents the API, and this file explains the
 > *intent* behind both.
 >
-> Last updated 2026-08-21 · library at `0.2.0`, published
+> Last updated 2026-08-23 · library at `0.2.0`, published; `0.3.0` unreleased on main
 
 ---
 
@@ -36,19 +36,27 @@ If a feature can't serialize into a preset, it doesn't ship.
 
 ### What exists today
 
-- **10 behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`,
-  `fall`, `carry`, `flight`, `crumple`. Human-named params ("tightness", not
-  "cylinderRadius") over a stack of pure geometry deformers.
+- **12 behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`,
+  `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`. Human-named params
+  ("tightness", not "cylinderRadius") over a stack of pure geometry deformers,
+  each nominating the two or three that ARE it.
 - **7 deformers** — `roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple`.
   Each has a JS implementation (CPU/hero path) and a GLSL twin (GPU/field
-  path), held identical by a golden-vector parity gate.
+  path), held identical by a golden-vector parity gate — and, since
+  2026-08-23, each is separately asserted to actually draw a surface.
 - **12 layouts** — every one names a place paper actually sits: `book`,
   `accordion`, `fan`, `spread`, `pile`, `rack`, `wall`, `spill`, `sweep`,
   `ring`, `colonnade`, `sheet`.
-- **13 paper presets**, **5 stage presets**, **7 stocks**.
+- **15 paper presets**, **6 stage presets**, **7 stocks**, 8 lighting rigs.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **508 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+- **671 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+
+> These counts drift. `apps/docs/src/docsDrift.test.ts` holds the NAMES in
+> README / AGENTS / llms.txt to the registries in both directions, but nothing
+> checks a number in prose — so when one of these is wrong, it is wrong
+> quietly. Re-read them from the registries before quoting one anywhere that
+> matters.
 
 ---
 
@@ -135,15 +143,15 @@ cadence.
 
 | # | phase | done test | status |
 |---|---|---|---|
-| 00 | Ground | a stranger can open all three apps; the README promises nothing missing | **partly** — repo public, Pages live, plan now landed here. **README honesty pass still owed** (deferred to phase 07 on purpose) |
+| 00 | Ground | a stranger can open all three apps; the README promises nothing missing | done — the README pass landed with phase 07, where it was deferred to |
 | 01 | The grade | the source reads as light; white paper keeps its hue | done |
 | 02 | The material | open Field mode, change nothing, screenshot: it is a portfolio image | done |
 | 03 | The room | a frame with nobody in it reads as a large room | done — columns and a doorway landed 2026-08-23 |
 | 04 | The primitives | a hung sheet shows what suspends it; a fallen sheet lies convincingly | done — rods and pegs landed 2026-08-23 |
 | 05 | Ribbon | a still stops someone scrolling with no caption | done, after the four defects above were fixed |
 | 06 | The tool, structurally | a stranger changes the one thing they meant to, and undoes it | done |
-| 07 | Honesty | every URL on a phone, cold cache, nothing confusing or blank | **not started** |
-| — | launch gate | publish 0.3.0, render assets, Product Hunt | blocked on 07 |
+| 07 | Honesty | every URL on a phone, cold cache, nothing confusing or blank | done 2026-08-23 |
+| — | launch gate | publish 0.3.0, render assets, Product Hunt | **next** — nothing above it is open |
 | 08 | The rest of the gallery | one stage every couple of weeks | after launch, deliberately |
 
 ### What phases 03 and 04 did not build — *built 2026-08-23*
@@ -377,6 +385,89 @@ just created. No remount was ever needed: the inspector derives the zone rows
 from the store on every render, which `patchZone` had always relied on. Both
 bumps removed. The surface toggles already carried a comment saying exactly
 this; these two had simply never been held to it.
+
+---
+
+## Phase 07 — honesty — *done 2026-08-23*
+
+The last thing above the launch gate, and the one where measuring first
+changed what got built.
+
+### Every app was a blank page for two seconds
+
+Measured, not assumed: cold cache, throttled to slow 4G with a 4× CPU
+penalty, **all three apps showed nothing at all until somewhere between 1.8
+and 3.5 seconds.** No wordmark, no text, no sign that anything was coming.
+Each is a single React bundle over a megabyte of three.js, and `#root` was
+empty until it parsed.
+
+Blank is worse than slow, because **a visitor cannot tell a heavy scene from
+a broken link** — and it is the one thing this phase's done test names.
+
+The fix is markup and inline CSS inside `#root`: on screen with the first
+byte, no request, no JavaScript, and `createRoot().render()` replaces it on
+mount so there is nothing to tear down. Content now paints at **400ms**
+instead of 3.5s. The fade is held back 220ms on purpose, so a warm cache —
+which mounts in well under that — never flashes it.
+
+`apps/docs/src/firstPaint.test.ts` guards it, and guards the shape rather
+than the words: present, **inside** `#root` (outside it React never clears it
+and it covers the app forever), styled from the document head, carrying a
+real sentence rather than a spinner, and delayed. It is exactly the kind of
+thing that gets deleted while tidying an `index.html` — nothing in the build,
+the types or the unit suite would notice, and it only shows up on a cold
+cache on a slow connection, which is not how anyone develops.
+
+### Mobile: three surfaces, three different answers
+
+Lumping this into one decision was the mistake. It is three:
+
+- **The docs were already fine.** Read on a phone, no changes needed.
+- **The playground needed copy, not layout.** It rendered and scrolled
+  correctly, and then told the visitor to *press the arrow keys* — the
+  clearest possible signal that nobody had opened it on a phone. It now names
+  the gesture the device actually has (`@media (pointer: coarse)`), the stage
+  names scroll instead of being cut off, and the controls are thumb-sized.
+- **The editor gets a screen that says so.** It is a three-rail canvas tool:
+  at 390px the inspector is simply off the right-hand edge, the page scrolls
+  sideways to a panel nobody knows is there, and the one gesture the tool is
+  built around is a precise drag on a 12px target. **Broken with a message is
+  acceptable; broken in silence is not.**
+
+  Three things that gate has to do, in order: send them somewhere that works
+  (the playground, which is genuinely good on a phone — telling someone to
+  come back later without giving them anything to do now is how you lose
+  them), say what the editor is so coming back sounds worth it, and **let
+  them in anyway**. A hard wall is a lie about capability; the editor does
+  run, it is just cramped. Shown by a media query rather than by measuring
+  the window in JS: no resize listener, no first-paint flash, and rotating a
+  tablet into landscape reveals the editor with no code involved.
+
+### The README pass
+
+Deferred here on purpose, because the stale claims kept moving while phases
+landed. What was actually wrong:
+
+- **It promised a walking figure, twice** — in the hero's alt text and in the
+  stage bullet, which also listed "the figure" among the things that read the
+  same walk. `showFigure` has defaulted to FALSE since phase 03.
+- **The hero GIF predated the room.** It was rendered 2026-08-21, before the
+  columns, the doorway, and the banner-typesetting fix — so the single
+  most-seen image of this project showed `ca / rr / ie / d` down a banner in
+  an empty hall. Re-rendered. It costs 0.7 MB more than the old one (2.7 →
+  3.4 MB) and is worth it: the point of an honesty pass is that the picture
+  is of the thing that ships.
+- The stage bullet said nothing about the room, the doorway or the
+  suspension hardware — all of which now exist and are the reason the mode
+  reads at all.
+- Nothing said the editor wants a desktop. It does, and now says so where it
+  is linked.
+
+**And the inventory in this file was wrong**: 10 behaviors (12), 13 presets
+(15), 5 stage presets (6), 508 tests (671). `docsDrift` holds the *names* in
+README / AGENTS / llms.txt to the registries in both directions, but **nothing
+checks a number in prose**, so each of those had been wrong quietly for
+weeks. A warning now sits beside them.
 
 ---
 

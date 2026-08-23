@@ -30,6 +30,7 @@ import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
 import { ViewportGuide } from './ViewportGuide'
 import { CoachMark, HandleAnchor, coachMarkUsed } from './CoachMark'
+import { SmallScreen } from './SmallScreen'
 import { captureThumbnail } from './userPresets'
 import { SHARE_PARAM, paperShareUrl, readPaperShare } from './paperShare'
 import { DEMO_CARDS } from './demoAssets'
@@ -483,6 +484,7 @@ export function App() {
         </footer>
       )}
       <UIHost />
+      <SmallScreen />
     </div>
   )
 }

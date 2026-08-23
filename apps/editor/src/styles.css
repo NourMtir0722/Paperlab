@@ -1635,3 +1635,108 @@ button.export:hover {
   top: 100%;
   left: -3.5px;
 }
+
+/* ── The small-screen gate (Phase 07) ────────────────────────────────────── */
+
+/* Above the breakpoint it does not exist. The editor's grid is a 220px rail,
+   a viewport and a 300px inspector — under about 900px the inspector is off
+   the edge of the screen, and the page scrolls sideways to reach a panel
+   nobody knows is there. */
+.small-screen {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .small-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #0f1012;
+    overflow-y: auto;
+  }
+
+  /* The escape hatch. Dismissing does not remember: the editor at this size
+     is a thing you looked at, not a thing you set up. */
+  .small-screen.dismissed {
+    display: none;
+  }
+
+  /* The app underneath must not scroll sideways behind the gate — an
+     address bar that can still be swiped past the edge is the exact
+     "broken in silence" this replaces. */
+  .app {
+    overflow: hidden;
+  }
+}
+
+.small-screen-card {
+  max-width: 30rem;
+  margin: auto;
+}
+
+.small-screen-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6b6a64;
+  margin-bottom: 18px;
+}
+
+.small-screen-card h1 {
+  font-size: clamp(24px, 7vw, 32px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  color: #f2ede6;
+}
+
+.small-screen-card p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #a8a6a1;
+  margin: 0 0 20px;
+}
+
+.small-screen-go {
+  display: block;
+  padding: 15px 18px;
+  border-radius: 10px;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+}
+
+.small-screen-note {
+  margin-top: 12px;
+  font-size: 13.5px;
+}
+
+.small-screen-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  align-items: center;
+  border-top: 1px solid #2a2b2f;
+  padding-top: 18px;
+}
+
+.small-screen-links a,
+.small-screen-links button {
+  background: none;
+  border: 0;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: #8b8a86;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

@@ -20,9 +20,111 @@
     <meta name="twitter:image" content="https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/og.png" />
 
     <meta name="theme-color" content="#12100f" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #12100f;
+      }
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        font-family: "Inter", system-ui, -apple-system, sans-serif;
+        text-align: center;
+        opacity: 0;
+        animation: boot-in 300ms ease 220ms forwards;
+      }
+      @keyframes boot-in {
+        to {
+          opacity: 1;
+        }
+      }
+      .boot-mark {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #f0ebe3;
+      }
+      .boot-line {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: rgba(240,235,227,0.5);
+        max-width: 26rem;
+      }
+      .boot-bar {
+        width: 168px;
+        height: 2px;
+        border-radius: 2px;
+        overflow: hidden;
+        background: rgba(240,235,227,0.14);
+      }
+      .boot-bar span {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 2px;
+        background: #f0ebe3;
+        animation: boot-slide 1.4s ease-in-out infinite;
+      }
+      @keyframes boot-slide {
+        0% {
+          transform: translateX(-110%);
+        }
+        100% {
+          transform: translateX(360%);
+        }
+      }
+      /* Someone who asked for less motion gets a bar that simply sits there
+         rather than one that runs for as long as the wait lasts. */
+      @media (prefers-reduced-motion: reduce) {
+        .boot {
+          animation-delay: 0ms;
+        }
+        .boot-bar span {
+          animation: none;
+          width: 100%;
+          opacity: 0.5;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      The first paint, written into the document.
+
+      All three apps are a single React bundle over a megabyte of three.js,
+      and until it parses there is nothing in `#root` — measured on a cold
+      cache over throttled 4G, every one of them showed a **completely blank
+      page for the best part of two seconds**. Blank is the one thing the
+      phase-07 done test forbids, and it is worse than slow: a visitor cannot
+      tell a heavy scene from a broken link.
+
+      This costs no request and no JavaScript. It is markup and inline CSS,
+      so it is on screen with the first byte of the document, and
+      `createRoot().render()` replaces the children of `#root` the moment the
+      app mounts — there is nothing to tear down.
+
+      The fade is delayed on purpose. A warm cache mounts in well under
+      200ms, and a loading state that flashes on a fast load is noise; this
+      one only ever appears for the visitors who were going to wait anyway.
+    -->
+    <div id="root">
+      <div class="boot" role="status" aria-live="polite">
+        <p class="boot-mark">Paperlab</p>
+        <p class="boot-line">Loading the reference. Every example on this page renders live, so the first one takes a moment.</p>
+        <div class="boot-bar"><span></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

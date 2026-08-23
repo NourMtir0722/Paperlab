@@ -198,3 +198,74 @@ input[type="range"] {
     max-width: none;
   }
 }
+
+/* The hint names the gesture the device actually has. */
+.on-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .on-keys {
+    display: none;
+  }
+  .on-touch {
+    display: inline;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Side by side, the six stage names and the transport share 390px and
+     neither gets enough. Stacked, the names get the full width and the
+     transport gets a row it can actually be dragged on. */
+  .rail {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  /* The names run off the edge on any phone, so let them scroll rather than
+     be cut — and keep the fade below as the sign that they do. */
+  .presets {
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* The last chip stays clear of the fade. */
+    padding-right: 26px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .presets::-webkit-scrollbar {
+    display: none;
+  }
+
+  .presets > .chip {
+    flex: none;
+  }
+
+  /* A row that is cut off dead looks like a row that ends there. */
+  .rail-scroll {
+    position: relative;
+  }
+
+  .rail-scroll::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 34px;
+    pointer-events: none;
+    background: linear-gradient(to right, rgba(22, 17, 15, 0), rgba(22, 17, 15, 0.92));
+  }
+
+  /* Touch targets. 44px is the smallest thing a thumb hits reliably, and
+     every control down here was built for a cursor. */
+  .chip {
+    min-height: 40px;
+    padding: 9px 15px;
+    font-size: 13px;
+  }
+
+  input[type="range"] {
+    height: 32px;
+  }
+}
