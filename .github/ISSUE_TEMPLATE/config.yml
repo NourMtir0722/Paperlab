@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/NourMtir0722/Paperlab/security/advisories/new
+    about: Report privately instead — please do not open a public issue.
+  - name: Try it first
+    url: https://nourmtir0722.github.io/Paperlab/editor/
+    about: The editor reproduces most things faster than a description does, and Share gives you a link that carries the whole paper.
+  - name: The API reference
+    url: https://nourmtir0722.github.io/Paperlab/docs/
+    about: Every behavior, deformer, layout, stock and surface, rendering live.

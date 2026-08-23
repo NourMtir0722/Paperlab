@@ -1,0 +1,56 @@
+name: Bug report
+description: Something renders wrong, throws, or does not match the docs.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before anything else, two things cause most reports:
+
+        1. **Blank canvas?** The parent element needs a height — `<Paper>` fills
+           its parent, and a parent of `height: auto` is 0px tall.
+        2. **`cloth` plus a `behavior`?** That throws by design. Cloth owns the
+           vertices; they cannot both write them.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: paper
+    attributes:
+      label: The paper
+      description: >
+        The fastest possible report. Sculpt it in the editor, hit **Share**, and
+        paste the link — it carries the whole config, so it reproduces exactly.
+        A `.paper` JSON blob or the `<Paper …>` props work too.
+      placeholder: https://nourmtir0722.github.io/Paperlab/editor/?p=...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: paperlab version
+      placeholder: 0.4.0
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: Browser, OS, and three version
+      placeholder: Chrome 141 on macOS 15, three 0.185
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Shader compile failures show up here and nowhere else.
+      render: shell
