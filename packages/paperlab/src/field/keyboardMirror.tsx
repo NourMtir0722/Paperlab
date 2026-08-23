@@ -18,7 +18,7 @@ export interface KeyboardStepResult {
 }
 
 /**
- * The M6 §6 keyboard flow as a pure step (so it's testable without a DOM):
+ * The keyboard flow as a pure step (so it's testable without a DOM):
  * given the current carry state, the focused paper `slot`, and the pressed
  * `key`, it drives the field `controller` (pick → move between zones → place /
  * cancel) and returns the next carry state. All side effects go through
@@ -77,7 +77,7 @@ const mirrorHidden: React.CSSProperties = {
 /**
  * The hidden DOM mirror of an interactive field: each paper is a button.
  * Keyboard flow — focus a paper, Enter picks it, arrow keys move between
- * zones, Enter places, Escape returns it to its slot (spec M6 §6). The key
+ * zones, Enter places, Escape returns it to its slot. The key
  * handling lives in the pure {@link fieldKeyboardStep} so it can be tested.
  */
 export function FieldKeyboardMirror({

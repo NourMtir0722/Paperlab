@@ -44,7 +44,7 @@ describe('paper config schema', () => {
     expect(config.content).toMatchObject({ align: 'left', lineHeight: 1.45 })
   })
 
-  it('content.back: letter front, kraft-image back (spec §4.6)', () => {
+  it('content.back: letter front, kraft-image back', () => {
     const config = paperConfigSchema.parse({
       content: {
         type: 'text',

@@ -30,7 +30,7 @@ export interface DeformerContext {
  * A deformer is a pure vertex-mapping function. The JS implementation is the
  * CPU path (hero mode) and must be allocation-free in the loop: it mutates
  * `out` in place. The mirrored GLSL implementation (GPU path, field mode)
- * lands in M4 — golden-vector parity tests will enforce identical results.
+ * lands with field mode — golden-vector parity tests will enforce identical results.
  */
 export interface Deformer<O = Record<string, unknown>> {
   id: string
@@ -39,7 +39,7 @@ export interface Deformer<O = Record<string, unknown>> {
   optionsSchema: z.ZodType<O, z.ZodTypeDef, unknown>
   /** Mutate `out` (sheet-local space; flat sheet is the XY plane facing +Z). */
   displace(out: THREE.Vector3, uv: THREE.Vector2, o: O, ctx: DeformerContext): void
-  /** GPU path — arrives with field mode (M4). */
+  /** GPU path — arrives with field mode. */
   glsl?: {
     chunk: string
     uniforms(o: O): Record<string, unknown>

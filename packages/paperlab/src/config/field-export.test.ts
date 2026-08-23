@@ -73,7 +73,7 @@ describe('field export', () => {
     })
   })
 
-  it('the stamp sheet exports with states, zones, and the M6 verify vocabulary', () => {
+  it('the stamp sheet exports with states, zones, and the verify vocabulary', () => {
     const stamp = getPreset('postage-stamp')
     const stampSheet: FieldExportInput = {
       layout: 'sheet',

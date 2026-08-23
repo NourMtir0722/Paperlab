@@ -1,5 +1,5 @@
 /**
- * The shared fake-aerodynamics core (spec M6 §4): velocity-linked lift +
+ * The shared fake-aerodynamics core: velocity-linked lift +
  * curated noise, per v0.2's "reads more real than a true sim" doctrine.
  * Pure math, no three.js, no allocation in the per-frame paths — `carry`
  * and `flight` both source their motion here.

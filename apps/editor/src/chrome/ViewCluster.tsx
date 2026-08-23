@@ -29,7 +29,7 @@ import { isTypingTarget } from '../state/keys'
  * IS the scene. The gestures worth adding next are the deformer's own —
  * a handle per signature param, and dragging the key light — and both need
  * library work first. A button that toggles nothing is worse than an absent
- * one, so they are in `docs/roadmap.md` rather than greyed out here.
+ * one, so they are left out entirely rather than greyed out here.
  */
 
 export type SnapView = 'front' | 'three-quarter' | 'edge' | 'back'

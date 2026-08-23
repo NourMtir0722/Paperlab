@@ -68,8 +68,8 @@ export function sheetBackingSize(o: SheetLayoutOptions): { width: number; height
 type Corner = CurlOptions['corner']
 
 /**
- * The corner facing away from the sheet's center — what a thumb would find
- * (spec M6 §1.3). A tie (an odd grid's exact-center row/column, where the
+ * The corner facing away from the sheet's center — what a thumb would find.
+ * A tie (an odd grid's exact-center row/column, where the
  * cell straddles the midline) breaks outward-and-down: strict `<` on both
  * axes sends the center right and down, so a dead-center cell peels
  * bottom-right — the standalone peel default.

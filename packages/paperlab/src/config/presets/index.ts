@@ -123,7 +123,7 @@ const builtins: Record<string, PaperConfigInput> = {
     meta: { name: 'Blank sheet', tags: ['starter'] },
     stock: 'printer',
   },
-  // The M6 driving use case: one stamp of the 2×5 block. Hover peels the
+  // The driving use case: one stamp of the 2×5 block. Hover peels the
   // outward-facing corner ('auto' resolves per sheet slot), pressing deepens
   // the peel; the perforation tears when it detaches (field auto-wiring).
   'postage-stamp': {

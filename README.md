@@ -1,31 +1,39 @@
 # Paperlab
 
-**Physical, realistic paper as a React component.** A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints — real 3D paper, not a CSS fake. Content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
+**Physical, realistic paper as a React component.**
 
-**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/) (desktop)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for agents](AGENTS.md)
+[![npm](https://img.shields.io/npm/v/paperlab.svg)](https://www.npmjs.com/package/paperlab)
+[![CI](https://github.com/NourMtir0722/Paperlab/actions/workflows/ci.yml/badge.svg)](https://github.com/NourMtir0722/Paperlab/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/NourMtir0722/Paperlab/blob/main/LICENSE)
+
+A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
+
+**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/) (desktop)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for coding agents](AGENTS.md)
 
 | | |
 |---|---|
 | ![A thermal receipt unrolling from a paper roll](docs/media/receipt-unroll.gif) | ![A photo print with its corner peeling up](docs/media/hero-peel.gif) |
 | ![A letter folding itself into thirds](docs/media/letter-fold.gif) | ![A page turning on its spine](docs/media/page-flip.gif) |
 
-Every frame above is real geometry — no video, no sprite sheet. Type a sentence into the playground and it builds you a room out of it:
+Every frame above is real geometry — no video, no sprite sheet.
 
-![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](docs/media/stage-nave.gif)
-
-## Quick start
+## Install
 
 ```sh
 npm i paperlab three @react-three/fiber gsap
 ```
 
-Stage mode lives at `paperlab/stage` and needs two more:
+Requires React ≥ 19 and three ≥ 0.162. TypeScript types ship with the package; both ESM and CJS builds are published.
+
+Stage mode lives at the `paperlab/stage` subpath and needs two more peers:
 
 ```sh
 npm i @react-three/postprocessing postprocessing
 ```
 
-They are optional peers — `<Paper>` and `<PaperField>` never reach them, so a bundle that does not import `paperlab/stage` contains none of it.
+They are optional. `<Paper>` and `<PaperField>` never reach for them, so a bundle that does not import `paperlab/stage` contains none of it — and the subpath is what keeps the import specifier itself out of your build graph.
+
+## Quick start
 
 ```tsx
 import { Paper } from 'paperlab'
@@ -34,7 +42,7 @@ import { Paper } from 'paperlab'
 <Paper preset="receipt-unroll" autoplay />
 ```
 
-Or sculpt your own:
+Or configure it yourself:
 
 ```tsx
 <Paper
@@ -48,7 +56,16 @@ Or sculpt your own:
 />
 ```
 
-Galleries are one component too:
+## The four components
+
+| | |
+|---|---|
+| `<Paper>` | one sheet, owns its own `<Canvas>`, fills its parent |
+| `<PaperMesh>` | the same sheet without a canvas, for an existing React Three Fiber scene |
+| `<PaperField>` | many sheets in **one instanced draw call**, arranged by a layout |
+| `<PaperStage>` | paper as architecture — a room of hanging banners you can walk through (`paperlab/stage`) |
+
+A gallery is one component:
 
 ```tsx
 import { PaperField } from 'paperlab'
@@ -56,7 +73,9 @@ import { PaperField } from 'paperlab'
 <PaperField images={photos} preset="photo-print" layout="ring" />
 ```
 
-Or build a space out of a sentence and walk through it:
+![Twelve photo prints standing in a ring, curving inward](docs/media/field-ring.gif)
+
+And a space built out of a sentence is one component:
 
 ```tsx
 import { PaperStage } from 'paperlab/stage'
@@ -64,39 +83,36 @@ import { PaperStage } from 'paperlab/stage'
 <PaperStage text="the paper remembers every hand that folded it" progress={scroll} />
 ```
 
+![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](docs/media/stage-nave.gif)
+
 ## What's inside
 
-- **Behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`, `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`: human-named params ('tightness', not 'cylinderRadius') over a stack of pure geometry deformers. Draggable handles when `interactive`.
-- **Stocks & surfaces** — seven paper stocks (thermal gets banding, newsprint gets grain) plus grain, torn deckle edges, crease lines, and aging as composable shader effects. Real lighting throughout.
-- **Physics** — curated idle motion (`float`, `tumble`, `breeze`…) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull.
-- **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU (parity-tested against the CPU path), arranged by pure layout functions. Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners arranged along a walk, for stage mode), plus `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl. Each pose carries a **bias** — how strongly that one sheet takes the deformation — so the top of a pile curls while the sheets pressed underneath lie flat, in the same draw call. The camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
-- **Stage mode** — paper as *architecture*: banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence — split a word to a banner and set down its drop — and binding `progress` to scroll makes the page scroll the walk. The room is real: a ceiling, poured floor slabs, columns with base plates, and a doorway the source shines through, all of it there because **architecture carries scale better than a figure does** (there is a walking figure, and it is off by default — the stage is navigable, so the person in the hall is the viewer). Every part of the scene — the arrangement, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own.
+- **Behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`, `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`: human-named params ("tightness", not "cylinderRadius") over a stack of pure geometry deformers. Each behavior nominates the two or three params that *are* it, so tools can lead with those. Draggable handles when `interactive`.
+- **Deformers** — the seven primitives behind those behaviors (`roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple`), each a pure vertex mapping written twice: a JS implementation for the CPU/hero path and a GLSL twin for the GPU/field path. A golden-vector gate holds the two identical, and a separate test asserts each one actually draws a surface. Arc-length preserving — paper never stretches.
+- **Stocks & surfaces** — seven paper stocks (thermal gets banding, newsprint gets grain) plus grain, torn deckle edges, crease lines, perforation and aging as composable shader effects. Alpha-affecting effects use `alphaTest` rather than blending, so shadows stay correct.
+- **Content** — `blank`, `image`, `text`, `card` and `receipt`, any of which can also sit on the reverse of the sheet via `content.back`. Text is measured and wrapped with real tracking applied before measurement, so the painted line matches the line it was broken to.
+- **Physics** — curated idle motion (`float`, `tumble`, `dangle`, `taped`, `breeze`) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull. Cloth and behaviors are mutually exclusive by schema — cloth owns the vertices.
+- **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU, arranged by pure layout functions. Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners arranged along a walk, for stage mode), plus `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl. Each pose carries a **bias** — how strongly that one sheet takes the deformation — so the top of a pile curls while the sheets pressed underneath lie flat, in the same draw call. The camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
+- **Interaction states** — a preset can carry `states`: overrides-on-base diffs keyed `rest` / `hover` / `pressed` / `picked` / `placed`, with the triggers built in. Drag a stamp past its threshold and it tears off its sheet (the perforation edges facing its neighbours flip to torn), release it over a `<DropZone>` and it settles, release it anywhere else and it flutters home. The whole flow is reachable from the keyboard: focus a paper, Enter picks, arrows move between zones, Enter places, Escape returns it.
+- **Stage mode** — paper as *architecture*: banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk. The room is real — a ceiling, poured floor slabs, columns with base plates, and a doorway the source shines through — because **architecture carries scale better than a figure does**. There is a walking figure, and it is off by default: the stage is navigable, so the person in the hall is the viewer. Every part of the scene — the arrangement, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own across four tiers.
 - **A stage you can walk** — stage mode is navigable, not a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll; binding `progress` to page scroll still wins over all of it.
-- **Lighting you can actually light with** — a preset is the starting point, not the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in (degrees around the room, degrees above the horizon), and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. Overrides serialize as overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
-- **Hardware that holds the paper up** — thread to the ceiling or a rod across the top edge, gripped by a clip or a peg. Every reference installation shows what suspends it, and a hung thing that shows what holds it stops reading as a rectangle that happens to float.
-- **Presets** — everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
-- **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into Claude Code (or any coding agent): install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md).
-- **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose, a hidden DOM mirror carries the content for screen readers, and a flat DOM fallback renders when WebGL isn't available.
+- **Lighting you can actually light with** — eight rigs, and a preset is the starting point rather than the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in (degrees around the room, degrees above the horizon), and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. Overrides serialize as overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
+- **Hardware that holds the paper up** — thread to the ceiling or a rod across the top edge, gripped by a clip or a peg. A hung thing that shows what holds it stops reading as a rectangle that happens to float.
+- **Presets** — 15 paper presets and 6 stage presets, and everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
+- **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into a coding agent: install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md) and [docs/llms.txt](docs/llms.txt).
+- **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose and disables physics and entrances, a hidden DOM mirror carries the content for screen readers and find-in-page, and a flat DOM fallback renders when WebGL isn't available.
 
-## The editor
-
-```sh
-pnpm install && pnpm dev   # → localhost:5173
-```
-
-A Figma-shaped editor: presets on the left, sculpt on canvas (drag the blue handle on the paper), inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. Each behavior nominates the two or three params that matter, so the panel opens on those and folds the rest away. Field mode composes galleries; **Export code** ends the session in your codebase.
-
-It is a three-rail canvas tool and it wants a real screen — under about 900px it says so and points you at the playground, which is built for a phone.
+The zod schema in `config/schema.ts` is the single source of truth: it validates the API, generates the editor's controls, defines the file format and feeds the docs. If a feature can't serialize into a preset, it doesn't ship.
 
 ## Papers are made to be passed around
 
 A paper is data — a `.paper` JSON object validated by a zod schema — so it travels without asking anyone's permission. **You do not need to fork this repo to share one.**
 
-**Sending one.** Sculpt a paper in the [editor](https://nourmtir0722.github.io/Paperlab/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. Paste it in a thread, a PR, a Discord. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
+**Sending one.** Sculpt a paper in the [editor](https://nourmtir0722.github.io/Paperlab/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
 
-**Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins, ready to take apart.
+**Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins.
 
-**Using one in your project.** A `.paper` file is a preset object, so it goes straight in:
+**Using one in your project.** A `.paper` file *is* a preset object, so it goes straight in:
 
 ```tsx
 import alice from './alice-note.paper.json'
@@ -115,27 +131,63 @@ registerPreset('alice-note', alice)
 
 That's the whole loop: **make → send → remix → ship.** If you'd rather your paper shipped *with* the library so everyone gets it by name, that's the first rung of [CONTRIBUTING.md](CONTRIBUTING.md) — a preset PR is JSON and no code.
 
-## Repository
+## The apps
+
+Three surfaces ship alongside the library, all built on its public API only.
+
+**[The playground](https://nourmtir0722.github.io/Paperlab/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
+
+**[The editor](https://nourmtir0722.github.io/Paperlab/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas (drag the handle on the paper), inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. Each behavior nominates the params that matter, so the panel opens on those and folds the rest away. Field mode composes galleries; **Export code** ends the session in your codebase. It wants a real screen — under about 900px it says so and points you at the playground.
+
+**[The reference](https://nourmtir0722.github.io/Paperlab/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
+
+## Development
+
+pnpm + Turborepo, Node 22, [Biome](https://biomejs.dev) for lint and format.
+
+```sh
+pnpm install
+pnpm dev            # the editor at localhost:5173
+```
 
 | | |
 |---|---|
-| [`packages/paperlab`](packages/paperlab/) | the npm library |
+| [`packages/paperlab`](packages/paperlab/) | the npm library — the only published artifact |
 | [`apps/editor`](apps/editor/) | the editor — every knob, and the export |
 | [`apps/playground`](apps/playground/) | the playground — one input, one scene, shareable by link |
-| [`apps/docs`](apps/docs/) | the documentation site, with every behavior running live |
-| [`tools/`](tools/) | the browser harnesses — parity, perf, screenshots, the README's motion |
-| [`docs/llms.txt`](docs/llms.txt) | the agent-readable API reference |
-| [`docs/design.md`](docs/design.md) | the design rules the three apps share, enforced by a test |
-| [`docs/roadmap.md`](docs/roadmap.md) | what this is, what's decided, and what's next |
+| [`apps/docs`](apps/docs/) | the reference site, with every behavior running live |
+| [`tools/`](tools/) | browser harnesses — parity, perf, screenshots, the README's motion |
+| [`AGENTS.md`](AGENTS.md) · [`docs/llms.txt`](docs/llms.txt) | the agent-readable API reference |
+| [`docs/design.md`](docs/design.md) | the design language the three apps share, enforced by a test |
+
+### Checks
 
 ```sh
-pnpm test           # unit suite — deformer math, schema, cloth, layouts, exports
-pnpm test:parity    # GPU golden-vector gate: every deformer's GLSL twin vs its JS twin
-pnpm test:drive     # the stage really walks when you drag it
+pnpm test           # 700+ unit tests — deformer math, schema, cloth, layouts, exports
+pnpm test:parity    # 37 golden-vector cases: every deformer's GLSL twin vs its JS twin
+pnpm test:drive     # the stage really walks when you drag, wheel or arrow it
 pnpm test:share     # sculpt → link → a browser that has never seen the paper
+pnpm typecheck
+pnpm lint
+pnpm knip           # dead code and unused exports
 pnpm build
 ```
 
-Contributions climb a ladder from presets (JSON only) to dual-implementation deformers — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All four test commands are CI gates, along with `publint` and `are-the-types-wrong` on the published package.
 
-Apache 2.0 © Noor Mtir — attribution travels with the code: redistributions must reproduce the [NOTICE](NOTICE) file. If Paperlab made it into something you shipped, a visible credit or link back is warmly appreciated.
+### Measurement
+
+```sh
+pnpm perf           # stage frame cost      (--gpu for the platform GPU, --soft for the SwiftShader floor)
+pnpm perf:field     # field frame cost
+pnpm shot           # PNGs into .shots/    (also shot:ui, shot:play, shot:light)
+pnpm media          # the README's GIFs and MP4s, stepped frame-exact (needs ffmpeg)
+```
+
+## Contributing
+
+Contributions climb a ladder, easiest first: **presets** (JSON only, zero code) → **behaviors** (~50 lines over existing deformers) → **layouts** (a ~30-line pure function) → **deformers** (dual JS + GLSL implementation with parity cases) → **surface effects** (GLSL chunks). Merged work ships in the editor's library with attribution. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+Apache 2.0 © Noor Mtir. Attribution travels with the code: redistributions must reproduce the [NOTICE](NOTICE) file. If Paperlab made it into something you shipped, a visible credit or link back is warmly appreciated.

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { PaperConfig } from '../config/schema'
 
-// ── Drop zones (spec M6 §5) ──────────────────────────────────────────────────
+// ── Drop zones ─────────────────────────────────────────────────────────────
 
 export interface DropZoneConfig {
   id: string

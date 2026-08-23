@@ -144,7 +144,7 @@
 
   `core/tessellation.test.ts` measures the sagitta directly rather than trusting the arithmetic: for every edge of the resolved grid it compares the deformed chord midpoint against the deformer's own answer there, across each deformer's real option range. It also asserts the measure has teeth by forcing a tight bend onto the coarsest grid the ladder allows and requiring it to fail.
 
-  Two configurations still do not meet the tolerance and are honest about it: `wave` at `amplitude: 0.3` asks for 272 segments and `drape` at its default depth asks for 154, against a ceiling of 128. They pass the suite on a "no worse than the flat 72 this replaced" clause, which documents a real remaining gap rather than creating slack — closing it costs more CPU per frame than the budget above allows. Recorded in `docs/roadmap.md`.
+  Two configurations still do not meet the tolerance and are honest about it: `wave` at `amplitude: 0.3` asks for 272 segments and `drape` at its default depth asks for 154, against a ceiling of 128. They pass the suite on a "no worse than the flat 72 this replaced" clause, which documents a real remaining gap rather than creating slack — closing it costs more CPU per frame than the budget above allows.
 
 - c4899e7: Behaviors nominate the params that matter, and a paper can say where its handle is.
 
@@ -332,7 +332,7 @@
 
   **BREAKING: stage mode moves to its own entry point.** `import { PaperStage } from 'paperlab/stage'` — likewise `getStagePreset`, `walks`, `stageSchema`, `buildStageAgentPayload` and the rest of the stage surface. The main entry is unchanged for `<Paper>` and `<PaperField>`.
 
-  This reverses the decision recorded in `docs/roadmap.md`, and the reason it is allowed to is that it is a **different argument**. That decision was about BYTES, and it was right about bytes: tree-shaking already kept stage code out of a `<Paper>` bundle, so a subpath saved nobody a byte. This is about RESOLVABILITY, which tree-shaking cannot fix. Tree-shaking removes the _code_; it cannot remove the _import specifier_. While the main entry named `@react-three/postprocessing`, a consumer who installed paperlab for `<Paper>` alone — and believed the word "optional" — got an unresolvable module at build time. The peers were briefly shipped as `optional` on exactly that false premise.
+  This reverses an earlier decision, and the reason it is allowed to is that it is a **different argument**. That decision was about BYTES, and it was right about bytes: tree-shaking already kept stage code out of a `<Paper>` bundle, so a subpath saved nobody a byte. This is about RESOLVABILITY, which tree-shaking cannot fix. Tree-shaking removes the _code_; it cannot remove the _import specifier_. While the main entry named `@react-three/postprocessing`, a consumer who installed paperlab for `<Paper>` alone — and believed the word "optional" — got an unresolvable module at build time. The peers were briefly shipped as `optional` on exactly that false premise.
 
   Measured on the built package, which is the only way this claim is worth anything:
 
@@ -376,7 +376,7 @@
 
   **`drape` renders nothing on the hero path.** Not faintly — the frame contains one colour, the background. Ruled out in order: the math (swept across its whole option range, every vertex finite and bounded), tessellation (an explicit `segments: 96` renders the same blank), and the sheet and content (identical ones render fine under `hang`). Isolated by bisecting the stack: `roll` alone renders, `drape` alone is blank, both together blank.
 
-  Nobody had hit it because `drape` had exactly one caller in the library — the stage banner — and that runs the field/GPU path and its GLSL twin. No behavior and no paper preset had ever put it on the CPU side. **Which is worth stating plainly: a parity gate proves the two implementations agree, not that either one draws.** Written up in `docs/roadmap.md`.
+  Nobody had hit it because `drape` had exactly one caller in the library — the stage banner — and that runs the field/GPU path and its GLSL twin. No behavior and no paper preset had ever put it on the CPU side. **Which is worth stating plainly: a parity gate proves the two implementations agree, not that either one draws.**
 
   ### The stage
 
