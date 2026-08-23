@@ -29,9 +29,9 @@ export type RibbonOptions = z.infer<typeof ribbonOptionsSchema>
  * like a caption. It is the payoff for all of them.
  *
  * The mathematics is not new, which is the point of the contribution ladder.
- * A ribbon is a `drape` down its length and a `roll` that begins near the
- * bottom edge instead of at the sheet's centre — `roll.boundary` has always
- * been able to say "start here", and nothing had ever asked it to.
+ * A ribbon is a `drape` down its length and a `fold` whose hinge sits at the
+ * floor line rather than at the sheet's centre — `fold.offset` has always
+ * been able to say "crease here", and nothing had ever asked it to.
  */
 export const ribbon: Behavior<RibbonOptions> = {
   id: 'ribbon',
@@ -44,8 +44,9 @@ export const ribbon: Behavior<RibbonOptions> = {
    * The grid is sized by sampling this parameter from 0 to 1, so it has to
    * BE a 0..1 parameter (a `pool` that stops at 0.5 would be sampled across
    * a range it rejects), and it should be the one that drives the geometry
-   * hardest. `curl` sets the roll radius, sweeping it 0.5 -> 0.12, and the
-   * tightest radius is exactly the case that demands the most segments.
+   * hardest. `curl` opens the crease from a right angle to a fold back on
+   * itself, and the sharpest turn is exactly the case that demands the most
+   * segments across the hinge.
    */
   signature: ['pool', 'curl', 'drape'],
   progressParam: 'curl',
@@ -63,32 +64,57 @@ export const ribbon: Behavior<RibbonOptions> = {
     // whole drop from the ceiling down.
     const floorLine = -sheet.height / 2 + sheet.height * o.pool
 
+    // How soft the crease is. `curl` drives this rather than the fold angle
+    // — see the fold below for why.
+    const radius = Math.min(0.5, Math.max(0.02, sheet.height * (0.035 - o.curl * 0.027)))
+
+    /**
+     * The hinge does not turn on the spot: it wraps a cylinder of radius
+     * `radius / φ`, and the flap leaves that cylinder lower than the crease
+     * line by exactly that much.
+     *
+     * Which means placing the crease AT the floor buries the pool under it.
+     * That is what was happening — the pooled length came out about 9cm
+     * below the ground on the ribbon stage's own numbers, so the one thing
+     * the stage exists to show was inside the floor. The crease goes up by
+     * the hinge's own radius so that the POOL lands on the line, which is
+     * the thing that has to be true; where the crease sits is arithmetic.
+     */
+    const hingeDrop = radius / (Math.PI / 2)
+
     return [
       {
-        // `wave`, not `drape`, and that is a finding rather than a preference.
+        // `drape` — the deformer named after the thing this is.
         //
-        // `drape` is the obvious choice for folds down a hanging sheet, and
-        // it does not work here: it renders an invisible sheet on the hero
-        // (CPU) path at any grid, including an explicitly fixed one. It has
-        // only ever been reached through the field/GPU path — the stage
-        // banner is its single caller in the whole library — so nothing had
-        // ever run it on this side. Written up in docs/roadmap.md.
+        // It briefly used `wave` instead, to work around a report that
+        // `drape` rendered an invisible sheet on the hero path. That report
+        // was wrong: it rested on counting the colours in a screenshot, and
+        // a near-flat strip filling the frame has about as many colours as
+        // an empty one. `deformers/draws.test.ts` now asserts on geometry
+        // what the screenshot was being asked to guess at.
         //
-        // `wave` pinned at the top is the same picture by another road: the
-        // fold amplitude grows away from the fixing, which is what a strip
-        // hung from a clip does, and it is proven on both paths.
-        type: 'wave',
+        // `wave` was never the same picture. A wave is a sine of fixed
+        // amplitude end to end, so its folds ran just as deep at the clip as
+        // at the floor; a hung strip is FLAT where it is held and gathers as
+        // it falls, which is exactly `falloff`, and it narrows as it gathers,
+        // which is `gather`. Neither has an equivalent in `wave`.
+        type: 'drape',
         options: {
-          amplitude: o.drape * 0.06,
-          // Long and few. A printed strip carries two or three slow folds
+          // Depth at the free end. Larger than the wave's amplitude was,
+          // because this one starts at nothing under the clip rather than
+          // running at full depth the whole way down.
+          amplitude: o.drape * 0.1,
+          // Few and long. A printed strip carries two or three slow folds
           // down its drop; more than that is a curtain, not a ribbon.
-          wavelength: 0.62,
-          // Static — a hung strip is not a flag. `hang` is the behavior for
-          // paper that moves.
-          speed: 0,
-          // Across the width, so the folds run down the length.
-          angle: 8,
-          // Flat where the clip holds it, deepening toward the floor.
+          folds: 2.5,
+          // Holds the top flat and gathers the movement toward the floor,
+          // which is what a strip hung from a single clip does.
+          falloff: 1.5,
+          // Off a pure sine, so the folds do not read as corrugation.
+          irregular: 0.5,
+          // Gentle. The pooled length has to lie FLAT on the floor, and a
+          // hard pinch would narrow it as it went.
+          gather: 0.22,
           pinnedEdge: 'top',
         },
       },
@@ -106,16 +132,32 @@ export const ribbon: Behavior<RibbonOptions> = {
           // Travel measured down the drop, so the crease line sits across
           // the ribbon and the flap below it is what turns.
           angle: -90,
-          offset: -floorLine,
-          // A right angle lies the pool flat on the floor. Under that it is
-          // still coming down; over it, the paper has folded back on itself,
-          // which is what happens when more length arrives than there is
-          // floor to take it.
-          foldAngle: 62 + o.curl * 46,
-          // The hinge is soft and scales with the sheet: paper never creases
-          // to a mathematical edge, and a fixed radius that reads as a fold
-          // on a short strip reads as a knife-edge on a long one.
-          radius: Math.min(0.5, Math.max(0.02, sheet.height * 0.02)),
+          offset: -floorLine - hingeDrop,
+          // Exactly a right angle, at every setting, and this is the fix
+          // for the thing the ribbon stage was actually failing at.
+          //
+          // A hinge is one angle: whatever it turns through, the pooled
+          // length leaves the crease in a straight line and holds that
+          // heading. Only 90° is the floor. It shipped as `62 + curl * 46`
+          // (62°..108°), so below curl 0.61 the pool went on travelling
+          // downward and vanished THROUGH the floor — which is why the one
+          // stage built around this behavior rendered as flat strips
+          // stopping at the ground — and above it the pool tilted back UP
+          // and floated. Both halves of the range were wrong, in opposite
+          // directions, and only the midpoint was ever right.
+          //
+          // Paper with more length than floor does not rise at a constant
+          // angle; it buckles and lies in an S, which one hinge cannot
+          // describe and should not pretend to.
+          foldAngle: 90,
+          // So `curl` drives the CREASE instead, which is what its own
+          // description always claimed — "how tightly it turns where it
+          // lands. Low is a soft slump, high is a curl." A soft radius is a
+          // sheet slumping over the join; a tight one is a sheet that has
+          // been creased. It scales with the sheet, because a radius that
+          // reads as a fold on a short strip reads as a knife-edge on a long
+          // one.
+          radius,
         },
       },
     ]

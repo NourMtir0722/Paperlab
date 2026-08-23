@@ -130,10 +130,44 @@ export interface PaperStageProps extends PaperStageSceneProps {
 export function splitAcrossBanners(text: string, banners: number): string[] {
   const words = text.split(/\s+/).filter(Boolean)
   if (words.length === 0 || banners <= 0) return []
-  const per = Math.ceil(words.length / banners)
+  // Deal the words out rather than slicing at a fixed stride. `ceil` and a
+  // stride left the remainder on the floor: twenty words across twelve
+  // banners chunked by two produced TEN columns, and the last two banners
+  // hung blank in a stage that had asked for twelve. Dealing gives every
+  // banner a share and puts the odd words at the front, where a column one
+  // word longer than its neighbour reads as prose rather than as a mistake.
+  const each = Math.floor(words.length / banners)
+  const extra = words.length % banners
   const out: string[] = []
-  for (let i = 0; i < words.length; i += per) out.push(words.slice(i, i + per).join('\n'))
+  let at = 0
+  for (let i = 0; i < banners && at < words.length; i++) {
+    const take = each + (i < extra ? 1 : 0)
+    if (take === 0) break
+    out.push(words.slice(at, at + take).join('\n'))
+    at += take
+  }
   return out
+}
+
+/**
+ * Set a single word down the drop, one letter to a line.
+ *
+ * This is what the reference installations do, and it is what the stage was
+ * accidentally almost doing. Every built-in stage has FEWER words than
+ * banners — a nave of eighteen carries fifteen — so nearly every column is
+ * one word, and a one-word column asked for 150px type that no banner is
+ * wide enough to hold. `wrapLines` then broke it wherever the measure ran
+ * out, which turned "carried" into `ca / rr / ie / d`: vertical, full-drop,
+ * and unreadable as a word, because the break points were an accident of
+ * arithmetic rather than a decision.
+ *
+ * Breaking on purpose fixes both halves. One letter a line is legible as
+ * vertical setting, and it is the line COUNT that then sizes the type, so a
+ * long word gets small letters and a short word gets big ones — which is
+ * what makes a rank of banners look set rather than scaled.
+ */
+export function letterColumn(word: string): string {
+  return [...word].join('\n')
 }
 
 /**
@@ -146,9 +180,45 @@ export function splitAcrossBanners(text: string, banners: number): string[] {
  * size that lands the last line at the bottom of the paper. Clamped at both
  * ends: two words on an eight-metre drop should be enormous, but not so
  * enormous they crop, and a dense column still has to stay legible.
+ *
+ * **The drop is only half the constraint, and leaving the other half out was
+ * a real bug.** A banner is also NARROW, and the width was never consulted.
+ * On the ribbon stage — a 1.05 × 9 strip, so about 105px of measure once the
+ * margins are off — a two-word column asked for 150px type, every word came
+ * out wider than the sheet, `wrapLines` broke each one to a letter a line,
+ * and the column then overran the drop and was silently clipped. The frame
+ * showed one enormous letter per strip. So `measure` caps the size at
+ * something the longest word can actually sit on.
+ *
+ * The character estimate is exactly that — an estimate. Real advance widths
+ * need a canvas, which is not available where this is decided, so 0.62em is
+ * used as a deliberately generous average for a mixed-case serif: erring
+ * high makes the type a little small, and erring low brings back the letter
+ * a line. `wrapLines` is still the backstop for a word no size can fit.
  */
-export function bannerTextSize(lines: number): number {
-  return Math.round(Math.min(150, Math.max(26, 720 / Math.max(lines, 1))))
+export function bannerTextSize(lines: number, longestWord = 0, measure = Number.POSITIVE_INFINITY): number {
+  const byDrop = 720 / Math.max(lines, 1)
+  const byMeasure = longestWord > 0 ? measure / (longestWord * 0.62) : Number.POSITIVE_INFINITY
+  // Floor, not round: rounding UP is how a size that was computed to fit
+  // stops fitting, and half a pixel of type is worth nobody's attention.
+  return Math.floor(Math.min(150, Math.max(26, Math.min(byDrop, byMeasure))))
+}
+
+/** The inset the banner column is set inside, on both the sizer and the painter. */
+const PADDING = 0.06
+
+/**
+ * The usable width of a banner's texture, in the units `content.size` is in.
+ *
+ * Both numbers here are facts about how content is painted, not choices:
+ * the canvas is `LONG_EDGE` on its long side, and `paintText` insets by
+ * `padding` of the SHORT side. Stated once so the type sizer and the painter
+ * cannot drift apart about how much room there is.
+ */
+export function bannerMeasure(sheet: { width: number; height: number }, padding = PADDING): number {
+  const long = Math.max(sheet.width, sheet.height)
+  if (!(long > 0)) return Number.POSITIVE_INFINITY
+  return (sheet.width / long) * 1024 * (1 - padding * 2)
 }
 
 /**
@@ -331,25 +401,46 @@ export function PaperStageScene({
     if (papers) return papers
     if (images) return undefined
     if (text !== undefined) {
-      const columns = Array.isArray(text) ? text : splitAcrossBanners(text, count)
+      const split = Array.isArray(text) ? text : splitAcrossBanners(text, count)
+      // A whole-rank decision, not a per-banner one: if there is at most one
+      // word for every banner, the stage is set vertically. Mixing the two
+      // would put one banner's letters next to another's words at a single
+      // shared size, and one of the two would always be wrong.
+      const vertical = split.every((c) => !c.includes('\n'))
+      const columns = vertical ? split.map(letterColumn) : split
       const longest = columns.reduce((n, c) => Math.max(n, c.split('\n').length), 1)
-      const size = bannerTextSize(longest)
+      // The longest WORD, not the longest line: lines are already one word
+      // each, and it is the word that has to fit across the strip.
+      const longestWord = columns.reduce(
+        (n, c) => c.split('\n').reduce((m, w) => Math.max(m, w.length), n),
+        1,
+      )
+      const size = bannerTextSize(longest, longestWord, bannerMeasure(sheetDims, PADDING))
       return columns.map((column) => ({
         content: {
           type: 'text',
           text: column,
           size,
           align: 'center',
+          // Centred down the drop as well as across it. One size is shared
+          // by the whole rank — that is what makes it read as set rather
+          // than scaled — so a short word necessarily leaves slack, and the
+          // slack belongs at both ends. Hung from the top instead, "the"
+          // reads as a caption that ran out while "remembers" fills its
+          // banner, and the rank looks broken rather than composed.
+          valign: 'center',
           color: '#241f1a',
           lineHeight: 1.25,
           font: 'Georgia, "Times New Roman", serif',
           weight: 400,
-          padding: 0.06,
+          padding: PADDING,
         } satisfies ContentConfigInput,
       }))
     }
     return Array.from({ length: count }, () => ({}))
-  }, [papers, images, text, count])
+    // `sheetDims` belongs here: the type size is capped by how wide the
+    // banner is, so a preset that changes the sheet has to re-set the type.
+  }, [papers, images, text, count, sheetDims])
 
   const drive = stageMotionSchema.parse(motion ?? {})
 

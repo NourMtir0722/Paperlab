@@ -44,3 +44,60 @@ describe('patchStage', () => {
     expect(useEditor.getState().stage.playing).toBe(!before.playing)
   })
 })
+
+/**
+ * `inspectorEpoch` remounts the whole inspector, which resets every folder's
+ * open/closed state. That is right when the SUBJECT changes — a new preset,
+ * a new behavior, a new mode — and wrong when only a value does.
+ *
+ * It was wrong in four places, and the drop-zone one was visible: opening
+ * "Drop zones" and pressing "Add a drop zone" closed the folder on the zone
+ * you had just made. The state-override resets had the same shape — you open
+ * a folder to find the control you want to reset, and resetting it closes
+ * the folder. Each of these setters changes values the inspector already
+ * derives from the store on every render, so none of them needs a remount.
+ */
+describe('the inspector is not remounted for a value change', () => {
+  const epoch = () => useEditor.getState().inspectorEpoch
+
+  it('adding and removing a drop zone', () => {
+    const before = epoch()
+    useEditor.getState().addZone()
+    expect(useEditor.getState().field.zones.length).toBeGreaterThan(0)
+    useEditor.getState().removeZone(useEditor.getState().field.zones.length - 1)
+    expect(epoch()).toBe(before)
+  })
+
+  it('clearing one recorded state override', () => {
+    useEditor.getState().setEditingState('hover')
+    useEditor.getState().patchConfig({ surface: { grain: 0.7 } })
+    useEditor.getState().setEditingState(null)
+    const before = epoch()
+    useEditor.getState().clearStateOverride('hover', 'surface.grain')
+    expect(epoch()).toBe(before)
+  })
+
+  it('resetting a whole state to base', () => {
+    useEditor.getState().setEditingState('pressed')
+    useEditor.getState().patchConfig({ surface: { grain: 0.6 } })
+    useEditor.getState().setEditingState(null)
+    const before = epoch()
+    useEditor.getState().resetStateOverrides('pressed')
+    expect(useEditor.getState().config.states?.states.pressed?.overrides).toEqual({})
+    expect(epoch()).toBe(before)
+  })
+
+  it('clearing a slot-layer override', () => {
+    useEditor.getState().patchSlotState(0, 'hover', { behavior: { progress: 0.6 } })
+    const before = epoch()
+    useEditor.getState().clearSlotState(0, 'hover')
+    expect(epoch()).toBe(before)
+  })
+
+  it('but still remounts when the subject changes', () => {
+    const before = epoch()
+    useEditor.getState().setMode('field')
+    expect(epoch()).toBeGreaterThan(before)
+    useEditor.getState().setMode('paper')
+  })
+})

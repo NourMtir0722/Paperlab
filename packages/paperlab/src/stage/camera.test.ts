@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWalkPath, walkPathSchema } from './path'
 import { DEFAULT_PAPER_RATIO, shotSchema, stageCamera, walkPoint } from './camera'
-import { bannerTextSize, splitAcrossBanners } from './PaperStage'
+import { bannerMeasure, bannerTextSize, splitAcrossBanners } from './PaperStage'
 
 const HEIGHT = 1.75
 const path = (o: Record<string, unknown> = {}) => createWalkPath(walkPathSchema.parse(o))
@@ -187,5 +187,67 @@ describe('banner typography', () => {
   it('survives text with nothing in it', () => {
     expect(splitAcrossBanners('   ', 8)).toEqual([])
     expect(splitAcrossBanners('word', 0)).toEqual([])
+  })
+
+  /**
+   * A stage that asks for twelve banners and is handed a paragraph must get
+   * twelve columns. Slicing at `ceil(words / banners)` left the remainder
+   * unallocated — the ribbon stage's twenty words over twelve banners
+   * produced ten columns, and two banners hung blank.
+   */
+  it('gives every banner a share, however the words divide', () => {
+    for (const banners of [3, 5, 7, 12, 20]) {
+      const words = Array.from({ length: 20 }, (_, i) => `w${i}`).join(' ')
+      const columns = splitAcrossBanners(words, banners)
+      expect(columns, `${banners} banners`).toHaveLength(Math.min(banners, 20))
+      // Nothing dropped, nothing duplicated.
+      expect(columns.join('\n').split('\n')).toHaveLength(20)
+    }
+  })
+
+  it('never leaves a banner one word while another carries three', () => {
+    const columns = splitAcrossBanners('a b c d e f g h i j', 4)
+    const lengths = columns.map((c) => c.split('\n').length)
+    expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(1)
+  })
+
+  it('has fewer columns than banners only when there are fewer words', () => {
+    expect(splitAcrossBanners('one two', 9)).toHaveLength(2)
+  })
+
+  /**
+   * The bug this pair guards: the sizer knew how tall a banner was and not
+   * how WIDE. On the ribbon stage's 1.05 x 9 strip it asked for 150px type
+   * on about 105px of measure, so every word broke to one letter a line and
+   * the column then overran the drop and was clipped. The frame showed a
+   * single enormous letter per strip.
+   */
+  it('caps the size at something the longest word can sit on', () => {
+    const strip = bannerMeasure({ width: 1.05, height: 9 })
+    // Two words on a nine-metre drop still wants 150 on the drop alone…
+    expect(bannerTextSize(2)).toBe(150)
+    // …and cannot have it on a strip this narrow.
+    const sized = bannerTextSize(2, 'paper'.length, strip)
+    expect(sized).toBeLessThan(150)
+    expect(sized * 'paper'.length * 0.62).toBeLessThanOrEqual(strip)
+  })
+
+  it('leaves a wide banner alone — the width only binds when it is the tighter limit', () => {
+    // 520px of measure holds a four-letter word at the drop's own 120px.
+    const wide = bannerMeasure({ width: 1.5, height: 2.6 })
+    expect(bannerTextSize(6, 4, wide)).toBe(bannerTextSize(6))
+    // …and a long word on the same banner is still capped, because the
+    // constraint is the word, not the shape.
+    expect(bannerTextSize(6, 12, wide)).toBeLessThan(bannerTextSize(6))
+  })
+
+  it('still answers without a measure, so an old call site keeps its size', () => {
+    expect(bannerTextSize(6)).toBe(bannerTextSize(6, 0, 10))
+  })
+
+  it('measures the strip inside its margins, not edge to edge', () => {
+    // 1024 on the long edge, inset 6% of the short side at each margin.
+    expect(bannerMeasure({ width: 1.05, height: 9 })).toBeCloseTo((1.05 / 9) * 1024 * 0.88, 6)
+    expect(bannerMeasure({ width: 0, height: 0 })).toBe(Number.POSITIVE_INFINITY)
   })
 })

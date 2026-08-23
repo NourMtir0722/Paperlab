@@ -183,8 +183,31 @@ export const stagePresets: Record<string, StagePreset> = {
       surface: { grain: 0.2 },
       behavior: { type: 'ribbon', pool: 0.22, curl: 0.34, drape: 0.6 },
     },
-    count: 12,
-    text: 'the paper kept going long after the floor ran out from under it and nobody moved to pick it up',
+    // Eight, not twelve, and the reason is the type rather than the room.
+    // A strip 1.05 wide holds about 105px of measure, which caps the type at
+    // 26px, which means a column needs roughly twenty-six words to reach the
+    // bottom of a nine-metre drop. Twelve strips wanted three hundred words;
+    // eight want two hundred, which is a passage rather than an essay. Fewer
+    // and longer is also what the reference installations look like.
+    count: 8,
+    // Long, because the whole point of this stage is type running the length
+    // of the paper. It shipped with twenty words across twelve banners — two
+    // words a strip — which set as a caption at the top of nine metres of
+    // blank paper. Every word here is kept to seven letters or fewer: the
+    // measure is narrow, and one long word shrinks the type on every banner
+    // in the room, because a rank of banners is set at one size or it reads
+    // as a mistake.
+    text:
+      'the paper kept going long after the floor ran out from under it and nobody moved to pick it up ' +
+      'we let it lie there the way you let a letter lie it had come down from a height no one could name ' +
+      'and it held the shape of the fall in its folds someone inked it once and you can still read the ' +
+      'last of it where the light gets in a room is only a room until you hang a thing in it then it is ' +
+      'a place you walk across slowly the strips move when the door opens and settle again before you ' +
+      'reach them paper holds what it was rolled around it holds being flat too and it will go back to ' +
+      'flat if you leave it alone long enough but not today today it lies in a curve at the foot of the ' +
+      'wall and the curve is the whole point the floor was never meant to hold this much so the paper ' +
+      'takes over where the floor gives up it pools the way water would if water could be inked we came ' +
+      'to look at the light we stayed for the paper on the ground',
   },
   archive: {
     id: 'archive',

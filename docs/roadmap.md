@@ -117,6 +117,60 @@ twin; `pnpm test:parity` is a hard gate, not a suggestion.
 
 ---
 
+## The build order
+
+A product review on 2026-08-21 produced a sequenced plan, and **the plan
+lived only in an artifact link until now** — which was itself one of its own
+Phase 00 tasks, left open through five phases. It is here so that it can be
+checked against the repo, which is how the gaps below were found.
+
+**The sequencing principle, which is the part worth keeping:** phases are
+ordered by *what has to be true before the next thing can be built without
+being built twice*, not by importance. The grade goes first because every
+later frame is judged through it. The paper-content renderer goes before any
+gallery stage because all four stages are typographic. The room and the
+shared primitives go before the stages that inherit them. Only one stage is
+above the launch gate; the rest ship after, on purpose, as the content
+cadence.
+
+| # | phase | done test | status |
+|---|---|---|---|
+| 00 | Ground | a stranger can open all three apps; the README promises nothing missing | **partly** — repo public, Pages live, plan now landed here. **README honesty pass still owed** (deferred to phase 07 on purpose) |
+| 01 | The grade | the source reads as light; white paper keeps its hue | done |
+| 02 | The material | open Field mode, change nothing, screenshot: it is a portfolio image | done |
+| 03 | The room | a frame with nobody in it reads as a large room | **partly** — see below |
+| 04 | The primitives | a hung sheet shows what suspends it; a fallen sheet lies convincingly | **partly** — see below |
+| 05 | Ribbon | a still stops someone scrolling with no caption | done, after the four defects above were fixed |
+| 06 | The tool, structurally | a stranger changes the one thing they meant to, and undoes it | done |
+| 07 | Honesty | every URL on a phone, cold cache, nothing confusing or blank | **not started** |
+| — | launch gate | publish 0.3.0, render assets, Product Hunt | blocked on 07 |
+| 08 | The rest of the gallery | one stage every couple of weeks | after launch, deliberately |
+
+### What phases 03 and 04 did not build
+
+Recorded rather than quietly dropped. Neither is a defect — both stages'
+done tests pass — but both are less than the plan asked for, and nothing had
+written down which parts were skipped or why.
+
+**Phase 03 asked for five pieces of architecture: a ceiling, a column with a
+base plate, a doorway, floor slab seams, and a wall corner.** Two shipped —
+`stage.room` (the ceiling) and `ground.slab` (the seams). The column, the
+doorway and the wall corner were never built. The argument for them is the
+one that retired the walking figure in the first place: *architecture is a
+better scale cue than a human mesh, and it is the thing renderers never fail
+at.* A column with a base plate is the strongest of the five, because a base
+plate is a knowable size at a knowable height and it stands IN the scene
+rather than bounding it. Worth building before the launch assets are shot.
+
+**Phase 04 asked for "thread, clips, pegs, a rod".** Thread and clips
+shipped; pegs and a rod did not. This one is defensible as it stands — one
+suspension that works everywhere beats four that half do — but the rod in
+particular is what the canopy and suspension stages (phase 08) will want,
+because a rank of sheets hung from a common rod is a different image from a
+rank each on its own thread.
+
+---
+
 ## Now — the launch runway
 
 This was filed as pure distribution, no code. One of the two turned out to
@@ -292,44 +346,111 @@ this; these two had simply never been held to it.
 
 ---
 
-## Open bug — `drape` renders nothing on the hero path
+## The `drape` bug that was not one — *closed 2026-08-23*
 
-**Found 2026-08-22 while building the `ribbon` behavior. Not yet fixed.**
+**The open bug filed here on 2026-08-22 does not reproduce, and the way it
+was wrong is worth more than the bug would have been.**
 
-The `drape` deformer produces an **invisible sheet** when it runs through the
-hero (CPU/JS) path. Not a faint one — the frame contains exactly one colour,
-the background.
+It said `drape` rendered an invisible sheet on the hero path, on the evidence
+that a screenshot of it contained **exactly one colour** while the same frame
+of `roll` contained 698. Re-run against every case it named — the reported
+0.85 x 6.4 sheet, the ribbon stage's 1.05 x 9 banner, an explicit
+`segments: 96`, a square sheet, and the option range at its extremes —
+`drape` draws every time.
 
-What was ruled out, in order:
+**Counting colours cannot tell an empty frame from one flat surface filling
+it.** A tall drape at that scale is a nearly flat, nearly evenly lit white
+plane edge to edge; a roll is a cylinder, so of course it has hundreds of
+shades. The measurement answered a different question from the one being
+asked, and the answer was read as if it had not.
 
-- **The math.** `drape.displace` was swept across its whole option range on a
-  0.85 x 6.4 sheet: every vertex finite, every value bounded. The node probe
-  is clean.
-- **Tessellation.** The stack resolves to a `[72, 8]` grid, because `drape`
-  declares `axis: 0` (its folds run across the WIDTH) and so asks for zero
-  segments down the length, where the stack floor for that axis is 2. That
-  looked like the answer and is not: pinning the sheet to an explicit
-  `segments: 96` renders the same single colour.
-- **The sheet and the content.** The identical sheet and text render fine
-  with `hang` (bend + wave) at the same camera.
+What the report got right is the gap it named — *"a parity gate proves the
+two implementations agree, not that either one draws"* — and that gap was
+real. Both halves of `drape` could have returned zero forever and every test
+in the repo would still have passed: `drape.test.ts` checks `displace` at
+chosen uvs, parity checks CPU against GPU, and nothing checked that the
+pipeline between them produces a surface.
 
-Isolated by bisecting the ribbon stack one deformer at a time: `roll` alone
-renders (698 colours), `drape` alone is blank, both together blank.
+`deformers/draws.test.ts` closes it. For every registered deformer, on an
+ordinary sheet and on a tall banner, it builds the real geometry the way
+`<PaperMesh>` does and asserts the sheet is finite, actually moved, still has
+most of its area, and has unit normals to light. Verified to fail by
+collapsing `drape` on purpose. **A new deformer cannot skip it** — the last
+case asserts the table covers the registry.
 
-**Why nobody had hit it.** `drape` had exactly one caller in the entire
-library — the stage banner in `stage/PaperStage.tsx` — and that goes through
-the field/GPU path, which uses the GLSL twin. No behavior and no paper preset
-had ever put `drape` on the CPU side. `ribbon` was the first, which is how a
-deformer that ships with a parity gate can still be half-broken: **parity
-proves the two implementations agree, not that either one draws.**
+---
 
-`ribbon` therefore uses `wave` pinned at the top, which is the same picture
-by another road and is proven on both paths. That is a workaround, not a fix.
+## Phase 05 — the ribbon stage did not render what it is for — *fixed 2026-08-23*
 
-Worth checking when this is picked up: whether the normals come out
-degenerate (`computeSheetNormals` over a grid that drape has pinched in x via
-`gather`), and whether any other deformer has the same never-exercised-on-CPU
-status.
+The stage shipped and was never looked at closely enough. Four separate
+defects, three of them in the same eight lines.
+
+**The crease could not reach a right angle.** `foldAngle` was `62 + curl*46`
+— 62° to 108°. A hinge turns through one angle and the pooled length holds
+that heading from the crease onward, so **only a right angle is the floor**:
+under it the pool keeps descending and goes through the ground, over it the
+pool tilts back up and floats above it. The default (0.45) and the stage
+preset's own value (0.34) were both under. The pool — the entire subject of
+the stage — was inside the floor, and the frame showed flat strips stopping
+dead at the ground. `foldAngle` is now exactly 90 and `curl` drives the
+crease RADIUS, which is what its own description always claimed it did.
+
+**And the crease was placed as if the hinge had no size.** It wraps a
+cylinder of `radius / φ`, so the flap leaves it that much lower than the
+crease line — measured at about 9cm below the floor on the stage's own
+numbers. The crease now goes up by the hinge's own radius, because what has
+to land on the floor is the pool; where the crease sits follows from that.
+
+**It used `wave` where it meant `drape`**, working around the bug above that
+does not exist. `wave` was never the same picture: a sine runs at one
+amplitude end to end, and a hung strip is flat where it is held and gathers
+as it falls — which is `falloff`, and it narrows as it gathers, which is
+`gather`. Neither exists in `wave`.
+
+**The type was a two-word label at the top of nine metres of blank paper.**
+See below; the same bug had the whole stage set wrong.
+
+---
+
+## Banner typesetting was sized by the drop and never by the measure — *fixed 2026-08-23*
+
+`bannerTextSize` chose a size to fill the DROP and never asked how wide the
+banner was. On the ribbon stage's 1.05 x 9 strip — about 105px of measure
+once the margins are off — a two-word column asked for 150px type, every word
+came out wider than the sheet, `wrapLines` broke each one wherever the
+measure ran out, and the column then overran the drop and was silently
+clipped. The frame showed one enormous letter per strip.
+
+Fixing the cap exposed the bigger thing underneath. **Every built-in stage
+has fewer words than banners** — a nave of eighteen carries fifteen — so
+nearly every column is a single word. The old code "filled" the drop by
+shattering that word at arbitrary points: `carried` set as `ca / rr / ie / d`,
+which is vertical and full-length and unreadable as a word, because the
+break points were an accident of arithmetic rather than a decision.
+
+Three changes, and the stages read as designed for the first time:
+
+- **`letterColumn`** sets a single word one letter to a line, on purpose.
+  It is a whole-rank decision (`words <= banners`), not a per-banner one —
+  mixing letters and words at one shared size would always be wrong for one
+  of them. `carried` now reads down its banner.
+- **The measure caps the size**, so no word is ever broken by accident.
+- **`valign: 'center'`.** One size is shared by the rank, so a short word
+  necessarily leaves slack, and the slack belongs at both ends rather than
+  all at the bottom.
+
+**`splitAcrossBanners` also dropped banners.** It sliced at a fixed
+`ceil(words / banners)` stride, so twenty words across twelve banners gave
+TEN columns and two banners hung blank. It deals the words out now, odd ones
+at the front.
+
+**The ribbon stage got a passage instead of a caption.** The arithmetic is
+worth keeping: a 1.05-wide strip holds ~105px of measure, which caps the type
+near 26px, which means a column needs roughly twenty-six words to reach the
+bottom of a nine-metre drop. Twelve strips wanted three hundred words; the
+stage now runs eight strips and two hundred, with every word kept to seven
+letters or fewer — because the measure is narrow and **one long word shrinks
+the type on every banner in the room**.
 
 ---
 
