@@ -1,49 +1,51 @@
+/**
+ * The public API.
+ *
+ * Everything named here is a promise: once it is on npm, taking it away costs
+ * whoever imported it a migration. So the bar is not "is this useful?" but
+ * "would I support this for years?" — and the answer for a shader builder, a
+ * texture painter or a tessellation constant is no. Those are the inside of
+ * the box, and the box is `<Paper>`, `<PaperField>`, `<PaperStage>` and the
+ * data that describes them.
+ *
+ * Three things survive that bar despite looking internal, each for a reason
+ * written where it is exported: the parity harness, the tessellation
+ * arithmetic, and line breaking. Each is the answer to a question a caller
+ * can genuinely ask and cannot otherwise answer.
+ *
+ * Adding a name here later is free. Removing one is not. When in doubt, leave
+ * it out.
+ */
+
+// ── The components ──────────────────────────────────────────────────────────
+
 export { Paper, type PaperProps } from './Paper'
+export { PaperMesh, type PaperMeshProps, type PaperHandle } from './PaperMesh'
 export {
   PaperField,
   PaperFieldMesh,
-  groupFieldPapers,
-  resolveFieldSlotConfig,
-  fieldKeyboardStep,
   DropZone,
-  DropZoneRegistry,
-  zoneAccepts,
   type PaperFieldProps,
   type PaperFieldMeshProps,
   type FieldPaperSlot,
-  type FieldGroupData,
   type DropZoneConfig,
   type DropZoneProps,
   type PlacedPaper,
-  type FieldA11yController,
-  type KeyboardCarry,
-  type KeyboardStepResult,
 } from './PaperField'
-export { PaperMesh, resolveConfig, type PaperMeshProps, type PaperHandle } from './PaperMesh'
+
+// ── The schema. It is the spec: if it cannot serialize, it does not ship. ───
 
 export {
   paperConfigSchema,
-  sheetSchema,
-  stockSchema,
-  contentSchema,
-  backContentSchema,
   behaviorConfigSchema,
-  deformerInstanceSchema,
-  surfaceSchema,
-  cardContentSchema,
-  receiptContentSchema,
-  physicsSchema,
   clothConfigSchema,
+  paperStatesSchema,
+  stateDefSchema,
   physicsNames,
-  sceneSchema,
   lightingNames,
-  filmNames,
   stockNames,
   paperEdges,
   coreStateNames,
-  stateDefSchema,
-  stateTransitionSchema,
-  paperStatesSchema,
   type PaperConfig,
   type PaperConfigInput,
   type SheetConfig,
@@ -73,127 +75,71 @@ export {
   type PaperStatesInput,
 } from './config/schema'
 
-export {
-  PaperStateMachine,
-  stateEventTransitions,
-  resolveStateConfig,
-  recordStateOverride,
-  stripStates,
-  flattenNumeric,
-  type StateEvent,
-  type PaperStateMachineOptions,
-} from './states/machine'
-export { usePaperStates, type UsePaperStatesResult } from './states/usePaperStates'
+export { sheetLayoutSchema, type SheetLayoutOptions } from './field/sheetGrid'
+
+// ── Presets, and the file format ────────────────────────────────────────────
 
 export {
-  sheetLayoutSchema,
-  sheetSlotXY,
-  sheetBackingSize,
-  outwardCorner,
-  tornEdgesOnDetach,
-  withSheetCellFromPaper,
-  SHEET_LIFT,
-  type SheetLayoutOptions,
-} from './field/sheetGrid'
-export { drawBacking, silhouetteRects, lightenHex, type BackingDrawSpec } from './content/backing'
+  getPreset,
+  listPresets,
+  registerPreset,
+  unregisterPreset,
+  isBuiltinPreset,
+  uniquePresetName,
+} from './config/presets'
+export { parsePreset, serializePreset, mergeConfig, mergeWithDeletes } from './config/serialize'
+export { diffConfig, buildJsxSnippet } from './config/diff'
+
+// ── Export: the brief an agent or a codebase receives ───────────────────────
+
+export { buildAgentPayload, describeConfig } from './config/agent-payload'
+export {
+  buildFieldAgentPayload,
+  buildFieldComponentSource,
+  describeFieldConfig,
+  diffFieldProps,
+  type FieldExportInput,
+  type FieldExportPaper,
+  type FieldExportZone,
+} from './config/field-export'
+
+// ── The registries, and the three ways to extend them ───────────────────────
+
+export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
+export { registerDeformer, getDeformer, listDeformers } from './deformers/registry'
+export type { Behavior, HandleSpec } from './behaviors/types'
+export { registerBehavior, getBehavior, listBehaviors } from './behaviors/registry'
+export { getLayout, listLayouts, registerLayout, type Layout, type PaperPose } from './field/layouts'
+export { stocks, getStock, type Stock } from './core/stock'
+export { idleNames, type IdleName, type IdlePreset } from './physics/idle'
+
+// ── Lighting is data, not an enum ───────────────────────────────────────────
 
 export {
-  lightingPresets,
-  getLightingPreset,
-  type LightingPreset,
-  // Lighting as data: a preset is the starting point and these are the
-  // overrides that ride on it.
   lightSchema,
   resolveLighting,
   lightAngles,
-  lightPosition,
+  type LightingPreset,
   type LightAngles,
   type LightOverrides,
   type LightOverridesInput,
 } from './scene/lighting'
-export { PaperLighting, makeGoboTexture, type PaperLightingProps } from './scene/PaperLighting'
+export { PaperLighting, type PaperLightingProps } from './scene/PaperLighting'
 // Publish a resolved rig to the paper under it, so a hand-lit scene's
 // transmission agrees with its lamps. `<PaperStage>` does this for you.
 export { LightRig } from './scene/rig'
 
-export type { Deformer, DeformerInstance, DeformerContext, SheetDims } from './deformers/types'
-export {
-  registerDeformer,
-  getDeformer,
-  listDeformers,
-  resolveDeformerStack,
-} from './deformers/registry'
-export {
-  applyDeformerStack,
-  displacePoint,
-  stackAutoSegments,
-  stackMinSegments,
-} from './deformers/compose'
-export { roll, rollOptionsSchema, type RollOptions } from './deformers/roll'
-export { curl, curlOptionsSchema, cornerNames, type CurlOptions } from './deformers/curl'
-export { bend, bendOptionsSchema, type BendOptions } from './deformers/bend'
-export { fold, foldOptionsSchema, type FoldOptions } from './deformers/fold'
-export { wave, waveOptionsSchema, type WaveOptions } from './deformers/wave'
-export { drape, drapeOptionsSchema, type DrapeOptions } from './deformers/drape'
-export { crumple, crumpleOptionsSchema, type CrumpleOptions } from './deformers/crumple'
+// ── Interaction states ──────────────────────────────────────────────────────
 
-export type { Behavior, HandleSpec } from './behaviors/types'
-export { registerBehavior, getBehavior, listBehaviors } from './behaviors/registry'
-export { peel, peelOptionsSchema, type PeelOptions } from './behaviors/peel'
-export { unroll, unrollOptionsSchema, type UnrollOptions } from './behaviors/unroll'
-export { flip, flipOptionsSchema, type FlipOptions } from './behaviors/flip'
-export { letterFold, letterFoldOptionsSchema, type LetterFoldOptions } from './behaviors/letter-fold'
-export { hang, hangOptionsSchema, type HangOptions } from './behaviors/hang'
-export { fly, flyOptionsSchema, type FlyOptions } from './behaviors/fly'
-export { fall, fallOptionsSchema, type FallOptions } from './behaviors/fall'
-export { settle, settleOptionsSchema, type SettleOptions } from './behaviors/settle'
-export { ribbon, ribbonOptionsSchema, type RibbonOptions } from './behaviors/ribbon'
-export { carry, carryOptionsSchema, type CarryOptions } from './behaviors/carry'
-export { flight, flightOptionsSchema, type FlightOptions } from './behaviors/flight'
-// The first behavior whose name is already taken by the deformer it drives.
-// Both are `crumple` to their own registries; only the JS binding has to give.
-export {
-  crumpleBehavior,
-  crumpleBehaviorOptionsSchema,
-  type CrumpleBehaviorOptions,
-} from './behaviors/crumple'
+export { resolveStateConfig, recordStateOverride, type StateEvent } from './states/machine'
+export { usePaperStates, type UsePaperStatesResult } from './states/usePaperStates'
 
-export { idlePresets, getIdlePreset, idleNames, type IdleName, type IdlePreset } from './physics/idle'
+// ── Accessibility ───────────────────────────────────────────────────────────
 
-export {
-  buildDisplacementGLSL,
-  buildFieldVertexShader,
-  buildFieldFragmentShader,
-  stackUniformValues,
-  type ComposedDisplacement,
-} from './field/compose'
-export {
-  getLayout,
-  listLayouts,
-  registerLayout,
-  ring,
-  fan,
-  spread,
-  pile,
-  wall,
-  spill,
-  sweep,
-  book,
-  accordion,
-  rack,
-  colonnade,
-  sheet,
-  type Layout,
-  type PaperPose,
-} from './field/layouts'
-export { fieldBounds, fitCamera, type FieldBounds } from './field/framing'
-export {
-  translucencyUniforms,
-  translucencyValues,
-  TRANSMISSION_GAIN,
-  type TranslucencyValues,
-} from './surface/translucency'
-export { useContentAtlas, atlasGrid, type ContentAtlas } from './content/atlas'
+export { usePrefersReducedMotion, supportsWebGL } from './a11y'
+
+// ── The three that look internal and are not ────────────────────────────────
+
 /**
  * The GPU/CPU parity harness — public on purpose, and the reasoning is worth
  * writing down because it reads like test infrastructure that leaked.
@@ -218,65 +164,13 @@ export {
   type ParityCase,
   type ParityResult,
 } from './field/parity'
-export { ClothSim, type ClothParams, type PinMode } from './physics/cloth'
-export {
-  dampTo,
-  gust,
-  flightPose,
-  carryDrive,
-  type AeroPose,
-  type DampedValue,
-  type FlightParams,
-} from './physics/aero'
 
-export { composeSurface, type ComposedSurface, type SurfaceMaps } from './surface/compose'
-export { PaperMaterial, type PaperMaterialProps } from './surface/PaperMaterial'
-export { receiptTotals, barcodeBars, type ReceiptContent } from './content/receipt'
-export type { CardContent } from './content/card'
-// Line breaking is exported because it is the answer to "where does this
-// wrap", and a caller measuring a block of type before laying a sheet out
-// has to get the same answer the painter will.
-export { wrapLines } from './content/type'
-
-export { parsePreset, serializePreset, mergeConfig, mergeWithDeletes } from './config/serialize'
-export { diffConfig, buildJsxSnippet } from './config/diff'
-export {
-  buildAgentPayload,
-  describeConfig,
-  AGENT_PAYLOAD_VERSION,
-} from './config/agent-payload'
-export {
-  buildFieldAgentPayload,
-  buildFieldComponentSource,
-  describeFieldConfig,
-  diffFieldProps,
-  distinctFieldPresets,
-  type FieldExportInput,
-  type FieldExportPaper,
-  type FieldExportZone,
-} from './config/field-export'
-export {
-  usePrefersReducedMotion,
-  supportsWebGL,
-  contentText,
-  PaperMirror,
-  PaperFallback,
-} from './a11y'
-export { quantizeTime, quantizeProgress, ON_TWOS_FPS } from './motion/onTwos'
-export {
-  getPreset,
-  listPresets,
-  registerPreset,
-  unregisterPreset,
-  isBuiltinPreset,
-  uniquePresetName,
-} from './config/presets'
-export { stocks, getStock, type Stock } from './core/stock'
-export { createSheetGeometry, resolveSegments } from './core/sheet'
-// The arithmetic behind `geometry.autoSegments`. Public because
-// `registerDeformer` is: a deformer someone else writes has to be able to
-// answer the same question the built-in seven answer, and the answer should
-// be the same formula rather than a guess at what the library does.
+/**
+ * The arithmetic behind `geometry.autoSegments`. Public because
+ * `registerDeformer` is: a deformer someone else writes has to be able to
+ * answer the same question the built-in seven answer, and the answer should
+ * be the same formula rather than a guess at what the library does.
+ */
 export {
   AUTO_CEILING,
   FLAT_SEGMENTS,
@@ -286,4 +180,10 @@ export {
   segmentsForSine,
   spanAlong,
 } from './core/tessellation'
-export { resolveMode, type PaperMode, type PaperModeRequest } from './core/modes'
+
+/**
+ * Line breaking is exported because it is the answer to "where does this
+ * wrap", and a caller measuring a block of type before laying a sheet out
+ * has to get the same answer the painter will.
+ */
+export { wrapLines } from './content/type'
