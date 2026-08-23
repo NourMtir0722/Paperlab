@@ -21,29 +21,18 @@ import { useStable } from './core/stable'
 import type { SheetLayoutOptions } from './field/sheetGrid'
 import { fitCamera, resolveLayoutOptions } from './field/framing'
 
-// The field system lives in field/*; this module is the public composition.
-// Re-exported here so `import { … } from './PaperField'` (index.ts, tests,
-// consumers) keeps working across the split.
+// The field system lives in field/*; this module is the public composition,
+// so it forwards only what the public API names. The rest of field/* is
+// reachable from its own module for tests and for the internals — it is not
+// re-exported here, because a re-export is how something becomes public by
+// accident.
 export {
   DropZone,
-  DropZoneRegistry,
-  zoneAccepts,
   type DropZoneConfig,
   type DropZoneProps,
   type PlacedPaper,
 } from './field/dropZones'
-export {
-  groupFieldPapers,
-  resolveFieldSlotConfig,
-  type FieldPaperSlot,
-  type FieldGroupData,
-} from './field/slots'
-export type { FieldA11yController } from './field/interactiveField'
-export {
-  fieldKeyboardStep,
-  type KeyboardCarry,
-  type KeyboardStepResult,
-} from './field/keyboardMirror'
+export type { FieldPaperSlot } from './field/slots'
 
 export interface PaperFieldMeshProps {
   /** Per-paper slots; length sets the instance count. Slot presets override the shared one. */

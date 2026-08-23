@@ -26,18 +26,14 @@ export {
   type PaperStageProps,
   type PaperStageSceneProps,
 } from './stage/PaperStage'
-export { SOURCE_INTENSITY } from './stage/Surround'
 export {
   stageSchema,
-  stageGradeSchema,
-  stageRoomSchema,
-  stageSuspensionSchema,
   type StageConfig,
   type StageConfigInput,
   type StageGradeConfig,
 } from './stage/schema'
 // Who drives the walk — the same three names a field's motion uses.
-export { stageMotionSchema, type StageMotion, type StageMotionInput } from './stage/navigate'
+export type { StageMotion, StageMotionInput } from './stage/navigate'
 export { stagePresets, getStagePreset, listStagePresets, type StagePreset } from './stage/presets'
 export { walks, walkNames, getWalk, type WalkName } from './stage/walks'
 export { createWalkPath, type Ground, type WalkPath, type WalkPathOptions } from './stage/path'
@@ -50,7 +46,5 @@ export {
   buildStageComponentSource,
   describeStage,
   diffStage,
-  walkNameFor,
-  stringifyStage,
   type StageExportInput,
 } from './stage/export'

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fieldKeyboardStep, type FieldA11yController } from '../PaperField'
+import { fieldKeyboardStep } from './keyboardMirror'
+import type { FieldA11yController } from './interactiveField'
 import { PaperStateMachine } from '../states/machine'
 import { paperConfigSchema, type PaperConfig } from '../config/schema'
 

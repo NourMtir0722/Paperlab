@@ -9,7 +9,8 @@ import {
 } from './field-export'
 import { AGENT_PAYLOAD_VERSION } from './agent-payload'
 import { getPreset } from './presets'
-import { groupFieldPapers, zoneAccepts } from '../PaperField'
+import { groupFieldPapers } from '../field/slots'
+import { zoneAccepts } from '../field/dropZones'
 
 const photo = getPreset('photo-print')
 const receipt = getPreset('receipt-unroll')
