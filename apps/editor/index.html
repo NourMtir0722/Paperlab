@@ -9,7 +9,7 @@
       body {
         margin: 0;
         min-height: 100%;
-        background: #0f1012;
+        background: #08090a;
       }
       .boot {
         position: fixed;
@@ -20,7 +20,7 @@
         justify-content: center;
         gap: 14px;
         padding: 24px;
-        font-family: "Inter", system-ui, -apple-system, sans-serif;
+        font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
         text-align: center;
         opacity: 0;
         animation: boot-in 300ms ease 220ms forwards;
@@ -36,13 +36,13 @@
         font-weight: 700;
         letter-spacing: 0.2em;
         text-transform: uppercase;
-        color: #e6e4df;
+        color: rgba(255, 255, 255, 0.95);
       }
       .boot-line {
         margin: 0;
         font-size: 14px;
         line-height: 1.5;
-        color: #8b8a86;
+        color: rgba(255, 255, 255, 0.55);
         max-width: 26rem;
       }
       .boot-bar {
@@ -50,14 +50,14 @@
         height: 2px;
         border-radius: 2px;
         overflow: hidden;
-        background: #26272b;
+        background: rgba(255, 255, 255, 0.07);
       }
       .boot-bar span {
         display: block;
         width: 40%;
         height: 100%;
         border-radius: 2px;
-        background: #e6e4df;
+        background: rgba(255, 255, 255, 0.95);
         animation: boot-slide 1.4s ease-in-out infinite;
       }
       @keyframes boot-slide {

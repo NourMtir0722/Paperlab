@@ -196,3 +196,55 @@ describe('amendment 3 — the accent is the grab point', () => {
     }
   })
 })
+
+/**
+ * The three boot shells paint before any stylesheet exists, so they cannot
+ * read a custom property and have to inline the ramp. That makes them a third
+ * copy of the palette, and the first one a visitor actually sees — the old
+ * shell was still painting the previous scheme for the first few hundred
+ * milliseconds after the rest of the app had moved on.
+ */
+describe('the first paint agrees with the app it precedes', () => {
+  const SHELLS = {
+    'apps/editor/index.html': 'l0',
+    'apps/playground/index.html': 'room-stage',
+    'apps/docs/index.html': 'l0',
+  } as const
+
+  const token = (name: string) => {
+    const block = tokenBlock(read(SHEETS[0]))
+    return block.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1]?.toLowerCase()
+  }
+
+  for (const [file, ground] of Object.entries(SHELLS)) {
+    it(`${file} boots on --${ground}`, () => {
+      const html = read(file)
+      const shell = html.slice(0, html.indexOf('</head>'))
+
+      const body = shell.match(/html,\s*body \{[^}]*background:\s*(#[0-9a-f]{6})/i)
+      expect(body?.[1]?.toLowerCase(), 'the boot shell lost its ground').toBe(token(ground))
+
+      const theme = shell.match(/name="theme-color" content="(#[0-9a-f]{6})"/i)
+      if (theme) {
+        expect(theme[1]?.toLowerCase(), 'the browser chrome and the page disagree about the ground').toBe(
+          token(ground),
+        )
+      }
+    })
+
+    it(`${file} spends nothing outside the budget`, () => {
+      const html = read(file)
+      const offenders: string[] = []
+      for (const [hex] of html.matchAll(/#[0-9a-f]{3}(?:[0-9a-f]{3})?\b/gi)) {
+        const value = hex.toLowerCase()
+        if (BUDGET.has(value)) continue
+        if (spread(channels(value)) > CAST) offenders.push(value)
+      }
+      for (const m of html.matchAll(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g)) {
+        const rgb = [Number(m[1]), Number(m[2]), Number(m[3])] as [number, number, number]
+        if (spread(rgb) > CAST) offenders.push(m[0])
+      }
+      expect([...new Set(offenders)], 'a hue got into the first paint').toEqual([])
+    })
+  }
+})
