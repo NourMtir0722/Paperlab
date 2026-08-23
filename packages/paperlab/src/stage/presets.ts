@@ -45,6 +45,10 @@ export const stagePresets: Record<string, StagePreset> = {
       path: walks.straight,
       shot: { shot: 'follow', distance: 5, lookAhead: 12, offset: 1.5 },
       lighting: 'nave',
+      // The hall this stage is named for. Columns give it the one thing a
+      // ceiling and floor seams cannot: an object of known size standing IN
+      // the room rather than bounding it.
+      room: { columns: { enabled: true } },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 2.6, twist: 22, drape: 0.6, rise: 0.3 },
@@ -76,6 +80,12 @@ export const stagePresets: Record<string, StagePreset> = {
       path: walks.ring,
       shot: { shot: 'follow', distance: 4.5, lookAhead: 8, offset: 1.2 },
       lighting: 'nave',
+      // Pegs, not clips. A cloister is a walk you repeat, and the sheets are
+      // the same words coming back — hung the way you hang washing, not the
+      // way a gallery mounts a print. The silhouette is the whole difference
+      // at this distance: a peg grips DOWN the face where a clip grips
+      // across the edge.
+      suspension: { hardware: 'peg' },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 2.4, twist: 18, rise: 0.22 },
@@ -121,6 +131,13 @@ export const stagePresets: Record<string, StagePreset> = {
        */
       source: { spread: 1.1, color: '#ffd7a8', zenith: '#3d1c12' },
       ground: { color: '#6b2f1d' },
+      // The stage named for a doorway now has one. Without the wall the
+      // source is a bright rectangle floating in a coloured void — it reads
+      // as light, but not as light coming from anywhere. With it, the walk
+      // resolves toward an opening in a surface, and the room gets the
+      // corner it never had. The wall takes the terracotta so the opening is
+      // the only bright thing in the frame that is not paper.
+      room: { doorway: { enabled: true, color: '#4a2013' } },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 2.4, twist: 14, breathe: 0.18, margin: 0.12, rise: 0.2 },
@@ -156,7 +173,7 @@ export const stagePresets: Record<string, StagePreset> = {
       // short. This is the stage the room proportion matters most on.
       room: { height: 1.12 },
       source: { spread: 1.3 },
-      suspension: { clips: true },
+      suspension: { hardware: 'clip' },
     },
     layout: 'colonnade',
     // Packed tighter than the banner stages, barely twisted, and hung at a
@@ -224,6 +241,10 @@ export const stagePresets: Record<string, StagePreset> = {
       // so the default opening would be fifty units across — a wall, on a
       // walk whose whole point is that it is narrow.
       source: { spread: 1.1 },
+      // Records on a rail. Forty-four strips each on their own invisible
+      // thread read as forty-four accidents; on rods they read as a system
+      // somebody filed them into, which is what the stage is called.
+      suspension: { type: 'rod' },
     },
     layout: 'colonnade',
     layoutOptions: { aisle: 1.7, twist: 44, breathe: 0.5, drape: 0.75, rise: 0.4 },

@@ -83,13 +83,92 @@ export const stageGroundSchema = z.object({
  */
 export const stageSuspensionSchema = z.object({
   /**
-   * `thread` is monofilament to the ceiling. `none` is the old behaviour,
-   * for a stage where the paper is meant to be impossible.
+   * What carries the load.
+   *
+   * `thread` is monofilament to the ceiling — one straight line per sheet.
+   * `rod` is a dowel across each sheet's top edge, hung from the ceiling at
+   * both ends, which is a different image entirely: a rank on threads reads
+   * as sheets floating in a row, and a rank on rods reads as sheets that
+   * were HUNG, by someone, on something. `none` is for a stage where the
+   * paper is meant to be impossible.
    */
-  type: z.enum(['none', 'thread']).default('thread'),
+  type: z.enum(['none', 'thread', 'rod']).default('thread'),
   color: z.string().default('#9c948a'),
-  /** A small clip where the thread meets the sheet. */
-  clips: z.boolean().default(true),
+  /**
+   * What grips the sheet.
+   *
+   * A clip is wide and shallow — the bulldog clip of a gallery. A peg is
+   * narrow and deep, and grips DOWN the face of the sheet rather than
+   * across its edge: the domestic one, a line of paper on a washing line.
+   * They are told apart by silhouette at any distance, which is the only
+   * thing that survives being one instanced box at the top of an
+   * eight-metre banner.
+   *
+   * This replaced a `clips: boolean`. Two of the four pieces of hardware the
+   * plan named — pegs, and a rod — had no way to be asked for, and a boolean
+   * cannot grow a third answer.
+   */
+  hardware: z.enum(['none', 'clip', 'peg']).default('clip'),
+})
+
+/**
+ * Columns down the walk — the scale cue that is not a person.
+ *
+ * Retiring the walking figure rested on the argument that **architecture is
+ * a better scale cue than a human mesh, and it is the thing renderers never
+ * fail at**. A ceiling and floor seams carried that alone, and they are both
+ * boundaries: they tell you where the room stops, not how big it is. A
+ * column STANDS in the room. It has a knowable width, it is a known distance
+ * from the next one, and its base plate meets the floor at a height your eye
+ * already knows — which is exactly the reading a figure was there to give.
+ *
+ * Off by default: a colonnade of columns is a strong compositional claim,
+ * and a stage that did not ask for one should not grow one.
+ */
+export const stageColumnsSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Centres this far apart along the walk. Roughly a bay. */
+  spacing: z.number().min(1).max(24).default(7),
+  /** Shaft width. The number doing the work — a column is a known size. */
+  width: z.number().min(0.1).max(3).default(0.44),
+  /**
+   * How far off the walk's centreline each rank stands.
+   *
+   * Outside the banners, always. Columns are the room; the paper is the
+   * subject, and a column standing between the viewer and a banner has
+   * swapped the two over. Default clears a `colonnade`'s widest sensible
+   * aisle with room to spare.
+   */
+  offset: z.number().min(0.5).max(24).default(6.6),
+  /**
+   * Stone, and darker than paper on purpose.
+   *
+   * The brightest thing in any of these frames has to be the light, and the
+   * second brightest has to be the paper. A column the same value as a
+   * banner does not read as architecture behind the subject; it reads as
+   * more banners, and the eye stops being able to tell what the room is made
+   * of from what is hanging in it.
+   */
+  color: z.string().default('#5c554d'),
+})
+
+/**
+ * The end wall, with the source shining through an opening in it.
+ *
+ * Without it the source is a bright rectangle hanging in a void: it reads as
+ * light, but not as light coming from anywhere. A wall around it turns the
+ * same rectangle into a doorway — and gives the room the two things it had
+ * no way to show, a surface at the end of the walk and a corner where that
+ * surface meets the floor and the ceiling.
+ *
+ * Off by default for the same reason as the columns, and because it changes
+ * what the brightest part of every frame is standing in.
+ */
+export const stageDoorwaySchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Opening size, as a multiple of the source's own. 1 frames it exactly. */
+  opening: z.number().min(0.2).max(3).default(1.05),
+  color: z.string().default('#171310'),
 })
 
 export const stageRoomSchema = z.object({
@@ -104,6 +183,10 @@ export const stageRoomSchema = z.object({
    */
   height: z.number().min(1).max(6).default(2.2),
   color: z.string().default('#171310'),
+  /** Columns flanking the walk — see `stageColumnsSchema`. */
+  columns: stageColumnsSchema.default({}),
+  /** A wall at the end of the walk with the source in it. */
+  doorway: stageDoorwaySchema.default({}),
 })
 
 /**
