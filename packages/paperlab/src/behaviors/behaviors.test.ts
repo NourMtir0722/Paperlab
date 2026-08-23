@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { peel } from './peel'
 import { unroll } from './unroll'
@@ -7,7 +8,8 @@ import { flight } from './flight'
 import { getBehavior, listBehaviors } from './registry'
 import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
 import { settle } from './settle'
-import { ribbon } from './ribbon'
+import { ribbon, ribbonOptionsSchema } from './ribbon'
+import { getDeformer } from '../deformers/registry'
 
 const sheet = { width: 1, height: 2.6 }
 
@@ -216,17 +218,31 @@ describe('ribbon — the strip that reaches the floor and keeps going', () => {
       angle: number
     }
 
-  it('creases at the floor line, which it can only know from the sheet', () => {
+  /**
+   * The crease sits a hinge-radius ABOVE the floor line, on purpose.
+   *
+   * These two used to assert the crease landed exactly on it, which is the
+   * arithmetic that put the pool underneath the ground — the hinge wraps a
+   * cylinder of `radius / φ` and the flap leaves it that much lower. What
+   * has to land on the line is the pool; where the crease goes follows from
+   * that. See "lands the pool ON the floor" below, which measures the thing
+   * itself rather than the intermediate.
+   */
+  const hingeDrop = (o: Partial<typeof ribbon.defaults>, sheet = { width: 0.9, height: 8 }) =>
+    fold(o, sheet).radius / (Math.PI / 2)
+
+  it('creases a hinge above the floor line, which it can only know from the sheet', () => {
     // Almost every behavior takes only its options. This one cannot: "a
     // pool-length above the bottom edge" is meaningless without a height.
     const sheet = { width: 0.9, height: 8 }
-    // pool 0.25 of an 8-high sheet -> the crease sits 2 above the bottom
-    // edge, i.e. at y = -4 + 2 = -2, measured downward as +2.
-    expect(fold({ pool: 0.25 }, sheet).offset).toBeCloseTo(2)
+    // pool 0.25 of an 8-high sheet -> the floor line is 2 above the bottom
+    // edge, i.e. at y = -4 + 2 = -2, measured downward as +2 — and the
+    // crease goes one hinge higher so the flap comes to rest on it.
+    expect(fold({ pool: 0.25 }, sheet).offset).toBeCloseTo(2 - hingeDrop({ pool: 0.25 }, sheet), 6)
   })
 
   it('a ribbon with no pool creases at its own bottom edge — nothing lies down', () => {
-    expect(fold({ pool: 0 }).offset).toBeCloseTo(4)
+    expect(fold({ pool: 0 }).offset).toBeCloseTo(4 - hingeDrop({ pool: 0 }), 6)
   })
 
   it('the crease travels DOWN the drop, not up it', () => {
@@ -240,12 +256,82 @@ describe('ribbon — the strip that reaches the floor and keeps going', () => {
     expect(long).toBeGreaterThan(short)
   })
 
-  it('curl lays the pool flatter, and never folds it back past double', () => {
-    expect(fold({ curl: 1 }).foldAngle).toBeGreaterThan(fold({ curl: 0 }).foldAngle)
-    for (const curl of [0, 0.5, 1]) {
-      expect(fold({ curl }).foldAngle).toBeLessThanOrEqual(180)
-      expect(fold({ curl }).foldAngle).toBeGreaterThan(0)
+  /**
+   * The one that matters, and the one a bounds check on 0..180 was standing
+   * in for while being satisfied by a broken value.
+   *
+   * A hinge turns through one angle and the pooled length holds that heading
+   * from the crease onward, so only a right angle is the floor. Under it the
+   * pool keeps descending and goes through the ground; over it the pool
+   * tilts back up and floats above it. The range shipped as `62 + curl * 46`
+   * — 62°..108° — so it was wrong in one direction below curl 0.61 and wrong
+   * in the other above, and right only at a single setting nothing used.
+   */
+  it('creases to a right angle at every setting — that is the only angle the floor is', () => {
+    for (const curl of [0, 0.25, 0.45, 0.5, 0.75, 1]) {
+      expect(fold({ curl }).foldAngle, `curl ${curl} does not lay the pool on the floor`).toBe(90)
     }
+  })
+
+  /**
+   * The whole stage, in one number.
+   *
+   * `colonnade` hangs a ribbon so that the crease sits on the floor —
+   * `hover: -pool` — and the behavior has to make the POOL land there, which
+   * is not the same thing. The hinge wraps a cylinder of `radius / φ` and
+   * the flap leaves it that much lower than the crease line, so placing the
+   * crease at the floor put the pooled length about 9cm UNDER it. On the
+   * ribbon stage that meant the paper on the ground, the entire subject, was
+   * inside the ground.
+   *
+   * This walks the strip the way the renderer does and asks where the pooled
+   * end actually is, in the world, with the layout's own hover applied.
+   */
+  it('lands the pool ON the floor, not under it', () => {
+    const sheet = { width: 1.05, height: 9 }
+    for (const curl of [0, 0.34, 0.7, 1]) {
+      const o = ribbonOptionsSchema.parse({ pool: 0.22, curl, drape: 0.6 })
+      const stack = ribbon.stack(o, sheet).map((d) => ({
+        type: d.type,
+        options: getDeformer(d.type).optionsSchema.parse(d.options),
+      }))
+      // Where colonnade puts the sheet's centre for `hover: -pool`.
+      const centreY = sheet.height / 2 + sheet.height * -0.22
+      const out = new THREE.Vector3(0, -sheet.height / 2, 0)
+      const uv = new THREE.Vector2(0.5, 0)
+      for (const d of stack) getDeformer(d.type).displace(out, uv, d.options as never, { t: 0, sheet })
+      const worldY = centreY + out.y
+      expect(worldY, `curl ${curl}: the pooled end is ${worldY} — under the floor`).toBeGreaterThanOrEqual(0)
+      // …and resting on it, not hovering somewhere above it.
+      expect(worldY, `curl ${curl}: the pooled end floats at ${worldY}`).toBeLessThan(0.35)
+      // It has to actually run OUT along the ground to be a pool at all.
+      expect(out.z, `curl ${curl}: nothing lies down`).toBeGreaterThan(sheet.height * o.pool * 0.7)
+    }
+  })
+
+  it('curl tightens the crease instead, which is what it always said it did', () => {
+    expect(fold({ curl: 1 }).radius).toBeLessThan(fold({ curl: 0 }).radius)
+    for (const curl of [0, 0.5, 1]) {
+      expect(fold({ curl }).radius).toBeGreaterThan(0)
+      expect(fold({ curl }).radius).toBeLessThanOrEqual(0.5)
+    }
+  })
+
+  it('folds by the length that is meant to be lying down, not by the whole drop', () => {
+    // The crease sits `pool` of the height above the bottom edge, so raising
+    // pool has to move the hinge UP the sheet, never past its middle.
+    const sheet = { width: 0.9, height: 8 }
+    expect(fold({ pool: 0.5 }, sheet).offset).toBeLessThanOrEqual(0)
+    expect(fold({ pool: 0.1 }, sheet).offset).toBeGreaterThan(fold({ pool: 0.4 }, sheet).offset)
+  })
+
+  it('gathers its folds toward the floor, not evenly down the drop', () => {
+    // `wave` ran at one amplitude end to end; a hung strip is flat where it
+    // is held. That difference is the reason this uses `drape`.
+    const drape = ribbon.stack(ribbon.defaults, { width: 0.9, height: 8 }).find((d) => d.type === 'drape')
+    expect(drape, 'ribbon no longer drapes').toBeDefined()
+    expect((drape!.options as { falloff: number }).falloff).toBeGreaterThan(1)
+    expect((drape!.options as { pinnedEdge: string }).pinnedEdge).toBe('top')
   })
 
   it('hangs still — a ribbon is not a flag', () => {
