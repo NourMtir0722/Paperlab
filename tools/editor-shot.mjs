@@ -30,6 +30,14 @@ try {
   for (const mode of process.argv.slice(2).length ? process.argv.slice(2) : ['Stage']) {
     await page.getByRole('button', { name: mode, exact: true }).click()
     await page.waitForTimeout(2500)
+    // The coach mark is a first-visit hint that parks itself over the tool
+    // cluster. It is real UI, but it is transient, and a screenshot of the
+    // editor should show the editor rather than its onboarding.
+    const tip = page.getByRole('button', { name: 'Dismiss this tip' })
+    if (await tip.count()) {
+      await tip.first().click()
+      await page.waitForTimeout(400)
+    }
     const out = resolve(outDir, `editor-${mode.toLowerCase()}.png`)
     await page.screenshot({ path: out })
     console.log(`shot → ${out}`)

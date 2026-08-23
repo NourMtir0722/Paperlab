@@ -12,7 +12,7 @@ A hero image that peels, a receipt that unrolls, a letter that folds, a poster r
 
 | | |
 |---|---|
-| ![A thermal receipt unrolling from a paper roll](docs/media/receipt-unroll.gif) | ![A photo print with its corner peeling up](docs/media/hero-peel.gif) |
+| ![A thermal receipt unrolling from a paper roll](docs/media/receipt-unroll.gif) | ![A gloss card with its corner peeling up off the page](docs/media/hero-peel.gif) |
 | ![A letter folding itself into thirds](docs/media/letter-fold.gif) | ![A page turning on its spine](docs/media/page-flip.gif) |
 
 Every frame above is real geometry — no video, no sprite sheet.
@@ -73,8 +73,6 @@ import { PaperField } from 'paperlab'
 <PaperField images={photos} preset="photo-print" layout="ring" />
 ```
 
-![Twelve photo prints standing in a ring, curving inward](docs/media/field-ring.gif)
-
 And a space built out of a sentence is one component:
 
 ```tsx
@@ -83,20 +81,68 @@ import { PaperStage } from 'paperlab/stage'
 <PaperStage text="the paper remembers every hand that folded it" progress={scroll} />
 ```
 
-![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](docs/media/stage-nave.gif)
+## The catalogue
 
-## What's inside
+Everything below is rendered by the library itself and regenerated from the
+registries — `pnpm media`, `pnpm shot:catalogue`, `pnpm sheet`. No mockups.
+
+### Behaviors — 12
 
 - **Behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`, `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`: human-named params ("tightness", not "cylinderRadius") over a stack of pure geometry deformers. Each behavior nominates the two or three params that *are* it, so tools can lead with those. Draggable handles when `interactive`.
-- **Deformers** — the seven primitives behind those behaviors (`roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple`), each a pure vertex mapping written twice: a JS implementation for the CPU/hero path and a GLSL twin for the GPU/field path. A golden-vector gate holds the two identical, and a separate test asserts each one actually draws a surface. Arc-length preserving — paper never stretches.
-- **Stocks & surfaces** — seven paper stocks (thermal gets banding, newsprint gets grain) plus grain, torn deckle edges, crease lines, perforation and aging as composable shader effects. Alpha-affecting effects use `alphaTest` rather than blending, so shadows stay correct.
-- **Content** — `blank`, `image`, `text`, `card` and `receipt`, any of which can also sit on the reverse of the sheet via `content.back`. Text is measured and wrapped with real tracking applied before measurement, so the painted line matches the line it was broken to.
+
+Underneath them are seven **deformers** — `roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple` — each a pure vertex mapping written twice: a JS implementation for the CPU/hero path and a GLSL twin for the GPU/field path. A 37-case golden-vector gate holds the two identical, and a separate test asserts each one actually draws a surface. All arc-length preserving, because paper does not stretch.
+
+### Stocks — 7
+
+![The same letter on all seven paper stocks, side by side](docs/media/stocks.jpg)
+
+One sheet of words, seven papers. Stock is not a colour swap: thermal takes on banding, newsprint takes grain, vellum goes translucent and lets the light through it. On top of stock sit composable surface effects — grain, torn deckle edges, crease lines, perforation, aging — as shader chunks. Alpha-affecting effects use `alphaTest` rather than blending, so shadows stay correct.
+
+### Layouts — 12
+
+![All twelve field layouts rendered side by side](docs/media/layouts.jpg)
+
+Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners along a walk, for stage mode), `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl.
+
+Each pose also carries a **bias**: how strongly that one sheet takes the deformation. So the top of a pile curls while the sheets pressed underneath lie flat — in the same draw call. A whole field is **one instanced draw call** with the deformers running on the GPU, and the camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
+
+![Twelve cards standing in a ring, each with its corner peeling, rotating slowly](docs/media/field-ring.gif)
+
+Twelve sheets, twelve peeled corners, **one draw call** — the deformers run on the GPU and the text curls with the mesh.
+
+### Lighting — 8 rigs
+
+![The same letter under all eight lighting rigs](docs/media/lighting.jpg)
+
+A rig is the starting point, not the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in — degrees around the room, degrees above the horizon — and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. `window` and `leaves` carry a gobo; `lightbox` puts the source behind the sheet and lets you read it through the paper.
+
+Overrides serialize *as* overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
+
+### Stage — paper as architecture
+
+![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](docs/media/stage-nave.gif)
+
+Banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk.
+
+The room is real — a ceiling, poured floor slabs, columns with base plates, and a doorway the source shines through — because **architecture carries scale better than a figure does**. There is a walking figure, and it is off by default: the stage is navigable, so the person in the hall is the viewer.
+
+**Six rooms ship**, and they are not variations on a theme — the walk changes shape, the paper changes proportion, the light changes where it comes from:
+
+![The six stage presets — nave, procession, cloister, threshold, ribbon and archive](docs/media/stages.jpg)
+
+Every one of those is built from the same two things: sheets of paper, and words printed on them. No imagery, no textures from anywhere else.
+
+**Four camera shots** frame any of them, each reading the same walk as the arrangement and the light, so they cannot drift apart:
+
+![The four stage camera shots — follow, lead, low and wide](docs/media/camera.jpg)
+
+And it is navigable rather than a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll. Quality adapts to the machine on its own across four tiers.
+
+### The rest
+
+- **Content** — `blank`, `image`, `text`, `card` and `receipt`, any of which can also sit on the reverse of the sheet via `content.back`. Text is measured and wrapped with real tracking applied *before* measurement, so the painted line matches the line it was broken to.
 - **Physics** — curated idle motion (`float`, `tumble`, `dangle`, `taped`, `breeze`) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull. Cloth and behaviors are mutually exclusive by schema — cloth owns the vertices.
-- **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU, arranged by pure layout functions. Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners arranged along a walk, for stage mode), plus `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl. Each pose carries a **bias** — how strongly that one sheet takes the deformation — so the top of a pile curls while the sheets pressed underneath lie flat, in the same draw call. The camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
 - **Interaction states** — a preset can carry `states`: overrides-on-base diffs keyed `rest` / `hover` / `pressed` / `picked` / `placed`, with the triggers built in. Drag a stamp past its threshold and it tears off its sheet (the perforation edges facing its neighbours flip to torn), release it over a `<DropZone>` and it settles, release it anywhere else and it flutters home. The whole flow is reachable from the keyboard: focus a paper, Enter picks, arrows move between zones, Enter places, Escape returns it.
-- **Stage mode** — paper as *architecture*: banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk. The room is real — a ceiling, poured floor slabs, columns with base plates, and a doorway the source shines through — because **architecture carries scale better than a figure does**. There is a walking figure, and it is off by default: the stage is navigable, so the person in the hall is the viewer. Every part of the scene — the arrangement, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own across four tiers.
-- **A stage you can walk** — stage mode is navigable, not a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll; binding `progress` to page scroll still wins over all of it.
-- **Lighting you can actually light with** — eight rigs, and a preset is the starting point rather than the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in (degrees around the room, degrees above the horizon), and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. Overrides serialize as overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
 - **Hardware that holds the paper up** — thread to the ceiling or a rod across the top edge, gripped by a clip or a peg. A hung thing that shows what holds it stops reading as a rectangle that happens to float.
 - **Presets** — 15 paper presets and 6 stage presets, and everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
 - **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into a coding agent: install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md) and [docs/llms.txt](docs/llms.txt).
@@ -137,7 +183,15 @@ Three surfaces ship alongside the library, all built on its public API only.
 
 **[The playground](https://nourmtir0722.github.io/Paperlab/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
 
-**[The editor](https://nourmtir0722.github.io/Paperlab/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas (drag the handle on the paper), inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. Each behavior nominates the params that matter, so the panel opens on those and folds the rest away. Field mode composes galleries; **Export code** ends the session in your codebase. It wants a real screen — under about 900px it says so and points you at the playground.
+**[The editor](https://nourmtir0722.github.io/Paperlab/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z.
+
+![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](docs/media/editor.jpg)
+
+The inspector is generated from the zod schema, so it can never drift from the API. Each behavior nominates the two or three params that *are* it — `unroll` opens on progress and tightness, and folds sheet, stock, content, surface, physics and scene away behind their own headings. Labels drag to scrub: full range in ~300px, shift for a 4× finer pass, click the readout to type an exact value.
+
+![The editor in field mode, fourteen cards arranged in a ring with the layout panel open](docs/media/editor-field.jpg)
+
+Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export code** ends the session in your codebase, and **Copy for AI** ends it in a coding agent's. It wants a real screen: under about 900px it says so and points you at the playground.
 
 **[The reference](https://nourmtir0722.github.io/Paperlab/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
@@ -180,7 +234,10 @@ Anything that needs a real GPU, real pointer events or a second browser profile 
 ```sh
 pnpm perf           # stage frame cost      (--gpu for the platform GPU, --soft for the SwiftShader floor)
 pnpm perf:field     # field frame cost
-pnpm shot           # PNGs into .shots/    (also shot:ui, shot:play, shot:light)
+pnpm shot           # stage PNGs into .shots/   (also shot:ui, shot:play)
+pnpm shot:light     # every lighting rig, one frame each
+pnpm shot:catalogue # sweep any axis — --vary=layout|stock|lighting --all
+pnpm sheet          # compose those frames into a labelled contact sheet
 pnpm media          # the README's GIFs and MP4s, stepped frame-exact (needs ffmpeg)
 ```
 

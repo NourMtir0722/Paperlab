@@ -8,9 +8,11 @@ import {
   PaperMesh,
   resolveLighting,
   type LightingName,
+  type PaperConfigInput,
   type PaperHandle,
 } from 'paperlab'
 import { PaperStageScene, getStagePreset } from 'paperlab/stage'
+import { DEMO_CARDS } from '../state/demoAssets'
 /**
  * The frame server behind `pnpm media`.
  *
@@ -55,6 +57,13 @@ const fov = Number(query.get('fov')) || 40
  * whole point of a preset is that it is data; this makes it data you can
  * take a photograph of.
  */
+/**
+ * `?stock=` overrides the preset's own paper. Same argument as `?lighting=`:
+ * seven stocks that only differ in how they take light are a claim nobody can
+ * check without seeing them beside each other on the same sheet of words.
+ */
+const stockOverride = query.get('stock') as PaperConfigInput['stock'] | null
+
 const lighting = (query.get('lighting') ?? 'studio') as LightingName
 const light = query.has('film') ? { film: query.get('film') as never } : undefined
 
@@ -88,7 +97,7 @@ function PaperFrames() {
       <color attach="background" args={[background]} />
       <LightRig rig={rig}>
         <PaperLighting rig={rig} floor={-1.5} scale={10} />
-        <PaperMesh ref={ref} preset={preset} />
+        <PaperMesh ref={ref} preset={preset} {...(stockOverride ? { stock: stockOverride } : {})} />
       </LightRig>
     </Canvas>
   )
@@ -110,7 +119,10 @@ function FieldFrames() {
         <PaperLighting rig={rig} floor={-2.4} scale={14} />
         <group rotation={[0, phase * Math.PI * 2, 0]}>
           <PaperFieldMesh
-            papers={Array.from({ length: 12 }, () => ({ preset }))}
+            papers={Array.from({ length: 12 }, (_, i) => ({
+              preset,
+              content: DEMO_CARDS[i % DEMO_CARDS.length],
+            }))}
             layout={query.get('layout') ?? 'ring'}
             motion={{ driver: 'none' }}
             entrance={{ type: 'none' }}
