@@ -138,36 +138,70 @@ cadence.
 | 00 | Ground | a stranger can open all three apps; the README promises nothing missing | **partly** — repo public, Pages live, plan now landed here. **README honesty pass still owed** (deferred to phase 07 on purpose) |
 | 01 | The grade | the source reads as light; white paper keeps its hue | done |
 | 02 | The material | open Field mode, change nothing, screenshot: it is a portfolio image | done |
-| 03 | The room | a frame with nobody in it reads as a large room | **partly** — see below |
-| 04 | The primitives | a hung sheet shows what suspends it; a fallen sheet lies convincingly | **partly** — see below |
+| 03 | The room | a frame with nobody in it reads as a large room | done — columns and a doorway landed 2026-08-23 |
+| 04 | The primitives | a hung sheet shows what suspends it; a fallen sheet lies convincingly | done — rods and pegs landed 2026-08-23 |
 | 05 | Ribbon | a still stops someone scrolling with no caption | done, after the four defects above were fixed |
 | 06 | The tool, structurally | a stranger changes the one thing they meant to, and undoes it | done |
 | 07 | Honesty | every URL on a phone, cold cache, nothing confusing or blank | **not started** |
 | — | launch gate | publish 0.3.0, render assets, Product Hunt | blocked on 07 |
 | 08 | The rest of the gallery | one stage every couple of weeks | after launch, deliberately |
 
-### What phases 03 and 04 did not build
+### What phases 03 and 04 did not build — *built 2026-08-23*
 
-Recorded rather than quietly dropped. Neither is a defect — both stages'
-done tests pass — but both are less than the plan asked for, and nothing had
-written down which parts were skipped or why.
+Recorded when the audit found them, and closed the same week.
 
 **Phase 03 asked for five pieces of architecture: a ceiling, a column with a
-base plate, a doorway, floor slab seams, and a wall corner.** Two shipped —
-`stage.room` (the ceiling) and `ground.slab` (the seams). The column, the
-doorway and the wall corner were never built. The argument for them is the
-one that retired the walking figure in the first place: *architecture is a
-better scale cue than a human mesh, and it is the thing renderers never fail
-at.* A column with a base plate is the strongest of the five, because a base
-plate is a knowable size at a knowable height and it stands IN the scene
-rather than bounding it. Worth building before the launch assets are shot.
+base plate, a doorway, floor slab seams, and a wall corner.** Two had
+shipped. The three missing ones were the three that stand IN the room — a
+ceiling and floor seams are both *boundaries*, and a boundary says where a
+space stops, not how big it is. That distinction is the whole reason the
+walking figure was retired: **architecture is a better scale cue than a human
+mesh, and it is the thing renderers never fail at.**
 
-**Phase 04 asked for "thread, clips, pegs, a rod".** Thread and clips
-shipped; pegs and a rod did not. This one is defensible as it stands — one
-suspension that works everywhere beats four that half do — but the rod in
-particular is what the canopy and suspension stages (phase 08) will want,
-because a rank of sheets hung from a common rod is a different image from a
-rank each on its own thread.
+- **`room.columns`** — square piers with a base plate and a capital, down
+  both sides of the walk, spaced by arc length so a bend gets even bays.
+  Three instanced meshes, so a hundred-metre colonnade is three draw calls.
+  The base plate is the part doing the work: it is the only element in the
+  scene that puts a hard horizontal edge at a **known height off the floor**.
+  Two tuning findings, both learned from the render rather than argued:
+  columns must stand **outside** the paper (one between the viewer and a
+  banner has swapped the subject for the set), and they must be **darker than
+  paper** (at paper value they read as more banners, and the eye loses track
+  of what the room is made of). `nave` shows them.
+- **`room.doorway`** — a wall at the end of the walk with the source shining
+  through an opening in it, which delivers the doorway AND the wall corner
+  from one piece. It is the difference between light and light *from
+  somewhere*. `threshold`, the stage named for it, shows it.
+
+  Two things cost a render each. The wall has to **stand off the source
+  plane** — coplanar they fight for the same pixels, and across a whole wall
+  that is a moiré of stripes in the brightest part of the frame. And the
+  outer contour has to run **below the floor**, not down to it: the opening's
+  sill is under the floor line so the doorway reads as reaching the ground,
+  and a hole that pokes out through the bottom edge is not cut at all — the
+  triangulator drops it and the wall comes back solid.
+
+**Phase 04 asked for "thread, clips, pegs, a rod".** Thread and clips had
+shipped, and `suspension.clips` was a **boolean**, which is why: a boolean
+cannot grow a third answer. It is now two enums that say different things —
+`type` is what carries the load (`thread` / `rod` / `none`) and `hardware` is
+what grips the sheet (`clip` / `peg` / `none`).
+
+- **`rod`** — a dowel across each sheet's top edge, hung from the ceiling at
+  **both ends**, because a rod on one central line would tip and the eye
+  knows it. A rank on threads reads as sheets floating in a row; a rank on
+  rods reads as sheets somebody hung, on something. `archive` uses them.
+- **`peg`** — narrow and deep, gripping down the face, where a clip is wide
+  and shallow and grips across the edge. That difference is the entire
+  silhouette, and the silhouette is all that survives the distance this scene
+  works at. `cloister` uses them.
+
+Hardware now scales with the sheet it holds, which it did not: a layout that
+shrinks banners at the far end of a walk and leaves their clips full size has
+just told the viewer how far away they are not.
+
+A test asserts at least one built-in stage exercises each kind, so none of
+this is art nobody looks at.
 
 ---
 
