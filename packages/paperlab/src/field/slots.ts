@@ -22,7 +22,7 @@ export interface FieldPaperSlot {
    * (`contentSchema.parse`) so consumers downstream still get a full config.
    */
   content?: ContentConfigInput
-  /** Per-instance state overrides, merged over the preset's states (spec M6 §1.1). */
+  /** Per-instance state overrides, merged over the preset's states. */
   states?: PaperStatesInput
 }
 

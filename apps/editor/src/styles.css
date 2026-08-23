@@ -1870,7 +1870,7 @@ button.export:hover {
  *
  * It holds camera verbs only. A "sculpt" or "light" button belongs here too
  * and is not here yet, because a button that toggles nothing is worse than
- * an absent one — see `docs/roadmap.md`.
+ * an absent one.
  */
 .view-cluster {
   position: absolute;

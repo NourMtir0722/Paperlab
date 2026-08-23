@@ -10,7 +10,7 @@
  * module means a `<Paper>`-only consumer must still be able to resolve it.
  *
  * That is the whole argument, and it is a different argument from the one
- * `docs/roadmap.md` settled when it decided NOT to split stage into a
+ * that first settled this, when stage was deliberately NOT split into a
  * subpath. That decision was about BYTES, and it was correct about bytes:
  * a subpath saves nobody a byte, because tree-shaking already did. This is
  * about RESOLVABILITY, which tree-shaking demonstrably cannot fix.

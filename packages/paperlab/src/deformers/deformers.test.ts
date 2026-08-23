@@ -10,7 +10,7 @@ import { sheetSchema } from '../config/schema'
 
 /**
  * Golden-vector tests: exact expected outputs for known inputs. When the GLSL
- * implementations land (M4, field mode), the same vectors run against the GPU
+ * implementations land (field mode), the same vectors run against the GPU
  * path with epsilon comparison — that parity gate is what makes dual
  * implementation maintainable.
  */

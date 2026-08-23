@@ -3,8 +3,6 @@
 Paperlab renders physical, realistic paper as a React component. Content is a texture on a mesh that genuinely bends — text and imagery curl with perfect continuity. This file is the dense reference for agents integrating Paperlab into a project or contributing to this repo.
 
 > Reading as a human rather than as an agent? The [reference](https://nourmtir0722.github.io/Paperlab/docs/) is the same catalogue with everything rendering live.
->
-> Working *on* Paperlab rather than *with* it? Read [docs/roadmap.md](docs/roadmap.md) first — it carries the project's intent, the decisions already settled (and why), and what we plan to build next.
 
 ## Integrating Paperlab into a project
 
@@ -307,7 +305,7 @@ The scene's own parts (the figure, the surround, the gait and camera math)
 are not exported — `<PaperStage>` is the composition, and its insides are
 free to change.
 
-### Interaction states, the stamp sheet, and drop zones (M6)
+### Interaction states, the stamp sheet, and drop zones
 
 A preset may carry `states` — overrides-on-base diffs, never separate presets:
 

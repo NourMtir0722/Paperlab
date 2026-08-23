@@ -228,8 +228,8 @@ describe("the grid 'auto' picks holds the surface", () => {
         // The second clause is not slack. `fold`, `wave` and `drape` ask for
         // more than the ceiling at their tighter settings (127, 165, …), so
         // they are pinned at 72 and carry exactly the sagitta they have
-        // always carried. That is a real gap in the library, recorded in
-        // docs/roadmap.md — but it predates this change, and a test that
+        // always carried. That is a real and known gap in the library —
+        // but it predates this change, and a test that
         // failed on it would be reporting the ceiling, not a regression.
         expect(sag).toBeLessThan(Math.max(SAG_TOL * 3, legacy * 1.05))
       })

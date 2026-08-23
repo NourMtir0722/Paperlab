@@ -10,13 +10,13 @@ import {
 
 /**
  * The interaction-state engine. A state is a set of parameter overrides on
- * the base preset — never a separate preset (spec M6 §1.1). The machine
+ * the base preset — never a separate preset. The machine
  * resolves each state to a full config (base + overrides), keeps ONE live
  * tween target of flattened numeric leaves, and always tweens FROM CURRENT
  * VALUES: a pointer that enters/leaves rapidly retargets the same tween
  * values instead of stacking or snapping.
  *
- * Delivery split (spec v0.2 §4: GSAP owns values, useFrame owns uploads):
+ * Delivery split (GSAP owns values, useFrame owns uploads):
  * GSAP animates the STABLE `flat` object in place; per-tick values are polled
  * off `liveConfig` by the consumer's frame loop, never pushed through React.
  * `onChange` fires only on STRUCTURAL boundaries (a transition's start and

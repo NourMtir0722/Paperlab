@@ -172,7 +172,7 @@ void plPerforation(inout vec4 color) {
     float cell = mod(a + uPerfSpacing * 0.5, uPerfSpacing) - uPerfSpacing * 0.5;
     if (uPerfTorn[e] < 0.5) {
       // Intact: clean semicircular punches on the edge line (alphaTest, not
-      // blending — shadow correctness per v0.2 §4.5).
+      // blending — shadow correctness).
       if (length(vec2(cell, d)) < uPerfRadius) color.a = 0.0;
     } else {
       // Torn: ripped profile following the hole rhythm — alternating tabs and

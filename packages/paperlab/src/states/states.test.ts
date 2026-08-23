@@ -225,7 +225,7 @@ describe('PaperStateMachine', () => {
   })
 })
 
-// GSAP owns values, useFrame owns uploads (spec v0.2 §4): the tween must never
+// GSAP owns values, useFrame owns uploads: the tween must never
 // be reset by a config edit, and per-tick values must not route through React.
 describe('animation delivery (GSAP owns values)', () => {
   const tornStamp = (): PaperConfig =>
@@ -318,7 +318,7 @@ describe('programmatic pick/place/return (keyboard/a11y flow)', () => {
     machine.dispose()
   })
 
-  it('§6 flow: pick applies the override, place fires the emit, return goes home', () => {
+  it('keyboard flow: pick applies the override, place fires the emit, return goes home', () => {
     const onAction = vi.fn()
     // The field auto-wires this: picked → carry, placed → emit a postmark.
     const config = paperConfigSchema.parse({

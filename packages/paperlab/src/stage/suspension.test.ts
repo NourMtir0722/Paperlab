@@ -78,8 +78,8 @@ describe('the suspension config', () => {
 })
 
 /**
- * The architecture phase 03 asked for and did not build: a column with a
- * base plate, a doorway, a wall corner. A ceiling and floor seams shipped,
+ * The architecture the room had been missing: a column with a base plate,
+ * a doorway, a wall corner. A ceiling and floor seams shipped,
  * and both are BOUNDARIES — they say where the room stops, not how big it
  * is. These are the pieces that stand in it.
  */

@@ -8,24 +8,14 @@ name: Deploy site
 # No secrets, no third-party account: the OIDC token below is issued by
 # GitHub to this workflow.
 #
-# LIVE since 2026-08-22 at https://nourmtir0722.github.io/Paperlab/.
+# Live at https://nourmtir0722.github.io/Paperlab/.
 #
-# The history is worth keeping, because it cost two wrong diagnoses. Pages
-# refused to serve while the repo was PRIVATE (the API answers 422, "Your
-# current plan does not support GitHub Pages"), and both jobs failed on every
-# push from 2026-08-12 to 2026-08-13 — build fine, deploy-pages 404 — mailing
-# a failure each time for a site that could not exist. That is what the
-# `has_pages` guard below is for.
-#
-# Going public was then necessary but NOT sufficient, which is the part that
-# surprised us: `has_pages` stayed false and this workflow reported `skipped`
-# on every push, because Pages itself still had to be switched on in
-# Settings → Pages → Source: "GitHub Actions". Once it was, the site had
-# still never built — this triggers on push, and there had been none since.
-# `gh workflow run pages.yml --ref main` deployed it in 46 seconds.
-#
-# So: the guard is a guard, not a disabled workflow, and `workflow_dispatch`
-# is the escape hatch for exactly the case above.
+# The `has_pages` guard below is deliberate. Pages must be enabled on the
+# repository (Settings -> Pages -> Source: "GitHub Actions") and the repository
+# must be public; until both are true, `deploy-pages` 404s on every push. The
+# guard skips the deploy instead of failing it, and `workflow_dispatch` is the
+# escape hatch to publish once Pages has been switched on -- this workflow
+# triggers on push, so enabling Pages alone does not build the site.
 #
 # On a custom domain (paperlab.dev), set BASE to '/' and add the CNAME step.
 

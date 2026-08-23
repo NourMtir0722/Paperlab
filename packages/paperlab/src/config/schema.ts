@@ -456,7 +456,7 @@ export const paperConfigSchema = z
     physics: physicsSchema.default('none'),
     scene: sceneSchema.default({}),
     onTwos: z.boolean().default(false),
-    /** Interaction state machine — overrides-on-base diffs (spec M6 §1). */
+    /** Interaction state machine — overrides-on-base diffs. */
     states: paperStatesSchema.optional(),
   })
   .superRefine((config, ctx) => {

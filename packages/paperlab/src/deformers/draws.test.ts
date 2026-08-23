@@ -15,8 +15,7 @@ import type { SheetConfig } from '../config/schema'
  * recorded as rendering an **invisible sheet** on the CPU path, on the
  * evidence that a screenshot of it contained exactly one colour while the
  * same frame of `roll` contained 698. `ribbon` was built around the finding
- * — it uses `wave` where it means `drape` — and the roadmap carried it as an
- * open bug.
+ * — it uses `wave` where it means `drape` — and it stood as an open bug.
  *
  * It does not reproduce. A drape at that size fills the frame with a nearly
  * flat, nearly evenly lit surface, and **counting colours cannot tell that

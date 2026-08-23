@@ -41,7 +41,7 @@ const PIN_EDGE: Record<Corner, 'top' | 'bottom'> = {
 }
 
 /**
- * A held paper, alive from motion (spec M6 §4.1, the field/cheap path):
+ * A held paper, alive from motion (the field/cheap path):
  * droop away from the grab point + drag-velocity flutter. The hero path —
  * cloth with a single pin following the cursor — is the existing
  * `physics: 'cloth'` grab; this behavior is what fields and exports run.

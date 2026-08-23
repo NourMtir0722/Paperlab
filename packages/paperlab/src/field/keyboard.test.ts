@@ -4,7 +4,7 @@ import { PaperStateMachine } from '../states/machine'
 import { paperConfigSchema, type PaperConfig } from '../config/schema'
 
 /**
- * The M6 §6 keyboard flow, end to end across the two seams that were broken:
+ * The keyboard flow, end to end across the two seams that were broken:
  * key → field controller → state machine. There is no DOM/R3F renderer in this
  * suite, so we drive the pure `fieldKeyboardStep` against a controller wired to
  * a REAL PaperStateMachine (exactly what InteractiveField's a11y controller
@@ -46,7 +46,7 @@ function machineController(
   }
 }
 
-describe('keyboard field flow (M6 §6): key → controller → machine', () => {
+describe('keyboard field flow: key → controller → machine', () => {
   it('focus → Enter picks → arrows move zones → Enter places (emit fires)', () => {
     const onAction = vi.fn()
     const machine = new PaperStateMachine(stampConfig(), { instant: true, onAction })

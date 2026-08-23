@@ -48,7 +48,7 @@ export interface InteractiveFieldProps {
   a11yRef?: React.MutableRefObject<FieldA11yController | null>
 }
 
-/** Behaviors with a grab point — the only ones a drag can pick (spec §1.1). */
+/** Behaviors with a grab point — the only ones a drag can pick. */
 const PICK_BEHAVIORS = new Set(['peel', 'carry'])
 
 interface CarriedPaper {
@@ -213,7 +213,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
     return true
   }
 
-  // ── The settle: the 400ms that sells everything (spec §5.3) ──
+  // ── The settle: the 400ms that sells everything ──
   const settleInto = (carried: CarriedPaper, zone: ZoneEntry) => {
     const group = groupRefs.current[carried.slot]
     const handle = handleRefs.current[carried.slot]
@@ -254,7 +254,7 @@ export function InteractiveField(props: InteractiveFieldProps) {
     tl.to(group.scale, { x: 1, y: 1, duration: 0.06, ease: 'power1.out' }, 0.36)
   }
 
-  // ── The return: flutter back to the slot on a slight arc (spec §5.4) ──
+  // ── The return: flutter back to the slot on a slight arc ──
   const returnHome = (carried: CarriedPaper) => {
     const group = groupRefs.current[carried.slot]
     const handle = handleRefs.current[carried.slot]

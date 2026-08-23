@@ -20,7 +20,7 @@ export const flightOptionsSchema = z.object({
 export type FlightOptions = z.infer<typeof flightOptionsSchema>
 
 /**
- * Untethered paper carried across the scene on the wind (spec M6 §4.2) —
+ * Untethered paper carried across the scene on the wind —
  * the falling-leaf tumble core + directional travel + lift. Transform +
  * deformer based, so it's instancing-safe: a `scatter` layout + `flight`
  * idle = papers blowing through a hero section.
