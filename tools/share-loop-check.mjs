@@ -8,29 +8,15 @@
  * first one's localStorage, so this catches the failure where sharing
  * "works" only because the paper was already on the machine.
  */
-import { spawn } from 'node:child_process'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { chromium } from 'playwright'
+import { shotsDir, startApp } from './harness.mjs'
 
 const PORT = 5205
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-const kill = () => server.kill('SIGTERM')
-process.on('exit', kill)
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+// Same place every other harness writes. It was `/tmp` — outside the repo,
+// outside `.gitignore`, and on nobody's path when the run failed.
+const outDir = shotsDir()
+const { base, stop } = await startApp('editor', PORT)
 
 const results = []
 const check = (name, pass, detail = '') => {
@@ -70,7 +56,17 @@ try {
   b.on('pageerror', (e) => problems.push(`bob: ${e}`))
   b.on('console', (m) => m.type() === 'error' && problems.push(`bob: ${m.text()}`))
 
-  const storedBefore = await b.evaluate(() => localStorage.length).catch(() => 0)
+  // The fresh-profile claim, asserted rather than assumed. It has to be read
+  // AT THE APP'S ORIGIN and BEFORE the link is opened: `localStorage` on
+  // about:blank belongs to no origin at all, so reading it there measures
+  // nothing and throws for its trouble. This is the check that makes the
+  // second browser context worth having — without it the whole run would
+  // still pass if sharing "worked" only because the paper was already on the
+  // machine.
+  await b.goto(base, { waitUntil: 'domcontentloaded' })
+  const storedBefore = await b.evaluate(() => localStorage.length)
+  check('the second browser starts with an empty profile', storedBefore === 0, `${storedBefore} keys`)
+
   await b.goto(link, { waitUntil: 'networkidle' })
   await b.waitForTimeout(3000)
 
@@ -101,11 +97,10 @@ try {
   const hasAi = await b.getByText('Copy for AI').isVisible()
   check('export is one click from the remix', hasAi)
 
-  await b.screenshot({ path: '/tmp/share-loop-bob.png' })
-  console.log(`storage before: ${storedBefore} keys`)
+  await b.screenshot({ path: resolve(outDir, 'share-loop-bob.png') })
 } finally {
   await browser.close()
-  kill()
+  stop()
 }
 
 if (problems.length) {

@@ -14,7 +14,12 @@
       "project": "src/**"
     },
     "apps/editor": {
-      "entry": ["src/parity-main.ts", "src/stage-main.tsx", "src/media-main.tsx", "src/field-main.tsx"],
+      "entry": [
+        "src/harness/parity-main.ts",
+        "src/harness/stage-main.tsx",
+        "src/harness/media-main.tsx",
+        "src/harness/field-main.tsx"
+      ],
       "project": "src/**"
     }
   }

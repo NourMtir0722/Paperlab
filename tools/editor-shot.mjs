@@ -5,32 +5,14 @@
  * that only a picture of the actual interface can answer.
  * Run: `pnpm shot:ui`.
  */
-import { spawn } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { chromium } from 'playwright'
+import { shotsDir, startApp } from './harness.mjs'
 
 const PORT = 5202
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const outDir = resolve(root, '.shots')
+const outDir = shotsDir()
 
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-const kill = () => server.kill('SIGTERM')
-process.on('exit', kill)
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('editor', PORT)
 
 const browser = await chromium.launch({
   args: process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
@@ -44,7 +26,6 @@ try {
   page.on('pageerror', (e) => problems.push(String(e)))
 
   await page.goto(base, { waitUntil: 'networkidle' })
-  mkdirSync(outDir, { recursive: true })
 
   for (const mode of process.argv.slice(2).length ? process.argv.slice(2) : ['Stage']) {
     await page.getByRole('button', { name: mode, exact: true }).click()
@@ -63,5 +44,5 @@ try {
   }
 } finally {
   await browser.close()
-  kill()
+  stop()
 }

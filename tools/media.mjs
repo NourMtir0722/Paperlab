@@ -15,14 +15,13 @@
  * Writes a GIF (README-safe — GitHub does not render <video> in markdown)
  * and an MP4 (for Product Hunt, X, and anywhere that takes real video).
  */
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, rmSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { chromium } from 'playwright'
+import { root, startApp } from './harness.mjs'
 
 const PORT = 5204
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = resolve(root, 'docs/media')
 const tmpDir = resolve(root, '.media-frames')
 
@@ -104,22 +103,7 @@ if (only && !ASSETS[only]) {
   process.exit(1)
 }
 
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-const kill = () => server.kill('SIGTERM')
-process.on('exit', kill)
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('editor', PORT)
 
 mkdirSync(outDir, { recursive: true })
 const browser = await chromium.launch()
@@ -200,7 +184,7 @@ try {
 } finally {
   await browser.close()
   rmSync(tmpDir, { recursive: true, force: true })
-  kill()
+  stop()
 }
 
 if (problems.length) {

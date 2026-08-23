@@ -19,9 +19,9 @@ import {
   select,
   text,
   type Control,
-} from './controlModel'
-import { Panel } from './controls'
-import { useEditor } from './store'
+} from '../controls/controlModel'
+import { Panel } from '../controls/controls'
+import { useEditor } from '../state/store'
 
 /**
  * Stage mode inspector: Words / Walk / Arrangement / Light / Stage /

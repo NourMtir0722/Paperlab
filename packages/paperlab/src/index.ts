@@ -194,6 +194,23 @@ export {
   type TranslucencyValues,
 } from './surface/translucency'
 export { useContentAtlas, atlasGrid, type ContentAtlas } from './content/atlas'
+/**
+ * The GPU/CPU parity harness — public on purpose, and the reasoning is worth
+ * writing down because it reads like test infrastructure that leaked.
+ *
+ * It is test infrastructure. It is also the only way to check the invariant
+ * the contribution ladder is built on: a deformer ships a JS `displace` and a
+ * GLSL chunk, and the two must agree. `CONTRIBUTING.md` asks a contributor to
+ * add cases to `field/parity.ts` and run `pnpm test:parity`, which needs a
+ * real WebGL context, which means a browser, which means it runs from an app
+ * — and the apps consume this library **through its public API only**. So the
+ * harness is either exported or that invariant has no gate.
+ *
+ * The narrow read is that this is a repo concern that a published consumer
+ * will never call. The wider one is that someone writing a deformer in their
+ * own project faces exactly the problem this solves, and has no other way to
+ * solve it. Exported for the second reason; kept to five names for the first.
+ */
 export {
   runParityHarness,
   parityCases,

@@ -7,9 +7,9 @@ import {
   type PaperConfig,
   type StateDef,
 } from 'paperlab'
-import { numericFields } from './controlModel'
-import { Select } from './Select'
-import { useEditor } from './store'
+import { numericFields } from '../controls/controlModel'
+import { Select } from '../controls/Select'
+import { useEditor } from '../state/store'
 
 /**
  * The states chip bar (Figma interactive-components model): Rest · Hover ·

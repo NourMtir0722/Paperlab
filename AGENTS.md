@@ -408,16 +408,55 @@ Run the dev server and look at the canvas: `describeConfig(config)` (exported) g
 
 ## Working in this repo
 
-pnpm + Turborepo. `packages/paperlab` is the library (the editor consumes it through its public API only — if the editor needs a private hook, the API is wrong). `apps/editor` is the Vite editor.
+pnpm + Turborepo. `packages/paperlab` is the library; `apps/` holds three Vite apps that consume it **through its public API only** — if an app needs a private hook, the API is wrong.
+
+| | |
+|---|---|
+| `packages/paperlab` | the library. Folders are domains: `core` (sheet + tessellation), `deformers`, `behaviors`, `field`, `stage`, `surface`, `scene`, `content`, `physics`, `states`, `config`, `a11y` |
+| `apps/editor` | every knob in the schema, the preset library, and the export. Also hosts the browser harnesses on their own HTML entry points (see below) |
+| `apps/playground` | one input, one scene, a link. The launch surface |
+| `apps/docs` | the documentation site, every behavior running live |
+| `tools/` | Node scripts that boot one of those apps headless and measure or photograph it |
 
 ```sh
 pnpm install
 pnpm dev            # editor at localhost:5173
 pnpm test           # vitest: deformer math, schema, layouts, cloth, exports
-pnpm test:parity    # GPU golden-vector gate: GLSL twins vs JS deformers (headless Chromium)
-pnpm build          # tsup (library) + vite (editor)
 pnpm typecheck
+pnpm build          # tsup (library) + vite (apps)
+pnpm lint           # biome
+pnpm knip           # dead code and unused exports
 ```
+
+**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor` that is dev-only — `pnpm build` emits `index.html` and nothing else.
+
+| | | |
+|---|---|---|
+| `pnpm test:parity` | `parity.html` | every deformer's GLSL twin vs its JS twin. **CI gate** |
+| `pnpm test:drive` | the editor | the stage really walks when you drag, wheel or arrow it. **CI gate** |
+| `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
+| `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
+| `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
+| `pnpm media` | `media.html` | the README's GIFs and MP4s, stepped frame-exact |
+
+### The editor, structurally
+
+`apps/editor/src` is grouped by what a file is for. Anything that is not one of these five things belongs at the root of `src` (there are four files there, and that is the budget).
+
+| | |
+|---|---|
+| `state/` | zustand stores and everything they persist to: `store.ts` (one write path — `writeConfig` — so state-override recording cannot be bypassed), `history.ts`, `session.ts`, `userPresets.ts`, `paperShare.ts`, `keys.ts` |
+| `controls/` | the schema→UI machinery. `controlModel.ts` is a **pure** function from a zod schema to a `Control[]` — no React, no DOM, and unit-tested as such; `controls.tsx` renders that tree; `Select.tsx` and `ui.tsx` are the shared primitives |
+| `panels/` | the inspectors that assemble a `Control[]` for one mode and hand it to `<Panel>` |
+| `chrome/` | everything around the canvas that is not an inspector — the view cluster, transport, coach mark, crash and small-screen screens |
+| `harness/` | the dev-only entry points `tools/` drives. Not in `pnpm build`'s output |
+
+Two things about the control layer are load-bearing and easy to undo by accident:
+
+- **The panel derives its rows from the config on every render.** There is no "structural" remount when the control *set* changes (toggling deckle, swapping physics). Remounting would be actively wrong — it collapses the folder the toggle lives in.
+- **The `Control` tree keeps hierarchy, so duplicate leaf names are fine.** A stage whose `shot` and `figure` both carry `height` renders both. Do not reintroduce name-prefixing to work around a flattening that no longer happens; `controlModel.test.ts` pins this.
+
+Label **drag-to-scrub** is the interaction worth preserving: full range in ~300px, shift for a 4× finer pass, click the readout to type an exact value. Text commits on blur/Enter rather than per keystroke, because the canvas rebuilds its content texture on every change.
 
 Architecture invariants (violating these is a bug, not a style choice):
 

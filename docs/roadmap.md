@@ -6,7 +6,7 @@
 > sells the product, `AGENTS.md` documents the API, and this file explains the
 > *intent* behind both.
 >
-> Last updated 2026-08-21 · library at `0.2.0`, published
+> Last updated 2026-08-23 · library at `0.2.0`, published; `0.3.0` unreleased on main
 
 ---
 
@@ -36,19 +36,27 @@ If a feature can't serialize into a preset, it doesn't ship.
 
 ### What exists today
 
-- **10 behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`,
-  `fall`, `carry`, `flight`, `crumple`. Human-named params ("tightness", not
-  "cylinderRadius") over a stack of pure geometry deformers.
+- **12 behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`,
+  `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`. Human-named params
+  ("tightness", not "cylinderRadius") over a stack of pure geometry deformers,
+  each nominating the two or three that ARE it.
 - **7 deformers** — `roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple`.
   Each has a JS implementation (CPU/hero path) and a GLSL twin (GPU/field
-  path), held identical by a golden-vector parity gate.
+  path), held identical by a golden-vector parity gate — and, since
+  2026-08-23, each is separately asserted to actually draw a surface.
 - **12 layouts** — every one names a place paper actually sits: `book`,
   `accordion`, `fan`, `spread`, `pile`, `rack`, `wall`, `spill`, `sweep`,
   `ring`, `colonnade`, `sheet`.
-- **13 paper presets**, **5 stage presets**, **7 stocks**.
+- **15 paper presets**, **6 stage presets**, **7 stocks**, 8 lighting rigs.
 - **Three modes** — one paper, a field of them in a single instanced draw call,
   or a stage you walk through.
-- **508 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+- **671 tests** + a 37-case GPU/CPU parity gate, all green in CI.
+
+> These counts drift. `apps/docs/src/docsDrift.test.ts` holds the NAMES in
+> README / AGENTS / llms.txt to the registries in both directions, but nothing
+> checks a number in prose — so when one of these is wrong, it is wrong
+> quietly. Re-read them from the registries before quoting one anywhere that
+> matters.
 
 ---
 
@@ -135,15 +143,15 @@ cadence.
 
 | # | phase | done test | status |
 |---|---|---|---|
-| 00 | Ground | a stranger can open all three apps; the README promises nothing missing | **partly** — repo public, Pages live, plan now landed here. **README honesty pass still owed** (deferred to phase 07 on purpose) |
+| 00 | Ground | a stranger can open all three apps; the README promises nothing missing | done — the README pass landed with phase 07, where it was deferred to |
 | 01 | The grade | the source reads as light; white paper keeps its hue | done |
 | 02 | The material | open Field mode, change nothing, screenshot: it is a portfolio image | done |
 | 03 | The room | a frame with nobody in it reads as a large room | done — columns and a doorway landed 2026-08-23 |
 | 04 | The primitives | a hung sheet shows what suspends it; a fallen sheet lies convincingly | done — rods and pegs landed 2026-08-23 |
 | 05 | Ribbon | a still stops someone scrolling with no caption | done, after the four defects above were fixed |
 | 06 | The tool, structurally | a stranger changes the one thing they meant to, and undoes it | done |
-| 07 | Honesty | every URL on a phone, cold cache, nothing confusing or blank | **not started** |
-| — | launch gate | publish 0.3.0, render assets, Product Hunt | blocked on 07 |
+| 07 | Honesty | every URL on a phone, cold cache, nothing confusing or blank | done 2026-08-23 |
+| — | launch gate | publish 0.3.0, render assets, Product Hunt | **next** — nothing above it is open |
 | 08 | The rest of the gallery | one stage every couple of weeks | after launch, deliberately |
 
 ### What phases 03 and 04 did not build — *built 2026-08-23*
@@ -282,8 +290,14 @@ be a code problem after all — see the npm entry.
       Worth stating plainly, since it now gates the launch: a 3D library whose
       pitch is *real geometry that bends* currently has no place to try it.
       `npm i paperlab` works; "see it move" does not.
-- [ ] Product Hunt / launch posts. npm is live; the demo is not, and a
-      launch post with nothing to click is the weaker half of this.
+- [ ] Product Hunt / launch posts. **Both halves of the "something to click"
+      argument are now satisfied** — npm serves the package and the demo has
+      been live since 2026-08-22 — so this is the last item on the runway and
+      nothing technical is blocking it. The entry above said "the demo is
+      not", and it went stale the same week it was written; it is corrected
+      here rather than deleted, because a runway item that quietly disagrees
+      with the two entries above it is exactly how a launch gate gets read as
+      still-blocked when it is not.
 
 ---
 
@@ -377,6 +391,89 @@ just created. No remount was ever needed: the inspector derives the zone rows
 from the store on every render, which `patchZone` had always relied on. Both
 bumps removed. The surface toggles already carried a comment saying exactly
 this; these two had simply never been held to it.
+
+---
+
+## Phase 07 — honesty — *done 2026-08-23*
+
+The last thing above the launch gate, and the one where measuring first
+changed what got built.
+
+### Every app was a blank page for two seconds
+
+Measured, not assumed: cold cache, throttled to slow 4G with a 4× CPU
+penalty, **all three apps showed nothing at all until somewhere between 1.8
+and 3.5 seconds.** No wordmark, no text, no sign that anything was coming.
+Each is a single React bundle over a megabyte of three.js, and `#root` was
+empty until it parsed.
+
+Blank is worse than slow, because **a visitor cannot tell a heavy scene from
+a broken link** — and it is the one thing this phase's done test names.
+
+The fix is markup and inline CSS inside `#root`: on screen with the first
+byte, no request, no JavaScript, and `createRoot().render()` replaces it on
+mount so there is nothing to tear down. Content now paints at **400ms**
+instead of 3.5s. The fade is held back 220ms on purpose, so a warm cache —
+which mounts in well under that — never flashes it.
+
+`apps/docs/src/firstPaint.test.ts` guards it, and guards the shape rather
+than the words: present, **inside** `#root` (outside it React never clears it
+and it covers the app forever), styled from the document head, carrying a
+real sentence rather than a spinner, and delayed. It is exactly the kind of
+thing that gets deleted while tidying an `index.html` — nothing in the build,
+the types or the unit suite would notice, and it only shows up on a cold
+cache on a slow connection, which is not how anyone develops.
+
+### Mobile: three surfaces, three different answers
+
+Lumping this into one decision was the mistake. It is three:
+
+- **The docs were already fine.** Read on a phone, no changes needed.
+- **The playground needed copy, not layout.** It rendered and scrolled
+  correctly, and then told the visitor to *press the arrow keys* — the
+  clearest possible signal that nobody had opened it on a phone. It now names
+  the gesture the device actually has (`@media (pointer: coarse)`), the stage
+  names scroll instead of being cut off, and the controls are thumb-sized.
+- **The editor gets a screen that says so.** It is a three-rail canvas tool:
+  at 390px the inspector is simply off the right-hand edge, the page scrolls
+  sideways to a panel nobody knows is there, and the one gesture the tool is
+  built around is a precise drag on a 12px target. **Broken with a message is
+  acceptable; broken in silence is not.**
+
+  Three things that gate has to do, in order: send them somewhere that works
+  (the playground, which is genuinely good on a phone — telling someone to
+  come back later without giving them anything to do now is how you lose
+  them), say what the editor is so coming back sounds worth it, and **let
+  them in anyway**. A hard wall is a lie about capability; the editor does
+  run, it is just cramped. Shown by a media query rather than by measuring
+  the window in JS: no resize listener, no first-paint flash, and rotating a
+  tablet into landscape reveals the editor with no code involved.
+
+### The README pass
+
+Deferred here on purpose, because the stale claims kept moving while phases
+landed. What was actually wrong:
+
+- **It promised a walking figure, twice** — in the hero's alt text and in the
+  stage bullet, which also listed "the figure" among the things that read the
+  same walk. `showFigure` has defaulted to FALSE since phase 03.
+- **The hero GIF predated the room.** It was rendered 2026-08-21, before the
+  columns, the doorway, and the banner-typesetting fix — so the single
+  most-seen image of this project showed `ca / rr / ie / d` down a banner in
+  an empty hall. Re-rendered. It costs 0.7 MB more than the old one (2.7 →
+  3.4 MB) and is worth it: the point of an honesty pass is that the picture
+  is of the thing that ships.
+- The stage bullet said nothing about the room, the doorway or the
+  suspension hardware — all of which now exist and are the reason the mode
+  reads at all.
+- Nothing said the editor wants a desktop. It does, and now says so where it
+  is linked.
+
+**And the inventory in this file was wrong**: 10 behaviors (12), 13 presets
+(15), 5 stage presets (6), 508 tests (671). `docsDrift` holds the *names* in
+README / AGENTS / llms.txt to the registries in both directions, but **nothing
+checks a number in prose**, so each of those had been wrong quietly for
+weeks. A warning now sits beside them.
 
 ---
 
@@ -615,7 +712,7 @@ reproduction is "drive everything for ten minutes without reloading".
 
 ---
 
-## Callback props as effect dependencies — one fixed, two left
+## Callback props as effect dependencies — *all three closed, 2026-08-23*
 
 **Found 2026-08-22, chasing "the whole app freezes when I interact with
 anything." The freeze is fixed; the pattern behind it is not gone.**
@@ -638,21 +735,23 @@ tab out with an out-of-memory crash.
 
 Fixed by holding the callback in a ref and depending on `tier` alone, plus a
 store-side guard so `patchStage` returns the *same* object for a patch that
-changes nothing (`apps/editor/src/store.test.ts` covers the guard).
+changes nothing (`apps/editor/src/state/store.test.ts` covers the guard).
 
-**What is left.** Two places still have the shape, neither of them a loop
-today, both worth closing:
+**The other two, closed 2026-08-23.** Neither was a loop, and both were the
+same shape:
 
-- `field/dropZones.tsx` — the registration effect names `onPlace`, so a
-  consumer passing an inline handler re-registers the zone on every render.
-  It bumps the registry version and re-renders every `DropZoneVisual`. Churn
+- `field/dropZones.tsx` — the registration effect named `onPlace`, so a
+  consumer passing an inline handler re-registered the zone on every render.
+  It bumped the registry version and re-rendered every `DropZoneVisual`. Churn
   rather than a loop, because the effect's own component is not what the
-  version change re-renders — which is luck, not design.
-- `stage/PaperStage.tsx` — `stage` arrives as a fresh object literal from the
-  editor, so `stageSchema.parse` and `getWalkPath` both re-run on every
+  version change re-renders — which was luck, not design. Now the registration
+  stores a stable wrapper that reads the callback out of a ref, so it depends
+  on what the zone IS.
+- `stage/PaperStage.tsx` — `stage` arrived as a fresh object literal from the
+  editor, so `stageSchema.parse` and `getWalkPath` both re-ran on every
   render. Harmless per render, and it was the reason each pump iteration cost
-  as much as it did. Serialized deps, the way `PaperFieldMesh` already does
-  it, would settle it.
+  as much as it did. Now on serialized deps, the way `PaperFieldMesh` already
+  did it.
 
 The general rule this earned: **a callback prop is a notification, not a
 dependency.** If an effect exists to tell the consumer something, it should
@@ -1051,13 +1150,61 @@ including everything above the line.
 - ~~**The editor remembers nothing between sessions.**~~ **Done.** Reopening
   restores the paper that was on the canvas — the sculpt included, saved or
   not — along with the mode, the field composition, and the stage you were
-  walking. It is one validated localStorage key (`apps/editor/src/session.ts`,
+  walking. It is one validated localStorage key (`apps/editor/src/state/session.ts`,
   written debounced and flushed on `pagehide`); anything that fails the schema,
   or names a preset/layout/stage this build no longer has, is dropped and you
   land on the default, which is exactly the old behaviour rather than a broken
   editor. A `?p=` share link still outranks the remembered view — otherwise
   someone whose last session was stage mode would be told about the paper they
   opened instead of shown it.
+
+---
+
+## The public API is 283 names, and some of them are the inside of the box
+
+**Found 2026-08-12, re-measured 2026-08-23. Still open, because trimming it is
+a breaking change and that is a call to make deliberately, not in passing.**
+
+The stage boundary was drawn (71 → 33 exports) and `share.ts` was evicted to
+the playground. What was left over is the rest of the library, and the shape
+of the problem is the same: names that exist because something inside the
+repo needed to reach them, exported as though a consumer had asked for them.
+
+The candidates, grouped by what they actually are:
+
+- **Canvas painting internals** — `drawBacking`, `silhouetteRects`,
+  `lightenHex`, `barcodeBars`, `atlasGrid`, `makeGoboTexture`. Nothing about
+  these is a paper API; they are how a texture gets drawn.
+- **Shader assembly** — `buildFieldVertexShader`, `buildFieldFragmentShader`,
+  `buildDisplacementGLSL`, `stackUniformValues`. A consumer who needs these is
+  building a different renderer.
+- **Sheet-grid math** — `sheetSlotXY`, `sheetBackingSize`, `outwardCorner`,
+  `tornEdgesOnDetach`, `SHEET_LIFT`, `withSheetCellFromPaper`. All of it exists
+  to make the `sheet` layout agree with itself. (`withSheetCellFromPaper` is
+  also the worst name in the library — it reads like a helper someone gave up
+  on. `sheetCellsFromPaper` if it survives the trim.)
+- **State-machine plumbing** — `flattenNumeric`, `stripStates`,
+  `recordStateOverride`.
+- **The individual layout functions** — `ring`, `fan`, `spread`, … Twelve
+  names that `getLayout`/`listLayouts` already reach, and `registerLayout` is
+  the extension point.
+
+Two that were considered and **kept**, with the reasoning written into the
+code rather than left to be re-derived: `paperlab/stage` (see the header of
+`src/stage.ts` — resolvability, not bytes) and the parity harness (see the
+comment above its export in `src/index.ts` — it is the gate the contribution
+ladder's deformer rung stands on).
+
+**What makes this worth doing and what makes it worth waiting.** A large
+public surface is a large semver commitment, and every one of these names is
+something the project has promised not to break. Against that: none of them
+appears in the README, `llms.txt`, or any doc, so nobody has been told they
+exist. The trim is cheap *now* and expensive after the library has users.
+
+**How to do it when it is picked up.** One major, all at once, not by
+attrition — `pnpm knip` and the app builds will name everything that breaks,
+and `apps/` is the only consumer in the repo. Anything an app still needs
+after the trim is a genuine API finding, not a reason to re-export.
 
 ---
 
@@ -1618,6 +1765,38 @@ is a completely different surface.
 
 Small shader change, and it is the difference between "a texture on paper" and
 "a thing that was printed".
+
+### Direct manipulation, past the one blue dot
+
+The chrome was re-cut to a design language in phase 08 (`docs/design.md`) and
+the camera got a visible cluster at the foot of the viewport. Two gestures
+belong in that cluster and are not there, because a button that toggles
+nothing is worse than an absent one. Both need library work first.
+
+**A handle per signature param.** `HandleSpec` already exists and is already
+generic, and `Behavior.signature` already names the two or three options that
+ARE each behaviour. But only four behaviours declare handles — `peel`,
+`unroll`, `flip`, `letter-fold` — and the other eight (`hang`, `fly`, `fall`,
+`carry`, `flight`, `crumple`, `settle`, `ribbon`) have no direct manipulation
+at all. `ViewportGuide` admits it in its own fallback copy: *"press Space to
+play the fall"*. That is not a gesture, it is an apology.
+
+The work is authoring handles, not building a system: an anchor in UV space
+and a drag that writes back to options, per nominated param. The payoff is
+that the editor stops being a panel of sliders next to a picture and starts
+being a thing you touch.
+
+**Dragging the key light.** Paper sells on grazing light, and today finding a
+good angle means cycling eight lighting presets and hoping. The gesture is
+obvious — pick the light tool, drag the room — but `PaperLighting` takes a
+preset name, not an angle, so there is nothing to write to. This is the same
+piece of work as *"Lighting is the only part of the engine that isn't data"*
+below, and it is the best argument for doing it.
+
+**What a Blender-style gizmo would be wrong for.** The sheet IS the scene, so
+there is no object transform worth a move/rotate/scale widget. Everything
+worth manipulating belongs to the deformer, which is why the two entries above
+are the whole list.
 
 ### A camera with a lens
 

@@ -5,17 +5,15 @@
  * on a real GPU and whether the scene looks like the thing it was built to
  * look like. Run: `pnpm shot`, or `pnpm shot --shot=low --walked=14 --out=x.png`.
  */
-import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { root, shotsDir, startApp } from './harness.mjs'
 
 const PORT = 5201
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const args = new URLSearchParams()
-let out = resolve(root, '.shots/stage.png')
+let out = resolve(shotsDir(), 'stage.png')
 // Composition is a function of the frame it is composed in: a stage that
 // reads in a tall panel can be all empty sky in a 16:9 hero. Default stays
 // portrait so old shots stay comparable; `--w=1600 --h=900` judges the other.
@@ -28,22 +26,7 @@ for (const arg of process.argv.slice(2)) {
   else args.set(key, value)
 }
 
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-const kill = () => server.kill('SIGTERM')
-process.on('exit', kill)
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('editor', PORT)
 
 const browser = await chromium.launch({
   args: process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
@@ -86,5 +69,5 @@ try {
   }
 } finally {
   await browser.close()
-  kill()
+  stop()
 }

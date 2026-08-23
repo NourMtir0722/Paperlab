@@ -1,8 +1,8 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { CrashScreen } from './CrashScreen'
-import { startSessionMemory } from './session'
-import { useEditor } from './store'
+import { CrashScreen } from './chrome/CrashScreen'
+import { startSessionMemory } from './state/session'
+import { useEditor } from './state/store'
 import './styles.css'
 
 // The store restores the last session on import; this keeps it current.

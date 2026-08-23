@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PaperStage, getStagePreset, type ShotName } from 'paperlab/stage'
+import { WARMUP, rendererName } from './perf'
 /**
  * One frame of stage mode through the public component and the real stage
  * presets, on its own entry point so it can be booted headless and
@@ -12,7 +13,6 @@ import { PaperStage, getStagePreset, type ShotName } from 'paperlab/stage'
 declare global {
   interface Window {
     __STAGE__?: { ready: boolean; errors: string[]; walk?: number; visited?: number }
-    __PERF__?: { frames: number[]; done: boolean; tier?: string; renderer?: string }
   }
 }
 
@@ -27,8 +27,6 @@ const num = (key: string, fallback: number) => {
 
 window.__PERF__ = { frames: [], done: false }
 
-/** Warm-up frames to discard: shader compiles and texture uploads land here. */
-const WARMUP = 25
 /** Frames to time. Enough that one hitch cannot move the median. */
 const SAMPLE = 90
 
@@ -53,20 +51,11 @@ function Ready() {
         programs: gl.info.programs?.length ?? 0,
         textures: gl.info.memory.textures,
         geometries: gl.info.memory.geometries,
-        // What ACTUALLY drew it, not what was asked for. Headless Chromium
-        // hands out a software rasterizer far more often than the launch
-        // flags suggest, and a number read as a GPU number when SwiftShader
-        // produced it is worse than no number.
         renderer: rendererName(gl.getContext()),
       })
     }
   })
   return null
-}
-
-function rendererName(ctx: WebGLRenderingContext | WebGL2RenderingContext): string {
-  const ext = ctx.getExtension('WEBGL_debug_renderer_info')
-  return ext ? String(ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'unknown'
 }
 
 const preset = getStagePreset(query.get('preset') ?? 'nave')
