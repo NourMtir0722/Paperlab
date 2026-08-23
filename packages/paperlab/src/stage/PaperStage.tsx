@@ -15,7 +15,7 @@ import { getWalkPath } from './path'
 import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
-import { Ceiling, Floor } from './Room'
+import { Ceiling, Columns, Doorway, Floor } from './Room'
 import { Suspension } from './Suspension'
 import { Grade } from './Grade'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
@@ -512,10 +512,36 @@ export function PaperStageScene({
         <Floor size={surroundRadius * 1.3} color={stage.ground.color} slab={stage.ground.slab} />
       )}
 
+      {/* The wall the source shines through. Before the floor's own draw is
+          irrelevant, but before the banners matters: it is the far surface
+          they are seen against. */}
+      {stage.room.enabled && stage.room.doorway.enabled && stage.source.enabled && (
+        <Doorway
+          position={source.position}
+          yaw={source.yaw}
+          size={source.size}
+          opening={stage.room.doorway.opening}
+          color={stage.room.doorway.color}
+          extent={surroundRadius * 0.9}
+        />
+      )}
+
+      {/* Columns. The scale cue that is not a person — see stageColumnsSchema. */}
+      {stage.room.enabled && stage.room.columns.enabled && (
+        <Columns
+          path={path}
+          ceiling={paperHeight * stage.room.height}
+          spacing={stage.room.columns.spacing}
+          width={stage.room.columns.width}
+          offset={stage.room.columns.offset}
+          color={stage.room.columns.color}
+        />
+      )}
+
       {/* Hardware. Drawn before the lid so it is inside the room, and it
           anchors at the ceiling whether or not the ceiling is drawn — a
           thread that stops in mid-air is worse than no thread. */}
-      {stage.suspension.type === 'thread' && (
+      {stage.suspension.type !== 'none' && (
         <Suspension
           layout={layout}
           layoutOptions={resolvedLayoutOptions ?? {}}
@@ -526,7 +552,8 @@ export function PaperStageScene({
           paperHeight={paperHeight}
           ceiling={paperHeight * stage.room.height}
           color={stage.suspension.color}
-          clips={stage.suspension.clips}
+          type={stage.suspension.type}
+          hardware={stage.suspension.hardware}
         />
       )}
 

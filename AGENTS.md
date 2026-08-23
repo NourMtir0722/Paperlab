@@ -155,9 +155,37 @@ without drifting.
 
 ### The room, and why there is no figure in it
 
-`stage.room` is `{ enabled, height, color }` — a ceiling — and
+`stage.room` is `{ enabled, height, color, columns, doorway }` and
 `stage.ground.slab` is the width of one poured floor slab. Together they are
 the scale of the hall.
+
+A ceiling and floor seams are both **boundaries** — they say where the room
+stops, not how big it is. The two pieces that stand IN it are off by default,
+because either one is a strong compositional claim and a stage that did not
+ask for one should not grow one:
+
+- **`room.columns`** `{ enabled, spacing, width, offset, color }` — square
+  piers with a base plate and a capital, down both sides of the walk, spaced
+  by arc length so a bend or a spiral still gets even bays. The base plate is
+  the part doing the work: it is the only element in the scene that puts a
+  hard horizontal edge at a **known height off the floor**, which is what
+  makes a floor read as a floor. They stand outside the paper (`offset`
+  clears a colonnade's widest aisle) and they are darker than paper on
+  purpose — the light is the brightest thing in these frames, the paper is
+  second, and a column at paper value reads as more paper. `nave` uses them.
+- **`room.doorway`** `{ enabled, opening, color }` — a wall at the end of the
+  walk with the source shining through an opening in it. Without it the
+  source is a bright rectangle in a void: it reads as light, but not as light
+  coming from anywhere. With it the walk resolves toward an opening in a
+  surface, and the room gets the corner it never had. `threshold` uses it.
+
+`stage.suspension` is `{ type, color, hardware }`. `type` is what carries the
+load — `'thread'` (one line per sheet to the ceiling), `'rod'` (a dowel across
+the sheet's top edge, hung at both ends), or `'none'`. `hardware` is what
+grips the sheet — `'clip'` (wide and shallow, across the edge), `'peg'`
+(narrow and deep, down the face), or `'none'`. They are told apart by
+silhouette, which is all that survives the distance this scene works at.
+`archive` hangs on rods; `cloister` uses pegs.
 
 Stage mode used to be a void with a horizon: a graded dome, a flat plane, and
 a bright rectangle at the end, none of it a knowable size. That is why the
