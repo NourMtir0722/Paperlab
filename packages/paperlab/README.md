@@ -106,7 +106,9 @@ Every layout names somewhere paper actually sits: `book` (pages splayed from a s
 
 Each pose also carries a **bias**: how strongly that one sheet takes the deformation. So the top of a pile curls while the sheets pressed underneath lie flat — in the same draw call. A whole field is **one instanced draw call** with the deformers running on the GPU, and the camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
 
-![Twelve typeset cards standing in a ring, curving inward](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/field-ring.gif)
+![Twelve cards standing in a ring, each with its corner peeling, rotating slowly](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/field-ring.gif)
+
+Twelve sheets, twelve peeled corners, **one draw call** — the deformers run on the GPU and the text curls with the mesh.
 
 ### Lighting — 8 rigs
 
@@ -124,7 +126,13 @@ Banners hung the height of a room along a walk you travel, with light coming thr
 
 The room is real — a ceiling, poured floor slabs, columns with base plates, and a doorway the source shines through — because **architecture carries scale better than a figure does**. There is a walking figure, and it is off by default: the stage is navigable, so the person in the hall is the viewer.
 
-**Four camera shots**, each reading the same walk as the arrangement and the light, so they cannot drift apart:
+**Six rooms ship**, and they are not variations on a theme — the walk changes shape, the paper changes proportion, the light changes where it comes from:
+
+![The six stage presets — nave, procession, cloister, threshold, ribbon and archive](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/stages.jpg)
+
+Every one of those is built from the same two things: sheets of paper, and words printed on them. No imagery, no textures from anywhere else.
+
+**Four camera shots** frame any of them, each reading the same walk as the arrangement and the light, so they cannot drift apart:
 
 ![The four stage camera shots — follow, lead, low and wide](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/camera.jpg)
 

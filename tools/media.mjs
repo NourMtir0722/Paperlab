@@ -67,7 +67,13 @@ const ASSETS = {
   },
   'field-ring': {
     mode: 'field',
-    preset: 'photo-print',
+    // `hero-peel` rather than `photo-print`: the container preset carries
+    // only a shade of bow, and a ring of near-flat rectangles does not look
+    // like geometry. A peeled corner on every sheet does — and it is the
+    // same deformer stack running on the GPU, in ONE draw call. `page-flip`
+    // was tried and is too much: it rolls each sheet into a tube and the
+    // ring stops reading as a ring.
+    preset: 'hero-peel',
     layout: 'ring',
     width: 1000,
     height: 640,
