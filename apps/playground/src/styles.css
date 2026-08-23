@@ -1,11 +1,72 @@
+/*
+ * Paperlab — the playground: the front door.
+ *
+ * Showroom register (see `docs/design.md`): the scene is the product, the
+ * chrome floats over it and says as little as possible. Density belongs to
+ * the editor; nothing here holds more than one idea at a time.
+ *
+ * ── SHARED TOKEN BLOCK ──────────────────────────────────────────────────
+ * Byte-identical in all three apps. Edit `docs/design.md` first, then all
+ * three copies; the drift test names the one you missed.
+ */
 :root {
   color-scheme: dark;
-  --ink: #f2ede6;
-  --dim: #9a938a;
-  --edge: rgba(242, 237, 230, 0.16);
-  --pane: rgba(12, 10, 11, 0.62);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Plate. Depth is a step on this ladder, never a drop shadow. */
+  --l0: #08090a;
+  --l1: #0b0c0d;
+  --l2: #0c0d0e;
+  --l3: #141517;
+
+  /* The room. Chroma 0, and it stays there: a cool surround pushes warm
+     paper yellow, and this is the one band next to a colour being judged. */
+  --room: #171717;
+  --room-stage: #0b0b0b;
+  --room-bezel: #121212;
+
+  /* One white, stepped. Hierarchy is a step, never a hue. */
+  --ink: rgba(255, 255, 255, 0.95);
+  --ink-2: rgba(255, 255, 255, 0.75);
+  --ink-body: rgba(255, 255, 255, 0.55);
+  --ink-meta: rgba(255, 255, 255, 0.35);
+  --ink-faint: rgba(255, 255, 255, 0.2);
+
+  /* Lift. A surface comes forward by brightening, not by casting. */
+  --lift: rgba(255, 255, 255, 0.04);
+  --lift-2: rgba(255, 255, 255, 0.07);
+  --lift-3: rgba(255, 255, 255, 0.11);
+  --hair: rgba(255, 255, 255, 0.07);
+  --hair-2: rgba(255, 255, 255, 0.1);
+
+  /* The one floating material. Nothing docked to an edge may wear it.
+     It is DARKER than the room rather than lighter, which looks backwards
+     next to the "brighten to come forward" ladder and is not: a floating
+     control passes over the paper, and the paper is the brightest thing on
+     screen. A white-tinted glass over a white sheet is a white bar with
+     invisible icons on it. Carrying its own dark ground is the only way it
+     stays legible over both the room and the artwork. */
+  --glass-fill: rgba(14, 14, 16, 0.72);
+  --glass-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+
+  /* The chroma budget, spent. --grab is the grab point on the sheet and
+     nothing else; --alarm is destruction and failure, the one exception. */
+  --grab: #4f7cff;
+  --grab-glow: rgba(79, 124, 255, 0.25);
+  --alarm: #e2726e;
+
+  /* Brand actions invert luminance rather than taking a hue. */
+  --pill: #f4f4f4;
+
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --fast: 120ms;
 }
+/* ── END SHARED TOKEN BLOCK ─────────────────────────────────────────────── */
 
 * {
   box-sizing: border-box;
@@ -16,7 +77,8 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: #0c0a0b;
+  font-family: var(--font);
+  background: var(--room-stage);
   color: var(--ink);
 }
 
@@ -62,9 +124,8 @@ body,
   letter-spacing: 0.01em;
   padding: 8px 15px;
   border-radius: 999px;
-  background: var(--pane);
-  border: 1px solid var(--edge);
-  backdrop-filter: blur(10px);
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
 }
 
 .actions {
@@ -76,30 +137,29 @@ button {
   font: inherit;
   font-size: 13px;
   color: var(--ink);
-  background: var(--pane);
-  border: 1px solid var(--edge);
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
   border-radius: 999px;
   padding: 8px 15px;
   cursor: pointer;
-  backdrop-filter: blur(10px);
   transition:
     background 120ms ease,
     border-color 120ms ease;
 }
 
 button:hover {
-  background: rgba(30, 26, 24, 0.8);
+  background: var(--lift-3);
 }
 
 button.primary {
   background: var(--ink);
-  color: #16110f;
+  color: var(--l0);
   border-color: transparent;
   font-weight: 600;
 }
 
 button.primary:hover {
-  background: #fff;
+  background: var(--pill);
 }
 
 .bottom {
@@ -119,7 +179,7 @@ button.primary:hover {
   font-size: 11px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--ink-body);
 }
 
 textarea {
@@ -127,21 +187,20 @@ textarea {
   font-size: 15px;
   line-height: 1.5;
   color: var(--ink);
-  background: var(--pane);
-  border: 1px solid var(--edge);
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
   border-radius: 12px;
   padding: 11px 13px;
   resize: none;
-  backdrop-filter: blur(10px);
 }
 
 textarea:focus {
   outline: none;
-  border-color: rgba(242, 237, 230, 0.4);
+  border-color: var(--ink-body);
 }
 
 textarea::placeholder {
-  color: #6f6862;
+  color: var(--ink-meta);
 }
 
 .rail {
@@ -170,7 +229,7 @@ textarea::placeholder {
   margin: 0 0 8px;
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: rgba(242, 237, 230, 0.5);
+  color: var(--ink-body);
 }
 
 .chip {
@@ -179,8 +238,8 @@ textarea::placeholder {
 }
 
 .chip.on {
-  background: rgba(242, 237, 230, 0.92);
-  color: #16110f;
+  background: var(--pill);
+  color: var(--l0);
   border-color: transparent;
   font-weight: 600;
 }
@@ -254,7 +313,7 @@ input[type="range"] {
     bottom: 0;
     width: 34px;
     pointer-events: none;
-    background: linear-gradient(to right, rgba(22, 17, 15, 0), rgba(22, 17, 15, 0.92));
+    background: linear-gradient(to right, rgba(8, 9, 10, 0), rgba(8, 9, 10, 0.92));
   }
 
   /* Touch targets. 44px is the smallest thing a thumb hits reliably, and
@@ -267,5 +326,28 @@ input[type="range"] {
 
   input[type="range"] {
     height: 32px;
+  }
+}
+
+/* ── The one floating material ────────────────────────────────────────────
+ * The whole of this app's chrome hangs over a live scene, so every surface
+ * here has real geometry behind it to transmit — which is the test glass has
+ * to pass (`docs/design.md`, amendment 1). One recipe, declared once, so the
+ * blur can never quietly become four stacked ones.
+ */
+.wordmark,
+button,
+textarea {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .wordmark,
+  button,
+  textarea {
+    background: var(--l3);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }

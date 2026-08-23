@@ -1710,6 +1710,38 @@ is a completely different surface.
 Small shader change, and it is the difference between "a texture on paper" and
 "a thing that was printed".
 
+### Direct manipulation, past the one blue dot
+
+The chrome was re-cut to a design language in phase 08 (`docs/design.md`) and
+the camera got a visible cluster at the foot of the viewport. Two gestures
+belong in that cluster and are not there, because a button that toggles
+nothing is worse than an absent one. Both need library work first.
+
+**A handle per signature param.** `HandleSpec` already exists and is already
+generic, and `Behavior.signature` already names the two or three options that
+ARE each behaviour. But only four behaviours declare handles — `peel`,
+`unroll`, `flip`, `letter-fold` — and the other eight (`hang`, `fly`, `fall`,
+`carry`, `flight`, `crumple`, `settle`, `ribbon`) have no direct manipulation
+at all. `ViewportGuide` admits it in its own fallback copy: *"press Space to
+play the fall"*. That is not a gesture, it is an apology.
+
+The work is authoring handles, not building a system: an anchor in UV space
+and a drag that writes back to options, per nominated param. The payoff is
+that the editor stops being a panel of sliders next to a picture and starts
+being a thing you touch.
+
+**Dragging the key light.** Paper sells on grazing light, and today finding a
+good angle means cycling eight lighting presets and hoping. The gesture is
+obvious — pick the light tool, drag the room — but `PaperLighting` takes a
+preset name, not an angle, so there is nothing to write to. This is the same
+piece of work as *"Lighting is the only part of the engine that isn't data"*
+below, and it is the best argument for doing it.
+
+**What a Blender-style gizmo would be wrong for.** The sheet IS the scene, so
+there is no object transform worth a move/rotate/scale widget. Everything
+worth manipulating belongs to the deformer, which is why the two entries above
+are the whole list.
+
 ### A camera with a lens
 
 The stage runs at `fov: 38` and that is the entire camera model. Focal length

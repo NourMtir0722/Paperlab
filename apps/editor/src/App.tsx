@@ -30,6 +30,7 @@ import { ExportMenu } from './ExportMenu'
 import { PresetPanel } from './PresetPanel'
 import { ViewportGuide } from './ViewportGuide'
 import { CoachMark, HandleAnchor, coachMarkUsed } from './CoachMark'
+import { CameraRig, ViewCluster } from './ViewCluster'
 import { SmallScreen } from './SmallScreen'
 import { captureThumbnail } from './userPresets'
 import { SHARE_PARAM, paperShareUrl, readPaperShare } from './paperShare'
@@ -365,7 +366,10 @@ export function App() {
           dpr={[1, 2]}
           gl={{ preserveDrawingBuffer: true }}
         >
-          <color attach="background" args={[mode === 'stage' ? '#0c0a0b' : '#17181b']} />
+          {/* The room's ground. Pure grey on purpose: a cool or warm cast
+              here shifts the perceived colour of the paper sitting in front
+              of it — see `docs/design.md`, amendment 2. */}
+          <color attach="background" args={[mode === 'stage' ? '#0b0b0b' : '#171717']} />
           {/* Stage brings its own rig — a second one here would double the key. */}
           {mode !== 'stage' && (
             <PaperLighting
@@ -424,6 +428,14 @@ export function App() {
             />
           )}
           {mode === 'paper' && <HandleAnchor paperRef={paperRef} />}
+          {/* Stage walks its own camera; the other two modes orbit, and the
+              cluster below the canvas is how anyone finds that out. */}
+          {mode !== 'stage' && (
+            <CameraRig
+              home={mode === 'paper' ? [0, 0.35, 2.9] : [0, 0.9, 6.4]}
+              radius={mode === 'paper' ? 2.9 : 6.4}
+            />
+          )}
           {mode !== 'stage' && <OrbitControls makeDefault enableDamping />}
           {/* The FPS badge is a diagnostic, not furniture: it sits over the
               canvas in every screenshot and every recording, and it is the
@@ -434,6 +446,7 @@ export function App() {
         </Canvas>
         {mode === 'paper' && <CoachMark />}
         {mode === 'paper' && <ViewportGuide />}
+        {mode !== 'stage' && <ViewCluster key={`cluster:${mode}`} />}
       </main>
 
       <aside className="right">

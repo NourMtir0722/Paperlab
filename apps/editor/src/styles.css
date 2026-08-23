@@ -1,3 +1,75 @@
+/*
+ * Paperlab — the editor's chrome.
+ *
+ * Direction: Graphite Showroom. The whole argument is in `docs/design.md`,
+ * and `apps/docs/src/designSystem.test.ts` fails the build when this file
+ * breaks it. The short version: the paper is the artwork and this is the
+ * frame, so hierarchy is one white at stepped opacities, depth is a tint
+ * step, and the chroma budget buys exactly one element — the grab handle.
+ *
+ * ── SHARED TOKEN BLOCK ──────────────────────────────────────────────────
+ * Byte-identical in all three apps. Edit `docs/design.md` first, then all
+ * three copies; the drift test names the one you missed.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Plate. Depth is a step on this ladder, never a drop shadow. */
+  --l0: #08090a;
+  --l1: #0b0c0d;
+  --l2: #0c0d0e;
+  --l3: #141517;
+
+  /* The room. Chroma 0, and it stays there: a cool surround pushes warm
+     paper yellow, and this is the one band next to a colour being judged. */
+  --room: #171717;
+  --room-stage: #0b0b0b;
+  --room-bezel: #121212;
+
+  /* One white, stepped. Hierarchy is a step, never a hue. */
+  --ink: rgba(255, 255, 255, 0.95);
+  --ink-2: rgba(255, 255, 255, 0.75);
+  --ink-body: rgba(255, 255, 255, 0.55);
+  --ink-meta: rgba(255, 255, 255, 0.35);
+  --ink-faint: rgba(255, 255, 255, 0.2);
+
+  /* Lift. A surface comes forward by brightening, not by casting. */
+  --lift: rgba(255, 255, 255, 0.04);
+  --lift-2: rgba(255, 255, 255, 0.07);
+  --lift-3: rgba(255, 255, 255, 0.11);
+  --hair: rgba(255, 255, 255, 0.07);
+  --hair-2: rgba(255, 255, 255, 0.1);
+
+  /* The one floating material. Nothing docked to an edge may wear it.
+     It is DARKER than the room rather than lighter, which looks backwards
+     next to the "brighten to come forward" ladder and is not: a floating
+     control passes over the paper, and the paper is the brightest thing on
+     screen. A white-tinted glass over a white sheet is a white bar with
+     invisible icons on it. Carrying its own dark ground is the only way it
+     stays legible over both the room and the artwork. */
+  --glass-fill: rgba(14, 14, 16, 0.72);
+  --glass-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+
+  /* The chroma budget, spent. --grab is the grab point on the sheet and
+     nothing else; --alarm is destruction and failure, the one exception. */
+  --grab: #4f7cff;
+  --grab-glow: rgba(79, 124, 255, 0.25);
+  --alarm: #e2726e;
+
+  /* Brand actions invert luminance rather than taking a hue. */
+  --pill: #f4f4f4;
+
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --fast: 120ms;
+}
+/* ── END SHARED TOKEN BLOCK ─────────────────────────────────────────────── */
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -10,10 +82,10 @@ body,
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font);
   font-size: 13px;
-  background: #0f1012;
-  color: #e6e4df;
+  background: var(--l0);
+  color: var(--ink);
   overflow: hidden;
 }
 
@@ -34,8 +106,8 @@ body {
   align-items: center;
   gap: 14px;
   padding: 0 14px;
-  background: #1a1b1e;
-  border-top: 1px solid #2a2b2f;
+  background: var(--l2);
+  border-top: 1px solid var(--hair);
 }
 
 .transport .play {
@@ -43,14 +115,14 @@ body {
   height: 30px;
   border: 0;
   border-radius: 6px;
-  background: #26272b;
-  color: #e6e4df;
+  background: var(--lift-2);
+  color: var(--ink);
   cursor: pointer;
   font-size: 12px;
 }
 
 .transport .play:hover:not(:disabled) {
-  background: #3a3b40;
+  background: var(--hair-2);
 }
 
 .transport .play:disabled {
@@ -60,11 +132,11 @@ body {
 
 .transport .scrubber {
   flex: 1;
-  accent-color: #4f7cff;
+  accent-color: var(--ink-2);
 }
 
 .transport-hint {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -75,8 +147,8 @@ body {
   align-items: center;
   gap: 16px;
   padding: 0 14px;
-  background: #1a1b1e;
-  border-bottom: 1px solid #2a2b2f;
+  background: var(--l2);
+  border-bottom: 1px solid var(--hair);
 }
 
 .brand {
@@ -85,12 +157,12 @@ body {
 }
 
 .filename {
-  color: #8b8a86;
+  color: var(--ink-body);
 }
 
 .mode-switch {
   display: flex;
-  background: #26272b;
+  background: var(--lift-2);
   border-radius: 6px;
   padding: 2px;
 }
@@ -98,15 +170,15 @@ body {
 .mode-switch button {
   border: 0;
   background: transparent;
-  color: #8b8a86;
+  color: var(--ink-body);
   padding: 4px 14px;
   border-radius: 5px;
   cursor: pointer;
 }
 
 .mode-switch button.active {
-  background: #3a3b40;
-  color: #fff;
+  background: var(--hair-2);
+  color: var(--ink);
 }
 
 .mode-switch button:disabled {
@@ -120,22 +192,22 @@ body {
 
 .back-to-field {
   background: transparent;
-  border: 1px solid #3a3b40;
-  color: #c9c7c2;
+  border: 1px solid var(--hair-2);
+  color: var(--ink-2);
   border-radius: 6px;
   padding: 5px 12px;
   cursor: pointer;
 }
 
 .back-to-field:hover {
-  background: #26272b;
+  background: var(--lift-2);
 }
 
 .save-preset,
 .share-paper {
-  background: #26272b;
-  color: #e6e4df;
-  border: 1px solid #3a3b40;
+  background: var(--lift-2);
+  color: var(--ink);
+  border: 1px solid var(--hair-2);
   border-radius: 6px;
   padding: 6px 14px;
   cursor: pointer;
@@ -143,11 +215,11 @@ body {
 
 .save-preset:hover,
 .share-paper:hover {
-  background: #3a3b40;
+  background: var(--hair-2);
 }
 
 .preset-panel.dropping {
-  outline: 2px dashed #4f7cff;
+  outline: 2px dashed var(--ink-body);
   outline-offset: -4px;
   border-radius: 8px;
 }
@@ -165,7 +237,7 @@ body {
 .row-action {
   background: transparent;
   border: 0;
-  color: #55554f;
+  color: var(--ink-faint);
   cursor: pointer;
   padding: 3px 4px;
   font-size: 12px;
@@ -174,16 +246,16 @@ body {
 
 .preset-row:hover .row-action,
 h2 .row-action {
-  color: #8b8a86;
+  color: var(--ink-body);
 }
 
 .row-action:hover {
-  color: #fff;
-  background: #26272b;
+  color: var(--ink);
+  background: var(--lift-2);
 }
 
 .row-action.danger:hover {
-  color: #ff6b6b;
+  color: var(--alarm);
 }
 
 .row-actions {
@@ -205,11 +277,11 @@ h2 .row-action {
   height: 24px;
   object-fit: cover;
   border-radius: 3px;
-  background: #26272b;
+  background: var(--lift-2);
 }
 
 .hint {
-  color: #55554f;
+  color: var(--ink-faint);
   font-size: 11px;
   padding: 2px 10px 6px;
 }
@@ -236,7 +308,7 @@ h2 .row-action {
 }
 
 .slot-index {
-  color: #55554f;
+  color: var(--ink-faint);
   font-size: 11px;
   width: 18px;
   text-align: right;
@@ -244,9 +316,9 @@ h2 .row-action {
 
 .slot-row select {
   flex: 1;
-  background: #26272b;
-  color: #c9c7c2;
-  border: 1px solid #2a2b2f;
+  background: var(--lift-2);
+  color: var(--ink-2);
+  border: 1px solid var(--hair);
   border-radius: 5px;
   padding: 4px 6px;
   font-size: 12px;
@@ -260,9 +332,9 @@ h2 .row-action {
 
 .preset-select {
   flex: 1;
-  background: #26272b;
-  color: #e6e4df;
-  border: 1px solid #2a2b2f;
+  background: var(--lift-2);
+  color: var(--ink);
+  border: 1px solid var(--hair);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 12px;
@@ -271,33 +343,37 @@ h2 .row-action {
 
 .preset-select:focus {
   outline: none;
-  border-color: #4f7cff;
+  border-color: var(--ink-body);
 }
 
 .slot-edit {
   background: transparent;
   border: 0;
-  color: #8b8a86;
+  color: var(--ink-body);
   cursor: pointer;
   padding: 2px 4px;
 }
 
 .slot-edit:hover {
-  color: #fff;
+  color: var(--ink);
 }
 
+/* The one brand action in the frame. Rule 5: it inverts luminance rather
+   than taking a hue — a coloured button here would be the second-loudest
+   thing on screen after the paper, and it has no business being that. */
 button.export {
-  background: #4f7cff;
-  color: #fff;
+  background: var(--pill);
+  color: var(--l0);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-md);
   padding: 7px 16px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
+  transition: opacity var(--fast) var(--ease);
 }
 
 button.export:hover {
-  background: #6089ff;
+  opacity: 0.88;
 }
 
 .export-menu {
@@ -309,8 +385,8 @@ button.export:hover {
   top: calc(100% + 6px);
   right: 0;
   z-index: 30;
-  background: #222327;
-  border: 1px solid #3a3b40;
+  background: var(--l3);
+  border: 1px solid var(--hair-2);
   border-radius: 8px;
   min-width: 250px;
   overflow: hidden;
@@ -325,33 +401,33 @@ button.export:hover {
   text-align: left;
   background: transparent;
   border: 0;
-  color: #e6e4df;
+  color: var(--ink);
   padding: 10px 14px;
   cursor: pointer;
 }
 
 .export-dropdown button:hover {
-  background: #2e3a5c;
+  background: var(--lift-3);
 }
 
 .export-dropdown button span {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 11px;
 }
 
 /* "Copy for AI" is the hero path — promote it over the secondary two. */
 .export-dropdown .export-primary {
   position: relative;
-  background: #2e3a5c;
-  border-bottom: 1px solid #3a3b40;
+  background: var(--lift-3);
+  border-bottom: 1px solid var(--hair-2);
 }
 
 .export-dropdown .export-primary strong {
-  color: #cdd8ff;
+  color: var(--ink);
 }
 
 .export-dropdown .export-primary:hover {
-  background: #37436a;
+  background: var(--lift-3);
 }
 
 .export-dropdown .export-secondary button {
@@ -360,7 +436,7 @@ button.export:hover {
 
 .export-dropdown .export-secondary strong {
   font-weight: 500;
-  color: #c9c7c2;
+  color: var(--ink-2);
 }
 
 .copied-badge {
@@ -368,15 +444,15 @@ button.export:hover {
   top: 50%;
   right: 12px;
   transform: translateY(-50%);
-  color: #9fe4cd !important;
+  color: var(--ink) !important;
   font-size: 11px;
   font-weight: 600;
 }
 
 .left {
   grid-area: left;
-  background: #1a1b1e;
-  border-right: 1px solid #2a2b2f;
+  background: var(--l1);
+  border-right: 1px solid var(--hair);
   padding: 14px;
   overflow-y: auto;
 }
@@ -385,7 +461,7 @@ button.export:hover {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #8b8a86;
+  color: var(--ink-body);
   margin: 14px 0 8px;
 }
 
@@ -403,7 +479,7 @@ button.export:hover {
   text-align: left;
   background: transparent;
   border: 0;
-  color: #c9c7c2;
+  color: var(--ink-2);
   padding: 7px 10px;
   border-radius: 6px;
   cursor: pointer;
@@ -411,17 +487,25 @@ button.export:hover {
 }
 
 .presets button:hover {
-  background: #26272b;
+  background: var(--lift-2);
 }
 
 .presets button.active {
-  background: #2e3a5c;
-  color: #fff;
+  background: var(--lift-3);
+  color: var(--ink);
 }
 
+/* Amendment 2 made literal: a pure-grey band between the cool-cast rails
+   and the sheet, so nothing with a hue in it ever touches the canvas. */
 .viewport {
   grid-area: viewport;
   position: relative;
+  background: var(--room-bezel);
+  padding: 8px;
+}
+
+.viewport canvas {
+  border-radius: var(--r-lg);
 }
 
 /* drei <Stats> injects a fixed top-left panel; park it bottom-left instead. */
@@ -433,17 +517,17 @@ button.export:hover {
 
 .right {
   grid-area: right;
-  background: #1a1b1e;
-  border-left: 1px solid #2a2b2f;
+  background: var(--l1);
+  border-left: 1px solid var(--hair);
   overflow-y: auto;
 }
 
 /* ── States bar (M6): chips · transition row · preview toggle ─────────────── */
 
 .states-bar {
-  border-bottom: 1px solid #2a2b2f;
+  border-bottom: 1px solid var(--hair);
   padding: 8px 10px;
-  background: #1c1d21;
+  background: var(--l1);
 }
 
 .states-chips {
@@ -454,9 +538,9 @@ button.export:hover {
 }
 
 .state-chip {
-  background: #26272b;
+  background: var(--lift-2);
   border: 1px solid transparent;
-  color: #c9c7c2;
+  color: var(--ink-2);
   border-radius: 999px;
   padding: 3px 10px;
   font-size: 12px;
@@ -467,32 +551,32 @@ button.export:hover {
 }
 
 .state-chip:hover {
-  background: #2e2f34;
+  background: var(--lift-3);
 }
 
 .state-chip.active {
-  background: #3d2e5c;
-  border-color: #7a5cc4;
-  color: #fff;
+  background: var(--lift-3);
+  border-color: var(--hair-2);
+  color: var(--ink);
 }
 
 .state-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #a78bfa;
+  background: var(--ink-2);
   display: inline-block;
 }
 
 .state-dot.slot {
-  background: #5cc4a0;
+  background: var(--ink-body);
 }
 
 .state-preview {
   margin-left: auto;
-  background: #26272b;
+  background: var(--lift-2);
   border: 1px solid transparent;
-  color: #c9c7c2;
+  color: var(--ink-2);
   border-radius: 6px;
   padding: 3px 10px;
   cursor: pointer;
@@ -500,9 +584,9 @@ button.export:hover {
 }
 
 .state-preview.active {
-  background: #1e4634;
-  border-color: #2f8f62;
-  color: #d7f5e7;
+  background: var(--lift-3);
+  border-color: var(--hair-2);
+  color: var(--ink);
 }
 
 .state-detail {
@@ -512,22 +596,22 @@ button.export:hover {
   flex-wrap: wrap;
   margin-top: 8px;
   font-size: 12px;
-  color: #9a988f;
+  color: var(--ink-body);
 }
 
 .state-detail input[type="number"] {
   width: 52px;
-  background: #26272b;
-  border: 1px solid #333;
-  color: #e8e6e1;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
   border-radius: 4px;
   padding: 2px 4px;
 }
 
 .state-detail select {
-  background: #26272b;
-  border: 1px solid #333;
-  color: #e8e6e1;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
   border-radius: 4px;
   padding: 2px 4px;
   font-size: 12px;
@@ -541,9 +625,9 @@ button.export:hover {
 
 .state-override,
 .state-reset {
-  background: #2b2438;
-  border: 1px solid #4a3a6b;
-  color: #cbb8f5;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 11px;
@@ -551,19 +635,19 @@ button.export:hover {
 }
 
 .state-reset {
-  background: #26272b;
-  border-color: #3a3b40;
-  color: #c9c7c2;
+  background: var(--lift-2);
+  border-color: var(--hair-2);
+  color: var(--ink-2);
 }
 
 .state-hint {
   font-style: italic;
-  color: #6b6a64;
+  color: var(--ink-meta);
 }
 
 .states-slot-label {
   font-size: 11px;
-  color: #9a988f;
+  color: var(--ink-body);
   margin-right: 2px;
 }
 
@@ -571,7 +655,7 @@ button.export:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #c9c7c2;
+  color: var(--ink-2);
 }
 
 .slot-state-slider {
@@ -579,7 +663,7 @@ button.export:hover {
 }
 
 .slot-row.selected {
-  background: #2e3a5c;
+  background: var(--lift-3);
   border-radius: 6px;
 }
 
@@ -591,15 +675,15 @@ button.export:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(6, 7, 9, 0.55);
+  background: rgba(4, 4, 5, 0.6);
   backdrop-filter: blur(2px);
 }
 
 .dialog {
   width: 340px;
   max-width: calc(100vw - 32px);
-  background: #222327;
-  border: 1px solid #3a3b40;
+  background: var(--l3);
+  border: 1px solid var(--hair-2);
   border-radius: 10px;
   padding: 18px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
@@ -608,13 +692,13 @@ button.export:hover {
 .dialog-title {
   font-size: 14px;
   font-weight: 600;
-  color: #f2f0ec;
+  color: var(--ink);
 }
 
 .dialog-message {
   margin-top: 8px;
   font-size: 12px;
-  color: #a9a8a4;
+  color: var(--ink-body);
   line-height: 1.5;
 }
 
@@ -622,26 +706,26 @@ button.export:hover {
   width: 100%;
   margin-top: 14px;
   padding: 8px 10px;
-  background: #17181b;
-  border: 1px solid #3a3b40;
+  background: var(--l0);
+  border: 1px solid var(--hair-2);
   border-radius: 6px;
-  color: #e6e4df;
+  color: var(--ink);
   font-size: 13px;
 }
 
 .dialog-input:focus {
   outline: none;
-  border-color: #4f7cff;
+  border-color: var(--ink-body);
 }
 
 .dialog-input.invalid {
-  border-color: #ff6b6b;
+  border-color: var(--alarm);
 }
 
 .dialog-error {
   margin-top: 6px;
   font-size: 11px;
-  color: #ff6b6b;
+  color: var(--alarm);
 }
 
 .dialog-actions {
@@ -654,35 +738,36 @@ button.export:hover {
 .dialog-btn {
   padding: 7px 14px;
   border-radius: 6px;
-  border: 1px solid #3a3b40;
-  background: #26272b;
-  color: #e6e4df;
+  border: 1px solid var(--hair-2);
+  background: var(--lift-2);
+  color: var(--ink);
   font-size: 12px;
   cursor: pointer;
 }
 
 .dialog-btn:hover {
-  background: #33343a;
+  background: var(--lift-3);
 }
 
 .dialog-btn.primary {
-  background: #4f7cff;
-  border-color: #4f7cff;
-  color: #fff;
-  font-weight: 600;
+  background: var(--pill);
+  border-color: transparent;
+  color: var(--l0);
+  font-weight: 500;
 }
 
 .dialog-btn.primary:hover {
-  background: #6089ff;
+  background: var(--pill);
+  opacity: 0.88;
 }
 
 .dialog-btn.primary.danger {
-  background: #d84a4a;
-  border-color: #d84a4a;
+  background: var(--alarm);
+  border-color: var(--alarm);
 }
 
 .dialog-btn.primary.danger:hover {
-  background: #e35c5c;
+  background: var(--alarm);
 }
 
 /* --- Toasts --- */
@@ -701,10 +786,10 @@ button.export:hover {
 
 .toast {
   pointer-events: auto;
-  border: 1px solid #3a3b40;
+  border: 1px solid var(--hair-2);
   border-radius: 8px;
-  background: #26272b;
-  color: #e6e4df;
+  background: var(--lift-2);
+  color: var(--ink);
   padding: 9px 14px;
   font-size: 12px;
   cursor: pointer;
@@ -713,13 +798,13 @@ button.export:hover {
 }
 
 .toast.error {
-  border-color: #ff6b6b;
-  color: #ffb0b0;
+  border-color: var(--alarm);
+  color: var(--alarm);
 }
 
 .toast.success {
-  border-color: #5cc4a0;
-  color: #9fe4cd;
+  border-color: var(--ink-2);
+  color: var(--ink);
 }
 
 @keyframes toast-in {
@@ -736,12 +821,10 @@ button.export:hover {
   left: 14px;
   z-index: 20;
   width: 260px;
-  background: rgba(30, 31, 35, 0.92);
-  border: 1px solid #3a3b40;
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
   border-radius: 10px;
   padding: 12px 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
   animation: toast-in 0.18s ease-out;
 }
 
@@ -757,20 +840,20 @@ button.export:hover {
 .guide-head strong {
   font-size: 12px;
   letter-spacing: 0.02em;
-  color: #f2f0ec;
+  color: var(--ink);
 }
 
 .guide-close {
   background: transparent;
   border: 0;
-  color: #8b8a86;
+  color: var(--ink-body);
   cursor: pointer;
   font-size: 12px;
   padding: 2px 4px;
 }
 
 .guide-close:hover {
-  color: #fff;
+  color: var(--ink);
 }
 
 .guide-steps {
@@ -787,11 +870,11 @@ button.export:hover {
   gap: 8px;
   font-size: 12px;
   line-height: 1.45;
-  color: #c9c7c2;
+  color: var(--ink-2);
 }
 
 .guide-steps b {
-  color: #e6e4df;
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -801,22 +884,26 @@ button.export:hover {
   height: 9px;
   margin-top: 3px;
   border-radius: 50%;
-  background: #4f7cff;
-  box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.25);
+  background: var(--grab);
+  box-shadow: 0 0 0 3px var(--grab-glow);
 }
 
+/* Cloth has no single grab point — you pull the sheet anywhere — so it is
+   the same accent drawn hollow, rather than a second colour meaning
+   "also grabbable". Rule 4: the budget bought one hue, not two. */
 .guide-dot.cloth {
-  background: #5cc4a0;
-  box-shadow: 0 0 0 3px rgba(92, 196, 160, 0.25);
+  background: transparent;
+  border: 2px solid var(--grab);
+  box-shadow: none;
 }
 
 .guide-key {
   flex: none;
   padding: 1px 6px;
-  border: 1px solid #3a3b40;
+  border: 1px solid var(--hair-2);
   border-radius: 4px;
-  background: #26272b;
-  color: #e6e4df;
+  background: var(--lift-2);
+  color: var(--ink);
   font-size: 11px;
 }
 
@@ -826,15 +913,16 @@ button.export:hover {
   padding: 7px;
   border: 0;
   border-radius: 6px;
-  background: #4f7cff;
-  color: #fff;
-  font-weight: 600;
+  background: var(--lift-2);
+  color: var(--ink-2);
+  font-weight: 500;
   font-size: 12px;
   cursor: pointer;
 }
 
 .guide-got-it:hover {
-  background: #6089ff;
+  background: var(--lift-3);
+  color: var(--ink);
 }
 
 .guide-toggle {
@@ -845,21 +933,20 @@ button.export:hover {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1px solid #3a3b40;
-  background: rgba(30, 31, 35, 0.85);
-  color: #c9c7c2;
+  border: 1px solid var(--hair-2);
+  background: var(--glass-fill);
+  color: var(--ink-2);
   font-size: 14px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
 }
 
 .guide-toggle:hover {
-  color: #fff;
-  border-color: #4f7cff;
+  color: var(--ink);
+  border-color: var(--ink-body);
 }
 
 .stage-note {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 12px;
   line-height: 1.55;
   margin: 0 0 10px;
@@ -868,7 +955,7 @@ button.export:hover {
 /* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
    matches the same element as the .export-dropdown rule above. */
 .stage-note strong {
-  color: #c9c6c0;
+  color: var(--ink-2);
   font-weight: 600;
 }
 
@@ -889,19 +976,19 @@ button.export:hover {
   padding: 9px 10px;
   border: 1px solid transparent;
   border-radius: 7px;
-  background: #202125;
-  color: #e6e4df;
+  background: var(--lift);
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 
 .stage-preset:hover {
-  background: #26272b;
+  background: var(--lift-2);
 }
 
 .stage-preset.selected {
-  border-color: #4f7cff;
-  background: #23262f;
+  border-color: var(--ink-body);
+  background: var(--lift-2);
 }
 
 /* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
@@ -914,7 +1001,7 @@ button.export:hover {
 /* biome-ignore lint/style/noDescendingSpecificity: disjoint component — never
    matches the same element as the .export-dropdown rule above. */
 .stage-preset span {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -926,7 +1013,7 @@ button.export:hover {
 }
 
 .control-folder {
-  border-bottom: 1px solid #26272b;
+  border-bottom: 1px solid var(--lift-2);
 }
 
 .control-folder-head {
@@ -937,7 +1024,7 @@ button.export:hover {
   padding: 8px 10px;
   background: transparent;
   border: 0;
-  color: #c9c7c2;
+  color: var(--ink-2);
   font: inherit;
   font-weight: 600;
   text-align: left;
@@ -945,11 +1032,11 @@ button.export:hover {
 }
 
 .control-folder-head:hover {
-  background: #1e1f23;
+  background: var(--lift);
 }
 
 .control-folder-caret {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 10px;
   transition: transform 120ms ease;
 }
@@ -965,14 +1052,14 @@ button.export:hover {
 /* Nested folders (a stage's shot/figure/source) indent and lose the rule. */
 .control-folder-body .control-folder {
   border-bottom: 0;
-  border-left: 1px solid #2a2b2f;
+  border-left: 1px solid var(--hair);
   margin-left: 2px;
 }
 
 .control-folder-body .control-folder-head {
   padding-left: 8px;
   font-weight: 500;
-  color: #a8a6a1;
+  color: var(--ink-body);
 }
 
 .control-row {
@@ -998,7 +1085,7 @@ button.export:hover {
 }
 
 .control-label {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1011,20 +1098,20 @@ button.export:hover {
 }
 
 .control-label.scrub:hover {
-  color: #c9c7c2;
+  color: var(--ink-2);
 }
 
 .control-slider {
   width: 100%;
-  accent-color: #4f7cff;
+  accent-color: var(--ink-2);
   height: 14px;
 }
 
 .control-value {
-  background: #26272b;
+  background: var(--lift-2);
   border: 1px solid transparent;
   border-radius: 4px;
-  color: #e6e4df;
+  color: var(--ink);
   font: inherit;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -1035,20 +1122,20 @@ button.export:hover {
 }
 
 .control-value:hover:not(:disabled) {
-  border-color: #3a3b40;
+  border-color: var(--hair-2);
 }
 
 .control-value.editing {
-  border-color: #4f7cff;
+  border-color: var(--ink-body);
   outline: none;
 }
 
 .control-select,
 .control-text {
-  background: #26272b;
-  border: 1px solid #3a3b40;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
   border-radius: 4px;
-  color: #e6e4df;
+  color: var(--ink);
   font: inherit;
   font-size: 12px;
   padding: 4px 6px;
@@ -1064,7 +1151,7 @@ button.export:hover {
 
 .control-select:focus,
 .control-text:focus {
-  border-color: #4f7cff;
+  border-color: var(--ink-body);
   outline: none;
 }
 
@@ -1093,8 +1180,8 @@ button.export:hover {
   width: 30px;
   height: 17px;
   border-radius: 999px;
-  background: #26272b;
-  border: 1px solid #3a3b40;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
   position: relative;
   transition:
     background 120ms ease,
@@ -1109,33 +1196,33 @@ button.export:hover {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #8b8a86;
+  background: var(--ink-body);
   transition:
     transform 120ms ease,
     background 120ms ease;
 }
 
 .control-toggle input:checked + .control-toggle-track {
-  background: #23305c;
-  border-color: #4f7cff;
+  background: var(--l3);
+  border-color: var(--ink-body);
 }
 
 .control-toggle input:checked + .control-toggle-track::after {
   transform: translateX(13px);
-  background: #4f7cff;
+  background: var(--ink);
 }
 
 .control-toggle input:focus-visible + .control-toggle-track {
-  outline: 2px solid #4f7cff;
+  outline: 2px solid var(--ink-body);
   outline-offset: 2px;
 }
 
 .control-button {
   width: 100%;
-  background: #26272b;
-  border: 1px solid #3a3b40;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
   border-radius: 5px;
-  color: #c9c7c2;
+  color: var(--ink-2);
   font: inherit;
   font-size: 12px;
   padding: 5px 10px;
@@ -1143,13 +1230,13 @@ button.export:hover {
 }
 
 .control-button:hover {
-  background: #2e2f34;
-  border-color: #4f7cff;
-  color: #fff;
+  background: var(--lift-3);
+  border-color: var(--ink-body);
+  color: var(--ink);
 }
 
 .control-note {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 11px;
   line-height: 1.5;
   padding: 4px 0 6px;
@@ -1167,8 +1254,8 @@ button.export:hover {
   align-items: flex-start;
   justify-content: center;
   padding: 6vh 24px;
-  background: #17181b;
-  color: #e7e7ea;
+  background: var(--l0);
+  color: var(--ink);
   font:
     13px / 1.55 ui-sans-serif,
     system-ui,
@@ -1188,16 +1275,16 @@ button.export:hover {
 .crash-message {
   margin: 0 0 14px;
   padding: 10px 12px;
-  border-left: 2px solid #d9534f;
-  background: #1e1f23;
-  color: #ffb4b1;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-left: 2px solid var(--alarm);
+  background: var(--lift);
+  color: var(--alarm);
+  font-family: var(--mono);
   word-break: break-word;
 }
 
 .crash-hint {
   margin: 0 0 18px;
-  color: #9a9aa2;
+  color: var(--ink-body);
 }
 
 .crash-actions {
@@ -1209,17 +1296,17 @@ button.export:hover {
 
 .crash-actions button {
   padding: 7px 13px;
-  border: 1px solid #35363c;
+  border: 1px solid var(--hair-2);
   border-radius: 6px;
-  background: #232429;
-  color: #e7e7ea;
+  background: var(--lift-2);
+  color: var(--ink);
   font: inherit;
   cursor: pointer;
 }
 
 .crash-actions button:hover {
-  background: #2c2d33;
-  border-color: #45464e;
+  background: var(--lift-3);
+  border-color: var(--hair-2);
 }
 
 .crash-stack {
@@ -1227,10 +1314,10 @@ button.export:hover {
   padding: 12px;
   max-height: 46vh;
   overflow: auto;
-  border: 1px solid #26272c;
+  border: 1px solid var(--hair);
   border-radius: 6px;
-  background: #121316;
-  color: #8f9098;
+  background: var(--l0);
+  color: var(--ink-meta);
   font:
     11px / 1.5 ui-monospace,
     SFMono-Regular,
@@ -1253,14 +1340,14 @@ button.export:hover {
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: #c9c7c2;
+  color: var(--ink-2);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
 }
 
 .history button:hover:not(:disabled) {
-  background: #26272b;
+  background: var(--lift-2);
 }
 
 .history button:disabled {
@@ -1275,10 +1362,10 @@ button.export:hover {
   align-items: center;
   gap: 6px;
   width: 100%;
-  background: #26272b;
-  border: 1px solid #3a3b40;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
   border-radius: 4px;
-  color: #e6e4df;
+  color: var(--ink);
   font: inherit;
   font-size: 12px;
   padding: 4px 6px;
@@ -1287,12 +1374,12 @@ button.export:hover {
 }
 
 .select-trigger:hover {
-  border-color: #4a4b52;
+  border-color: var(--hair-2);
 }
 
 .select-trigger:focus-visible,
 .select-trigger.open {
-  border-color: #4f7cff;
+  border-color: var(--ink-body);
   outline: none;
 }
 
@@ -1304,7 +1391,7 @@ button.export:hover {
 }
 
 .select-caret {
-  color: #8b8a86;
+  color: var(--ink-body);
   font-size: 9px;
   flex: none;
 }
@@ -1324,8 +1411,8 @@ button.export:hover {
   flex-direction: column;
   overflow-y: auto;
   padding: 4px;
-  background: #1f2024;
-  border: 1px solid #3a3b40;
+  background: var(--l3);
+  border: 1px solid var(--hair-2);
   border-radius: 6px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
@@ -1337,7 +1424,7 @@ button.export:hover {
 .select-option {
   border: 0;
   background: transparent;
-  color: #c9c7c2;
+  color: var(--ink-2);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -1348,12 +1435,12 @@ button.export:hover {
 }
 
 .select-option.active {
-  background: #2e2f34;
-  color: #e6e4df;
+  background: var(--lift-3);
+  color: var(--ink);
 }
 
 .select-option.selected {
-  color: #9db4ff;
+  color: var(--ink-2);
 }
 
 .select-option.selected::after {
@@ -1385,10 +1472,10 @@ button.export:hover {
   -webkit-appearance: none;
   background: linear-gradient(
     to right,
-    #4f7cff 0,
-    #4f7cff var(--fill, 0%),
-    #303136 var(--fill, 0%),
-    #303136 100%
+    var(--ink-body) 0,
+    var(--ink-body) var(--fill, 0%),
+    var(--lift-2) var(--fill, 0%),
+    var(--lift-2) 100%
   );
   border-radius: 999px;
   height: 4px;
@@ -1402,7 +1489,7 @@ button.export:hover {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #e6e4df;
+  background: var(--ink);
   border: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: grab;
@@ -1414,7 +1501,7 @@ button.export:hover {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #e6e4df;
+  background: var(--ink);
   border: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: grab;
@@ -1423,12 +1510,12 @@ button.export:hover {
 .control-slider:active::-webkit-slider-thumb,
 .transport .scrubber:active::-webkit-slider-thumb {
   cursor: grabbing;
-  background: #fff;
+  background: var(--ink);
 }
 
 .control-slider:focus-visible,
 .transport .scrubber:focus-visible {
-  outline: 2px solid #4f7cff;
+  outline: 2px solid var(--ink-body);
   outline-offset: 3px;
 }
 
@@ -1441,7 +1528,7 @@ button.export:hover {
 /* The transport scrubber is written to imperatively by the canvas, so it has
    no React-set --fill; it keeps a plain track. */
 .transport .scrubber {
-  background: #303136;
+  background: var(--lift-2);
   height: 5px;
 }
 
@@ -1458,7 +1545,7 @@ button.export:hover {
 
 .control-row.signature .control-label {
   grid-area: label;
-  color: #d7d5d0;
+  color: var(--ink);
   font-size: 12.5px;
   font-weight: 500;
 }
@@ -1503,11 +1590,11 @@ button.export:hover {
   gap: 8px;
   padding: 7px 8px 7px 12px;
   max-width: 260px;
-  background: #23305c;
-  border: 1px solid #4f7cff;
+  background: var(--l3);
+  border: 1px solid var(--grab);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  color: #eaeefb;
+  color: var(--ink);
   font-size: 12.5px;
   line-height: 1.35;
   pointer-events: auto;
@@ -1536,7 +1623,7 @@ button.export:hover {
   top: 50%;
   width: 22px;
   height: 1px;
-  background: #4f7cff;
+  background: var(--grab);
 }
 
 .coach-mark-tether::before {
@@ -1547,7 +1634,7 @@ button.export:hover {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 1px solid #4f7cff;
+  border: 1px solid var(--grab);
 }
 
 .coach-mark-text {
@@ -1558,7 +1645,7 @@ button.export:hover {
   flex: none;
   border: 0;
   background: transparent;
-  color: #9db4ff;
+  color: var(--ink-2);
   font-size: 11px;
   cursor: pointer;
   padding: 2px 4px;
@@ -1567,20 +1654,20 @@ button.export:hover {
 
 .coach-mark-close:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: var(--ink);
 }
 
 /* ── States bar: it now says what it is ──────────────────────────────────── */
 
 .states-bar-label {
   font-size: 11px;
-  color: #a8a6a1;
+  color: var(--ink-body);
   margin-bottom: 6px;
   font-weight: 500;
 }
 
 .states-bar-hint {
-  color: #6b6a64;
+  color: var(--ink-meta);
   font-weight: 400;
 }
 
@@ -1655,7 +1742,7 @@ button.export:hover {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: #0f1012;
+    background: var(--l0);
     overflow-y: auto;
   }
 
@@ -1683,7 +1770,7 @@ button.export:hover {
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #6b6a64;
+  color: var(--ink-meta);
   margin-bottom: 18px;
 }
 
@@ -1692,13 +1779,13 @@ button.export:hover {
   line-height: 1.15;
   letter-spacing: -0.02em;
   margin: 0 0 14px;
-  color: #f2ede6;
+  color: var(--ink);
 }
 
 .small-screen-card p {
   font-size: 15px;
   line-height: 1.6;
-  color: #a8a6a1;
+  color: var(--ink-body);
   margin: 0 0 20px;
 }
 
@@ -1706,10 +1793,10 @@ button.export:hover {
   display: block;
   padding: 15px 18px;
   border-radius: 10px;
-  background: #4f7cff;
-  color: #fff;
+  background: var(--pill);
+  color: var(--l0);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   text-align: center;
 }
@@ -1724,7 +1811,7 @@ button.export:hover {
   flex-wrap: wrap;
   gap: 10px 22px;
   align-items: center;
-  border-top: 1px solid #2a2b2f;
+  border-top: 1px solid var(--hair);
   padding-top: 18px;
 }
 
@@ -1735,8 +1822,133 @@ button.export:hover {
   padding: 8px 0;
   font: inherit;
   font-size: 13.5px;
-  color: #8b8a86;
+  color: var(--ink-body);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+/* ── The one floating material ────────────────────────────────────────────
+ * Amendment 1: glass floats, plate docks. Every surface listed here hangs
+ * over the live canvas, which is the only place in the app with something
+ * real behind it to transmit — and what it transmits is actual geometry,
+ * not a page background. A blurred sidebar would be pure effect, which is
+ * the thing this library exists to argue against.
+ *
+ * This is the ONLY blur in the app apart from the modal scrim, and the
+ * design-system test fails on a third. That is not fussiness: a third one
+ * is exactly how this turns into every other translucent editor.
+ */
+.view-cluster,
+.viewport-guide,
+.guide-toggle {
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Transmission is a preference, not a requirement. Under reduced
+   transparency every glass surface becomes the plate it would have been. */
+@media (prefers-reduced-transparency: reduce) {
+  .view-cluster,
+  .viewport-guide,
+  .guide-toggle {
+    background: var(--l3);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ── The tool cluster ─────────────────────────────────────────────────────
+ * Snap views and framing, floating at the foot of the canvas. It replaces
+ * the old arrangement where the only way to learn the camera existed was to
+ * try dragging and see what happened.
+ *
+ * It holds camera verbs only. A "sculpt" or "light" button belongs here too
+ * and is not here yet, because a button that toggles nothing is worse than
+ * an absent one — see `docs/roadmap.md`.
+ */
+.view-cluster {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--r-xl);
+}
+
+.view-cluster button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-body);
+  cursor: pointer;
+  transition:
+    background var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.view-cluster button:hover {
+  background: var(--lift-2);
+  color: var(--ink);
+}
+
+.view-cluster button.on {
+  background: var(--lift-3);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.view-cluster .cluster-rule {
+  width: 1px;
+  height: 20px;
+  margin: 0 5px;
+  background: var(--hair-2);
+}
+
+/* The label appears above the icon it belongs to, and says the key as well
+   as the name — the point of the cluster is to teach the shortcut. */
+.cluster-tip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--hair-2);
+  background: var(--l3);
+  color: var(--ink);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
+}
+
+.cluster-slot {
+  position: relative;
+  display: flex;
+}
+
+.cluster-slot:hover .cluster-tip {
+  opacity: 1;
+}
+
+.cluster-tip kbd {
+  margin-left: 6px;
+  color: var(--ink-meta);
+  font: inherit;
 }
