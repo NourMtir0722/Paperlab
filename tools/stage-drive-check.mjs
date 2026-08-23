@@ -8,29 +8,12 @@
  * whether the listeners are actually attached to the thing on screen and
  * whether dragging it walks. Run: `pnpm test:drive`.
  */
-import { spawn } from 'node:child_process'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { startApp } from './harness.mjs'
 
 const PORT = 5203
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-process.on('exit', () => server.kill('SIGTERM'))
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('editor', PORT)
 
 const browser = await chromium.launch({
   // CI has no GPU, and a stage that never renders a frame never ticks the
@@ -265,7 +248,7 @@ try {
   await browser.close()
 }
 
-server.kill('SIGTERM')
+stop()
 if (failures.length > 0) {
   console.error(`\n${failures.length} failure(s): ${failures.join(', ')}`)
   process.exit(1)

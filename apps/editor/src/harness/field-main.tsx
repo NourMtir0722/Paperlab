@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PaperFieldMesh, PaperLighting, getPreset } from 'paperlab'
+import { WARMUP, rendererName } from './perf'
 
 /**
  * What a field actually costs to draw.
@@ -17,27 +18,16 @@ import { PaperFieldMesh, PaperLighting, getPreset } from 'paperlab'
  * exactly like `stage.html` is by `pnpm perf`.
  */
 
-declare global {
-  interface Window {
-    __FIELD_PERF__?: {
-      frames: number[]
-      done: boolean
-      triangles?: number
-      drawCalls?: number
-      renderer?: string
-    }
-  }
-}
-
-window.__FIELD_PERF__ = { frames: [], done: false }
+window.__PERF__ = { frames: [], done: false }
 
 const query = new URLSearchParams(window.location.search)
-const presetName = query.get('preset') ?? 'photo-print'
+// typed-note, not photo-print: this page exists to measure geometry, and
+// photo-print's content is a remote image, so its default would have put a
+// network fetch and a large texture upload inside the number.
+const presetName = query.get('preset') ?? 'typed-note'
 const count = Number(query.get('count')) || 20
 const layout = query.get('layout') ?? 'ring'
 
-/** Warm-up frames to discard: shader compiles and atlas uploads land here. */
-const WARMUP = 25
 /** Frames to time. Enough that one hitch cannot move the median. */
 const SAMPLE = 60
 
@@ -45,7 +35,7 @@ function Meter() {
   const gl = useThree((s) => s.gl)
   const started = useRef(false)
   useFrame((_, delta) => {
-    const perf = window.__FIELD_PERF__!
+    const perf = window.__PERF__!
     if (perf.done) return
 
     if (!started.current) {
@@ -68,19 +58,12 @@ function Meter() {
       Object.assign(perf, {
         triangles: gl.info.render.triangles,
         drawCalls: gl.info.render.calls,
-        // What actually drew this — headless Chromium falls back to software
-        // unless it is told not to, and a number without this is a fiction.
         renderer: rendererName(gl.getContext()),
       })
     }
     gl.info.reset()
   })
   return null
-}
-
-function rendererName(ctx: WebGLRenderingContext | WebGL2RenderingContext): string {
-  const ext = ctx.getExtension('WEBGL_debug_renderer_info')
-  return ext ? String(ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'unknown'
 }
 
 const preset = getPreset(presetName)

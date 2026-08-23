@@ -4,29 +4,11 @@
  * /parity.html in headless Chromium, and fails if any deformer's GLSL
  * implementation drifts from its JS twin. Run: `pnpm test:parity`.
  */
-import { spawn } from 'node:child_process'
 import { chromium } from 'playwright'
+import { startApp } from './harness.mjs'
 
 const PORT = 5199
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-})
-
-const kill = () => {
-  server.kill('SIGTERM')
-}
-process.on('exit', kill)
-
-// Wait for vite to answer.
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('editor', PORT)
 
 // CI runners have no GPU; force software WebGL via SwiftShader.
 const browser = await chromium.launch({
@@ -55,5 +37,5 @@ try {
   }
 } finally {
   await browser.close()
-  kill()
+  stop()
 }

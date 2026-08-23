@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_SHARE_LENGTH,
+  MAX_TEXT_LENGTH,
   SHARE_PARAM,
   decodeStageShare,
   encodeStageShare,
@@ -70,7 +71,8 @@ describe('decoding a link nobody should trust', () => {
   })
 
   it('caps the text a link can carry', () => {
-    expect(decodeStageShare(toB64(JSON.stringify({ t: 'x'.repeat(4001) })))).toBeNull()
+    expect(decodeStageShare(toB64(JSON.stringify({ t: 'x'.repeat(MAX_TEXT_LENGTH) })))).not.toBeNull()
+    expect(decodeStageShare(toB64(JSON.stringify({ t: 'x'.repeat(MAX_TEXT_LENGTH + 1) })))).toBeNull()
   })
 })
 
@@ -78,18 +80,39 @@ describe('links', () => {
   it('puts the scene in the query and reads it back', () => {
     const share: StageShare = { preset: 'cloister', text: 'around and around' }
     const url = stageShareUrl('https://paperlab.dev/', share)
-    expect(new URL(url).searchParams.get(SHARE_PARAM)).toBeTruthy()
-    expect(readStageShare(new URL(url).search)).toEqual(share)
+    expect(url).not.toBeNull()
+    expect(new URL(url!).searchParams.get(SHARE_PARAM)).toBeTruthy()
+    expect(readStageShare(new URL(url!).search)).toEqual(share)
   })
 
   it('keeps whatever was already on the url', () => {
     const url = stageShareUrl('https://paperlab.dev/?utm=x', { preset: 'nave' })
-    expect(new URL(url).searchParams.get('utm')).toBe('x')
+    expect(new URL(url!).searchParams.get('utm')).toBe('x')
   })
 
   it('a url with no stage on it reads as no stage, not as an error', () => {
     expect(readStageShare('')).toBeNull()
     expect(readStageShare('?other=1')).toBeNull()
+  })
+
+  /**
+   * The writer and the reader have to agree. This app rewrites the address
+   * bar on every keystroke, so a writer that produced a link past the ceiling
+   * would hand the visitor a URL that reloads as an empty room — their scene
+   * gone, and nothing said about it.
+   */
+  it('refuses to write a link it could not read back', () => {
+    const overflowing = { preset: 'nave', text: 'x'.repeat(MAX_SHARE_LENGTH) }
+    expect(encodeStageShare(overflowing).length).toBeGreaterThan(MAX_SHARE_LENGTH)
+    expect(decodeStageShare(encodeStageShare(overflowing))).toBeNull()
+    expect(stageShareUrl('https://paperlab.dev/', overflowing)).toBeNull()
+  })
+
+  it('writes anything up to the text cap, so the cap is the only limit that bites', () => {
+    const atCap = { preset: 'nave', text: 'x'.repeat(MAX_TEXT_LENGTH) }
+    const url = stageShareUrl('https://paperlab.dev/', atCap)
+    expect(url).not.toBeNull()
+    expect(readStageShare(new URL(url!).search)).toEqual(atCap)
   })
 })
 

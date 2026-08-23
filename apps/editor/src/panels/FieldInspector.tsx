@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import { getLayout, listLayouts, listPresets } from 'paperlab'
-import { button, folder, note, num, schemaControls, select, text, type Control } from './controlModel'
-import { Panel } from './controls'
-import { useEditor, type EditorZone } from './store'
+import {
+  button,
+  folder,
+  note,
+  num,
+  schemaControls,
+  select,
+  text,
+  type Control,
+} from '../controls/controlModel'
+import { Panel } from '../controls/controls'
+import { useEditor, type EditorZone } from '../state/store'
 
 /**
  * Field mode inspector: Layout / Motion / Paper / Drop zones. Layout options

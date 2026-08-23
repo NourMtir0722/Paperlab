@@ -10,20 +10,18 @@
  *   node tools/light-shot.mjs --lighting=raking --preset=vintage-note
  *   node tools/light-shot.mjs --all --preset=typed-note   # every rig, one run
  */
-import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { chromium } from 'playwright'
+import { root, shotsDir, startApp } from './harness.mjs'
 
-const PORT = 5207
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const PORT = 5209
 
 const RIGS = ['studio', 'window', 'leaves', 'goldenhour', 'noir', 'nave', 'raking', 'lightbox']
 
 const args = new URLSearchParams()
 let all = false
-let outDir = resolve(root, '.shots')
+let outDir = shotsDir()
 for (const arg of process.argv.slice(2)) {
   const [key, value = ''] = arg.replace(/^--/, '').split('=')
   if (key === 'all') all = true
@@ -33,22 +31,7 @@ for (const arg of process.argv.slice(2)) {
 const rigs = all ? RIGS : [args.get('lighting') ?? 'studio']
 const preset = args.get('preset') ?? 'typed-note'
 
-const server = spawn('pnpm', ['--filter', '@paperlab/editor', 'exec', 'vite', '--port', String(PORT)], {
-  stdio: 'pipe',
-  cwd: root,
-})
-const kill = () => server.kill('SIGTERM')
-process.on('exit', kill)
-
-const base = `http://localhost:${PORT}`
-for (let i = 0; i < 60; i++) {
-  try {
-    await fetch(base)
-    break
-  } catch {
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
+const { base, stop } = await startApp('editor', PORT)
 
 const browser = await chromium.launch()
 try {
@@ -77,5 +60,5 @@ try {
   }
 } finally {
   await browser.close()
-  kill()
+  stop()
 }

@@ -21,22 +21,24 @@ import {
   listStagePresets,
   type StageExportInput,
 } from 'paperlab/stage'
-import { Inspector } from './Inspector'
-import { FieldInspector } from './FieldInspector'
-import { StageInspector } from './StageInspector'
-import { StatesBar } from './StatesBar'
-import { Transport } from './Transport'
-import { ExportMenu } from './ExportMenu'
-import { PresetPanel } from './PresetPanel'
-import { ViewportGuide } from './ViewportGuide'
-import { CoachMark, HandleAnchor, coachMarkUsed } from './CoachMark'
-import { captureThumbnail } from './userPresets'
-import { SHARE_PARAM, paperShareUrl, readPaperShare } from './paperShare'
-import { DEMO_CARDS } from './demoAssets'
-import { UIHost, promptDialog, toast } from './ui'
-import { useEditor, zoneToConfig } from './store'
-import { Select } from './Select'
-import { useHistory, useHistoryKeys, useUndoState } from './history'
+import { Inspector } from './panels/Inspector'
+import { FieldInspector } from './panels/FieldInspector'
+import { StageInspector } from './panels/StageInspector'
+import { StatesBar } from './panels/StatesBar'
+import { Transport } from './chrome/Transport'
+import { ExportMenu } from './panels/ExportMenu'
+import { PresetPanel } from './panels/PresetPanel'
+import { ViewportGuide } from './chrome/ViewportGuide'
+import { CoachMark, HandleAnchor, coachMarkUsed } from './chrome/CoachMark'
+import { CameraRig, ViewCluster } from './chrome/ViewCluster'
+import { SmallScreen } from './chrome/SmallScreen'
+import { captureThumbnail } from './state/userPresets'
+import { SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
+import { DEMO_CARDS } from './state/demoAssets'
+import { UIHost, promptDialog, toast } from './controls/ui'
+import { useEditor, zoneToConfig } from './state/store'
+import { Select } from './controls/Select'
+import { useHistory, useHistoryKeys, useUndoState } from './state/history'
 
 /**
  * The walking figure's model, served from this app's own `public/`.
@@ -364,7 +366,10 @@ export function App() {
           dpr={[1, 2]}
           gl={{ preserveDrawingBuffer: true }}
         >
-          <color attach="background" args={[mode === 'stage' ? '#0c0a0b' : '#17181b']} />
+          {/* The room's ground. Pure grey on purpose: a cool or warm cast
+              here shifts the perceived colour of the paper sitting in front
+              of it — see `docs/design.md`, amendment 2. */}
+          <color attach="background" args={[mode === 'stage' ? '#0b0b0b' : '#171717']} />
           {/* Stage brings its own rig — a second one here would double the key. */}
           {mode !== 'stage' && (
             <PaperLighting
@@ -423,6 +428,14 @@ export function App() {
             />
           )}
           {mode === 'paper' && <HandleAnchor paperRef={paperRef} />}
+          {/* Stage walks its own camera; the other two modes orbit, and the
+              cluster below the canvas is how anyone finds that out. */}
+          {mode !== 'stage' && (
+            <CameraRig
+              home={mode === 'paper' ? [0, 0.35, 2.9] : [0, 0.9, 6.4]}
+              radius={mode === 'paper' ? 2.9 : 6.4}
+            />
+          )}
           {mode !== 'stage' && <OrbitControls makeDefault enableDamping />}
           {/* The FPS badge is a diagnostic, not furniture: it sits over the
               canvas in every screenshot and every recording, and it is the
@@ -433,6 +446,7 @@ export function App() {
         </Canvas>
         {mode === 'paper' && <CoachMark />}
         {mode === 'paper' && <ViewportGuide />}
+        {mode !== 'stage' && <ViewCluster key={`cluster:${mode}`} />}
       </main>
 
       <aside className="right">
@@ -483,6 +497,7 @@ export function App() {
         </footer>
       )}
       <UIHost />
+      <SmallScreen />
     </div>
   )
 }

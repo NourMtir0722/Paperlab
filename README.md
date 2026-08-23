@@ -2,7 +2,7 @@
 
 **Physical, realistic paper as a React component.** A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints — real 3D paper, not a CSS fake. Content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for agents](AGENTS.md)
+**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/) (desktop)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for agents](AGENTS.md)
 
 | | |
 |---|---|
@@ -11,7 +11,7 @@
 
 Every frame above is real geometry — no video, no sprite sheet. Type a sentence into the playground and it builds you a room out of it:
 
-![Banners hung along a walk, a figure walking down the aisle](docs/media/stage-nave.gif)
+![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](docs/media/stage-nave.gif)
 
 ## Quick start
 
@@ -70,9 +70,10 @@ import { PaperStage } from 'paperlab/stage'
 - **Stocks & surfaces** — seven paper stocks (thermal gets banding, newsprint gets grain) plus grain, torn deckle edges, crease lines, and aging as composable shader effects. Real lighting throughout.
 - **Physics** — curated idle motion (`float`, `tumble`, `breeze`…) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull.
 - **Field mode** — 10+ papers render as *one instanced draw call* with the deformers running on the GPU (parity-tested against the CPU path), arranged by pure layout functions. Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners arranged along a walk, for stage mode), plus `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl. Each pose carries a **bias** — how strongly that one sheet takes the deformation — so the top of a pile curls while the sheets pressed underneath lie flat, in the same draw call. The camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
-- **Stage mode** — paper as *architecture*: banners hung along a walk, a figure walking down it, light coming through the paper from the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk. Every part of the scene — the arrangement, the figure, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own.
+- **Stage mode** — paper as *architecture*: banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence — split a word to a banner and set down its drop — and binding `progress` to scroll makes the page scroll the walk. The room is real: a ceiling, poured floor slabs, columns with base plates, and a doorway the source shines through, all of it there because **architecture carries scale better than a figure does** (there is a walking figure, and it is off by default — the stage is navigable, so the person in the hall is the viewer). Every part of the scene — the arrangement, the camera, the light source — reads the same walk, so they cannot drift apart. Quality adapts to the machine on its own.
 - **A stage you can walk** — stage mode is navigable, not a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll; binding `progress` to page scroll still wins over all of it.
 - **Lighting you can actually light with** — a preset is the starting point, not the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in (degrees around the room, degrees above the horizon), and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. Overrides serialize as overrides, so a shared scene carries the two sliders you moved rather than a frozen copy of a rig you never touched.
+- **Hardware that holds the paper up** — thread to the ceiling or a rod across the top edge, gripped by a clip or a peg. Every reference installation shows what suspends it, and a hung thing that shows what holds it stops reading as a rectangle that happens to float.
 - **Presets** — everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
 - **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into Claude Code (or any coding agent): install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md).
 - **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose, a hidden DOM mirror carries the content for screen readers, and a flat DOM fallback renders when WebGL isn't available.
@@ -83,7 +84,9 @@ import { PaperStage } from 'paperlab/stage'
 pnpm install && pnpm dev   # → localhost:5173
 ```
 
-A Figma-shaped editor: presets on the left, sculpt on canvas (drag the blue handles), inspector on the right, transport at the bottom (space = play/pause). Field mode composes galleries; **Export code** ends the session in your codebase.
+A Figma-shaped editor: presets on the left, sculpt on canvas (drag the blue handle on the paper), inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. Each behavior nominates the two or three params that matter, so the panel opens on those and folds the rest away. Field mode composes galleries; **Export code** ends the session in your codebase.
+
+It is a three-rail canvas tool and it wants a real screen — under about 900px it says so and points you at the playground, which is built for a phone.
 
 ## Papers are made to be passed around
 
@@ -117,14 +120,19 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 | | |
 |---|---|
 | [`packages/paperlab`](packages/paperlab/) | the npm library |
-| [`apps/editor`](apps/editor/) | the editor |
+| [`apps/editor`](apps/editor/) | the editor — every knob, and the export |
 | [`apps/playground`](apps/playground/) | the playground — one input, one scene, shareable by link |
+| [`apps/docs`](apps/docs/) | the documentation site, with every behavior running live |
+| [`tools/`](tools/) | the browser harnesses — parity, perf, screenshots, the README's motion |
 | [`docs/llms.txt`](docs/llms.txt) | the agent-readable API reference |
+| [`docs/design.md`](docs/design.md) | the design rules the three apps share, enforced by a test |
 | [`docs/roadmap.md`](docs/roadmap.md) | what this is, what's decided, and what's next |
 
 ```sh
 pnpm test           # unit suite — deformer math, schema, cloth, layouts, exports
 pnpm test:parity    # GPU golden-vector gate: every deformer's GLSL twin vs its JS twin
+pnpm test:drive     # the stage really walks when you drag it
+pnpm test:share     # sculpt → link → a browser that has never seen the paper
 pnpm build
 ```
 

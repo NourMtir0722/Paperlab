@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { clearSession } from './session'
+import { clearSession } from '../state/session'
 
 /**
  * The editor's error boundary.

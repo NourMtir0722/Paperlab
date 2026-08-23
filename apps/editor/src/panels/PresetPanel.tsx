@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
 import { isBuiltinPreset, listPresets, parsePreset } from 'paperlab'
-import { useEditor } from './store'
-import { downloadPreset } from './userPresets'
-import { confirmDialog, promptDialog, toast } from './ui'
-import { Select } from './Select'
+import { useEditor } from '../state/store'
+import { downloadPreset } from '../state/userPresets'
+import { confirmDialog, promptDialog, toast } from '../controls/ui'
+import { Select } from '../controls/Select'
 
 /**
  * The preset library: built-ins (duplicate to fork) and user presets

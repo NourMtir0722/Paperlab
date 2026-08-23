@@ -14,9 +14,18 @@ import {
   type StockName,
   type SurfaceConfig,
 } from 'paperlab'
-import { button, folder, num, partitionSignature, select, text, toggle, type Control } from './controlModel'
-import { Panel } from './controls'
-import { useEditor } from './store'
+import {
+  button,
+  folder,
+  num,
+  partitionSignature,
+  select,
+  text,
+  toggle,
+  type Control,
+} from '../controls/controlModel'
+import { Panel } from '../controls/controls'
+import { useEditor } from '../state/store'
 
 /**
  * Inspector of the selection: a tree of `Control` descriptors rendered by the
