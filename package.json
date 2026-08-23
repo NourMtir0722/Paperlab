@@ -29,5 +29,12 @@
     "knip": "^6.32.2",
     "playwright": "1.62.1",
     "turbo": "^2.10.11"
+  },
+  "pnpm": {
+    "overrides": {
+      "js-yaml@3": "^3.15.1",
+      "js-yaml@4": "^4.3.1",
+      "esbuild": ">=0.28.1"
+    }
   }
 }
