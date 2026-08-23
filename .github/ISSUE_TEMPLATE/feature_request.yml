@@ -1,0 +1,60 @@
+name: Feature request
+description: A behavior, layout, deformer, stock, surface effect or stage worth adding.
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **You may not need to ask.** A paper is a `.paper` JSON object, so you
+        can sculpt one and share the link without anyone's permission — and
+        behaviors, layouts and deformers are all registerable from your own
+        project via `registerBehavior`, `registerLayout`, `registerDeformer`.
+
+        Open this when you think the library itself should ship it by name.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What should exist
+      description: >
+        Name it the way a person would say it. This library names things after
+        where paper actually sits — `rack`, `pile`, `colonnade` — not after the
+        maths that produces them.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What you would build with it
+      description: >
+        A concrete scene beats a general capability. It is also how the default
+        values get chosen.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which rung of the ladder
+      description: See CONTRIBUTING.md — the tiers go from JSON-only upward.
+      options:
+        - Preset (JSON only, no code)
+        - Behavior (~50 lines over existing deformers)
+        - Layout (a ~30-line pure function)
+        - Deformer (dual JS + GLSL, parity-gated)
+        - Surface effect (GLSL chunk)
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: serializes
+    attributes:
+      label: The one hard rule
+      options:
+        - label: >
+            This can be expressed as data in a `.paper` file. (The zod schema is
+            the spec — if a feature cannot serialize into a preset, it does not
+            ship.)
+          required: true
