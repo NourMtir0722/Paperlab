@@ -1952,3 +1952,22 @@ button.export:hover {
   color: var(--ink-meta);
   font: inherit;
 }
+
+/* ── Less motion, on request ──────────────────────────────────────────────
+ * The library exports `usePrefersReducedMotion`, the boot shell honours it,
+ * and the docs teach visitors to honour it — the editor's own chrome was the
+ * one place that did not. Targeted rather than a blanket `!important` reset,
+ * matching the boot shell: what goes is the three things that TRAVEL. Colour
+ * and opacity transitions stay, because rule 6 already keeps them to a
+ * luminance step and a step is not motion.
+ *
+ * The camera's own travel is handled in `ViewCluster.tsx`, where a snap view
+ * cuts instead of flying.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .viewport-guide,
+  .coach-mark.placed {
+    animation: none;
+  }
+}

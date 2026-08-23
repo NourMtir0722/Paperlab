@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { usePrefersReducedMotion } from 'paperlab'
 import { isTypingTarget } from './keys'
 
 /**
@@ -69,6 +70,11 @@ export function CameraRig({ home, radius }: { home: [number, number, number]; ra
   // `makeDefault` on <OrbitControls> is what puts it here.
   const controls = useThree((s) => s.controls) as { update?: () => void } | null
   const goal = useRef<THREE.Vector3 | null>(null)
+  // The camera travel is the one thing in this app that moves on its own, so
+  // it is the one thing that has to ask. The library exports this hook and
+  // the docs teach visitors to honour it; the editor does not get an
+  // exemption for its own chrome.
+  const still = usePrefersReducedMotion()
 
   useEffect(
     () =>
@@ -82,14 +88,20 @@ export function CameraRig({ home, radius }: { home: [number, number, number]; ra
   useFrame((_, dt) => {
     const target = goal.current
     if (!target) return
-    // Frame-rate independent ease-out: the same fraction of the remaining
-    // distance per second however fast the machine is drawing.
-    camera.position.lerp(target, 1 - 0.0015 ** Math.min(dt, 0.1))
-    camera.lookAt(0, 0, 0)
-    if (camera.position.distanceTo(target) < 0.004) {
+    if (still) {
+      // Cut, don't travel. The view still changes — it just arrives.
       camera.position.copy(target)
       goal.current = null
+    } else {
+      // Frame-rate independent ease-out: the same fraction of the remaining
+      // distance per second however fast the machine is drawing.
+      camera.position.lerp(target, 1 - 0.0015 ** Math.min(dt, 0.1))
+      if (camera.position.distanceTo(target) < 0.004) {
+        camera.position.copy(target)
+        goal.current = null
+      }
     }
+    camera.lookAt(0, 0, 0)
     controls?.update?.()
   })
 
