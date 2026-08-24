@@ -16,28 +16,42 @@ import {
   diffStage,
   type StageExportInput,
 } from 'paperlab/stage'
+import type { CaptureHandle } from '../chrome/CaptureRig'
+import { EXPORT_FRAMES, downloadImage, imageFilename } from '../chrome/imageExport'
+import { toast } from '../controls/ui'
 /**
- * The tool's job ends in someone's codebase. Export serializes the ACTIVE
- * editor mode: a <Paper> in Paper mode, a <PaperField> (with every
+ * Two ways out of the editor, and they are for different people.
+ *
+ * The tool's job ends in someone's codebase, so the code half serializes the
+ * ACTIVE editor mode: a <Paper> in Paper mode, a <PaperField> (with every
  * referenced preset inlined) in Field mode, a <PaperStage> in Stage mode —
  * where the primary offer is the SCROLL-bound hero, because binding the walk
  * to the page is the thing people want and the fiddly thing to write.
+ *
+ * The picture half is what gets the codebase half looked at. A sheet that
+ * peels or unrolls is the most persuasive argument this library has, and the
+ * only way to get one out of the editor used to be a screenshot of the whole
+ * application. It sits first because it is the one you reach for on the way
+ * to showing someone, and the code is what you reach for once they ask.
  */
 export function ExportMenu({
   mode,
   config,
   paperRef,
+  captureRef,
   fieldInput,
   stageInput,
 }: {
   mode: 'paper' | 'field' | 'stage'
   config: PaperConfig
   paperRef: React.RefObject<PaperHandle | null>
+  captureRef: React.RefObject<CaptureHandle | null>
   fieldInput: () => FieldExportInput
   stageInput: () => StageExportInput
 }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [rendering, setRendering] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -62,6 +76,30 @@ export function ExportMenu({
 
   const badge = (label: string) => (copied === label ? <span className="copied-badge">Copied ✓</span> : null)
 
+  const saveImage = async (frame: (typeof EXPORT_FRAMES)[number]) => {
+    const capture = captureRef.current
+    if (!capture) return
+    setRendering(frame.id)
+    try {
+      const dataUrl = await capture.capture(frame.width, frame.height)
+      // Named for what is IN the picture. Field and Stage are compositions of
+      // their own, and both were coming out named after whichever paper the
+      // Paper tab happened to be holding.
+      downloadImage(dataUrl, imageFilename(mode === 'paper' ? config.meta.name : mode, frame.id))
+      // The menu stays open — picking a second frame is the common next move,
+      // and the download itself is the confirmation.
+    } catch (error) {
+      // A frame past the GPU's texture limit, or a canvas the browser
+      // refuses to read back. Better named than silently doing nothing.
+      toast(
+        `Could not render that frame: ${error instanceof Error ? error.message.slice(0, 120) : error}`,
+        'error',
+      )
+    } finally {
+      setRendering(null)
+    }
+  }
+
   const fieldJson = () => {
     const input = fieldInput()
     return JSON.stringify(
@@ -80,10 +118,25 @@ export function ExportMenu({
   return (
     <div className="export-menu" ref={rootRef}>
       <button type="button" className="export" onClick={() => setOpen((v) => !v)}>
-        Export code
+        Export
       </button>
       {open && (
         <div className="export-dropdown">
+          <p className="export-group">Picture</p>
+          <div className="export-frames">
+            {EXPORT_FRAMES.map((frame) => (
+              <button
+                key={frame.id}
+                type="button"
+                disabled={rendering !== null}
+                onClick={() => void saveImage(frame)}
+              >
+                <strong>{frame.label}</strong>
+                <span>{rendering === frame.id ? 'rendering…' : frame.hint}</span>
+              </button>
+            ))}
+          </div>
+          <p className="export-group">Code</p>
           {mode === 'stage' ? (
             <>
               <button

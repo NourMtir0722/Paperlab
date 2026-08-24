@@ -623,6 +623,12 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         behavior?.handles?.map((h, i) => (
           <mesh
             key={h.id}
+            // Marked as chrome so a renderer that is producing a PICTURE can
+            // leave it out. The handle is an editing affordance, and it is
+            // drawn with `depthTest: false` precisely so it sits on top of
+            // the sheet — which makes it the most prominent thing in any
+            // frame captured for export. The editor's capture rig reads this.
+            userData={{ paperlabChrome: true }}
             ref={(m) => {
               handleRefs.current[i] = m
             }}
