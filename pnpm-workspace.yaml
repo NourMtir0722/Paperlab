@@ -1,3 +1,31 @@
 packages:
   - packages/*
   - apps/*
+
+# Dependencies allowed to run install scripts.
+#
+# pnpm 11 blocks them by default, the same shift npm 12 made, and for the same
+# reason: an install script is arbitrary code from a transitive dependency.
+# Only esbuild needs one — it links the native binary for this platform — and
+# it is a build-time tool that never reaches the published package.
+#
+# Adding to this list is a security decision, not a formality. Anything new
+# here should be a package you would be comfortable letting run code on a
+# contributor's machine.
+allowBuilds:
+  esbuild: true
+
+# Security pins for transitive dependencies.
+#
+# These live here rather than under a `pnpm` key in package.json because pnpm
+# 11 stopped reading that key. It warns, the warning is easy to scroll past,
+# and the failure mode is that a CVE pin quietly stops applying.
+#
+# Bounded on purpose: `>=3.15.1` also matches 5.x, which is a different API for
+# the v3 consumer, so each requester is held inside its own major.
+overrides:
+  # CVE-2026-59870 — quadratic CPU consumption in `!!omap` resolution.
+  js-yaml@3: ^3.15.1
+  js-yaml@4: ^4.3.1
+  # Arbitrary file read from the dev server on Windows.
+  esbuild: '>=0.28.1'

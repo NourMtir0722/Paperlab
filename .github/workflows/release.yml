@@ -53,15 +53,16 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      # Trusted Publishing (OIDC) needs npm >= 11.5.1; Node 22 ships npm 10.
-      # Pinned to 11 rather than `latest`, and the pin is load-bearing:
-      # changesets publishes through pnpm, and pnpm hands its own
-      # `--no-git-checks` down to npm. npm 11 warns about the unknown flag and
-      # carries on; npm 12 rejects it outright (EUNKNOWNCONFIG) and the publish
-      # fails after the version bump has already landed on main. Unpin when
-      # pnpm or changesets stops passing that flag to npm.
+      # Trusted Publishing (OIDC) needs npm >= 11.5.1 and Node 22 ships npm 10,
+      # so npm still has to be upgraded — but no longer PINNED.
+      #
+      # It was pinned to 11 because pnpm handed its own `--no-git-checks` down
+      # to npm, which npm 12 rejects outright (EUNKNOWNCONFIG), failing the
+      # publish after the version bump had already landed on main. pnpm fixed
+      # that in #10077 by stripping its own flags before calling npm, and this
+      # repo is on pnpm 11, so the pin has done its job and can go.
       - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@11
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -76,14 +77,13 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && !inputs.publish
         run: |
           echo "node    $(node --version)"
-          echo "npm     $(npm --version)   # must be 11.x — 12 rejects --no-git-checks"
+          echo "npm     $(npm --version)   # >= 11.5.1 for OIDC trusted publishing"
           echo "pnpm    $(pnpm --version)  # must match packageManager in package.json"
           echo
-          npm --version | grep -q '^11\.' || {
-            echo "::error::npm is not 11.x. The pin above is load-bearing: pnpm hands"
-            echo "::error::--no-git-checks down to npm, and npm 12 rejects it outright."
-            exit 1
-          }
+          node -e 'const [a,b]=[process.argv[1].split(".").map(Number),[11,5,1]];
+            const ok=a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&a[2]>=b[2])));
+            if(!ok){console.log("::error::npm "+process.argv[1]+" is below 11.5.1, which is the floor for OIDC trusted publishing.");process.exit(1)}' "$(npm --version)"
+
           want=$(node -p "(require('./package.json').packageManager||'@').split('@')[1]||''")
           got=$(pnpm --version)
           if [ -n "$want" ] && [ "${want%%.*}" != "${got%%.*}" ]; then
