@@ -12,6 +12,7 @@ import {
 } from '../controls/controlModel'
 import { Panel } from '../controls/controls'
 import { lightControls } from './lightControls'
+import { backdropControls } from './backdropControls'
 import { useEditor, type EditorZone } from '../state/store'
 
 /**
@@ -85,6 +86,13 @@ export function FieldInspector() {
       // preset name for it to resolve against.
       lightControls(sceneSchema.parse(field.scene) as unknown as Record<string, unknown>, (patch) =>
         patchField({ scene: { ...field.scene, ...(patch as object) } }),
+      ),
+      { collapsed: true },
+    ),
+    folder(
+      'Scene',
+      backdropControls(sceneSchema.parse(field.scene).backdrop, (next) =>
+        patchField({ scene: { ...field.scene, backdrop: next } }),
       ),
       { collapsed: true },
     ),

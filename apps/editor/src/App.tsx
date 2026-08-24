@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stats } from '@react-three/drei'
 import {
   PaperFieldMesh,
+  PaperBackdrop,
   PaperLighting,
   PaperMesh,
   diffConfig,
@@ -408,6 +409,12 @@ export function App() {
               here shifts the perceived colour of the paper sitting in front
               of it — see `docs/design.md`, amendment 2. */}
           <color attach="background" args={[mode === 'stage' ? '#0b0b0b' : '#171717']} />
+          {/* The editor owns this canvas, so it renders the backdrop itself —
+              the same way it renders the lighting rig. Stage has a whole
+              room of its own and would be arguing with one. */}
+          {mode !== 'stage' && (
+            <PaperBackdrop backdrop={mode === 'paper' ? config.scene.backdrop : fieldScene.backdrop} />
+          )}
           {/* Stage brings its own rig — a second one here would double the key. */}
           {mode !== 'stage' && (
             <PaperLighting

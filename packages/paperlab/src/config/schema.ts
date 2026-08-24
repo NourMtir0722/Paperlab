@@ -497,8 +497,45 @@ export const lightSchema = z.object({
 export type LightOverrides = z.infer<typeof lightSchema>
 export type LightOverridesInput = z.input<typeof lightSchema>
 
+/**
+ * What is behind the sheet.
+ *
+ * Optional, and that is deliberate: an unset backdrop means the canvas is
+ * left exactly as it was found. `<Paper>` has always rendered onto whatever
+ * is behind it, and a default that painted the frame would change the look
+ * of every sheet already on a page.
+ *
+ * It is part of the CONFIG rather than a preview trick in the editor,
+ * because the whole export story is that the code you copy makes the picture
+ * you were looking at. A backdrop that existed only in the editor would make
+ * the most-photographed part of a composition the one thing that does not
+ * travel.
+ */
+export const backdropSchema = z.object({
+  /** Behind everything, and behind the picture where it does not reach. */
+  color: z.string().default('#171717').describe('color'),
+  /** A URL, or an uploaded picture. Empty is the colour on its own. */
+  image: z.string().default(''),
+  fit: z.enum(['cover', 'contain']).default('cover'),
+  /**
+   * Toward the colour, so the paper stays the subject.
+   *
+   * A backdrop at full strength competes with the sheet in front of it —
+   * which is what a real photographer solves by putting the background out
+   * of the light, and what this solves by mixing it back toward the ground
+   * it sits on.
+   */
+  fade: z.number().min(0).max(1).default(0.25),
+  /** Out of focus, for the same reason. */
+  blur: z.number().min(0).max(1).default(0.2),
+})
+
+export type BackdropConfig = z.infer<typeof backdropSchema>
+
 export const sceneSchema = z.object({
   lighting: z.enum(lightingNames).default('studio'),
+  /** What is behind the sheet. Unset leaves the canvas alone. */
+  backdrop: backdropSchema.optional(),
   /**
    * Overrides on the named preset — the same authorable half stage mode has
    * always had, and which a lone sheet had no way to reach.

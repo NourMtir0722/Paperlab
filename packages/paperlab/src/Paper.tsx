@@ -3,6 +3,7 @@ import { forwardRef, useMemo } from 'react'
 import { PaperMesh, useResolvedConfig, type PaperHandle, type PaperMeshProps } from './PaperMesh'
 import { PaperFallback, PaperMirror, supportsWebGL } from './a11y'
 import { PaperLighting } from './scene/PaperLighting'
+import { PaperBackdrop } from './scene/backdrop'
 
 export interface PaperProps extends PaperMeshProps {
   /** Extra children rendered inside the canvas (lights are provided). */
@@ -33,8 +34,13 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       {webgl ? (
         <Canvas shadows camera={{ position: [0, 0.35, 2.4], fov: 40 }} dpr={[1, 2]}>
+          <PaperBackdrop backdrop={config.scene.backdrop} />
           <PaperLighting
             preset={config.scene.lighting}
+            // The overrides, which this component was resolving without: a
+            // preset whose scene said "studio, but dimmer" rendered as plain
+            // studio here while the editor showed the dimmer one.
+            light={config.scene.light}
             floor={-1.05}
             scale={8}
             reducedMotion={meshProps.reducedMotion}

@@ -35,6 +35,7 @@ import { useEditor } from '../state/store'
 import { formatItems, parseItems } from './receiptItems'
 import { pickImageAsDataUrl } from '../chrome/pickImage'
 import { lightControls } from './lightControls'
+import { backdropControls } from './backdropControls'
 
 /**
  * Inspector of the selection: a tree of `Control` descriptors rendered by the
@@ -112,6 +113,13 @@ export function Inspector() {
       'Light',
       lightControls(config.scene as unknown as Record<string, unknown>, (patch) =>
         patchConfig({ scene: patch as never }),
+      ),
+      { collapsed: true },
+    ),
+    folder(
+      'Scene',
+      backdropControls(config.scene.backdrop, (next, opts) =>
+        patchConfig({ scene: { backdrop: next } as never }, opts),
       ),
       { collapsed: true },
     ),

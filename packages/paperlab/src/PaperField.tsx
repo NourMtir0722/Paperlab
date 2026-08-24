@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import { sceneSchema, type PaperConfigInput, type SceneConfigInput } from './config/schema'
 import { PaperLighting } from './scene/PaperLighting'
+import { PaperBackdrop } from './scene/backdrop'
 import { usePrefersReducedMotion } from './a11y'
 import { DropZoneContext, DropZoneRegistry, type DropZoneConfig, type PlacedPaper } from './field/dropZones'
 import {
@@ -325,6 +326,7 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
       <DropZoneContext.Provider value={registry}>
         <Canvas shadows camera={{ position: [0, 0.6, 5.2], fov: 45 }} dpr={[1, 2]}>
           <FitCamera {...meshProps} />
+          <PaperBackdrop backdrop={rig.backdrop} />
           {/* The floor and footprint a gallery of sheets needs — a lone sheet
               sits closer to the camera and on a tighter shadow. */}
           <PaperLighting preset={rig.lighting} light={rig.light} floor={-2.4} scale={14} />

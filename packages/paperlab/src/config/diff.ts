@@ -3,6 +3,7 @@ import {
   clothConfigSchema,
   contentSchema,
   paperConfigSchema,
+  sceneSchema,
   sheetSchema,
   type PaperConfig,
   type PaperConfigInput,
@@ -77,7 +78,14 @@ export function diffConfig(config: PaperConfig): PaperConfigInput {
     out.physics = config.physics
   }
 
-  if (config.scene.lighting !== 'studio') out.scene = { lighting: config.scene.lighting }
+  // The WHOLE scene, diffed like everything else. This used to read
+  // `if (lighting !== 'studio') out.scene = { lighting }` — which was true
+  // while `lighting` was the only thing in a scene, and quietly threw away
+  // every field added beside it. A hand-tuned light rig and a backdrop both
+  // vanished on the way into a `.paper` file, a share link and a snippet:
+  // the editor showed them and nothing that left the editor carried them.
+  const scene = diffAgainst(config.scene as never, sceneSchema.parse({}) as never)
+  if (Object.keys(scene).length > 0) out.scene = scene
   if (config.onTwos) out.onTwos = true
   // States are already diffs on the base — emit them whole.
   if (config.states) out.states = config.states
@@ -94,13 +102,56 @@ function jsxValue(value: unknown): string {
 }
 
 /**
+ * The same config with uploaded pictures swapped for paths.
+ *
+ * An uploaded image lives in a config as a data URL — a hundred kilobytes
+ * and up of base64 — and there are now two places one can be: the sheet's
+ * own content, and the backdrop behind it. Pasting that into somebody's
+ * source file is not an export, and the reader cannot edit it, diff it, or
+ * even scroll past it.
+ *
+ * So a code export gets a path in the same position instead, and says that
+ * is what it did. A referenced URL is already something the receiver can
+ * fetch and travels untouched. Emitting nothing was the other option and it
+ * is worse: a sheet that silently loses its picture looks like a bug in the
+ * library rather than a limit of the clipboard.
+ *
+ * The `.paper` file and the share link are deliberately NOT run through
+ * this — a file has room for the bytes, and losing them there would lose
+ * the artwork rather than reformat it.
+ */
+export function withoutUploads<T>(value: T): { value: T; replaced: number } {
+  let replaced = 0
+  const walk = (node: unknown): unknown => {
+    if (typeof node === 'string') {
+      if (!node.startsWith('data:')) return node
+      replaced++
+      const extension = node.startsWith('data:image/png') ? 'png' : 'jpg'
+      return `/paperlab-image-${replaced}.${extension}`
+    }
+    if (Array.isArray(node)) return node.map(walk)
+    if (node && typeof node === 'object') {
+      return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, walk(v)]))
+    }
+    return node
+  }
+  return { value: walk(value) as T, replaced }
+}
+
+/** The one-line warning a code export carries when it had to substitute. */
+export const UPLOAD_NOTE =
+  '// Uploaded pictures cannot travel in a snippet — the paths below are\n// stand-ins, in order. Point them at your own files.'
+
+/**
  * A plain `<Paper />` snippet with only the non-default props — the
  * secondary export for people who read code.
  */
 export function buildJsxSnippet(config: PaperConfig): string {
-  const diff = diffConfig(config) as Record<string, unknown>
-  delete diff.meta
+  const diffed = diffConfig(config) as Record<string, unknown>
+  delete diffed.meta
+  const { value: diff, replaced } = withoutUploads(diffed)
   const props = Object.entries(diff).map(([key, value]) => `  ${key}=${jsxValue(value)}`)
   if (props.length === 0) return '<Paper />'
-  return `<Paper\n${props.join('\n')}\n/>`
+  const snippet = `<Paper\n${props.join('\n')}\n/>`
+  return replaced > 0 ? `${UPLOAD_NOTE}\n${snippet}` : snippet
 }

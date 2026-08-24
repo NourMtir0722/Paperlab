@@ -1,6 +1,6 @@
 import type { PaperConfig } from './schema'
 import { getStock } from '../core/stock'
-import { diffConfig } from './diff'
+import { UPLOAD_NOTE, diffConfig, withoutUploads } from './diff'
 
 /**
  * The primary export consumer is a coding agent; the human is the courier.
@@ -88,7 +88,12 @@ function componentName(config: PaperConfig): string {
 /** The self-contained integration brief — one paste into a coding agent. */
 export function buildAgentPayload(config: PaperConfig): string {
   const name = componentName(config)
-  const preset = JSON.stringify(diffConfig(config), null, 2)
+  // Uploaded pictures become paths: this payload is pasted into a coding
+  // agent's context window, and a hundred kilobytes of base64 in there is
+  // both useless and expensive.
+  const { value: stripped, replaced } = withoutUploads(diffConfig(config))
+  const preset = JSON.stringify(stripped, null, 2)
+  const uploadNote = replaced > 0 ? `${UPLOAD_NOTE}\n` : ''
 
   return `Integrate a Paperlab paper component into this project. (paperlab agent-payload v${AGENT_PAYLOAD_VERSION})
 
@@ -102,7 +107,7 @@ export function buildAgentPayload(config: PaperConfig): string {
 \`\`\`tsx
 import { Paper, type PaperConfigInput } from 'paperlab'
 
-const preset = ${preset.replace(/\n/g, '\n')} satisfies PaperConfigInput
+${uploadNote}const preset = ${preset.replace(/\n/g, '\n')} satisfies PaperConfigInput
 
 export function ${name}() {
   return <Paper preset={preset} />
