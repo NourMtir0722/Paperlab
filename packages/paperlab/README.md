@@ -181,7 +181,7 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 Three surfaces ship alongside the library, all built on its public API only.
 
-**[The playground](https://paperlab.nawwara.studio/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
+**[The playground](https://paperlab.nawwara.studio/playground/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
 
 **[The editor](https://paperlab.nawwara.studio/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z.
 

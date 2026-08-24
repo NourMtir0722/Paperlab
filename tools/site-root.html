@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paperlab — physical paper as a React component</title>
+    <meta name="description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
+
+    <!--
+      The site root is a signpost, not a page. The editor is a three-rail
+      desktop tool with no mobile layout, and the playground is built for a
+      phone — so sending everyone to the same one strands half of them. This
+      picks by device instead, and the crawler that never runs the script
+      still reads the card below.
+
+      Assembled into the site by .github/workflows/pages.yml. The apps
+      themselves live at /editor/, /playground/ and /docs/.
+    -->
+    <meta property="og:url" content="https://paperlab.nawwara.studio/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paperlab" />
+    <meta property="og:title" content="Paperlab — physical paper as a React component" />
+    <meta property="og:description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
+    <meta property="og:image" content="https://paperlab.nawwara.studio/media/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Paperlab — physical paper as a React component" />
+    <meta name="twitter:description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
+    <meta name="twitter:image" content="https://paperlab.nawwara.studio/media/og.png" />
+
+    <meta name="theme-color" content="#0b0b0b" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #0b0b0b;
+        color: #f4f2ee;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      /* Only ever seen without JS: with it, the redirect fires first. */
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 2rem;
+        text-align: center;
+      }
+      h1 {
+        margin: 0;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+      }
+      p {
+        margin: 0;
+        max-width: 32rem;
+        line-height: 1.5;
+        color: #a8a29b;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: center;
+      }
+      a {
+        padding: 0.6rem 1.1rem;
+        border: 1px solid #2a2a28;
+        border-radius: 999px;
+        color: #f4f2ee;
+        font-size: 0.9rem;
+        text-decoration: none;
+      }
+      a:hover {
+        border-color: #56544f;
+      }
+    </style>
+    <script>
+      // Runs before paint, so nobody sees the fallback flash past.
+      ;(() => {
+        var search = window.location.search
+        var tail = search + window.location.hash
+        var target = null
+        // The editor needs room and a real cursor. Anything else gets the
+        // playground, which was built for a phone in the first place.
+        var roomy = window.matchMedia('(min-width: 1024px)').matches
+        var precise = window.matchMedia('(pointer: fine)').matches
+
+        // A shared link names its own destination: ?s= is a playground scene,
+        // ?p= is an editor sculpt. Honour that over the device guess —
+        // someone sent this exact thing on purpose.
+        if (/[?&]s=/.test(search)) {
+          target = '/playground/'
+        } else if (/[?&]p=/.test(search)) {
+          target = '/editor/'
+        } else {
+          target = roomy && precise ? '/editor/' : '/playground/'
+          tail = ''
+        }
+
+        // Replace, not assign: back should leave the site, not bounce here.
+        window.location.replace(target + tail)
+      })()
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Paperlab</h1>
+      <p>Physical, realistic paper as a React component — real 3D geometry that peels, unrolls, folds and hangs.</p>
+      <nav>
+        <a href="/editor/">The editor <span aria-hidden="true">→</span></a>
+        <a href="/playground/">The playground <span aria-hidden="true">→</span></a>
+        <a href="/docs/">The reference <span aria-hidden="true">→</span></a>
+      </nav>
+    </main>
+  </body>
+</html>
