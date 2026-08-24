@@ -18,6 +18,7 @@
     "perf:field": "node tools/field-perf.mjs",
     "media": "node tools/media.mjs",
     "test:share": "node tools/share-loop-check.mjs",
+    "test:route": "node tools/route-check.mjs",
     "test:drive": "node tools/stage-drive-check.mjs",
     "shot:light": "node tools/catalogue-shot.mjs --vary=lighting --all",
     "shot:catalogue": "node tools/catalogue-shot.mjs",

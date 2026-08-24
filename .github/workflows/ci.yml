@@ -73,3 +73,10 @@ jobs:
       # was the one harness in the repo nothing ran.
       - name: Share loop gate
         run: pnpm test:share
+
+      # The site root decides, in a script inside an HTML file, which app
+      # every visitor sees — the editor has no mobile layout, so guessing
+      # wrong strands a phone on a three-rail desktop tool. Nothing else in
+      # the pipeline type-checks or renders that file, so check it directly.
+      - name: Root routing gate
+        run: pnpm test:route
