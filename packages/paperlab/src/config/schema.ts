@@ -214,6 +214,34 @@ export type ContentConfig = z.infer<typeof contentSchema>
 /** What a caller may WRITE — defaults still unfilled. This is the prop type. */
 export type ContentConfigInput = z.input<typeof contentSchema>
 
+/**
+ * Every kind of thing that can print on a sheet, in declaration order.
+ *
+ * Read off the union rather than written out beside it. The sibling name
+ * lists here (`stockNames`, `physicsNames`) are the SOURCE their schema is
+ * built from, so a hand-written array is the single source of truth; this
+ * one is not — the union is — and a second copy would be free to drift the
+ * day a sixth content type lands.
+ */
+export const contentNames = contentSchema.options.map(
+  (option) => option.shape.type.value,
+) as readonly ContentConfig['type'][]
+
+/**
+ * One variant's schema, by its `type`.
+ *
+ * Exists so that a caller GENERATING UI from the schema — the editor's
+ * inspector already does this for behaviors, layouts and the stage — can
+ * reach a content variant without reaching into the union's internals.
+ * Which member carries which discriminator is the union's own fact to
+ * state, not a walk's to rediscover.
+ */
+export function contentSchemaFor(type: ContentConfig['type']): (typeof contentSchema)['options'][number] {
+  const option = contentSchema.options.find((candidate) => candidate.shape.type.value === type)
+  if (!option) throw new Error(`Unknown content type: ${type}`)
+  return option
+}
+
 // ── Surface ──────────────────────────────────────────────────────────────────
 
 export const paperEdges = ['top', 'right', 'bottom', 'left'] as const

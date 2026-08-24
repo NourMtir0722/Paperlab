@@ -53,20 +53,46 @@ export function encodePaperShare(name: string, config: PaperConfig): string {
 }
 
 /**
- * Why a paper might not fit in a link. An uploaded image becomes a data URL
- * inside the config, and a downscaled JPEG is still ~100 KB — far past what
- * a URL survives. That is worth saying plainly rather than silently
- * producing a link that breaks on paste.
+ * Does this config carry an uploaded FILE rather than a reference to one?
+ *
+ * Walked generically rather than by reading `content.src`, because `src` is
+ * not the only place a data URL can reach: `content.back` is a second whole
+ * content union with its own image variant, and any field that later learns
+ * to hold a bitmap should not quietly start producing links that break on
+ * paste. A false negative here is a wrong explanation shown to someone whose
+ * share just failed, which is worse than no explanation.
  */
-export type ShareRefusal = 'too-long'
+function carriesUpload(value: unknown): boolean {
+  if (typeof value === 'string') return value.startsWith('data:')
+  if (Array.isArray(value)) return value.some(carriesUpload)
+  if (value && typeof value === 'object') return Object.values(value).some(carriesUpload)
+  return false
+}
+
+/**
+ * Why a paper might not fit in a link.
+ *
+ * Two reasons, and they need different advice, which is the whole point of
+ * telling them apart. An uploaded image becomes a data URL inside the config
+ * and a downscaled JPEG is still ~100KB — no amount of editing will get that
+ * under the cap, so the answer is to send the file. A paper that is merely
+ * long can be shortened, and saying "this carries an uploaded image" to
+ * someone who never uploaded one sends them looking for a picture that is
+ * not there.
+ */
+export type ShareRefusal = 'uploaded-image' | 'too-long'
 
 export function tryEncodePaperShare(
   name: string,
   config: PaperConfig,
-): { ok: true; encoded: string } | { ok: false; reason: ShareRefusal } {
+): { ok: true; encoded: string } | { ok: false; reason: ShareRefusal; length: number } {
   const encoded = encodePaperShare(name, config)
-  if (encoded.length > MAX_SHARE_LENGTH) return { ok: false, reason: 'too-long' }
-  return { ok: true, encoded }
+  if (encoded.length <= MAX_SHARE_LENGTH) return { ok: true, encoded }
+  return {
+    ok: false,
+    reason: carriesUpload(diffConfig(config)) ? 'uploaded-image' : 'too-long',
+    length: encoded.length,
+  }
 }
 
 /**
@@ -93,14 +119,23 @@ export function decodePaperShare(encoded: string): PaperShare | null {
   return { name: n.trim(), config: c as PaperConfigInput }
 }
 
-export function paperShareUrl(base: string, name: string, config: PaperConfig): string | null {
+/**
+ * The link, or why there isn't one. The refusal travels with the URL rather
+ * than collapsing to null, because the caller has to say something specific
+ * to whoever just pressed Share — and a null cannot tell it what.
+ */
+export function paperShareUrl(
+  base: string,
+  name: string,
+  config: PaperConfig,
+): { ok: true; url: string } | { ok: false; reason: ShareRefusal; length: number } {
   const attempt = tryEncodePaperShare(name, config)
-  if (!attempt.ok) return null
+  if (!attempt.ok) return attempt
   const url = new URL(base)
   // A shared paper replaces whatever was on the URL before, so re-sharing
   // an opened link does not stack parameters.
   url.searchParams.set(SHARE_PARAM, attempt.encoded)
-  return url.toString()
+  return { ok: true, url: url.toString() }
 }
 
 export function readPaperShare(search: string): PaperShare | null {

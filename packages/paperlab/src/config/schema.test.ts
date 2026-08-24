@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { paperConfigSchema } from './schema'
+import { contentNames, contentSchemaFor, paperConfigSchema } from './schema'
 import { mergeConfig, mergeWithDeletes, parsePreset, serializePreset } from './serialize'
 import {
   getPreset,
@@ -164,5 +164,50 @@ describe('uniquePresetName', () => {
   it('walks past every taken suffix', () => {
     const taken = new Set(['note copy', 'note copy 2', 'note copy 3'])
     expect(uniquePresetName('note copy', (n) => taken.has(n))).toBe('note copy 4')
+  })
+})
+
+describe('content variants', () => {
+  it('names every member of the union, and only those', () => {
+    // Read off the union rather than written beside it, so a sixth content
+    // type cannot ship with an editor that refuses to offer it.
+    expect([...contentNames].sort()).toEqual(['blank', 'card', 'image', 'receipt', 'text'])
+  })
+
+  it('hands back the variant carrying each discriminator', () => {
+    for (const name of contentNames) {
+      expect(contentSchemaFor(name).shape.type.value).toBe(name)
+    }
+  })
+
+  it('throws on a type the union does not carry', () => {
+    expect(() => contentSchemaFor('poster' as never)).toThrow(/Unknown content type/)
+  })
+
+  it('every variant parses from its discriminator alone', () => {
+    // This is the whole contract behind the inspector's type selector: the
+    // patch it writes is `{ type }` and nothing else, and the schema is
+    // expected to fill the rest.
+    for (const name of contentNames) {
+      const parsed = paperConfigSchema.parse({ content: { type: name } }).content
+      expect(parsed.type).toBe(name)
+    }
+  })
+
+  it('fills the receipt a preset would ship with', () => {
+    const content = paperConfigSchema.parse({ content: { type: 'receipt' } }).content
+    expect(content).toMatchObject({ type: 'receipt', store: 'PAPERLAB', barcode: true })
+    expect(content.type === 'receipt' && content.items.length).toBeGreaterThan(0)
+  })
+
+  it('switching type leaves no field of the old variant behind', () => {
+    // mergeWithDeletes replaces a differing `type` wholesale; if it ever
+    // merged instead, a receipt would carry the image's `src` into an export.
+    const image = paperConfigSchema.parse({ content: { type: 'image', src: 'photo.jpg' } })
+    const receipt = paperConfigSchema.parse(
+      mergeWithDeletes(image as Record<string, unknown>, { content: { type: 'receipt' } }),
+    )
+    expect(receipt.content.type).toBe('receipt')
+    expect(receipt.content).not.toHaveProperty('src')
   })
 })

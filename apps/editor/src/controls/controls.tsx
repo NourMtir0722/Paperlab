@@ -229,6 +229,19 @@ function ToggleControl({ control }: { control: Of<'toggle'> }) {
  * Text commits on blur / Enter rather than per keystroke: the canvas rebuilds
  * its content texture on every change, and doing that per character while
  * someone types a paragraph into a banner is what makes the app feel slow.
+ *
+ * That model is right and stays. What was missing was any way to SEE it, and
+ * on the textarea any way to trigger it — Enter is a newline there, so the
+ * only commit was clicking somewhere else in the panel and hoping. Content
+ * text is a textarea (`rows: 4`), which made the app's most-used field the
+ * one with no commit at all.
+ *
+ * So an uncommitted draft now says so twice: the label brightens a step, and
+ * the textarea grows an Apply button. Both appear only while dirty — a
+ * button that is always there, and does nothing most of the time, teaches
+ * nobody when it matters. The one-line input keeps Enter and takes only the
+ * brightened label: the row is `label | input | 44px` with nowhere to put a
+ * button, and Enter is already the answer there.
  */
 function TextControl({ control }: { control: Of<'text'> }) {
   const [draft, setDraft] = useState(control.value)
@@ -239,6 +252,8 @@ function TextControl({ control }: { control: Of<'text'> }) {
     if (draft !== control.value) setDraft(control.value)
   }
 
+  const dirty = draft !== control.value
+
   const commit = () => {
     if (draft !== control.value) {
       committed.current = draft
@@ -246,18 +261,50 @@ function TextControl({ control }: { control: Of<'text'> }) {
     }
   }
 
+  const multiline = Boolean(control.rows && control.rows > 1)
+
   return (
-    <div className={`control-row${control.rows && control.rows > 1 ? ' stacked' : ''}`}>
+    <div className={`control-row${multiline ? ' stacked' : ''}${dirty ? ' dirty' : ''}`}>
       <span className="control-label">{control.label}</span>
-      {control.rows && control.rows > 1 ? (
-        <textarea
-          className="control-text"
-          rows={control.rows}
-          value={draft}
-          aria-label={control.label}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-        />
+      {multiline ? (
+        <>
+          <textarea
+            className="control-text"
+            rows={control.rows}
+            value={draft}
+            title={control.hint}
+            aria-label={control.label}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              // Enter is a newline in a textarea, so the commit key is the
+              // one every other multi-line editor uses for "send".
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                commit()
+              }
+              // Abandon the draft and go back to what is on the sheet.
+              if (e.key === 'Escape') setDraft(control.value)
+            }}
+          />
+          {dirty && (
+            <button
+              type="button"
+              className="control-apply"
+              // On mousedown, not click: clicking blurs the textarea first,
+              // which commits, which un-dirties, which unmounts this button
+              // before its own click ever lands. preventDefault keeps the
+              // caret where it was — applying is not leaving.
+              onMouseDown={(e) => {
+                e.preventDefault()
+                commit()
+              }}
+              onClick={commit}
+            >
+              Apply <kbd>⌘↵</kbd>
+            </button>
+          )}
+        </>
       ) : (
         <input
           type="text"
@@ -269,6 +316,7 @@ function TextControl({ control }: { control: Of<'text'> }) {
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') setDraft(control.value)
           }}
         />
       )}

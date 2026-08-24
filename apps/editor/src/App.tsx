@@ -5,6 +5,7 @@ import {
   PaperFieldMesh,
   PaperLighting,
   PaperMesh,
+  diffConfig,
   getPreset,
   isBuiltinPreset,
   listPresets,
@@ -32,10 +33,11 @@ import { ViewportGuide } from './chrome/ViewportGuide'
 import { CoachMark, HandleAnchor, coachMarkUsed } from './chrome/CoachMark'
 import { CameraRig, ViewCluster } from './chrome/ViewCluster'
 import { SmallScreen } from './chrome/SmallScreen'
-import { captureThumbnail } from './state/userPresets'
-import { SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
+import { captureThumbnail, downloadPreset } from './state/userPresets'
+import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
-import { UIHost, promptDialog, toast } from './controls/ui'
+import { UIHost, confirmDialog, promptDialog, toast } from './controls/ui'
+import { reportSave } from './chrome/saveReport'
 import { useEditor, zoneToConfig } from './state/store'
 import { Select } from './controls/Select'
 import { useHistory, useHistoryKeys, useUndoState } from './state/history'
@@ -99,18 +101,24 @@ export function App() {
     adopted.current = true
     const share = readPaperShare(window.location.search)
     if (!share) return
-    const error = importSharedPaper(share)
+    const outcome = importSharedPaper(share)
     const url = new URL(window.location.href)
     url.searchParams.delete(SHARE_PARAM)
     window.history.replaceState(null, '', url)
-    if (error) {
-      toast(error, 'error')
+    if (!outcome.ok) {
+      toast(outcome.error, 'error')
       return
     }
     // A link outranks the remembered session: someone who was last in stage
     // mode has to be shown the paper they just opened, not told about it.
     setMode('paper')
-    toast(`Opened "${share.name}" — it's yours to edit now`, 'success')
+    // An opened link that could not be stored is still worth warning about —
+    // it is someone else's paper, and losing it means going back for the URL.
+    if (outcome.storage === 'stored') {
+      toast(`Opened "${outcome.name}" — it's yours to edit now`, 'success')
+    } else {
+      reportSave(outcome)
+    }
   }, [importSharedPaper, setMode])
 
   // Presets are components: the field renders the live edit of its preset.
@@ -241,9 +249,7 @@ export function App() {
                 // base and lose the machine. The preset is the store's base.
                 const snapshot =
                   editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-                const error = savePreset(name, snapshot, captureThumbnail())
-                if (error) toast(error, 'error')
-                else toast(`Saved "${name}"`, 'success')
+                reportSave(savePreset(name, snapshot, captureThumbnail()))
               })()
             }}
           >
@@ -261,15 +267,26 @@ export function App() {
               // a step that stops the thing from being sent at all.
               const snapshot =
                 editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-              const url = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
-              if (!url) {
-                toast(
-                  'This paper carries an uploaded image, which is too big for a link. Download the .paper file and send that instead.',
-                  'error',
-                )
+              const attempt = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
+              if (!attempt.ok) {
+                // The `.paper` file is the answer to both refusals, and it is
+                // offered here rather than described: telling someone whose
+                // share just failed to go and save a preset, find it in the
+                // left panel and download it is three steps and two panels
+                // away from the button they actually pressed.
+                void confirmDialog({
+                  title: 'Too big for a link',
+                  message:
+                    attempt.reason === 'uploaded-image'
+                      ? 'This paper carries an uploaded image. A picture cannot travel in a URL, but the .paper file carries it — download that and send it instead.'
+                      : `This paper needs about ${Math.round(attempt.length / 1000)}KB and a link holds ${Math.round(MAX_SHARE_LENGTH / 1000)}KB. Shorten the text, or download the .paper file and send that instead.`,
+                  confirmLabel: 'Download .paper',
+                }).then((ok) => {
+                  if (ok) downloadPreset(snapshot.meta.name, diffConfig(snapshot))
+                })
                 return
               }
-              void navigator.clipboard.writeText(url)
+              void navigator.clipboard.writeText(attempt.url)
               toast('Link copied — anyone who opens it gets an editable copy', 'success')
             }}
           >

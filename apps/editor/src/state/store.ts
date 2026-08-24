@@ -35,6 +35,7 @@ import {
   loadUserPresets,
   persistUserPresets,
   syncRegistry,
+  type PersistOutcome,
   type StoredPreset,
   type UserPresetMap,
 } from './userPresets'
@@ -150,13 +151,13 @@ interface EditorState {
   backToField(): void
   userPresets: UserPresetMap
   /** Save (or overwrite) a user preset; rejects built-in names. */
-  savePreset(name: string, config: PaperConfig, thumbnail?: string): string | null
+  savePreset(name: string, config: PaperConfig, thumbnail?: string): SaveOutcome
   duplicatePreset(source: string): void
   deletePreset(name: string): void
   renamePreset(oldName: string, newName: string): string | null
-  importPreset(json: string): string | null
-  /** Adopt a paper that arrived on the URL. Returns an error, or null. */
-  importSharedPaper(share: PaperShare): string | null
+  importPreset(json: string): SaveOutcome
+  /** Adopt a paper that arrived on the URL. */
+  importSharedPaper(share: PaperShare): SaveOutcome
   /** Bumped when the canvas changes params behind the inspector's back (handle drags, transport commits) — remounts the inspector. */
   inspectorEpoch: number
   setPreset(name: string): void
@@ -168,6 +169,25 @@ interface EditorState {
   setPhysics(name: string): void
   patchCloth(patch: Partial<ClothConfig>): void
 }
+
+/**
+ * What came of trying to store a paper.
+ *
+ * Two failures that used to look identical to a caller, and must not: a
+ * REJECTED save stored nothing and the reason is the user's to fix (a name
+ * that is taken, a file that will not parse), while a save that reached the
+ * registry but not the disk is a real save the user still needs warned
+ * about. Both used to come back as `string | null`, so the second one could
+ * only ever be reported as the success it partly is.
+ *
+ * The stored config travels on the success arm so whoever reports it can
+ * offer the `.paper` file — the same escape hatch a refused share offers,
+ * and for the same reason: the file is what survives when the browser will
+ * not hold the thing.
+ */
+export type SaveOutcome =
+  | { ok: false; error: string }
+  | { ok: true; name: string; config: PaperConfigInput; storage: PersistOutcome }
 
 export interface WriteOpts {
   /** The canvas changed params behind the inspector's back — remount it. */
@@ -493,21 +513,31 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   savePreset: (name, config, thumbnail) => {
     const trimmed = name.trim()
-    if (!trimmed) return 'Preset needs a name.'
-    if (isBuiltinPreset(trimmed)) return `"${trimmed}" is a built-in — pick another name.`
+    if (!trimmed) return { ok: false, error: 'Preset needs a name.' }
+    if (isBuiltinPreset(trimmed)) {
+      return { ok: false, error: `"${trimmed}" is a built-in — pick another name.` }
+    }
     const named = paperConfigSchema.parse({ ...config, meta: { ...config.meta, name: trimmed } })
     const stored: StoredPreset = {
       config: diffConfig(named),
       thumbnail,
       savedAt: new Date().toISOString(),
     }
-    set((s) => {
-      const userPresets = { ...s.userPresets, [trimmed]: stored }
-      persistUserPresets(userPresets)
-      syncRegistry(userPresets)
-      return { userPresets, presetName: trimmed, config: named, inspectorEpoch: s.inspectorEpoch + 1 }
-    })
-    return null
+    // Written OUTSIDE the set() updater. A zustand updater is a pure
+    // function of state that may be invoked more than once, and this one was
+    // doing two side effects in it — a localStorage write and a registry
+    // sync — neither of which has an answer it could return from in there.
+    // The storage outcome is exactly what the caller now has to report.
+    const userPresets = { ...get().userPresets, [trimmed]: stored }
+    const storage = persistUserPresets(userPresets)
+    syncRegistry(userPresets)
+    set((s) => ({
+      userPresets,
+      presetName: trimmed,
+      config: named,
+      inspectorEpoch: s.inspectorEpoch + 1,
+    }))
+    return { ok: true, name: trimmed, config: stored.config, storage }
   },
 
   duplicatePreset: (source) => {
@@ -575,9 +605,12 @@ export const useEditor = create<EditorState>((set, get) => ({
     try {
       return get().savePreset(name, paperConfigSchema.parse(share.config))
     } catch (error) {
-      return `That link isn't a paper this build can open: ${
-        error instanceof Error ? error.message.slice(0, 120) : error
-      }`
+      return {
+        ok: false,
+        error: `That link isn't a paper this build can open: ${
+          error instanceof Error ? error.message.slice(0, 120) : error
+        }`,
+      }
     }
   },
   importPreset: (json) => {
@@ -589,7 +622,10 @@ export const useEditor = create<EditorState>((set, get) => ({
       const name = uniquePresetName(base, (n) => isBuiltinPreset(n) || Boolean(get().userPresets[n]))
       return get().savePreset(name, config)
     } catch (error) {
-      return `Not a valid .paper file: ${error instanceof Error ? error.message.slice(0, 120) : error}`
+      return {
+        ok: false,
+        error: `Not a valid .paper file: ${error instanceof Error ? error.message.slice(0, 120) : error}`,
+      }
     }
   },
 }))
