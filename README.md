@@ -8,7 +8,7 @@
 
 A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/) (desktop)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for coding agents](AGENTS.md)
+**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [for coding agents](AGENTS.md)
 
 | | |
 |---|---|
@@ -154,7 +154,7 @@ The zod schema in `config/schema.ts` is the single source of truth: it validates
 
 A paper is data — a `.paper` JSON object validated by a zod schema — so it travels without asking anyone's permission. **You do not need to fork this repo to share one.**
 
-**Sending one.** Sculpt a paper in the [editor](https://nourmtir0722.github.io/Paperlab/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
+**Sending one.** Sculpt a paper in the [editor](https://paperlab.nawwara.studio/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
 
 **Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins.
 
@@ -181,9 +181,9 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 Three surfaces ship alongside the library, all built on its public API only.
 
-**[The playground](https://nourmtir0722.github.io/Paperlab/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
+**[The playground](https://paperlab.nawwara.studio/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
 
-**[The editor](https://nourmtir0722.github.io/Paperlab/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z.
+**[The editor](https://paperlab.nawwara.studio/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z.
 
 ![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](docs/media/editor.jpg)
 
@@ -193,7 +193,7 @@ The inspector is generated from the zod schema, so it can never drift from the A
 
 Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export code** ends the session in your codebase, and **Copy for AI** ends it in a coding agent's. It wants a real screen: under about 900px it says so and points you at the playground.
 
-**[The reference](https://nourmtir0722.github.io/Paperlab/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
+**[The reference](https://paperlab.nawwara.studio/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
 ## Development
 
