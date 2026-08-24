@@ -415,6 +415,60 @@ button.export:hover {
   font-size: 11px;
 }
 
+/* Two exports now share one menu — a picture to post and code to ship — so
+   each half says which it is. A hairline label, not a heading: the menu is
+   250px of machine-register chrome, not a page. */
+.export-dropdown .export-group {
+  color: var(--ink-meta);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 9px 14px 5px;
+  border-top: 1px solid var(--hair);
+}
+
+.export-dropdown .export-group:first-child {
+  border-top: 0;
+}
+
+/* Four frames read as a set of choices, which a stack of full-width rows
+   does not — and the stack made the menu twice as tall as the canvas cluster
+   it hangs over. */
+.export-frames {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--hair);
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.export-frames button {
+  background: var(--l3);
+  padding: 9px 12px;
+  gap: 1px;
+}
+
+.export-frames button strong {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.export-frames button span {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.export-frames button:disabled {
+  cursor: progress;
+  color: var(--ink-body);
+}
+
+.export-frames button:disabled:hover {
+  background: var(--l3);
+}
+
 /* "Copy for AI" is the hero path — promote it over the secondary two. */
 .export-dropdown .export-primary {
   position: relative;

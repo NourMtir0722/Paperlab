@@ -32,6 +32,7 @@ import { PresetPanel } from './panels/PresetPanel'
 import { ViewportGuide } from './chrome/ViewportGuide'
 import { CoachMark, HandleAnchor, coachMarkUsed } from './chrome/CoachMark'
 import { CameraRig, ViewCluster } from './chrome/ViewCluster'
+import { CaptureRig, type CaptureHandle } from './chrome/CaptureRig'
 import { SmallScreen } from './chrome/SmallScreen'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
@@ -82,6 +83,7 @@ export function App() {
   const editFieldPaper = useEditor((s) => s.editFieldPaper)
   const backToField = useEditor((s) => s.backToField)
   const savePreset = useEditor((s) => s.savePreset)
+  const captureRef = useRef<CaptureHandle | null>(null)
   const editingState = useEditor((s) => s.editingState)
   const statePreview = useEditor((s) => s.statePreview)
   const selectedSlot = useEditor((s) => s.selectedSlot)
@@ -297,6 +299,7 @@ export function App() {
           mode={mode}
           config={config}
           paperRef={paperRef}
+          captureRef={captureRef}
           fieldInput={fieldExportInput}
           stageInput={stageExportInput}
         />
@@ -444,6 +447,7 @@ export function App() {
               zones={fieldZones}
             />
           )}
+          <CaptureRig handleRef={captureRef} />
           {mode === 'paper' && <HandleAnchor paperRef={paperRef} />}
           {/* Stage walks its own camera; the other two modes orbit, and the
               cluster below the canvas is how anyone finds that out. */}
