@@ -4,6 +4,7 @@ import { useEditor } from '../state/store'
 import { downloadPreset } from '../state/userPresets'
 import { confirmDialog, promptDialog, toast } from '../controls/ui'
 import { Select } from '../controls/Select'
+import { reportSave } from '../chrome/saveReport'
 
 /**
  * The preset library: built-ins (duplicate to fork) and user presets
@@ -27,9 +28,7 @@ export function PresetPanel() {
 
   const importFiles = async (files: FileList | null) => {
     for (const file of files ?? []) {
-      const error = importPreset(await file.text())
-      if (error) toast(error, 'error')
-      else toast(`Imported ${file.name}`, 'success')
+      reportSave(importPreset(await file.text()))
     }
   }
 

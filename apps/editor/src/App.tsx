@@ -37,6 +37,7 @@ import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
 import { UIHost, confirmDialog, promptDialog, toast } from './controls/ui'
+import { reportSave } from './chrome/saveReport'
 import { useEditor, zoneToConfig } from './state/store'
 import { Select } from './controls/Select'
 import { useHistory, useHistoryKeys, useUndoState } from './state/history'
@@ -100,18 +101,24 @@ export function App() {
     adopted.current = true
     const share = readPaperShare(window.location.search)
     if (!share) return
-    const error = importSharedPaper(share)
+    const outcome = importSharedPaper(share)
     const url = new URL(window.location.href)
     url.searchParams.delete(SHARE_PARAM)
     window.history.replaceState(null, '', url)
-    if (error) {
-      toast(error, 'error')
+    if (!outcome.ok) {
+      toast(outcome.error, 'error')
       return
     }
     // A link outranks the remembered session: someone who was last in stage
     // mode has to be shown the paper they just opened, not told about it.
     setMode('paper')
-    toast(`Opened "${share.name}" — it's yours to edit now`, 'success')
+    // An opened link that could not be stored is still worth warning about —
+    // it is someone else's paper, and losing it means going back for the URL.
+    if (outcome.storage === 'stored') {
+      toast(`Opened "${outcome.name}" — it's yours to edit now`, 'success')
+    } else {
+      reportSave(outcome)
+    }
   }, [importSharedPaper, setMode])
 
   // Presets are components: the field renders the live edit of its preset.
@@ -242,9 +249,7 @@ export function App() {
                 // base and lose the machine. The preset is the store's base.
                 const snapshot =
                   editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-                const error = savePreset(name, snapshot, captureThumbnail())
-                if (error) toast(error, 'error')
-                else toast(`Saved "${name}"`, 'success')
+                reportSave(savePreset(name, snapshot, captureThumbnail()))
               })()
             }}
           >

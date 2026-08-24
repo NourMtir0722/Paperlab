@@ -34,9 +34,24 @@ export function loadUserPresets(): UserPresetMap {
   }
 }
 
-export function persistUserPresets(presets: UserPresetMap): void {
+/**
+ * What became of a write to localStorage.
+ *
+ * `session-only` is the one that matters. The presets are live in the
+ * registry and fully editable, but nothing reached disk, so they die with
+ * the tab. That outcome used to be swallowed here and reported to the user
+ * as a plain "Saved" — the worst shape a failure can have, because the way
+ * you find out is by losing the work.
+ *
+ * It is reachable: an uploaded image lands in a config as a data URL of
+ * ~100KB and up, and a handful of those clears a 5MB quota.
+ */
+export type PersistOutcome = 'stored' | 'thumbnails-dropped' | 'session-only'
+
+export function persistUserPresets(presets: UserPresetMap): PersistOutcome {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
+    return 'stored'
   } catch {
     // Quota exceeded (thumbnails add up) — drop thumbnails and retry once.
     const slim: UserPresetMap = {}
@@ -45,8 +60,9 @@ export function persistUserPresets(presets: UserPresetMap): void {
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(slim))
+      return 'thumbnails-dropped'
     } catch {
-      /* out of options — presets stay session-only */
+      return 'session-only'
     }
   }
 }
