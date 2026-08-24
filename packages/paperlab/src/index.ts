@@ -44,6 +44,8 @@ export {
   physicsNames,
   lightingNames,
   stockNames,
+  contentNames,
+  contentSchemaFor,
   paperEdges,
   coreStateNames,
   type PaperConfig,

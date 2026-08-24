@@ -1,4 +1,6 @@
 import {
+  contentNames,
+  contentSchemaFor,
   getBehavior,
   getStock,
   lightingNames,
@@ -9,6 +11,7 @@ import {
   stockNames,
   type ClothConfig,
   type ContentConfig,
+  type ContentConfigInput,
   type PaperEdge,
   type PhysicsConfig,
   type StockName,
@@ -17,8 +20,10 @@ import {
 import {
   button,
   folder,
+  note,
   num,
   partitionSignature,
+  schemaControls,
   select,
   text,
   toggle,
@@ -26,6 +31,7 @@ import {
 } from '../controls/controlModel'
 import { Panel } from '../controls/controls'
 import { useEditor } from '../state/store'
+import { formatItems, parseItems } from './receiptItems'
 
 /**
  * Inspector of the selection: a tree of `Control` descriptors rendered by the
@@ -266,31 +272,96 @@ function pickImageAsDataUrl(): Promise<string | null> {
   })
 }
 
+/** What the `src` field shows in place of a 200KB base64 string. */
+const UPLOADED = '(uploaded image)'
+
+/**
+ * The Content folder: which kind of thing prints on the sheet, then that
+ * kind's own fields.
+ *
+ * Everything below the type selector is generated from the variant's zod
+ * schema by the same walk that gives behaviors, layouts and the stage their
+ * panels. Content was the one branch of the config still hand-written, and
+ * it had grown UI for two of the five types — so `card`, `receipt` and
+ * `blank` each opened onto an empty folder, and no sheet could be turned
+ * into another kind at all.
+ *
+ * Four fields stay hand-built, because they are the four the walk cannot
+ * state well. They are placed FIRST, ahead of the generated rest, on a rule
+ * worth keeping as more content types land: the content itself, and then
+ * how it is set.
+ */
 function contentControls(
   content: ContentConfig,
-  patchConfig: (p: { content: ContentConfig }, opts?: { external?: boolean }) => void,
+  patchConfig: (p: { content: ContentConfigInput }, opts?: { external?: boolean }) => void,
 ): Control[] {
-  if (content.type === 'text') {
-    return [
-      text('text', content.text, (v) => patchConfig({ content: { ...content, text: v } }), { rows: 4 }),
-      num('size', content.size, { min: 12, max: 128, step: 1 }, (v) =>
-        patchConfig({ content: { ...content, size: v } }),
-      ),
-    ]
-  }
+  const set = (patch: Record<string, unknown>, opts?: { external?: boolean }) =>
+    patchConfig({ content: { ...content, ...patch } as ContentConfigInput }, opts)
+
+  // The patch is the discriminator and nothing else: a differing `type`
+  // replaces the union wholesale (mergeWithDeletes) rather than merging, and
+  // the parse that follows fills the new variant's defaults — so switching to
+  // `receipt` cannot leave a `src` behind. External, because every row under
+  // this one is about to be a different set and the inspector should remount.
+  const controls: Control[] = [
+    select('type', content.type, [...contentNames], (v) =>
+      patchConfig({ content: { type: v } as ContentConfigInput }, { external: true }),
+    ),
+  ]
+
+  // `back` is a nested discriminated union — what prints on the REVERSE of
+  // the sheet. The walk skips it silently; naming it here says that is meant.
+  const skip = ['type', 'back']
+
   if (content.type === 'image') {
-    return [
-      text('src', content.src.startsWith('data:') ? '(uploaded image)' : content.src, (v) => {
-        if (v === '(uploaded image)') return
-        patchConfig({ content: { ...content, src: v } })
-      }),
+    skip.push('src')
+    controls.push(
+      text(
+        'src',
+        content.src.startsWith('data:') ? UPLOADED : content.src,
+        (v) => {
+          // Editing the mask itself would replace the picture with the words.
+          if (v !== UPLOADED) set({ src: v })
+        },
+        { hint: 'a URL, or upload a file below' },
+      ),
       button('upload image', () => {
         void pickImageAsDataUrl().then((dataUrl) => {
           // external → the inspector remounts and the src field shows the mask.
-          if (dataUrl) patchConfig({ content: { ...content, src: dataUrl } }, { external: true })
+          if (dataUrl) set({ src: dataUrl }, { external: true })
         })
       }),
-    ]
+    )
   }
-  return []
+
+  if (content.type === 'text') {
+    skip.push('text')
+    controls.push(text('text', content.text, (v) => set({ text: v }), { rows: 4 }))
+  }
+
+  if (content.type === 'card') {
+    skip.push('body')
+    controls.push(text('body', content.body, (v) => set({ body: v }), { rows: 3 }))
+  }
+
+  if (content.type === 'receipt') {
+    skip.push('items')
+    controls.push(
+      text('items', formatItems(content.items), (v) => set({ items: parseItems(v) }), { rows: 5 }),
+      // A visible line, not a tooltip: the format is not guessable, and a
+      // hint nobody hovers is a hint nobody reads.
+      note('itemsFormat', 'One item per line — NAME | PRICE'),
+    )
+  }
+
+  controls.push(
+    ...schemaControls(
+      contentSchemaFor(content.type),
+      content as unknown as Record<string, unknown>,
+      (key, value) => set({ [key]: value }),
+      skip,
+    ),
+  )
+
+  return controls
 }
