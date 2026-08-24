@@ -18,7 +18,13 @@ import {
 } from 'paperlab/stage'
 import type { CaptureHandle } from '../chrome/CaptureRig'
 import { EXPORT_FRAMES, downloadImage, imageFilename } from '../chrome/imageExport'
+import { clipFilename, downloadBlob } from '../chrome/videoExport'
 import { toast } from '../controls/ui'
+import { useEditor } from '../state/store'
+
+/** 2.4 seconds at 30fps — long enough to read a motion, short enough to loop. */
+const CLIP_FRAMES = 72
+const CLIP_FPS = 30
 /**
  * Two ways out of the editor, and they are for different people.
  *
@@ -52,7 +58,11 @@ export function ExportMenu({
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [rendering, setRendering] = useState<string | null>(null)
+  const [recording, setRecording] = useState<{ id: string; done: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const patchStage = useEditor((s) => s.patchStage)
+  const stagePlaying = useEditor((s) => s.stage.playing)
+  const busy = rendering !== null || recording !== null
 
   useEffect(() => {
     if (!open) return
@@ -76,6 +86,87 @@ export function ExportMenu({
 
   const badge = (label: string) => (copied === label ? <span className="copied-badge">Copied ✓</span> : null)
 
+  // Named for what is IN the picture. Field and Stage are compositions of
+  // their own, and both were coming out named after whichever paper the
+  // Paper tab happened to be holding.
+  const subject = mode === 'paper' ? config.meta.name : mode
+
+  /**
+   * What drives the motion while a clip records, and how to put things back.
+   *
+   * Supplied per mode rather than discovered by the rig, because only this
+   * component knows what "the motion" is: a behavior's progress in Paper
+   * mode, distance along the walk in Stage. Field has neither — its motion
+   * runs on its own clock with nothing to step — so it returns null and the
+   * menu says why instead of offering a button that cannot work.
+   *
+   * Whatever was playing is paused first. A clock still running underneath
+   * would be a second animation fighting the stepping, and the recorded
+   * frames would come out of the argument between them.
+   */
+  const clipDriver = () => {
+    if (mode === 'paper') {
+      const handle = paperRef.current
+      if (!handle || !config.behavior) return null
+      const wasPlaying = handle.playing
+      return {
+        // Out and back, so the loop closes: a peel that snaps flat every
+        // 2.4 seconds reads as a broken GIF rather than as a peel.
+        style: 'pingpong' as const,
+        step: (t: number) => handle.set('progress', t),
+        before: () => handle.pause(),
+        after: () => {
+          if (wasPlaying) handle.play()
+        },
+      }
+    }
+    if (mode === 'stage') {
+      return {
+        // One way. A walk played backwards is a person walking backwards.
+        style: 'loop' as const,
+        step: (t: number) => patchStage({ progress: t }),
+        before: () => patchStage({ playing: false }),
+        after: () => patchStage({ playing: stagePlaying }),
+      }
+    }
+    return null
+  }
+
+  /** Why there is no clip to record, or null when there is. */
+  const clipBlocker = (): string | null => {
+    if (mode === 'field') return 'Field motion runs on its own clock — there is no timeline to step.'
+    if (mode === 'paper' && !config.behavior)
+      return 'Pick a behavior first — a still sheet has no motion to record.'
+    return null
+  }
+
+  const saveClip = async (frame: (typeof EXPORT_FRAMES)[number]) => {
+    const capture = captureRef.current
+    const driver = clipDriver()
+    if (!capture || !driver) return
+    setRecording({ id: frame.id, done: 0 })
+    driver.before()
+    try {
+      const { blob, extension } = await capture.recordClip({
+        width: frame.width,
+        height: frame.height,
+        frames: CLIP_FRAMES,
+        fps: CLIP_FPS,
+        style: driver.style,
+        step: driver.step,
+        onProgress: (done) => setRecording({ id: frame.id, done }),
+      })
+      downloadBlob(blob, clipFilename(subject, frame.id, extension))
+    } catch (error) {
+      // A browser with no recorder, no codec, or no exact-frame control. All
+      // three are better named than silently doing nothing.
+      toast(`Could not record that clip: ${error instanceof Error ? error.message : error}`, 'error')
+    } finally {
+      driver.after()
+      setRecording(null)
+    }
+  }
+
   const saveImage = async (frame: (typeof EXPORT_FRAMES)[number]) => {
     const capture = captureRef.current
     if (!capture) return
@@ -85,7 +176,7 @@ export function ExportMenu({
       // Named for what is IN the picture. Field and Stage are compositions of
       // their own, and both were coming out named after whichever paper the
       // Paper tab happened to be holding.
-      downloadImage(dataUrl, imageFilename(mode === 'paper' ? config.meta.name : mode, frame.id))
+      downloadImage(dataUrl, imageFilename(subject, frame.id))
       // The menu stays open — picking a second frame is the common next move,
       // and the download itself is the confirmation.
     } catch (error) {
@@ -125,17 +216,29 @@ export function ExportMenu({
           <p className="export-group">Picture</p>
           <div className="export-frames">
             {EXPORT_FRAMES.map((frame) => (
-              <button
-                key={frame.id}
-                type="button"
-                disabled={rendering !== null}
-                onClick={() => void saveImage(frame)}
-              >
+              <button key={frame.id} type="button" disabled={busy} onClick={() => void saveImage(frame)}>
                 <strong>{frame.label}</strong>
                 <span>{rendering === frame.id ? 'rendering…' : frame.hint}</span>
               </button>
             ))}
           </div>
+          <p className="export-group">Clip</p>
+          {clipBlocker() ? (
+            <p className="export-note">{clipBlocker()}</p>
+          ) : (
+            <div className="export-frames">
+              {EXPORT_FRAMES.map((frame) => (
+                <button key={frame.id} type="button" disabled={busy} onClick={() => void saveClip(frame)}>
+                  <strong>{frame.label}</strong>
+                  <span>
+                    {recording?.id === frame.id
+                      ? `recording ${Math.round((recording.done / CLIP_FRAMES) * 100)}%`
+                      : `${(CLIP_FRAMES / CLIP_FPS).toFixed(1)}s loop`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <p className="export-group">Code</p>
           {mode === 'stage' ? (
             <>
