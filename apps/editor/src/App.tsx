@@ -44,6 +44,17 @@ import { Select } from './controls/Select'
 import { useHistory, useHistoryKeys, useUndoState } from './state/history'
 
 /**
+ * How many drops are actually hanging.
+ *
+ * Pictures go one per banner, so a stage hanging four of them IS four
+ * banners however high the count slider was left — and a status line
+ * reporting eighteen is naming a number nothing on screen agrees with.
+ */
+function stageBannerCount(stage: { source: string; images: string[]; count: number }): number {
+  return stage.source === 'images' && stage.images.length > 0 ? stage.images.length : stage.count
+}
+
+/**
  * The walking figure's model, served from this app's own `public/`.
  *
  * Built off BASE_URL rather than hardcoded, because the editor deploys under
@@ -176,8 +187,11 @@ export function App() {
     layout: stage.layout,
     layoutOptions: stage.layoutOptions,
     paper: stage.paper,
-    text: stage.text.trim() ? stage.text : undefined,
-    count: stage.count,
+    text: stage.source === 'words' && stage.text.trim() ? stage.text : undefined,
+    images: stage.source === 'images' && stage.images.length > 0 ? stage.images : undefined,
+    // Pictures are one per drop, so they ARE the count — exporting the
+    // slider's number alongside them would contradict the array.
+    count: stage.source === 'images' && stage.images.length > 0 ? undefined : stage.count,
   })
 
   // State-editing mode shows the state applied; preview runs the live machine.
@@ -329,8 +343,8 @@ export function App() {
               })}
             </ul>
             <p className="stage-note">
-              Type into <strong>Words</strong> and the space is rebuilt out of them — one column per banner,
-              stacked down the drop.
+              Under <strong>Content</strong>, type words and the space is rebuilt out of them — one column per
+              banner, stacked down the drop — or hang your own pictures, one per drop.
             </p>
           </>
         ) : (
@@ -413,7 +427,10 @@ export function App() {
               preset={stage.paper}
               layout={stage.layout}
               layoutOptions={stage.layoutOptions}
-              text={stage.text.trim() ? stage.text : undefined}
+              // Words or pictures, never both: the scene resolves them in a
+              // fixed order, so passing both means one silently does nothing.
+              text={stage.source === 'words' && stage.text.trim() ? stage.text : undefined}
+              images={stage.source === 'images' && stage.images.length > 0 ? stage.images : undefined}
               count={stage.count}
               // Playing hands the walk to the clock; paused, the scrubber owns it.
               progress={stage.playing ? undefined : stage.progress}
@@ -506,7 +523,7 @@ export function App() {
             {stage.playing
               ? 'walking · drag the scene to walk it yourself'
               : `${Math.round(stage.progress * 100)}% along the walk`}{' '}
-            · {stage.count} banners · quality{' '}
+            · {stageBannerCount(stage)} banners · quality{' '}
             {stage.quality === 'auto' ? `auto → ${stage.settled ?? '…'}` : stage.quality}
           </span>
         </footer>

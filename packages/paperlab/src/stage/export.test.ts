@@ -5,6 +5,7 @@ import {
   buildStageComponentSource,
   describeStage,
   diffStage,
+  exportableImages,
   walkNameFor,
   type StageExportInput,
 } from './export'
@@ -218,5 +219,60 @@ describe('the light travels with the stage', () => {
   it('the description says the light was set by hand, so it still matches the render', () => {
     expect(describeStage(base())).not.toContain('by hand')
     expect(describeStage(base({ stage: { light: { exposure: 2 } } }))).toContain('its exposure set by hand')
+  })
+})
+
+describe('pictures on the banners', () => {
+  const dataUrl = `data:image/jpeg;base64,${'A'.repeat(400)}`
+
+  it('passes a referenced URL through untouched — the receiver can fetch it', () => {
+    const { list, substituted } = exportableImages(['/a.jpg', 'https://example.com/b.png'])
+    expect(list).toEqual(['/a.jpg', 'https://example.com/b.png'])
+    expect(substituted).toBe(false)
+  })
+
+  it('substitutes an upload for a placeholder path', () => {
+    // 100KB+ of base64 pasted into a source file is not an export.
+    const { list, substituted } = exportableImages([dataUrl, dataUrl])
+    expect(list).toEqual(['/banner-1.jpg', '/banner-2.jpg'])
+    expect(substituted).toBe(true)
+  })
+
+  it('keeps the count and the order when it substitutes', () => {
+    // The banners are hung one picture each, in order, so a placeholder list
+    // that is short or shuffled describes a different stage.
+    const { list } = exportableImages(['/real.jpg', dataUrl, '/other.jpg'])
+    expect(list).toEqual(['/real.jpg', '/banner-2.jpg', '/other.jpg'])
+  })
+
+  it('writes the images into the component, and says when they are stand-ins', () => {
+    const source = buildStageComponentSource(base({ text: undefined, images: [dataUrl] }))
+    expect(source).toContain('images={images}')
+    expect(source).toContain('/banner-1.jpg')
+    expect(source).not.toContain('base64')
+    expect(source).toMatch(/cannot travel in a snippet/)
+  })
+
+  it('does not apologise for images that need no apology', () => {
+    const source = buildStageComponentSource(base({ text: undefined, images: ['/a.jpg'] }))
+    expect(source).toContain('/a.jpg')
+    expect(source).not.toMatch(/cannot travel in a snippet/)
+  })
+
+  it('leaves the images prop out entirely when there are none', () => {
+    expect(buildStageComponentSource(base())).not.toContain('images=')
+    expect(buildStageComponentSource(base({ images: [] }))).not.toContain('images=')
+  })
+
+  it('describes the pictures for an agent that has to verify the render', () => {
+    // `base` carries words; a picture stage is one that does not.
+    expect(describeStage(base({ text: undefined, images: ['/a.jpg', '/b.jpg'] }))).toContain('2 pictures')
+  })
+
+  it('still prefers the words when both are somehow set', () => {
+    // The scene resolves text first; the description must not claim otherwise.
+    const brief = describeStage(base({ text: 'HELLO', images: ['/a.jpg'] }))
+    expect(brief).toContain('your text')
+    expect(brief).not.toContain('pictures')
   })
 })

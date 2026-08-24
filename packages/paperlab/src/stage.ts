@@ -23,6 +23,7 @@
 export {
   PaperStage,
   PaperStageScene,
+  stageBanner,
   type PaperStageProps,
   type PaperStageSceneProps,
 } from './stage/PaperStage'

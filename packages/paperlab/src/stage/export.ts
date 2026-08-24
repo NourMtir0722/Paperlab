@@ -23,6 +23,8 @@ export interface StageExportInput {
   paper?: PaperConfigInput
   /** The words the space is built from. Omitted renders blank banners. */
   text?: string
+  /** Pictures on the banners, one per drop, instead of words. */
+  images?: string[]
   count?: number
   /** Bind the walk to page scroll, pinned, rather than to the clock. */
   scroll?: boolean
@@ -119,6 +121,8 @@ export function describeStage(input: StageExportInput): string {
 
   if (input.text?.trim()) {
     parts.push('each printed with a column of your text running down it')
+  } else if (input.images?.length) {
+    parts.push(`each printed with one of ${input.images.length} pictures`)
   }
   // The shot is named whether or not anyone is walking. It used to ride
   // along inside the figure's clause, so turning the figure off silently
@@ -147,10 +151,34 @@ export function describeStage(input: StageExportInput): string {
   return parts.join(', ')
 }
 
+/**
+ * The pictures, as a caller could actually paste them.
+ *
+ * An uploaded image lives in the editor as a data URL — a hundred kilobytes
+ * and up of base64 — and pasting that into a source file is not an export,
+ * it is a hostage situation. So an upload becomes a PLACEHOLDER path, the
+ * right number of them in the right order, and the snippet says what it did.
+ * A referenced URL is already something the receiver can fetch, so it
+ * travels verbatim.
+ *
+ * Emitting nothing was the other option and it is worse: the reader gets a
+ * stage of blank banners and no clue that the pictures were the point.
+ */
+export function exportableImages(images: string[]): { list: string[]; substituted: boolean } {
+  let substituted = false
+  const list = images.map((src, i) => {
+    if (!src.startsWith('data:')) return src
+    substituted = true
+    return `/banner-${i + 1}.jpg`
+  })
+  return { list, substituted }
+}
+
 function propLines(input: StageExportInput, indent: string): string {
   const lines: string[] = []
   if (input.paper) lines.push(`${indent}preset={banner}`)
   if (input.text?.trim()) lines.push(`${indent}text={text}`)
+  if (input.images?.length) lines.push(`${indent}images={images}`)
   if (input.count !== undefined) lines.push(`${indent}count={${input.count}}`)
   if (input.layout !== 'colonnade') lines.push(`${indent}layout="${input.layout}"`)
   const layoutOptions = input.layoutOptions ?? {}
@@ -177,11 +205,19 @@ export function buildStageComponentSource(input: StageExportInput): string {
     ? `\n\nconst banner = ${stringifyStage(diffConfig(paperConfigSchema.parse(input.paper)))} satisfies PaperConfigInput`
     : ''
   const textConst = input.text?.trim() ? `\n\nconst text = ${JSON.stringify(input.text)}` : ''
+  const images = input.images?.length ? exportableImages(input.images) : null
+  const imagesConst = images
+    ? `\n${
+        images.substituted
+          ? '\n// Your uploaded pictures cannot travel in a snippet — these are\n// placeholders in the same order. Point them at your own files.'
+          : ''
+      }\nconst images = ${JSON.stringify(images.list, null, 2)}`
+    : ''
 
   if (!input.scroll) {
     return `import { PaperStage, type StageConfigInput } from 'paperlab/stage'${input.paper ? "\nimport type { PaperConfigInput } from 'paperlab'" : ''}
 
-${stageConst}${bannerConst}${textConst}
+${stageConst}${bannerConst}${textConst}${imagesConst}
 
 export function ${name}() {
   return (
@@ -195,7 +231,7 @@ ${propLines(input, '      ')}
   return `import { useEffect, useRef, useState } from 'react'
 import { PaperStage, type StageConfigInput } from 'paperlab/stage'${input.paper ? "\nimport type { PaperConfigInput } from 'paperlab'" : ''}
 
-${stageConst}${bannerConst}${textConst}
+${stageConst}${bannerConst}${textConst}${imagesConst}
 
 export function ${name}() {
   const ref = useRef<HTMLDivElement>(null)

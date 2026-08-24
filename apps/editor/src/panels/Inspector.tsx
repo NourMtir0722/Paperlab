@@ -32,6 +32,7 @@ import {
 import { Panel } from '../controls/controls'
 import { useEditor } from '../state/store'
 import { formatItems, parseItems } from './receiptItems'
+import { pickImageAsDataUrl } from '../chrome/pickImage'
 
 /**
  * Inspector of the selection: a tree of `Control` descriptors rendered by the
@@ -231,45 +232,6 @@ function surfaceControls(
   }
 
   return controls
-}
-
-/**
- * Read a local file into a self-contained data URL, downscaled so it stays
- * serializable (presets live in localStorage and travel in exports).
- */
-function pickImageAsDataUrl(): Promise<string | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return resolve(null)
-      const url = URL.createObjectURL(file)
-      const img = new Image()
-      img.onload = () => {
-        const MAX = 1024
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(img.width * scale))
-        canvas.height = Math.max(1, Math.round(img.height * scale))
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-        URL.revokeObjectURL(url)
-        // PNG keeps transparency (die-cut stickers); photos go JPEG.
-        resolve(
-          file.type === 'image/png' || file.type === 'image/webp'
-            ? canvas.toDataURL('image/png')
-            : canvas.toDataURL('image/jpeg', 0.85),
-        )
-      }
-      img.onerror = () => {
-        URL.revokeObjectURL(url)
-        resolve(null)
-      }
-      img.src = url
-    }
-    input.click()
-  })
 }
 
 /** What the `src` field shows in place of a 200KB base64 string. */
