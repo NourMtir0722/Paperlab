@@ -50,24 +50,77 @@ describe('encoding a paper into a link', () => {
   })
 })
 
+/** The refusal of a share that is expected to fail. */
+function refusal(name: string, config: Parameters<typeof tryEncodePaperShare>[1]) {
+  const attempt = tryEncodePaperShare(name, config)
+  if (attempt.ok) throw new Error('expected a refusal, got a link')
+  return attempt
+}
+
+const upload = (bytes: number) =>
+  paperConfigSchema.parse({
+    ...receipt,
+    content: { type: 'image', src: `data:image/jpeg;base64,${'A'.repeat(bytes)}` },
+  })
+
 describe('refusing what cannot travel', () => {
   it('refuses a paper carrying an uploaded image rather than emitting a broken link', () => {
     // An uploaded image lands in the config as a data URL. A downscaled JPEG
     // is still ~100 KB, which no URL survives — say so instead of truncating.
-    const withUpload = paperConfigSchema.parse({
+    expect(refusal('photo', upload(120_000)).reason).toBe('uploaded-image')
+  })
+
+  it('blames the upload, not the length, so the advice can differ', () => {
+    // The two refusals need different answers — an image can only be sent as
+    // a file, whereas a long paper can be shortened — so a share that fails
+    // because of a picture must not be reported as merely wordy.
+    const long = paperConfigSchema.parse({
       ...receipt,
-      content: { type: 'image', src: `data:image/jpeg;base64,${'A'.repeat(120_000)}` },
+      content: { type: 'text', text: 'a very long letter. '.repeat(1000) },
     })
-    const attempt = tryEncodePaperShare('photo', withUpload)
+    expect(refusal('letter', long).reason).toBe('too-long')
+    expect(refusal('photo', upload(120_000)).reason).toBe('uploaded-image')
+  })
+
+  it('finds an upload printed on the reverse of the sheet', () => {
+    // `content.back` is a second content union with its own image variant.
+    // Reading `content.src` alone would call this one merely too long and
+    // send someone looking for a picture they would not find there.
+    const backed = paperConfigSchema.parse({
+      ...receipt,
+      content: {
+        type: 'text',
+        text: 'front',
+        back: { type: 'image', src: `data:image/jpeg;base64,${'A'.repeat(120_000)}` },
+      },
+    })
+    expect(refusal('backed', backed).reason).toBe('uploaded-image')
+  })
+
+  it('reports how long the link would have been, for a message that can say', () => {
+    expect(refusal('photo', upload(120_000)).length).toBeGreaterThan(MAX_SHARE_LENGTH)
+  })
+
+  it('hands the refusal back through paperShareUrl rather than a bare null', () => {
+    const attempt = paperShareUrl('https://paperlab.dev/editor/', 'photo', upload(120_000))
     expect(attempt.ok).toBe(false)
     if (attempt.ok) throw new Error('expected a refusal')
-    expect(attempt.reason).toBe('too-long')
-    expect(paperShareUrl('https://paperlab.dev/editor/', 'photo', withUpload)).toBeNull()
+    expect(attempt.reason).toBe('uploaded-image')
   })
 
   it('accepts a paper that fits', () => {
     const attempt = tryEncodePaperShare('receipt', receipt)
     expect(attempt.ok).toBe(true)
+  })
+
+  it('does not mistake an image URL for an upload', () => {
+    // A referenced picture is exactly what DOES travel in a link. Only the
+    // bytes-in-the-config case is the one that cannot.
+    const linked = paperConfigSchema.parse({
+      ...receipt,
+      content: { type: 'image', src: 'https://example.com/photo.jpg' },
+    })
+    expect(tryEncodePaperShare('linked', linked).ok).toBe(true)
   })
 })
 
@@ -96,21 +149,28 @@ describe('decoding a link nobody should trust', () => {
   })
 })
 
+/** The url of a share that is expected to succeed. */
+function shareUrl(base: string, name: string, config: Parameters<typeof paperShareUrl>[2]): string {
+  const attempt = paperShareUrl(base, name, config)
+  if (!attempt.ok) throw new Error(`expected a link, got ${attempt.reason}`)
+  return attempt.url
+}
+
 describe('links', () => {
   it('puts the paper in the query and reads it back', () => {
-    const url = paperShareUrl('https://paperlab.dev/editor/', 'my receipt', receipt)!
+    const url = shareUrl('https://paperlab.dev/editor/', 'my receipt', receipt)
     expect(new URL(url).searchParams.get(SHARE_PARAM)).toBeTruthy()
     expect(readPaperShare(new URL(url).search)?.name).toBe('my receipt')
   })
 
   it('keeps whatever was already on the url', () => {
-    const url = paperShareUrl('https://paperlab.dev/editor/?utm=x', 'r', receipt)!
+    const url = shareUrl('https://paperlab.dev/editor/?utm=x', 'r', receipt)
     expect(new URL(url).searchParams.get('utm')).toBe('x')
   })
 
   it('replaces rather than stacks when re-sharing an opened link', () => {
-    const first = paperShareUrl('https://paperlab.dev/editor/', 'a', receipt)!
-    const second = paperShareUrl(first, 'b', receipt)!
+    const first = shareUrl('https://paperlab.dev/editor/', 'a', receipt)
+    const second = shareUrl(first, 'b', receipt)
     expect(new URL(second).searchParams.getAll(SHARE_PARAM)).toHaveLength(1)
     expect(readPaperShare(new URL(second).search)?.name).toBe('b')
   })
