@@ -9,6 +9,7 @@ import {
   physicsNames,
   resolveStateConfig,
   stockNames,
+  washSchema,
   type ClothConfig,
   type ContentConfig,
   type ContentConfigInput,
@@ -16,6 +17,7 @@ import {
   type PhysicsConfig,
   type StockName,
   type SurfaceConfig,
+  type WashConfig,
 } from 'paperlab'
 import {
   button,
@@ -273,7 +275,11 @@ function contentControls(
 
   // `back` is a nested discriminated union — what prints on the REVERSE of
   // the sheet. The walk skips it silently; naming it here says that is meant.
-  const skip = ['type', 'back']
+  // `wash` is skipped for a different reason: it is OPTIONAL, and the walk
+  // would draw an unset one as a folder of sliders sitting at their minimums,
+  // which reads as a wash that is switched on and colourless rather than as
+  // one that is not there. It gets a toggle below, the way `deckle` does.
+  const skip = ['type', 'back', 'wash']
 
   if (content.type === 'image') {
     skip.push('src')
@@ -324,6 +330,26 @@ function contentControls(
       skip,
     ),
   )
+
+  // The ground, under whatever the sheet carries. Last in the folder because
+  // it is painted first — the panel reads top-to-bottom as subject, then
+  // setting, then what it is all sitting on.
+  controls.push(
+    toggle('wash', Boolean(content.wash), (on) =>
+      set({ wash: on ? washSchema.parse({}) : undefined }, { external: true }),
+    ),
+  )
+  if (content.wash) {
+    const wash = content.wash
+    controls.push(
+      folder(
+        'Wash',
+        schemaControls(washSchema, wash as unknown as Record<string, unknown>, (key, value) =>
+          set({ wash: { ...wash, [key]: value } as WashConfig }),
+        ),
+      ),
+    )
+  }
 
   return controls
 }

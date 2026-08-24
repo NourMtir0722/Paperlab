@@ -72,6 +72,52 @@ export type StockName = z.infer<typeof stockSchema>
 
 // ── Content ──────────────────────────────────────────────────────────────────
 
+/**
+ * A watercolour wash, painted under whatever else the sheet carries.
+ *
+ * It is a FIELD on every content type rather than a content type of its own,
+ * and that is the whole design. A wash is a ground, not a subject: the thing
+ * people want is a letter written over one, a card laid on one, a poster with
+ * one behind the type. Made a sixth member of the union it would have been
+ * mutually exclusive with the text it exists to sit behind, and the only way
+ * to get both would have been to bake the words into an uploaded picture —
+ * which is exactly the trick this library exists to avoid.
+ *
+ * Painted rather than shipped as artwork, for the same reason `DEMO_CARDS`
+ * are typeset rather than photographed. A bitmap is ~100KB that cannot cross
+ * a share link, does not survive an export to someone else's codebase, and
+ * does not know what stock it is lying on. A wash described in nine numbers
+ * travels anywhere the config does, tints against the paper under it, and
+ * curls with the mesh because it IS the texture.
+ */
+export const washSchema = z.object({
+  /** The first pigment. */
+  color: z.string().default('#4a5b8c'),
+  /** The second. Blooms alternate, and overlaps multiply into a third. */
+  secondary: z.string().default('#b06a6a'),
+  /** How many pools of colour. */
+  blooms: z.number().int().min(1).max(24).default(7),
+  /** How far a pool runs before it dries — its size against the sheet. */
+  spread: z.number().min(0.1).max(1).default(0.7),
+  /** Softness of the wet edge. 0 is a hard cut, 1 is a pool still moving. */
+  bleed: z.number().min(0).max(1).default(0.5),
+  /** How much pigment is in the water. */
+  intensity: z.number().min(0).max(1).default(0.55),
+  /**
+   * Edge darkening — the ring of pigment left where a pool dried.
+   *
+   * The signature of the medium, and the one thing a plain gradient cannot
+   * fake. Without it a wash reads as an airbrush.
+   */
+  edge: z.number().min(0).max(1).default(0.6),
+  /** Pigment settling into the tooth of the paper. */
+  granulation: z.number().min(0).max(1).default(0.35),
+  /** Fixed so a preset paints the same wash every time. */
+  seed: z.number().int().min(0).max(99).default(0),
+})
+
+export type WashConfig = z.infer<typeof washSchema>
+
 const blankContentBase = z.object({
   type: z.literal('blank'),
 })
@@ -183,18 +229,25 @@ const receiptContentBase = z.object({
   footer: z.string().default('KEEP FOR YOUR RECORDS'),
 })
 
+/** A ground under the subject, on either side of the sheet. */
+const withWash = { wash: washSchema.optional() }
+
 /** What can print on the reverse side (letter front / blank back, printed front / kraft back). */
 export const backContentSchema = z.discriminatedUnion('type', [
-  blankContentBase,
-  imageContentBase,
-  textContentBase,
-  cardContentBase,
-  receiptContentBase,
+  blankContentBase.extend(withWash),
+  imageContentBase.extend(withWash),
+  textContentBase.extend(withWash),
+  cardContentBase.extend(withWash),
+  receiptContentBase.extend(withWash),
 ])
 
 export type BackContentConfig = z.infer<typeof backContentSchema>
 
-const withBack = { back: backContentSchema.optional() }
+/**
+ * What every content type carries besides its own subject: what prints on
+ * the reverse, and what is washed on underneath.
+ */
+const withBack = { back: backContentSchema.optional(), ...withWash }
 
 export const blankContentSchema = blankContentBase.extend(withBack)
 export const imageContentSchema = imageContentBase.extend(withBack)
