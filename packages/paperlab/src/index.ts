@@ -37,6 +37,7 @@ export {
 
 export {
   paperConfigSchema,
+  sceneSchema,
   behaviorConfigSchema,
   clothConfigSchema,
   paperStatesSchema,

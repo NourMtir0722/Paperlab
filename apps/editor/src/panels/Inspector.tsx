@@ -3,7 +3,6 @@ import {
   contentSchemaFor,
   getBehavior,
   getStock,
-  lightingNames,
   listBehaviors,
   paperEdges,
   physicsNames,
@@ -35,6 +34,7 @@ import { Panel } from '../controls/controls'
 import { useEditor } from '../state/store'
 import { formatItems, parseItems } from './receiptItems'
 import { pickImageAsDataUrl } from '../chrome/pickImage'
+import { lightControls } from './lightControls'
 
 /**
  * Inspector of the selection: a tree of `Control` descriptors rendered by the
@@ -105,13 +105,14 @@ export function Inspector() {
     folder('Content', contentControls(config.content, patchConfig), { collapsed: true }),
     folder('Surface', surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
     folder('Physics', physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
+    // The same light panel stage mode has always had. It was never a stage
+    // feature — `<PaperLighting>` has taken these overrides all along, and a
+    // lone sheet simply had no control that wrote them.
     folder(
-      'Scene',
-      [
-        select('lighting', config.scene.lighting, [...lightingNames], (v) =>
-          patchConfig({ scene: { lighting: v as never } }),
-        ),
-      ],
+      'Light',
+      lightControls(config.scene as unknown as Record<string, unknown>, (patch) =>
+        patchConfig({ scene: patch as never }),
+      ),
       { collapsed: true },
     ),
   ]

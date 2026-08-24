@@ -38,6 +38,7 @@ const baseInput = (): SessionInput => ({
     speed: 0.5,
     entrance: 'rise',
     slots: ['photo-print', 'photo-print'],
+    scene: {},
     slotStates: {},
     zones: [],
   },

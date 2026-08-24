@@ -1252,6 +1252,44 @@ button.export:hover {
   font-size: 10px;
 }
 
+/* Swatch and hex together: the swatch is how you find a colour you have not
+   decided on, the field is how you paste one you have. */
+.control-color {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.control-color input[type="color"] {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* The native swatch paints a chrome frame inside the element; strip it so the
+   control reads as one flat chip in a panel that has no other frames in it. */
+.control-color input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.control-color input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.control-color .control-text {
+  grid-column: auto;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+
 .control-toggle {
   grid-column: 2 / -1;
   justify-self: start;

@@ -7,6 +7,7 @@ import {
   PaperMesh,
   diffConfig,
   getPreset,
+  sceneSchema,
   isBuiltinPreset,
   listPresets,
   resolveStateConfig,
@@ -166,7 +167,10 @@ export function App() {
     }
   })
   const fieldZones = field.zones.map(zoneToConfig)
+  const fieldScene = sceneSchema.parse(field.scene)
+
   const fieldExportInput = (): FieldExportInput => ({
+    scene: field.scene,
     layout: field.layout,
     layoutOptions: field.layoutOptions,
     motion: { driver: field.driver, speed: field.speed },
@@ -407,11 +411,11 @@ export function App() {
           {/* Stage brings its own rig — a second one here would double the key. */}
           {mode !== 'stage' && (
             <PaperLighting
-              preset={
-                mode === 'paper'
-                  ? config.scene.lighting
-                  : resolvePresetByName(field.slots[0] ?? 'photo-print').scene.lighting
-              }
+              // Field mode used to inherit slot 0's preset, so swapping one
+              // card changed the lighting of the whole gallery. It has its
+              // own scene now, the same one the export carries.
+              preset={mode === 'paper' ? config.scene.lighting : fieldScene.lighting}
+              light={mode === 'paper' ? config.scene.light : fieldScene.light}
               floor={mode === 'paper' ? -1.5 : -2.4}
               scale={mode === 'paper' ? 10 : 14}
             />

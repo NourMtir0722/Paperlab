@@ -32,6 +32,8 @@ function ControlRow({ control }: { control: Control }) {
       return <SelectControl control={control} />
     case 'toggle':
       return <ToggleControl control={control} />
+    case 'color':
+      return <ColorControl control={control} />
     case 'text':
       return <TextControl control={control} />
     case 'note':
@@ -221,6 +223,118 @@ function ToggleControl({ control }: { control: Of<'toggle'> }) {
         />
         <span className="control-toggle-track" aria-hidden="true" />
       </label>
+    </div>
+  )
+}
+
+/** `#rgb` and `#rrggbb`, the two a swatch can show. */
+const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
+
+/** What the swatch shows for a value it cannot parse. */
+const expand = (value: string): string => {
+  const v = value.trim()
+  if (!HEX.test(v)) return '#000000'
+  return v.length === 4 ? `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}` : v
+}
+
+/**
+ * A real colour picker, and the hex beside it.
+ *
+ * Both, rather than either. The swatch is how you find a colour you have not
+ * decided on yet; the field is how you paste the one from your brand
+ * palette, and how you read back what the swatch gave you.
+ *
+ * **The swatch is throttled.** A native picker fires while you drag it, and
+ * on a content colour every one of those events repaints the sheet's texture
+ * — the same cost that made text commit on blur rather than per keystroke.
+ * Dropping the events would make the picker feel dead, so they are spent at
+ * a rate a canvas can keep up with, and the value you release on is always
+ * committed whether or not it lands on a tick.
+ */
+function ColorControl({ control }: { control: Of<'color'> }) {
+  const { value, onChange } = control
+  const [draft, setDraft] = useState(value)
+  const committed = useRef(value)
+  const throttle = useRef<{ at: number; pending: string | null; timer: number | null }>({
+    at: 0,
+    pending: null,
+    timer: null,
+  })
+
+  if (committed.current !== value) {
+    committed.current = value
+    if (draft !== value) setDraft(value)
+  }
+
+  // Cleared on unmount so a trailing commit cannot fire into a dead control.
+  useEffect(() => {
+    const state = throttle.current
+    return () => {
+      if (state.timer !== null) window.clearTimeout(state.timer)
+    }
+  }, [])
+
+  const RATE = 120
+
+  const live = (next: string) => {
+    setDraft(next)
+    const state = throttle.current
+    const now = performance.now()
+    if (now - state.at >= RATE) {
+      state.at = now
+      committed.current = next
+      onChange(next)
+      return
+    }
+    // Not this tick — but never dropped: the last value seen wins at the end.
+    state.pending = next
+    if (state.timer === null) {
+      state.timer = window.setTimeout(
+        () => {
+          state.timer = null
+          state.at = performance.now()
+          if (state.pending !== null) {
+            committed.current = state.pending
+            onChange(state.pending)
+            state.pending = null
+          }
+        },
+        RATE - (now - state.at),
+      )
+    }
+  }
+
+  const commitText = () => {
+    if (draft !== value) {
+      committed.current = draft
+      onChange(draft)
+    }
+  }
+
+  return (
+    <div className="control-row">
+      <span className="control-label">{control.label}</span>
+      <div className="control-color">
+        <input
+          type="color"
+          value={expand(draft)}
+          aria-label={`${control.label} swatch`}
+          onChange={(e) => live(e.target.value)}
+        />
+        <input
+          type="text"
+          className="control-text"
+          value={draft}
+          aria-label={control.label}
+          spellCheck={false}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitText}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') setDraft(value)
+          }}
+        />
+      </div>
     </div>
   )
 }

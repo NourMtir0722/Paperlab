@@ -92,9 +92,9 @@ export type StockName = z.infer<typeof stockSchema>
  */
 export const washSchema = z.object({
   /** The first pigment. */
-  color: z.string().default('#4a5b8c'),
+  color: z.string().default('#4a5b8c').describe('color'),
   /** The second. Blooms alternate, and overlaps multiply into a third. */
-  secondary: z.string().default('#b06a6a'),
+  secondary: z.string().default('#b06a6a').describe('color'),
   /** How many pools of colour. */
   blooms: z.number().int().min(1).max(24).default(7),
   /** How far a pool runs before it dries — its size against the sheet. */
@@ -144,7 +144,7 @@ const textContentBase = z.object({
   /** px at texture resolution (long edge = 1024 logical px before DPR). */
   size: z.number().min(8).max(256).default(44),
   weight: z.number().min(100).max(900).default(400),
-  color: z.string().default('#2b2620'),
+  color: z.string().default('#2b2620').describe('color'),
   align: z.enum(['left', 'center', 'right']).default('left'),
   /** Fraction of the short edge. */
   padding: z.number().min(0).max(0.4).default(0.09),
@@ -208,7 +208,7 @@ const cardContentBase = z.object({
    * was cropped rather than as a card that was set.
    */
   size: z.number().min(8).max(256).default(58),
-  color: z.string().default('#2b2620'),
+  color: z.string().default('#2b2620').describe('color'),
   align: z.enum(['left', 'center']).default('left'),
   padding: z.number().min(0).max(0.4).default(0.1),
 })
@@ -453,8 +453,62 @@ export const lightingNames = [
 export const filmNames = ['agx', 'neutral', 'filmic'] as const
 
 /** Scene-level presentation, serialized with the paper. */
+/**
+ * Overrides on top of a named preset — the Blender-panel half of lighting.
+ *
+ * Every field is optional ON PURPOSE. An unset field means "whatever the
+ * preset says", so a shared link carries the two sliders you actually moved
+ * rather than a frozen copy of a rig you never touched, and re-basing onto
+ * another preset keeps your intent instead of your numbers.
+ */
+export const lightSchema = z.object({
+  /** Tone-mapping exposure — the stop the whole picture is printed at. */
+  exposure: z.number().min(0.1).max(4).optional(),
+  /**
+   * The tone curve — the film, where `exposure` is the stop.
+   *
+   * `filmic` is ACES, which is what every preset used to be pinned to and is
+   * kept so a scene tuned against it can say so. On near-white paper it is
+   * the wrong film: it desaturates and drags bright neutrals toward
+   * yellow-green, which is the sepia cast a lit sheet used to pick up.
+   */
+  film: z.enum(filmNames).optional(),
+  /** Key light strength. */
+  key: z.number().min(0).max(12).optional(),
+  /** Key light colour. */
+  color: z.string().optional().describe('color'),
+  /**
+   * Where the key stands, degrees around the vertical. 0° is straight in
+   * front of the paper (+Z, beside the camera), 90° is off to the right,
+   * and ±180° is directly behind it — which is where `nave` puts it, and
+   * why that preset is carried by light coming THROUGH the paper.
+   */
+  direction: z.number().min(-180).max(180).optional(),
+  /** How high the key stands, degrees above the horizon. */
+  height: z.number().min(-30).max(89).optional(),
+  /** Flat fill from every direction at once. Cheap, and it kills form — reach for `studio` first. */
+  ambient: z.number().min(0).max(2).optional(),
+  /** The room's own light: an environment map built from `sky`. Directional fill, and the only thing paper's sheen has to reflect. */
+  studio: z.number().min(0).max(3).optional(),
+  /** Distance haze, as a multiple of the preset's. 0 clears the air entirely; 2 halves the distance you can see. */
+  haze: z.number().min(0).max(3).optional(),
+})
+
+export type LightOverrides = z.infer<typeof lightSchema>
+export type LightOverridesInput = z.input<typeof lightSchema>
+
 export const sceneSchema = z.object({
   lighting: z.enum(lightingNames).default('studio'),
+  /**
+   * Overrides on the named preset — the same authorable half stage mode has
+   * always had, and which a lone sheet had no way to reach.
+   *
+   * A preset was the starting point everywhere EXCEPT here: a stage could be
+   * "nave, but the sun is lower", and a `<Paper>` could only be one of seven
+   * rigs exactly as shipped. `<PaperLighting>` has taken these overrides all
+   * along; nothing was passing them.
+   */
+  light: lightSchema.default({}),
 })
 
 export type SceneConfig = z.infer<typeof sceneSchema>

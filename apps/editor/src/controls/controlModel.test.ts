@@ -269,3 +269,61 @@ describe('numericFields', () => {
     expect(numericFields(z.number())).toEqual([])
   })
 })
+
+describe('colours', () => {
+  it('draws a described string as a swatch, not a text field', () => {
+    const schema = z.object({ color: z.string().describe('color').default('#4a5b8c') })
+    expect(
+      byKey(
+        schemaControls(schema, { color: '#123456' }, () => {}),
+        'color',
+      ),
+    ).toMatchObject({
+      kind: 'color',
+      value: '#123456',
+    })
+  })
+
+  it('finds the marker after .default(), where zod actually puts it', () => {
+    // `.describe()` attaches to whatever it was called on, so this lands on
+    // the ZodDefault and never reaches the string the walk unwraps to.
+    const schema = z.object({ color: z.string().default('#4a5b8c').describe('color') })
+    expect(
+      byKey(
+        schemaControls(schema, {}, () => {}),
+        'color',
+      ).kind,
+    ).toBe('color')
+  })
+
+  it('finds it after .optional() too — the light rig is written that way', () => {
+    const schema = z.object({ color: z.string().optional().describe('color') })
+    expect(
+      byKey(
+        schemaControls(schema, {}, () => {}),
+        'color',
+      ).kind,
+    ).toBe('color')
+  })
+
+  it('leaves every other string alone', () => {
+    // `color` and `secondary` are both pigments and `font` and `text` are
+    // both not; no rule over field NAMES separates them, which is why the
+    // schema says so instead.
+    const schema = z.object({ font: z.string().default('Georgia'), text: z.string().default('hi') })
+    const controls = schemaControls(schema, {}, () => {})
+    expect(controls.map((c) => c.kind)).toEqual(['text', 'text'])
+  })
+
+  it('writes the value straight through, so a paste survives', () => {
+    const seen: string[] = []
+    const schema = z.object({ color: z.string().describe('color').default('#000000') })
+    const ctl = byKey(
+      schemaControls(schema, {}, (_k, v) => seen.push(v as string)),
+      'color',
+    )
+    if (ctl.kind !== 'color') throw new Error('expected color')
+    ctl.onChange('#ff8800')
+    expect(seen).toEqual(['#ff8800'])
+  })
+})
