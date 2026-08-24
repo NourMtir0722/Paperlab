@@ -4,6 +4,7 @@ import type { BackContentConfig, ContentConfig, SheetConfig } from '../config/sc
 import type { Stock } from '../core/stock'
 import { paintReceipt } from './receipt'
 import { paintCard } from './card'
+import { paintWash } from './wash'
 import { ensureFont, wrapLines } from './type'
 
 /**
@@ -99,6 +100,9 @@ export function renderContentToCanvas(
   canvas.height = h
   const ctx = canvas.getContext('2d')!
   paintBackground(ctx, w, h, stock)
+  // Under everything the sheet carries, and over the stock. A wash is a
+  // ground: the letter is written on it, not beside it.
+  if (content.wash) paintWash(ctx, w, h, content.wash)
   if (content.type === 'image' && image && content.src) paintImage(ctx, w, h, image, content.fit)
   if (content.type === 'text') paintText(ctx, w, h, content, stock)
   if (content.type === 'receipt') paintReceipt(ctx, w, h, content, stock)

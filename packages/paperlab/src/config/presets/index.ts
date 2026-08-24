@@ -35,6 +35,33 @@ const builtins: Record<string, PaperConfigInput> = {
     behavior: { type: 'letter-fold', progress: 0.4, crease: 0.3 },
     surface: { creaseLines: { angle: 0, positions: [1 / 3, 2 / 3], strength: 0.5 } },
   },
+  /**
+   * The wash, shown rather than described.
+   *
+   * A `wash` is a field on every content type, which means it is reachable
+   * from any preset and discoverable from none — a toggle three folders down
+   * is not an argument for the feature. This is the argument: type set over
+   * paint, on cotton, deckled, with the paper still showing through both.
+   */
+  'washed-letter': {
+    meta: { name: 'Washed letter', tags: ['wash', 'text'] },
+    // Printer stock, not vellum: vellum is translucent and takes the room's
+    // grey through the back of the sheet, which turns a wash the colour of
+    // dishwater. Pigment needs something white behind it.
+    sheet: { width: 1.05, height: 1.45 },
+    stock: 'printer',
+    content: {
+      type: 'text',
+      text: 'Painted first,\nwritten after.',
+      font: 'Georgia, "Times New Roman", serif',
+      size: 52,
+      valign: 'center',
+      align: 'center',
+      wash: { color: '#5b6f9a', secondary: '#c08a86', blooms: 6, spread: 0.85, intensity: 0.5, seed: 3 },
+    },
+    behavior: { type: 'peel', progress: 0.12, corner: 'bottom-right', radius: 0.3 },
+    surface: { grain: 0.35, deckle: { edges: ['bottom', 'right'], roughness: 0.45 } },
+  },
   'vintage-note': {
     meta: { name: 'Vintage note', tags: ['aging', 'text'] },
     sheet: { width: 1.1, height: 1.4 },
