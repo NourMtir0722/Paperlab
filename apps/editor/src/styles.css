@@ -1155,6 +1155,39 @@ button.export:hover {
   outline: none;
 }
 
+/* An uncommitted text draft, said twice — the label takes a brighter step
+   (rule 4: emphasis is a step on the white ladder, never a hue) and the
+   textarea grows the Apply button below. */
+.control-row.dirty .control-label {
+  color: var(--ink);
+}
+
+.control-apply {
+  justify-self: end;
+  background: var(--lift-2);
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.control-apply:hover {
+  background: var(--lift-3);
+  border-color: var(--ink-body);
+}
+
+.control-apply kbd {
+  color: var(--ink-meta);
+  font: inherit;
+  font-size: 10px;
+}
+
 .control-toggle {
   grid-column: 2 / -1;
   justify-self: start;
