@@ -92,7 +92,7 @@ try {
   check('refreshing does not duplicate it', afterReload === inLibrary, `${afterReload} preset(s)`)
 
   // ── The export half: what Bob does with it next. ───────────────────────
-  await b.getByRole('button', { name: 'Export code' }).click()
+  await b.getByRole('button', { name: 'Export', exact: true }).click()
   await b.waitForTimeout(400)
   const hasAi = await b.getByText('Copy for AI').isVisible()
   check('export is one click from the remix', hasAi)
