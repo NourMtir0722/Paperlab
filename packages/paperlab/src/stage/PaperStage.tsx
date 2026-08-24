@@ -45,12 +45,24 @@ import {
  */
 
 /** A banner: tall, translucent, with folds running the length of its drop. */
-const BANNER: PaperConfigInput = {
+/**
+ * The sheet a stage hangs when the caller does not name one.
+ *
+ * Exported because it is the base anyone RESHAPING a banner has to start
+ * from. A caller who wants a wider drop wants this stock, this grain and
+ * this drape with different dimensions — and rebuilding it from the schema
+ * defaults instead gives a sheet of printer paper with no fold in it, which
+ * is a different object. A second copy of these numbers in a caller is a
+ * copy free to drift from the one the scene actually falls back to.
+ */
+export const stageBanner: PaperConfigInput = {
   sheet: { width: 1.5, height: 8.5, segments: 'auto' },
   stock: 'vellum',
   surface: { grain: 0.22 },
   deformers: [{ type: 'drape', options: { amplitude: 0.16, folds: 3, falloff: 1.7, gather: 0.28 } }],
 }
+
+const BANNER = stageBanner
 
 export interface PaperStageSceneProps {
   /** Walk, shot, figure, lighting — see `stageSchema`. */

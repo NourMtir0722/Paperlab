@@ -91,8 +91,16 @@ export interface StageState {
   walk: WalkName
   layout: string
   layoutOptions: Record<string, unknown>
+  /**
+   * What the banners carry. Words are split across them a line at a time;
+   * pictures go one per drop, and then the count is the picture count —
+   * there is no such thing as eight pictures on twelve banners.
+   */
+  source: 'words' | 'images'
   /** The words the space is built out of. Empty renders blank banners. */
   text: string
+  /** Uploaded pictures, as data URLs. One per banner, in order. */
+  images: string[]
   count: number
   /** 0..1 along the walk, used while paused. */
   progress: number
@@ -240,7 +248,9 @@ function stageStateFrom(id: string): StageState {
     walk,
     layout: preset.layout,
     layoutOptions: { ...preset.layoutOptions },
+    source: 'words',
     text: preset.text ?? '',
+    images: [],
     count: preset.count,
     progress: 0.42,
     // Opens walking. A stage that opens as a still photograph of itself is

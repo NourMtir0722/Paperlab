@@ -175,7 +175,14 @@ export function readSession(): EditorSession | null {
 }
 
 export function writeSession(input: SessionInput): void {
-  const { progress: _p, playing: _pl, settled: _s, ...stage } = input.stage
+  // `images` and `source` are deliberately not remembered. Stage pictures are
+  // uploads — data URLs, ~150KB each, a dozen of them on a colonnade — and
+  // this key is rewritten constantly. Carrying them would exceed the quota on
+  // nearly every write, and the handler below responds to that by clearing
+  // the WHOLE session: you would lose the remembered paper, the field and the
+  // mode in order to try to remember pictures that still did not fit.
+  // Restoring falls back to `stageStateFrom`, which starts on words.
+  const { progress: _p, playing: _pl, settled: _s, images: _i, source: _src, ...stage } = input.stage
   const payload = {
     mode: input.mode,
     // The diff, not the whole config — the reader's copy of the schema
