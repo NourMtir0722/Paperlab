@@ -8,21 +8,22 @@
 
     <!--
       A shared link with no card is a link nobody clicks. og:image has to be
-      an absolute URL, and the raw GitHub path stays valid wherever the site
-      itself ends up hosted.
+      an absolute URL; it points at the site's own domain rather than a raw
+      GitHub path, which would carry the account name and die on a rename.
     -->
+    <meta property="og:url" content="https://paperlab.nawwara.studio/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Paperlab" />
     <meta property="og:title" content="Paperlab — write a room" />
     <meta property="og:description" content="Type something. Walk through it. Real 3D paper as a React component." />
-    <meta property="og:image" content="https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/og.png" />
+    <meta property="og:image" content="https://paperlab.nawwara.studio/media/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Paperlab — write a room" />
     <meta name="twitter:description" content="Type something. Walk through it. Real 3D paper as a React component." />
-    <meta name="twitter:image" content="https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/og.png" />
+    <meta name="twitter:image" content="https://paperlab.nawwara.studio/media/og.png" />
 
     <meta name="theme-color" content="#0b0b0b" />
     <style>

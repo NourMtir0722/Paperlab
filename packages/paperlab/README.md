@@ -8,12 +8,12 @@
 
 A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://nourmtir0722.github.io/Paperlab/)**  ·  [the editor](https://nourmtir0722.github.io/Paperlab/editor/) (desktop)  ·  [the reference](https://nourmtir0722.github.io/Paperlab/docs/)  ·  [for coding agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
+**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [for coding agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
 
 | | |
 |---|---|
-| ![A thermal receipt unrolling from a paper roll](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/receipt-unroll.gif) | ![A gloss card with its corner peeling up off the page](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/hero-peel.gif) |
-| ![A letter folding itself into thirds](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/letter-fold.gif) | ![A page turning on its spine](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/page-flip.gif) |
+| ![A thermal receipt unrolling from a paper roll](https://paperlab.nawwara.studio/media/receipt-unroll.gif) | ![A gloss card with its corner peeling up off the page](https://paperlab.nawwara.studio/media/hero-peel.gif) |
+| ![A letter folding itself into thirds](https://paperlab.nawwara.studio/media/letter-fold.gif) | ![A page turning on its spine](https://paperlab.nawwara.studio/media/page-flip.gif) |
 
 Every frame above is real geometry — no video, no sprite sheet.
 
@@ -94,25 +94,25 @@ Underneath them are seven **deformers** — `roll`, `curl`, `bend`, `fold`, `wav
 
 ### Stocks — 7
 
-![The same letter on all seven paper stocks, side by side](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/stocks.jpg)
+![The same letter on all seven paper stocks, side by side](https://paperlab.nawwara.studio/media/stocks.jpg)
 
 One sheet of words, seven papers. Stock is not a colour swap: thermal takes on banding, newsprint takes grain, vellum goes translucent and lets the light through it. On top of stock sit composable surface effects — grain, torn deckle edges, crease lines, perforation, aging — as shader chunks. Alpha-affecting effects use `alphaTest` rather than blending, so shadows stay correct.
 
 ### Layouts — 12
 
-![All twelve field layouts rendered side by side](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/layouts.jpg)
+![All twelve field layouts rendered side by side](https://paperlab.nawwara.studio/media/layouts.jpg)
 
 Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners along a walk, for stage mode), `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl.
 
 Each pose also carries a **bias**: how strongly that one sheet takes the deformation. So the top of a pile curls while the sheets pressed underneath lie flat — in the same draw call. A whole field is **one instanced draw call** with the deformers running on the GPU, and the camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
 
-![Twelve cards standing in a ring, each with its corner peeling, rotating slowly](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/field-ring.gif)
+![Twelve cards standing in a ring, each with its corner peeling, rotating slowly](https://paperlab.nawwara.studio/media/field-ring.gif)
 
 Twelve sheets, twelve peeled corners, **one draw call** — the deformers run on the GPU and the text curls with the mesh.
 
 ### Lighting — 8 rigs
 
-![The same letter under all eight lighting rigs](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/lighting.jpg)
+![The same letter under all eight lighting rigs](https://paperlab.nawwara.studio/media/lighting.jpg)
 
 A rig is the starting point, not the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in — degrees around the room, degrees above the horizon — and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. `window` and `leaves` carry a gobo; `lightbox` puts the source behind the sheet and lets you read it through the paper.
 
@@ -120,7 +120,7 @@ Overrides serialize *as* overrides, so a shared scene carries the two sliders yo
 
 ### Stage — paper as architecture
 
-![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/stage-nave.gif)
+![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](https://paperlab.nawwara.studio/media/stage-nave.gif)
 
 Banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk.
 
@@ -128,13 +128,13 @@ The room is real — a ceiling, poured floor slabs, columns with base plates, an
 
 **Six rooms ship**, and they are not variations on a theme — the walk changes shape, the paper changes proportion, the light changes where it comes from:
 
-![The six stage presets — nave, procession, cloister, threshold, ribbon and archive](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/stages.jpg)
+![The six stage presets — nave, procession, cloister, threshold, ribbon and archive](https://paperlab.nawwara.studio/media/stages.jpg)
 
 Every one of those is built from the same two things: sheets of paper, and words printed on them. No imagery, no textures from anywhere else.
 
 **Four camera shots** frame any of them, each reading the same walk as the arrangement and the light, so they cannot drift apart:
 
-![The four stage camera shots — follow, lead, low and wide](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/camera.jpg)
+![The four stage camera shots — follow, lead, low and wide](https://paperlab.nawwara.studio/media/camera.jpg)
 
 And it is navigable rather than a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll. Quality adapts to the machine on its own across four tiers.
 
@@ -154,7 +154,7 @@ The zod schema in `config/schema.ts` is the single source of truth: it validates
 
 A paper is data — a `.paper` JSON object validated by a zod schema — so it travels without asking anyone's permission. **You do not need to fork this repo to share one.**
 
-**Sending one.** Sculpt a paper in the [editor](https://nourmtir0722.github.io/Paperlab/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
+**Sending one.** Sculpt a paper in the [editor](https://paperlab.nawwara.studio/editor/) and hit **Share**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
 
 **Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins.
 
@@ -181,19 +181,19 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 Three surfaces ship alongside the library, all built on its public API only.
 
-**[The playground](https://nourmtir0722.github.io/Paperlab/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
+**[The playground](https://paperlab.nawwara.studio/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
 
-**[The editor](https://nourmtir0722.github.io/Paperlab/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z.
+**[The editor](https://paperlab.nawwara.studio/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z.
 
-![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/editor.jpg)
+![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](https://paperlab.nawwara.studio/media/editor.jpg)
 
 The inspector is generated from the zod schema, so it can never drift from the API. Each behavior nominates the two or three params that *are* it — `unroll` opens on progress and tightness, and folds sheet, stock, content, surface, physics and scene away behind their own headings. Labels drag to scrub: full range in ~300px, shift for a 4× finer pass, click the readout to type an exact value.
 
-![The editor in field mode, fourteen cards arranged in a ring with the layout panel open](https://raw.githubusercontent.com/NourMtir0722/Paperlab/main/docs/media/editor-field.jpg)
+![The editor in field mode, fourteen cards arranged in a ring with the layout panel open](https://paperlab.nawwara.studio/media/editor-field.jpg)
 
 Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export code** ends the session in your codebase, and **Copy for AI** ends it in a coding agent's. It wants a real screen: under about 900px it says so and points you at the playground.
 
-**[The reference](https://nourmtir0722.github.io/Paperlab/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
+**[The reference](https://paperlab.nawwara.studio/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
 ## Development
 

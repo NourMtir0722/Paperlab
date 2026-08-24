@@ -8,7 +8,10 @@ name: Deploy site
 # No secrets, no third-party account: the OIDC token below is issued by
 # GitHub to this workflow.
 #
-# Live at https://nourmtir0722.github.io/Paperlab/.
+# Live at https://paperlab.nawwara.studio/ — a custom domain, so the URL
+# survives a GitHub username change. The CNAME file below is what keeps it:
+# this deploys via Actions rather than from a branch, and without a CNAME in
+# the artifact each deploy clears the custom domain and takes the site down.
 #
 # The `has_pages` guard below is deliberate. Pages must be enabled on the
 # repository (Settings -> Pages -> Source: "GitHub Actions") and the repository
@@ -16,8 +19,6 @@ name: Deploy site
 # guard skips the deploy instead of failing it, and `workflow_dispatch` is the
 # escape hatch to publish once Pages has been switched on -- this workflow
 # triggers on push, so enabling Pages alone does not build the site.
-#
-# On a custom domain (paperlab.dev), set BASE to '/' and add the CNAME step.
 
 on:
   push:
@@ -34,8 +35,9 @@ permissions:
   id-token: write
 
 env:
-  # Project-pages subpath. Change to '/' when a custom domain is attached.
-  BASE: /Paperlab/
+  # Site root. On the custom domain the site is the apex, not a subpath.
+  BASE: /
+  DOMAIN: paperlab.nawwara.studio
 
 jobs:
   build:
@@ -89,6 +91,12 @@ jobs:
           # Pages serves 404.html for unknown paths; point it at the
           # playground so a stale shared link still lands on something.
           cp site/index.html site/404.html
+          # The README on npm cannot resolve repo-relative paths, so its
+          # images point here. Serving them off the domain rather than
+          # raw.githubusercontent keeps them alive across a username change.
+          cp -r docs/media site/media
+          # Pages reads the custom domain from this file on every deploy.
+          echo "$DOMAIN" > site/CNAME
           # .nojekyll keeps Pages from eating asset dirs that start with _.
           touch site/.nojekyll
 

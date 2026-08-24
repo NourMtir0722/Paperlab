@@ -16,14 +16,22 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const RAW = 'https://raw.githubusercontent.com/NourMtir0722/Paperlab/main'
+// Images resolve against the custom domain rather than raw.githubusercontent.
+// A published README is frozen at its version forever, and a raw URL carries
+// the GitHub username in it — so renaming the account would break every image
+// on every release already sitting on npm. The domain outlives the username.
+// The workflow copies docs/media to /media on the site to make these resolve.
+const MEDIA = 'https://paperlab.nawwara.studio/media'
 const BLOB = 'https://github.com/NourMtir0722/Paperlab/blob/main'
 
 const source = readFileSync(resolve(root, 'README.md'), 'utf8')
 
 const absolute = source
-  // Images resolve against raw.githubusercontent; anything else against blob.
-  .replace(/!\[([^\]]*)\]\((?!https?:)([^)]+)\)/g, (_, alt, path) => `![${alt}](${RAW}/${path})`)
+  // Images resolve against the site's /media; anything else against blob.
+  .replace(
+    /!\[([^\]]*)\]\((?!https?:)([^)]+)\)/g,
+    (_, alt, path) => `![${alt}](${MEDIA}/${path.replace(/^docs\/media\//, '')})`,
+  )
   .replace(/(?<!!)\[([^\]]+)\]\((?!https?:|#)([^)]+)\)/g, (_, text, path) => `[${text}](${BLOB}/${path})`)
 
 const out = resolve(root, 'packages/paperlab/README.md')
