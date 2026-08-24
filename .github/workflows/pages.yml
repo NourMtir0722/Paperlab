@@ -1,8 +1,9 @@
 name: Deploy site
 
-# The playground is the demo — a 3D library nobody can try is a screenshot.
-# Publishes the playground at the site root, the editor at /editor, and the
-# reference at /docs.
+# A 3D library nobody can try is a screenshot, so the site is the demo.
+# The root is a signpost that picks by device — the editor is a three-rail
+# desktop tool with no mobile layout, the playground was built for a phone —
+# and the apps sit at /editor, /playground and /docs behind it.
 #
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
 # No secrets, no third-party account: the OIDC token below is issued by
@@ -65,10 +66,10 @@ jobs:
       - name: Build the library
         run: pnpm --filter paperlab build
 
-      - name: Build the playground (site root)
+      - name: Build the playground (/playground)
         run: pnpm --filter @paperlab/playground exec vite build
         env:
-          PAPERLAB_BASE: ${{ env.BASE }}
+          PAPERLAB_BASE: ${{ env.BASE }}playground/
 
       - name: Build the editor (/editor)
         run: pnpm --filter @paperlab/editor exec vite build
@@ -83,13 +84,16 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir -p site
-          cp -r apps/playground/dist/* site/
+          # The root picks a destination by device; the apps sit behind it.
+          cp tools/site-root.html site/index.html
+          mkdir -p site/playground
+          cp -r apps/playground/dist/* site/playground/
           mkdir -p site/editor
           cp -r apps/editor/dist/* site/editor/
           mkdir -p site/docs
           cp -r apps/docs/dist/* site/docs/
-          # Pages serves 404.html for unknown paths; point it at the
-          # playground so a stale shared link still lands on something.
+          # Pages serves 404.html for unknown paths; point it at the root
+          # signpost so a stale shared link still lands on something.
           cp site/index.html site/404.html
           # The README on npm cannot resolve repo-relative paths, so its
           # images point here. Serving them off the domain rather than
