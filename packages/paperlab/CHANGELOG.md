@@ -1,5 +1,175 @@
 # paperlab
 
+## 0.5.0
+
+### Minor Changes
+
+- 309ec56: Mark every colour field with `.describe('color')`, and publish `sceneSchema`.
+
+  A colour is a string the way a date is a string, and a schema-driven panel had
+  no way to tell the difference — so twelve colour fields across content, wash,
+  light and the stage rendered as text boxes you had to type hex into. The schema
+  now says which strings are pigments, rather than asking every consumer to guess
+  from field names: `color` and `secondary` are both colours, `font` and `text`
+  are both not, and no rule over names separates them.
+
+  `sceneSchema` becomes public because `<PaperField>` now takes one.
+
+- 15fd6c1: Publish `contentNames` and `contentSchemaFor`, so content can be edited the way
+  everything else already is.
+
+  Behaviors, layouts and the stage all hand their editor UI to a caller by
+  publishing a zod schema and letting it be walked. Content could not: the union
+  was internal, so the only way to build a panel for a `receipt` was to write one
+  by hand and keep it in step with the schema — which is exactly what the editor
+  did, for two of the five types, until `card`, `receipt` and `blank` each opened
+  onto an empty folder.
+
+  `contentNames` is read off the union rather than written beside it, because the
+  sibling name lists here (`stockNames`, `physicsNames`) are the SOURCE their
+  schema is built from and this one is not — a hand-written copy would be free to
+  drift the day a sixth content type lands. `contentSchemaFor` answers which
+  member carries which discriminator, which is the union's own fact to state
+  rather than a walk's to rediscover.
+
+- 309ec56: Light overrides reach a single sheet and a field, not just a stage.
+
+  `scene.light` joins `scene.lighting`, so a `<Paper>` can be "studio, but the
+  key is lower and the room is dimmer" — the authorable half that stage mode has
+  always had. `<PaperLighting>` has accepted these overrides all along; nothing
+  was passing them, and a lone sheet could only ever be one of seven rigs exactly
+  as shipped.
+
+  `lightSchema` moves from `scene/lighting.ts` into `config/schema.ts`, where the
+  rest of the serialized config lives. It has to: `sceneSchema` needs it, and
+  `lighting.ts` imports FROM the schema, so the dependency could not run the
+  other way. It is re-exported from its old home, where a caller reaching for the
+  overrides beside `resolveLighting` will still find it.
+
+  `<PaperField>` takes a `scene` too, and lights itself with `<PaperLighting>`
+  rather than the bare ambient-and-directional pair it had. **This changes how an
+  existing `<PaperField>` looks** — and it changes it to what the editor has been
+  showing all along, which is the point: the gallery you composed and the gallery
+  the exported code produced were lit by two different rigs, and the export was
+  the one nobody had looked at.
+
+  `diffFieldProps` also now compares structurally rather than by reference. No
+  object or array copied from a default is ever reference-equal to it, so a
+  layout option holding an array exported a prop that said exactly what the
+  default already said.
+
+- 3cd3bb2: Watercolour washes: `washSchema`, a `wash` field on every content type, and a
+  `washed-letter` preset that shows what it is for.
+
+  A wash is a FIELD rather than a sixth member of the content union, and that is
+  the whole design. It is a ground, not a subject — the thing people want is a
+  letter written over one, a card laid on one, a poster with one behind the type.
+  Made a content type it would have been mutually exclusive with the text it
+  exists to sit behind, and the only way to get both would have been to bake the
+  words into an uploaded picture, which is exactly the trick this library exists
+  to avoid. It applies to the back of the sheet on the same terms.
+
+  Painted rather than shipped as artwork, for the reason `DEMO_CARDS` are typeset
+  rather than photographed. A bitmap is ~100KB that cannot cross a share link,
+  does not survive an export into someone else's codebase, and does not know what
+  stock it is lying on. A wash described in nine numbers travels anywhere the
+  config does, tints against the paper under it, and curls with the mesh because
+  it IS the texture rather than a picture composited over one.
+
+  Four things separate watercolour from a soft gradient, and the painter does all
+  four: edge darkening that follows each pool's own irregular outline and varies
+  in weight around it, wet edges from three harmonics on a radius, `multiply`
+  glazing so two washes crossing are a third hue, and granulation confined to
+  where there is pigment. Seeded, so a preset paints the same wash forever.
+
+- 23d8bb4: Publish `stageBanner`, and carry a stage's pictures through its export.
+
+  `<PaperStageScene>` has accepted an `images` array all along, but
+  `StageExportInput` had no way to say so — a stage built out of pictures
+  exported as a stage of blank banners, silently. `images` now travels, and
+  `exportableImages` decides how.
+
+  An uploaded picture lives as a data URL, and pasting a hundred kilobytes of
+  base64 into a source file is not an export. So an upload becomes a placeholder
+  path — the right number of them, in the right order — and the snippet says
+  that is what happened. A referenced URL is already something the receiver can
+  fetch, so it travels verbatim and gets no apology. Emitting nothing was the
+  other option and it is the worst one: the reader gets blank banners and no clue
+  that the pictures were the point.
+
+  `stageBanner` is the sheet a stage hangs when the caller does not name one. It
+  is exported because it is the base anyone RESHAPING a banner has to start from
+  — a wider drop wants this stock, this grain and this drape at different
+  dimensions, and rebuilding from the schema defaults instead gives a sheet of
+  printer paper with no fold in it. A second copy of those numbers in a caller is
+  a copy free to drift from the one the scene actually falls back to.
+
+- 309ec56: Backdrops: `scene.backdrop`, and `<PaperBackdrop>` to render one.
+
+  A colour and a picture behind the sheet, with `fade` and `blur` so the
+  backdrop stays a backdrop — a photograph at full strength competes with the
+  paper in front of it, which is what a photographer solves by putting the
+  background out of the light.
+
+  Optional on purpose. An unset backdrop leaves the canvas exactly as it was
+  found, because `<Paper>` has always rendered onto whatever is behind it and a
+  default that painted the frame would change the look of every sheet already on
+  a page.
+
+  Painted onto a canvas at the viewport's size rather than assigned straight to
+  `scene.background`: three stretches a background texture to the frame whatever
+  shape it is, so a landscape photograph behind a 9:16 export would come out
+  squashed — and the export sizes are exactly where a backdrop earns its keep.
+
+  `<Paper>` and `<PaperField>` render it. `<PaperMesh>` deliberately does not —
+  it drops into someone else's scene, and a sheet that repainted the background
+  of the app it is embedded in would be doing something nobody asked for.
+  Callers who own their own canvas render `<PaperBackdrop>` themselves.
+
+### Patch Changes
+
+- 8ace6ea: Mark the interactive drag handle as chrome, so a renderer producing a picture
+  can leave it out.
+
+  The handle is drawn with `depthTest: false` on purpose — it has to sit on top
+  of the sheet to be grabbable where the sheet curls away. That also makes it the
+  single most prominent thing in any frame captured off the canvas, which is how
+  the editor's new image export came out with a blue dot in the middle of the
+  receipt.
+
+  `userData.paperlabChrome` says what the object IS — an editing affordance
+  rather than part of the artwork — instead of asking every capture path to know
+  this one mesh by sight. Nothing reads it unless it wants to; the flag is inert
+  for every existing consumer.
+
+- 8aa3029: Point the README and `homepage` at paperlab.nawwara.studio.
+
+  The demo, editor, reference and every image in the npm README resolved through
+  a URL containing the GitHub account name — `nourmtir0722.github.io` for links,
+  `raw.githubusercontent.com/NourMtir0722` for images. A published README is
+  frozen at its version forever, so renaming the account would have left every
+  release already on npm pointing at a dead demo and showing broken images. The
+  custom domain outlives the username.
+
+- 309ec56: Fix `diffConfig` throwing away everything in a scene except `lighting`.
+
+  It read `if (config.scene.lighting !== 'studio') out.scene = { lighting }`,
+  which was true while `lighting` was the only thing a scene had — and silently
+  discarded every field added beside it. So a hand-tuned light rig, and now a
+  backdrop, were shown by the editor and carried by nothing that left it: not a
+  `.paper` file, not a share link, not a JSX snippet or an agent payload.
+
+  The scene is diffed like every other branch of the config now, and a test
+  round-trips it: what the diff emits parses back to what went in.
+
+  Code exports also stop pasting uploaded pictures into source. An upload is a
+  data URL of a hundred kilobytes and up, and there are two places one can now
+  be — the sheet's content and the backdrop behind it. A snippet gets a numbered
+  path in the same position and a line saying so; a referenced URL is untouched.
+  The `.paper` file and the share link still carry the real bytes, because a file
+  has room for them and dropping them there would lose the artwork rather than
+  reformat it.
+
 ## 0.4.0
 
 ### Minor Changes
