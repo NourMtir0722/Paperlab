@@ -469,6 +469,16 @@ button.export:hover {
   background: var(--l3);
 }
 
+/* Why a section is empty, where the buttons would have been. A disabled row
+   says "not now"; this has to say "not here, and here is what would make it
+   possible", which needs a sentence. */
+.export-dropdown .export-note {
+  color: var(--ink-body);
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 2px 14px 10px;
+}
+
 /* "Copy for AI" is the hero path — promote it over the secondary two. */
 .export-dropdown .export-primary {
   position: relative;
