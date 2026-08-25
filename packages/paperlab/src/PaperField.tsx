@@ -2,7 +2,9 @@ import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { forwardRef, useEffect, useMemo, useRef } from 'react'
-import type { PaperConfigInput } from './config/schema'
+import { sceneSchema, type PaperConfigInput, type SceneConfigInput } from './config/schema'
+import { PaperLighting } from './scene/PaperLighting'
+import { PaperBackdrop } from './scene/backdrop'
 import { usePrefersReducedMotion } from './a11y'
 import { DropZoneContext, DropZoneRegistry, type DropZoneConfig, type PlacedPaper } from './field/dropZones'
 import {
@@ -80,6 +82,16 @@ export interface PaperFieldMeshProps {
 }
 
 export interface PaperFieldProps extends PaperFieldMeshProps {
+  /**
+   * Lighting — the same `{ lighting, light }` a single sheet carries.
+   *
+   * This component used to light itself with a bare ambient and a bare
+   * directional, while the editor previewed field mode through
+   * `<PaperLighting>` like everything else. So the gallery you composed and
+   * the gallery the exported code produced were lit by two different rigs,
+   * and the export was the one nobody had looked at.
+   */
+  scene?: SceneConfigInput
   children?: React.ReactNode
   className?: string
   style?: React.CSSProperties
@@ -288,9 +300,10 @@ function FitCamera(meshProps: PaperFieldMeshProps) {
 
 /** `<PaperField />` owns its own Canvas; PaperFieldMesh drops into existing scenes. */
 export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function PaperField(
-  { children, className, style, ...meshProps },
+  { children, className, style, scene, ...meshProps },
   ref,
 ) {
+  const rig = sceneSchema.parse(scene ?? {})
   const registry = useMemo(() => new DropZoneRegistry(), [])
   const a11yRef = useRef<FieldA11yController | null>(null)
 
@@ -313,14 +326,10 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
       <DropZoneContext.Provider value={registry}>
         <Canvas shadows camera={{ position: [0, 0.6, 5.2], fov: 45 }} dpr={[1, 2]}>
           <FitCamera {...meshProps} />
-          <ambientLight intensity={0.7} />
-          <directionalLight
-            position={[3, 5, 4]}
-            intensity={1.4}
-            castShadow
-            shadow-mapSize={[1024, 1024]}
-            shadow-normalBias={0.05}
-          />
+          <PaperBackdrop backdrop={rig.backdrop} />
+          {/* The floor and footprint a gallery of sheets needs — a lone sheet
+              sits closer to the camera and on a tighter shadow. */}
+          <PaperLighting preset={rig.lighting} light={rig.light} floor={-2.4} scale={14} />
           <PaperFieldMesh ref={ref} a11yControllerRef={a11yRef} {...meshProps} />
           {children}
         </Canvas>

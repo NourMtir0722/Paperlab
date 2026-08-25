@@ -1,4 +1,10 @@
-import type { ContentConfig, PaperConfig, PaperStatesInput } from './schema'
+import {
+  sceneSchema,
+  type ContentConfig,
+  type PaperConfig,
+  type PaperStatesInput,
+  type SceneConfigInput,
+} from './schema'
 import { diffConfig } from './diff'
 import { AGENT_PAYLOAD_VERSION } from './agent-payload'
 import { getLayout } from '../field/layouts'
@@ -32,6 +38,8 @@ export interface FieldExportInput {
   motion?: { driver?: 'autoplay' | 'drag' | 'none'; speed?: number }
   entrance?: { type?: 'rise' | 'scatter' | 'none'; stagger?: number; duration?: number }
   papers: FieldExportPaper[]
+  /** How the gallery is lit. Omitted means the schema's own default rig. */
+  scene?: SceneConfigInput
   /** Drop zones — exported as `<DropZone>` children with an onPlace stub. */
   zones?: FieldExportZone[]
 }
@@ -66,13 +74,24 @@ export function distinctFieldPresets(input: FieldExportInput): DistinctPreset[] 
   return [...byKey.values()]
 }
 
+/**
+ * The entries that differ from the defaults.
+ *
+ * Compared STRUCTURALLY rather than by reference. Most of what passes
+ * through here is numbers and strings, where the two agree — but a layout
+ * option holding an array, or a scene holding a nested rig, is never
+ * reference-equal to the default it was copied from, so those exported a
+ * prop that said exactly what the default already said.
+ */
 function nonDefault<T extends Record<string, unknown>>(
   value: T | undefined,
   defaults: Record<string, unknown>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(value ?? {})) {
-    if (v !== undefined && v !== defaults[k]) out[k] = v
+    if (v === undefined) continue
+    const same = v === defaults[k] || JSON.stringify(v) === JSON.stringify(defaults[k])
+    if (!same) out[k] = v
   }
   return out
 }
@@ -87,6 +106,14 @@ export function diffFieldProps(input: FieldExportInput): Record<string, unknown>
   if (Object.keys(motion).length > 0) out.motion = motion
   const entrance = nonDefault(input.entrance, ENTRANCE_DEFAULTS)
   if (Object.keys(entrance).length > 0) out.entrance = entrance
+  // Resolved through the schema before comparing, so an input naming only
+  // `lighting` is judged against a whole default rig rather than a
+  // half-filled one.
+  const scene = nonDefault(
+    sceneSchema.parse(input.scene ?? {}) as unknown as Record<string, unknown>,
+    sceneSchema.parse({}) as unknown as Record<string, unknown>,
+  )
+  if (Object.keys(scene).length > 0) out.scene = scene
   return out
 }
 

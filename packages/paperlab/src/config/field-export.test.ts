@@ -9,6 +9,7 @@ import {
 } from './field-export'
 import { AGENT_PAYLOAD_VERSION } from './agent-payload'
 import { getPreset } from './presets'
+import { getLayout } from '../field/layouts'
 import { groupFieldPapers } from '../field/slots'
 import { zoneAccepts } from '../field/dropZones'
 
@@ -177,5 +178,50 @@ describe('groupFieldPapers', () => {
     const groups = groupFieldPapers([{}, { preset: 'receipt-unroll' }], 'photo-print')
     expect(groups).toHaveLength(2)
     expect(groups[0]!.config.stock).toBe('photo-gloss')
+  })
+})
+
+describe('how the gallery is lit', () => {
+  const field = (scene?: FieldExportInput['scene']): FieldExportInput => ({
+    layout: 'ring',
+    papers: [{ presetName: 'photo-print', preset: photo }],
+    ...(scene ? { scene } : {}),
+  })
+
+  it('says nothing when the rig is the default one', () => {
+    // A `scene` prop repeating what the schema already says is noise in
+    // somebody's file.
+    expect(diffFieldProps(field())).not.toHaveProperty('scene')
+    expect(diffFieldProps(field({}))).not.toHaveProperty('scene')
+    expect(diffFieldProps(field({ lighting: 'studio' }))).not.toHaveProperty('scene')
+  })
+
+  it('carries a named preset that is not the default', () => {
+    expect(diffFieldProps(field({ lighting: 'nave' })).scene).toEqual({ lighting: 'nave' })
+  })
+
+  it('carries hand-moved overrides, and only those', () => {
+    // Unset fields mean "whatever the preset says", so an export that froze
+    // the whole resolved rig would stop tracking the preset it names.
+    expect(diffFieldProps(field({ light: { exposure: 1.8 } })).scene).toEqual({
+      light: { exposure: 1.8 },
+    })
+  })
+
+  it('writes the scene into the component the editor previews', () => {
+    // The editor lit field mode through PaperLighting while <PaperField> lit
+    // itself with a bare ambient and directional, so the gallery you composed
+    // and the code you exported were two different pictures.
+    const source = buildFieldComponentSource(field({ lighting: 'nave' }))
+    expect(source).toContain('scene=')
+    expect(source).toContain('nave')
+  })
+
+  it('compares structurally, so an array equal to its default stays out', () => {
+    // `nonDefault` used to compare by reference, and no object or array
+    // copied from a default is ever reference-equal to it.
+    const defaults = getLayout('ring').defaults as Record<string, unknown>
+    const props = diffFieldProps({ ...field(), layoutOptions: { ...defaults } })
+    expect(props).not.toHaveProperty('layoutOptions')
   })
 })

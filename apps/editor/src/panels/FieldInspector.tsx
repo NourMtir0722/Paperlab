@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getLayout, listLayouts, listPresets } from 'paperlab'
+import { getLayout, listLayouts, listPresets, sceneSchema } from 'paperlab'
 import {
   button,
   folder,
@@ -11,6 +11,8 @@ import {
   type Control,
 } from '../controls/controlModel'
 import { Panel } from '../controls/controls'
+import { lightControls } from './lightControls'
+import { backdropControls } from './backdropControls'
 import { useEditor, type EditorZone } from '../state/store'
 
 /**
@@ -72,6 +74,26 @@ export function FieldInspector() {
         select('replaceWith', replaceTarget, listPresets(), setReplaceTarget, 'replace all with'),
         button('Replace all →', () => setAllSlots(replaceTarget)),
       ],
+      { collapsed: true },
+    ),
+    // The same light panel paper and stage have. A gallery used to be lit by
+    // whichever preset happened to be in slot 0, so swapping one card
+    // relit the room.
+    folder(
+      'Light',
+      // Parsed, not passed raw. The panel draws the RESOLVED rig — the
+      // numbers the scene is actually using — and a half-filled scene has no
+      // preset name for it to resolve against.
+      lightControls(sceneSchema.parse(field.scene) as unknown as Record<string, unknown>, (patch) =>
+        patchField({ scene: { ...field.scene, ...(patch as object) } }),
+      ),
+      { collapsed: true },
+    ),
+    folder(
+      'Scene',
+      backdropControls(sceneSchema.parse(field.scene).backdrop, (next) =>
+        patchField({ scene: { ...field.scene, backdrop: next } }),
+      ),
       { collapsed: true },
     ),
     folder(

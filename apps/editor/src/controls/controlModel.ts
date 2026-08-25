@@ -38,6 +38,14 @@ export type Control =
       onChange: (v: boolean) => void
     }
   | {
+      kind: 'color'
+      key: string
+      label: string
+      /** Whatever the config holds — may not be a `#rrggbb` the swatch can show. */
+      value: string
+      onChange: (v: string) => void
+    }
+  | {
       kind: 'text'
       key: string
       label: string
@@ -109,6 +117,13 @@ export const text = (
   onChange,
 })
 
+export const color = (
+  key: string,
+  value: string,
+  onChange: (v: string) => void,
+  label?: string,
+): Control => ({ kind: 'color', key, label: label ?? key, value, onChange })
+
 export const note = (key: string, value: string): Control => ({ kind: 'note', key, value })
 
 export const button = (label: string, onClick: () => void, key?: string): Control => ({
@@ -177,6 +192,15 @@ export function partitionSignature(
   }
 }
 
+/**
+ * What a schema field says about itself to be drawn as a colour.
+ *
+ * Kept next to the walk that reads it rather than exported from the library,
+ * because it is a contract about a STRING and the library's half of it is a
+ * single call. `paperlab` marks the field; this decides what to draw.
+ */
+const COLOR = 'color'
+
 // ── The schema walk. ────────────────────────────────────────────────────────
 
 /**
@@ -231,7 +255,20 @@ export function schemaControls(
     } else if (inner instanceof z.ZodBoolean) {
       controls.push(toggle(key, Boolean(value), (v) => onChange(key, v)))
     } else if (inner instanceof z.ZodString) {
-      controls.push(text(key, String(value ?? ''), (v) => onChange(key, v)))
+      // A colour is a string the way a date is a string. The schema says
+      // which ones with `.describe('color')`, rather than this walk guessing
+      // from field names — `color` and `secondary` are both pigments, and
+      // `font` and `text` are both not, and no naming rule separates them.
+      //
+      // Read off BOTH the field and its unwrapped inside, because
+      // `.describe()` attaches to whatever it was called on: after
+      // `.default()` it lands on the ZodDefault and never reaches the string.
+      const described = field.description ?? inner.description
+      controls.push(
+        described === COLOR
+          ? color(key, String(value ?? ''), (v) => onChange(key, v))
+          : text(key, String(value ?? ''), (v) => onChange(key, v)),
+      )
     } else if (inner instanceof z.ZodObject) {
       const nested = (value ?? {}) as Record<string, unknown>
       const children = schemaControls(inner, nested, (childKey, childValue) =>

@@ -37,6 +37,8 @@ export {
 
 export {
   paperConfigSchema,
+  sceneSchema,
+  backdropSchema,
   behaviorConfigSchema,
   clothConfigSchema,
   paperStatesSchema,
@@ -68,6 +70,7 @@ export {
   type PhysicsConfigInput,
   type ClothConfig,
   type SceneConfig,
+  type BackdropConfig,
   type SceneConfigInput,
   type LightingName,
   type FilmName,
@@ -129,6 +132,8 @@ export {
   type LightOverridesInput,
 } from './scene/lighting'
 export { PaperLighting, type PaperLightingProps } from './scene/PaperLighting'
+// Rendered by whoever owns the canvas — see the note on the component.
+export { PaperBackdrop } from './scene/backdrop'
 // Publish a resolved rig to the paper under it, so a hand-lit scene's
 // transmission agrees with its lamps. `<PaperStage>` does this for you.
 export { LightRig } from './scene/rig'

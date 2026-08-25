@@ -4,6 +4,7 @@ import {
   listLayouts,
   listPresets,
   paperConfigSchema,
+  sceneSchema,
   paperStatesSchema,
   type PaperStatesInput,
 } from 'paperlab'
@@ -65,6 +66,7 @@ const fieldSessionSchema = z.object({
   speed: z.number(),
   entrance: z.enum(['rise', 'scatter', 'none']),
   slots: z.array(z.string()).min(1),
+  scene: sceneSchema,
   // JSON turns the numeric slot keys into strings; they come back as numbers.
   slotStates: z.record(z.string(), paperStatesSchema),
   zones: z.array(zoneSchema),

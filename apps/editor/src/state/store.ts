@@ -18,6 +18,7 @@ import {
   type PaperConfig,
   type PaperConfigInput,
   type PaperStatesInput,
+  type SceneConfigInput,
   type SurfaceConfig,
 } from 'paperlab'
 import {
@@ -58,6 +59,8 @@ export interface FieldState {
   entrance: 'rise' | 'scatter' | 'none'
   /** Preset name per slot — each field slot references a preset (components). */
   slots: string[]
+  /** How the gallery is lit — the same `{ lighting, light }` a sheet carries. */
+  scene: SceneConfigInput
   /** Per-slot state overrides (slot layer, merged over the preset's states). */
   slotStates: Record<number, PaperStatesInput>
   /** Drop zones — serialized into the field config and the export. */
@@ -278,6 +281,10 @@ const DEFAULT_FIELD: FieldState = {
   // content, and a museum label printed on gloss photo stock is the wrong
   // material. Matte printer stock is what a card is cut from.
   slots: Array.from({ length: 14 }, () => 'blank-sheet'),
+  // The schema's own rig. Field mode used to inherit whatever the first
+  // slot's preset happened to say, which meant the lighting of a gallery
+  // changed when you swapped one card in it.
+  scene: {},
   slotStates: {},
   zones: [],
 }

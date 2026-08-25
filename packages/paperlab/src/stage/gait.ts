@@ -24,7 +24,7 @@ export const figureSchema = z.object({
   /** Arm swing, 0..1. Drop it toward 0 for hands-in-pockets stillness. */
   swing: z.number().min(0).max(1).default(1),
   /** Silhouette color. Near-black by default: it should read as an absence, not an object. */
-  color: z.string().default('#0a0a0c'),
+  color: z.string().default('#0a0a0c').describe('color'),
   /**
    * How the figure takes light.
    *

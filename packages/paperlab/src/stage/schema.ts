@@ -15,7 +15,7 @@ import { figureSchema } from './gait'
 export const stageSourceSchema = z.object({
   /** The bright void the walk resolves toward. Without it the vanishing point is a hole. */
   enabled: z.boolean().default(true),
-  color: z.string().default('#fff4e2'),
+  color: z.string().default('#fff4e2').describe('color'),
   /** How far past the end of the walk it stands, world units. */
   beyond: z.number().min(0).max(80).default(10),
   /**
@@ -48,7 +48,7 @@ export const stageGroundSchema = z.object({
    * kept its contrast against the source and gained a surface you can read
    * the size of the room from.
    */
-  color: z.string().default('#241e19'),
+  color: z.string().default('#241e19').describe('color'),
   /**
    * Width of one poured slab, in world units. 0 leaves the floor unseamed.
    *
@@ -93,7 +93,7 @@ export const stageSuspensionSchema = z.object({
    * paper is meant to be impossible.
    */
   type: z.enum(['none', 'thread', 'rod']).default('thread'),
-  color: z.string().default('#9c948a'),
+  color: z.string().default('#9c948a').describe('color'),
   /**
    * What grips the sheet.
    *
@@ -149,7 +149,7 @@ export const stageColumnsSchema = z.object({
    * more banners, and the eye stops being able to tell what the room is made
    * of from what is hanging in it.
    */
-  color: z.string().default('#5c554d'),
+  color: z.string().default('#5c554d').describe('color'),
 })
 
 /**
@@ -168,7 +168,7 @@ export const stageDoorwaySchema = z.object({
   enabled: z.boolean().default(false),
   /** Opening size, as a multiple of the source's own. 1 frames it exactly. */
   opening: z.number().min(0.2).max(3).default(1.05),
-  color: z.string().default('#171310'),
+  color: z.string().default('#171310').describe('color'),
 })
 
 export const stageRoomSchema = z.object({
@@ -182,7 +182,7 @@ export const stageRoomSchema = z.object({
    * happened to be scaled to that day.
    */
   height: z.number().min(1).max(6).default(2.2),
-  color: z.string().default('#171310'),
+  color: z.string().default('#171310').describe('color'),
   /** Columns flanking the walk — see `stageColumnsSchema`. */
   columns: stageColumnsSchema.default({}),
   /** A wall at the end of the walk with the source in it. */

@@ -130,3 +130,75 @@ describe('onTwos quantizer', () => {
     expect(quantizeProgress(0.53, 2)).toBeCloseTo(13 / 24)
   })
 })
+
+describe('the scene survives the trip out', () => {
+  const parse = (scene: unknown) => paperConfigSchema.parse({ scene })
+  const upload = 'data:image/jpeg;base64,AAAA'
+
+  it('says nothing about a scene nobody touched', () => {
+    expect(diffConfig(parse({}))).not.toHaveProperty('scene')
+    expect(diffConfig(parse({ lighting: 'studio' }))).not.toHaveProperty('scene')
+  })
+
+  it('carries a named preset', () => {
+    expect(diffConfig(parse({ lighting: 'nave' })).scene).toEqual({ lighting: 'nave' })
+  })
+
+  it('carries hand-moved light overrides', () => {
+    // This is what the old `if (lighting !== "studio") out.scene = { lighting }`
+    // threw away: the editor showed a tuned rig and nothing that left the
+    // editor — file, link or snippet — carried a single number of it.
+    expect(diffConfig(parse({ light: { exposure: 1.8, key: 6 } })).scene).toEqual({
+      light: { exposure: 1.8, key: 6 },
+    })
+  })
+
+  it('carries only the overrides that were moved', () => {
+    // An unset field means "whatever the preset says"; freezing the resolved
+    // rig would stop it tracking the preset it names.
+    const scene = diffConfig(parse({ lighting: 'nave', light: { haze: 0.4 } })).scene
+    expect(scene).toEqual({ lighting: 'nave', light: { haze: 0.4 } })
+  })
+
+  it('carries a backdrop', () => {
+    const scene = diffConfig(parse({ backdrop: { image: '/wall.jpg' } })).scene
+    expect(scene).toMatchObject({ backdrop: { image: '/wall.jpg', fit: 'cover' } })
+  })
+
+  it('round-trips: what the diff emits parses back to what went in', () => {
+    const original = parse({ lighting: 'nave', light: { exposure: 1.8 }, backdrop: { image: '/w.jpg' } })
+    expect(paperConfigSchema.parse(diffConfig(original)).scene).toEqual(original.scene)
+  })
+
+  it('swaps an uploaded backdrop for a path in a code export, and says so', () => {
+    const jsx = buildJsxSnippet(parse({ backdrop: { image: upload } }))
+    expect(jsx).not.toContain('base64')
+    expect(jsx).toContain('/paperlab-image-1.jpg')
+    expect(jsx).toContain('stand-ins')
+  })
+
+  it('swaps an uploaded sheet picture too', () => {
+    // Same problem, and it was there before backdrops were: an uploaded
+    // content image put its whole base64 into the snippet.
+    const config = paperConfigSchema.parse({ content: { type: 'image', src: upload } })
+    expect(buildJsxSnippet(config)).not.toContain('base64')
+    expect(buildAgentPayload(config)).not.toContain('base64')
+  })
+
+  it('leaves a referenced URL exactly as it is', () => {
+    // A path the receiver can fetch is the case that already works.
+    const jsx = buildJsxSnippet(parse({ backdrop: { image: 'https://example.com/w.jpg' } }))
+    expect(jsx).toContain('https://example.com/w.jpg')
+    expect(jsx).not.toContain('stand-ins')
+  })
+
+  it('numbers the stand-ins so two pictures do not become one', () => {
+    const config = paperConfigSchema.parse({
+      content: { type: 'image', src: upload },
+      scene: { backdrop: { image: upload } },
+    })
+    const jsx = buildJsxSnippet(config)
+    expect(jsx).toContain('/paperlab-image-1.jpg')
+    expect(jsx).toContain('/paperlab-image-2.jpg')
+  })
+})
