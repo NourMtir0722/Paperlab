@@ -80,3 +80,11 @@ jobs:
       # the pipeline type-checks or renders that file, so check it directly.
       - name: Root routing gate
         run: pnpm test:route
+
+      # The select is the app's own, so its option list is app DOM in a
+      # scrolling box. It shipped dismissing itself on its own scroll, which
+      # put every option below the fold out of reach of a mouse with nothing
+      # in the console to say so. Only a browser can tell whether the whole
+      # list is reachable.
+      - name: Dropdown reach gate
+        run: pnpm test:dropdown
