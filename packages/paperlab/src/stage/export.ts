@@ -147,7 +147,18 @@ export function describeStage(input: StageExportInput): string {
     .filter(([, value]) => value !== undefined)
     .map(([key]) => key)
   if (moved.length > 0) parts.push(`with its ${moved.join(', ')} set by hand`)
-  if (input.scroll) parts.push('and scrolling the page walks the figure deeper into it')
+  // Gated on the figure, not just on `scroll`. `showFigure` defaults to
+  // false and every built-in stage preset leaves it there, so the common
+  // export has nobody walking — and this clause was promising one anyway, in
+  // the same sentence the reader is told to check the render against. What
+  // scroll moves when the stage is empty is the camera.
+  if (input.scroll) {
+    parts.push(
+      stage.showFigure
+        ? 'and scrolling the page walks the figure deeper into it'
+        : 'and scrolling the page carries the camera deeper into it',
+    )
+  }
   return parts.join(', ')
 }
 
@@ -279,7 +290,16 @@ export function buildStageAgentPayload(input: StageExportInput): string {
     : `4. Sizing: the component fills its parent container. Place it where I ask;
    give the parent an explicit height.`
 
-  return `Integrate a Paperlab stage — paper as architecture, with a figure walking through it — into this project. (paperlab agent-payload v${AGENT_PAYLOAD_VERSION})
+  // Same reason the scroll clause is gated: a stage with `showFigure` off —
+  // which is the default, and every built-in preset — has no figure in it,
+  // and opening the brief by promising one sends the reader looking for a
+  // thing the component cannot render. The library ships no assets, so a
+  // figure is always the caller's own model on the caller's own URL.
+  const subject = stageSchema.parse(input.stage).showFigure
+    ? 'paper as architecture, with a figure walking through it'
+    : 'paper as architecture, banners hung along a walk you move through'
+
+  return `Integrate a Paperlab stage — ${subject} — into this project. (paperlab agent-payload v${AGENT_PAYLOAD_VERSION})
 
 1. Install the dependencies:
 

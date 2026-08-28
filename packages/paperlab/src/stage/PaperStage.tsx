@@ -11,6 +11,7 @@ import { getLayout } from '../field/layouts'
 import { PaperLighting } from '../scene/PaperLighting'
 import { resolveLighting } from '../scene/lighting'
 import { LightRig } from '../scene/rig'
+import { ReleaseContextOnUnmount } from '../scene/release'
 import { getWalkPath } from './path'
 import { stageCamera, walkPoint } from './camera'
 import { Figure } from './Figure'
@@ -671,6 +672,7 @@ export function PaperStage({ children, className, style, ...sceneProps }: PaperS
       >
         <PaperStageScene {...sceneProps} />
         {children}
+        <ReleaseContextOnUnmount />
       </Canvas>
     </div>
   )

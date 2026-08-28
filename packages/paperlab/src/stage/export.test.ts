@@ -123,7 +123,18 @@ describe('describeStage', () => {
   it('names the walk shape, and says when scroll drives it', () => {
     expect(describeStage(base({ stage: { path: walks.ess } }))).toContain('"ess" walk')
     expect(describeStage(base({ stage: { path: walks.ring } }))).toContain('closed loop')
-    expect(describeStage(base({ scroll: true }))).toContain('scrolling the page walks the figure')
+    expect(describeStage(base({ scroll: true }))).toContain('scrolling the page')
+  })
+
+  it('says what scroll actually moves, which is the figure only if there is one', () => {
+    // `showFigure` is off by default and every built-in preset leaves it
+    // there, so the common scroll export moves a camera through an empty
+    // hall. Naming a figure there sends the reader hunting for one.
+    expect(describeStage(base({ scroll: true }))).toContain('carries the camera deeper')
+    expect(describeStage(base({ scroll: true }))).not.toContain('walks the figure')
+    expect(describeStage(base({ scroll: true, stage: { showFigure: true } }))).toContain(
+      'walks the figure deeper',
+    )
   })
 
   it('mentions the figure only when one is actually drawn', () => {
@@ -146,6 +157,17 @@ describe('stage agent payload', () => {
     expect(payload).toContain('You should see')
     // The mistake a receiving agent would otherwise make.
     expect(payload).toContain("don't add OrbitControls")
+  })
+
+  it('does not open by promising a figure the stage has not got', () => {
+    // The first line is the one sentence a receiving agent reads before it
+    // reads any code, so a figure claimed there is a figure it goes looking
+    // for. The library ships no assets — a figure is always the caller's own
+    // model on the caller's own URL.
+    expect(buildStageAgentPayload(base())).not.toContain('with a figure walking through it')
+    expect(buildStageAgentPayload(base({ stage: { showFigure: true } }))).toContain(
+      'with a figure walking through it',
+    )
   })
 
   it('tells the receiver the scroll variant brings its own height', () => {

@@ -1023,6 +1023,25 @@ button.export:hover {
   font-weight: 600;
 }
 
+/* The composer's one caveat, under the slot list it is about. Same voice as
+   .stage-note and sat apart from the rail by a rule, because it is a note
+   about the papers rather than another control. */
+.slot-note {
+  color: var(--ink-body);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+}
+
+/* biome-ignore lint/style/noDescendingSpecificity: disjoint component — the
+   composer's slot note and an export-frame button never match one element. */
+.slot-note strong {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
 .stage-presets {
   list-style: none;
   margin: 0 0 16px;
