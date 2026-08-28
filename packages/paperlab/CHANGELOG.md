@@ -1,5 +1,46 @@
 # paperlab
 
+## 0.5.1
+
+### Patch Changes
+
+- 9eab598: Stop the generated scroll component shipping a comment about a figure that is
+  not in the scene.
+
+  The stage brief's figure claims were gated on `showFigure`, but the comment
+  baked into the generated component source was not — so a scroll export planted
+  `// Scroll the section, walk the figure.` in the receiver's own file whether or
+  not one was drawn. `showFigure` is off by default and every built-in stage
+  preset leaves it there. It now names the camera when nobody is walking.
+
+- 0adc36b: Stop the stage agent brief promising a figure that is not there.
+
+  `showFigure` defaults to false and every built-in stage preset leaves it
+  there, so the common export is a camera moving through an empty hall.
+  `describeStage` already knew that and withheld the "a small dark figure
+  walking between them" clause — but the payload's opening sentence claimed
+  "with a figure walking through it" unconditionally, and the scroll clause was
+  gated on `scroll` rather than on the figure, so it promised "scrolling the
+  page walks the figure deeper into it" as well. Both now follow the figure, and
+  the scroll clause names the camera when there is nobody to walk.
+
+  This matters because the brief's description is the acceptance test a
+  receiving agent checks the render against: a figure named there is a figure it
+  goes looking for, and the library ships no assets — a figure is always the
+  caller's own model on the caller's own URL.
+
+- 0adc36b: Hand the WebGL context back when a canvas unmounts.
+
+  A browser allows a page about sixteen live WebGL contexts and then starts
+  killing the oldest. React Three Fiber disposes the renderer's own resources on
+  unmount, but the drawing context itself survives until the garbage collector
+  reaches the canvas — so anything that mounts and unmounts paper as it scrolls
+  exhausts the ceiling with contexts belonging to sheets that are no longer on
+  screen. `<Paper>`, `<PaperField>` and `<PaperStage>` now release the context
+  explicitly. Measured on the reference page: one scroll to the bottom went from
+  101 "Too many active WebGL contexts" warnings to none, at an unchanged peak of
+  thirteen simultaneous canvases.
+
 ## 0.5.0
 
 ### Minor Changes

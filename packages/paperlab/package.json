@@ -1,6 +1,6 @@
 {
   "name": "paperlab",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Physical, realistic paper as a React component. Sculptable sheets, preset-driven, geometry-true curl.",
   "license": "Apache-2.0",
   "type": "module",
