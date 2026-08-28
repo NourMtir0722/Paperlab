@@ -216,6 +216,11 @@ export function buildStageComponentSource(input: StageExportInput): string {
     ? `\n\nconst banner = ${stringifyStage(diffConfig(paperConfigSchema.parse(input.paper)))} satisfies PaperConfigInput`
     : ''
   const textConst = input.text?.trim() ? `\n\nconst text = ${JSON.stringify(input.text)}` : ''
+  // What the scroll actually drives, for the comment that ships inside the
+  // generated component. `showFigure` is off by default, so this line was
+  // telling the receiver — in their own codebase, in their own file — to
+  // watch a figure that is not in the scene.
+  const scrolls = stageSchema.parse(input.stage).showFigure ? 'walk the figure' : 'move the camera'
   const images = input.images?.length ? exportableImages(input.images) : null
   const imagesConst = images
     ? `\n${
@@ -248,7 +253,7 @@ export function ${name}() {
   const ref = useRef<HTMLDivElement>(null)
   const [progress, setProgress] = useState(0)
 
-  // Scroll the section, walk the figure. The stage is pinned for the height
+  // Scroll the section, ${scrolls}. The stage is pinned for the height
   // of the section, so the page scrolling past it IS the walk.
   useEffect(() => {
     const el = ref.current
