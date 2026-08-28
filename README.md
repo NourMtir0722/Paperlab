@@ -144,7 +144,7 @@ And it is navigable rather than a video. It drifts on its own until you touch it
 - **Physics** — curated idle motion (`float`, `tumble`, `dangle`, `taped`, `breeze`) that composes with behaviors, and a verlet **cloth** mode: pin the top edge, add wind, grab the sheet and pull. Cloth and behaviors are mutually exclusive by schema — cloth owns the vertices.
 - **Interaction states** — a preset can carry `states`: overrides-on-base diffs keyed `rest` / `hover` / `pressed` / `picked` / `placed`, with the triggers built in. Drag a stamp past its threshold and it tears off its sheet (the perforation edges facing its neighbours flip to torn), release it over a `<DropZone>` and it settles, release it anywhere else and it flutters home. The whole flow is reachable from the keyboard: focus a paper, Enter picks, arrows move between zones, Enter places, Escape returns it.
 - **Hardware that holds the paper up** — thread to the ceiling or a rod across the top edge, gripped by a clip or a peg. A hung thing that shows what holds it stops reading as a rectangle that happens to float.
-- **Presets** — 15 paper presets and 6 stage presets, and everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
+- **Presets** — 16 paper presets and 6 stage presets, and everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
 - **Agent-first export** — the editor's **Copy for AI** button produces a self-contained brief you paste into a coding agent: install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md) and [docs/llms.txt](docs/llms.txt).
 - **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose and disables physics and entrances, a hidden DOM mirror carries the content for screen readers and find-in-page, and a flat DOM fallback renders when WebGL isn't available.
 
@@ -229,7 +229,7 @@ pnpm knip           # dead code and unused exports
 pnpm build
 ```
 
-Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All four test commands are CI gates, along with `publint` and `are-the-types-wrong` on the published package.
+Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All six test commands are CI gates, along with `publint` and `are-the-types-wrong` on the published package.
 
 ### Measurement
 
