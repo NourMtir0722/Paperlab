@@ -5,6 +5,7 @@ import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import { sceneSchema, type PaperConfigInput, type SceneConfigInput } from './config/schema'
 import { PaperLighting } from './scene/PaperLighting'
 import { PaperBackdrop } from './scene/backdrop'
+import { ReleaseContextOnUnmount } from './scene/release'
 import { usePrefersReducedMotion } from './a11y'
 import { DropZoneContext, DropZoneRegistry, type DropZoneConfig, type PlacedPaper } from './field/dropZones'
 import {
@@ -332,6 +333,7 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
           <PaperLighting preset={rig.lighting} light={rig.light} floor={-2.4} scale={14} />
           <PaperFieldMesh ref={ref} a11yControllerRef={a11yRef} {...meshProps} />
           {children}
+          <ReleaseContextOnUnmount />
         </Canvas>
         {interactive && <FieldKeyboardMirror papers={papers} controller={a11yRef} />}
       </DropZoneContext.Provider>
