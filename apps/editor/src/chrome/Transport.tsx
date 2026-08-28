@@ -80,6 +80,10 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
         ref={scrubRef}
         className="scrubber"
         type="range"
+        // The only control in the transport with no visible label — the play
+        // button carries a glyph, this carries a track. Unnamed, a screen
+        // reader announces it as a bare slider from 0 to 1.
+        aria-label="Progress through the behavior"
         min={0}
         max={1}
         step={0.001}

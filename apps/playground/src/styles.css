@@ -176,10 +176,19 @@ button.primary:hover {
 }
 
 .write span {
+  /* Carries its own ground, for the reason .wordmark does: the hall behind
+     this is bright cream more often than not, and 55% white on cream measured
+     2.55:1 on a phone — the label of the one control the whole mode is about,
+     unreadable. A pill would be heavy on a field label, so this is the same
+     glass, sized to the text and sitting only under it. */
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--glass-fill);
   font-size: 11px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-body);
+  color: var(--ink-2);
 }
 
 textarea {
@@ -226,10 +235,18 @@ textarea::placeholder {
 /* The one instruction the mode needs. It is not obvious that a rendered
    scene can be grabbed, and nobody discovers an arrow key by accident. */
 .walkhint {
+  /* Same rule as .write span. This one happens to sit over the dark floor at
+     the opening camera position and reads fine there — but it is the same
+     bare-text-on-a-live-render pattern, and it fails the moment the walk
+     reaches a lit part of the hall. */
+  align-self: flex-start;
   margin: 0 0 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--glass-fill);
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: var(--ink-body);
+  color: var(--ink-2);
 }
 
 .chip {

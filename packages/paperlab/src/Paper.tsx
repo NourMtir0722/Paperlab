@@ -4,6 +4,7 @@ import { PaperMesh, useResolvedConfig, type PaperHandle, type PaperMeshProps } f
 import { PaperFallback, PaperMirror, supportsWebGL } from './a11y'
 import { PaperLighting } from './scene/PaperLighting'
 import { PaperBackdrop } from './scene/backdrop'
+import { ReleaseContextOnUnmount } from './scene/release'
 
 export interface PaperProps extends PaperMeshProps {
   /** Extra children rendered inside the canvas (lights are provided). */
@@ -47,6 +48,7 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
           />
           <PaperMesh ref={ref} {...meshProps} />
           {children}
+          <ReleaseContextOnUnmount />
         </Canvas>
       ) : (
         <PaperFallback config={config} />
