@@ -189,6 +189,88 @@ try {
     'a resize still dismisses it',
     await closedBy(() => page.setViewportSize({ width: 1500, height: 950 })),
   )
+
+  // ── The keyboard contract ───────────────────────────────────────────────
+  // A navigation key names an option: closed, that opens the list on it, and
+  // the value does not move until Enter, Space or a click. Home and End used
+  // to commit on the spot instead, so one keystroke could swap the sculpt for
+  // another preset and rebuild the canvas with no list ever shown.
+  await dismiss()
+  const shownValue = async () => ((await presetPicker.textContent()) ?? '').replace('▾', '').trim()
+  const openBy = async (key) => {
+    await presetPicker.focus()
+    await page.keyboard.press(key)
+    return await list
+      .first()
+      .waitFor({ state: 'attached', timeout: SETTLE })
+      .then(() => true)
+      .catch(() => false)
+  }
+
+  // Start from the top of the list. The run above left the picker on the last
+  // preset, and there "End committed it" and "End did nothing" produce the
+  // same value — the check would pass on the broken behaviour too.
+  if (await openList(presetPicker)) {
+    const first = list.first().locator('.select-option').first()
+    const firstName = (await first.textContent())?.trim()
+    await first.click({ timeout: SETTLE }).catch(() => {})
+    await page
+      .waitForFunction(
+        (want) =>
+          (
+            document.querySelector('[role=combobox][aria-label="Choose a built-in preset"]')?.textContent ??
+            ''
+          ).includes(want),
+        firstName ?? '',
+        { timeout: SETTLE },
+      )
+      .catch(() => {})
+  }
+  await dismiss()
+  // Park the pointer clear of the list. Hover follows the mouse, and a cursor
+  // left sitting over an option would be answering these keyboard checks.
+  await page.mouse.move(10, 10)
+
+  const before = await shownValue()
+  const endOpened = await openBy('End')
+  check('End on a closed select opens the list', endOpened)
+  // If it did not open, End committed instead — the exact regression this
+  // section is here for. Say so for each remaining check rather than throwing
+  // on the list that is not there and losing the rest of the run.
+  const last = endOpened ? (await list.first().locator('.select-option').last().textContent())?.trim() : null
+  check(
+    'and does not commit on its own',
+    endOpened && (await shownValue()) === before,
+    endOpened ? `still "${before}"` : `was "${before}", now "${await shownValue()}"`,
+  )
+
+  let commits = false
+  if (endOpened) {
+    await page.keyboard.press('Enter')
+    commits = await page
+      .waitForFunction(
+        (want) =>
+          (
+            document.querySelector('[role=combobox][aria-label="Choose a built-in preset"]')?.textContent ??
+            ''
+          ).includes(want),
+        last ?? '',
+        { timeout: SETTLE },
+      )
+      .then(() => true)
+      .catch(() => false)
+  }
+  check('Enter is what commits it', commits, `wanted "${last}"`)
+
+  // Whatever the value is by now, backing out of the list must not move it.
+  const beforeHome = await shownValue()
+  check('Home on a closed select opens the list', await openBy('Home'))
+  await page.keyboard.press('Escape')
+  await list
+    .first()
+    .waitFor({ state: 'detached', timeout: SETTLE })
+    .catch(() => {})
+  check('Escape leaves the value alone', (await shownValue()) === beforeHome, `still "${beforeHome}"`)
 } finally {
   await browser.close()
   stop()

@@ -222,6 +222,7 @@ pnpm test:parity    # 37 golden-vector cases: every deformer's GLSL twin vs its 
 pnpm test:drive     # the stage really walks when you drag, wheel or arrow it
 pnpm test:share     # sculpt → link → a browser that has never seen the paper
 pnpm test:dropdown  # every dropdown option is reachable, including below the fold
+pnpm test:route     # the site root sends each device to the app built for it
 pnpm typecheck
 pnpm lint
 pnpm knip           # dead code and unused exports

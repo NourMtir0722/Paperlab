@@ -11,10 +11,17 @@ import { createPortal } from 'react-dom'
  *
  * Two things it must not lose by leaving the native control behind:
  *
- * - **Keyboard.** Enter / Space / ArrowDown open, arrows and Home/End move,
- *   Enter or Space commit, Escape and Tab close, and typing letters jumps to
- *   the next matching option. That is the native contract, and this is the
- *   whole cost of replacing a native control.
+ * - **Keyboard.** One rule: a navigation key *names* an option. Closed, that
+ *   opens the list on it; open, it moves the highlight to it. Arrows, Home,
+ *   End and typeahead all work that way, and nothing changes the value until
+ *   Enter, Space or a click says so. Escape and Tab close.
+ *
+ *   This is the ARIA select-only combobox pattern, which is the contract the
+ *   widget opted into the moment it claimed `role="combobox"` over a
+ *   `role="listbox"`. It replaced a split where ArrowDown opened but ArrowUp,
+ *   Home and End committed on the spot — so Home on a closed picker silently
+ *   swapped the sculpt for the first preset and rebuilt the canvas, with no
+ *   list ever shown and nothing asked.
  * - **Not being clipped.** Both inspector rails are `overflow-y: auto`, so a
  *   popup positioned inside one is cut off by it. The list is therefore
  *   portaled to `<body>` and positioned `fixed` off the trigger's rect —
@@ -87,19 +94,18 @@ export function Select({ value, options, onChange, label, className, format, tit
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const index = open ? active : Math.max(0, options.indexOf(value))
+    // Every key below names an option. Closed, that opens the list on it
+    // rather than committing it: choosing a preset rebuilds the canvas, and
+    // no keystroke should do that without the list ever being seen.
     const move = (next: number) => {
       e.preventDefault()
       const clamped = Math.min(options.length - 1, Math.max(0, next))
       if (open) setActive(clamped)
-      // Closed, the arrows step the value directly, the way a native select
-      // does on every platform this app runs on.
-      else commit(clamped)
+      else openList(clamped)
     }
     switch (e.key) {
       case 'ArrowDown':
-        if (open) return move(index + 1)
-        e.preventDefault()
-        return openList(index)
+        return move(index + 1)
       case 'ArrowUp':
         return move(index - 1)
       case 'Home':
@@ -222,10 +228,15 @@ function SelectList({
 
   // Focus moves into the list so the arrows keep working after the mouse
   // opened it; dismissing puts focus back on the trigger.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount only — the list is unmounted when it closes, so "once, when it appears" is the whole intent.
+  //
+  // It has to wait for the measurement. Until `box` lands the list is still
+  // `visibility: hidden`, and a hidden element cannot take focus — so the
+  // version of this that ran on mount called `focus()` into the void and left
+  // the listbox unreachable to anything that follows focus.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the measurement is the trigger — the list is reached through the DOM rather than by closing over it, and `box` lands once per open.
   useEffect(() => {
-    ref.current?.focus()
-  }, [])
+    if (box) ref.current?.focus()
+  }, [box])
 
   // Keep the active option in view for arrow-key and typeahead travel.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the whole trigger — the effect re-runs to scroll the newly-active option into view, and reads it through the DOM rather than by closing over it.
@@ -251,6 +262,12 @@ function SelectList({
         }
         onKeyDown={onKeyDown}
       >
+        {/* `mousemove`, not `mouseenter`: the list opens under wherever the
+            cursor already was, and `mouseenter` fires on an option that
+            appears beneath a stationary pointer. That let the mouse overrule
+            the key that opened the list — press End, and the highlight landed
+            on whatever happened to be under your hand instead of on the last
+            option. Hover should follow the hand, and only when it moves. */}
         {options.map((option, i) => (
           <button
             key={option}
@@ -259,7 +276,7 @@ function SelectList({
             aria-selected={option === value}
             data-active={i === active}
             className={`select-option${option === value ? ' selected' : ''}${i === active ? ' active' : ''}`}
-            onMouseEnter={() => onHover(i)}
+            onMouseMove={() => onHover(i)}
             onClick={() => onPick(i)}
           >
             {show(option)}

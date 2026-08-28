@@ -434,6 +434,7 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:drive` | the editor | the stage really walks when you drag, wheel or arrow it. **CI gate** |
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
+| `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
 | `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
 | `pnpm media` | `media.html` | the README's GIFs and MP4s, stepped frame-exact |
