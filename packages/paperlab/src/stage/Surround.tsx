@@ -71,16 +71,31 @@ export function makeGlowTexture(color: string): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d')!
   const glow = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
   const c = new THREE.Color(color)
-  const rgb = `${(c.r * 255) | 0}, ${(c.g * 255) | 0}, ${(c.b * 255) | 0}`
-  // Same colour throughout — only the alpha falls, so the fade never tints.
+  // The falloff is carried by the COLOUR, on a texture that stays fully
+  // opaque, and `Source` adds it to the room rather than mixing into it.
+  //
+  // It was an alpha ramp over a flat colour, which is the same picture in
+  // theory and a drift of green dots across the far wall in Safari. A 2D
+  // canvas stores its pixels premultiplied; uploading one as an
+  // un-premultiplied texture makes the browser divide the colour back out,
+  // and along this tail — where alpha reaches 3/255 — that division
+  // multiplies an 8-bit rounding error by eighty. WebKit's rounding puts a
+  // few of those texels off-hue, and this plane is the widest thing in
+  // frame, so a handful of bad texels became speckle over the whole end of
+  // the hall. Premultiplying the ramp here means there is nothing to divide
+  // back out: what is drawn is what is uploaded.
+  //
+  // Adding is the more honest model anyway — a source puts light INTO the
+  // room, it does not stand in front of it — and it is what stops the tail
+  // from very slightly darkening everything it crosses.
   //
   // A held core and then a long tail. The core has to stay — it is the one
   // thing in frame brighter than the paper, and a falloff that starts at the
-  // centre gives a soft warm haze with nothing to walk toward. What changed
-  // is the tail: dropping from full to nothing over the last 45% put a
-  // visible RIM on the plane, a disc of light with an edge hanging in the
-  // room like a moon, and light does not have an edge.
-  for (const [stop, alpha] of [
+  // centre gives a soft warm haze with nothing to walk toward. The tail is
+  // long for its own reason: dropping from full to nothing over the last 45%
+  // put a visible RIM on the plane, a disc of light with an edge hanging in
+  // the room like a moon, and light does not have an edge.
+  for (const [stop, level] of [
     [0, 1],
     [0.5, 1],
     [0.62, 0.66],
@@ -89,7 +104,8 @@ export function makeGlowTexture(color: string): THREE.CanvasTexture {
     [0.94, 0.03],
     [1, 0],
   ] as const) {
-    glow.addColorStop(stop, `rgba(${rgb}, ${alpha})`)
+    const scaled = `${(c.r * 255 * level) | 0}, ${(c.g * 255 * level) | 0}, ${(c.b * 255 * level) | 0}`
+    glow.addColorStop(stop, `rgb(${scaled})`)
   }
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, size, size)
@@ -147,6 +163,10 @@ export function Source({
       <meshBasicMaterial
         map={texture}
         transparent
+        // The map is premultiplied and opaque — see `makeGlowTexture` — so
+        // the falloff has to be applied by ADDING it, and adding is what a
+        // light does to a room in any case.
+        blending={THREE.AdditiveBlending}
         // `color` multiplies the map, and a THREE.Color is not clamped to 1,
         // so this is how a basic material carries HDR.
         color={new THREE.Color(intensity, intensity, intensity)}
