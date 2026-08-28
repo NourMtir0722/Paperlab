@@ -167,16 +167,6 @@ export function App() {
       ...(field.slotStates[i] ? { states: field.slotStates[i] } : {}),
     }
   })
-  // How many slots are showing a card that is NOT theirs.
-  //
-  // The demo pool above is preview dressing, and `fieldExportInput` leaves it
-  // out on purpose — a slot's real content lives in its preset, and the
-  // editor's sample cards are not the caller's to ship. Both halves of that
-  // are right, and together they made the composer lie: the default field is
-  // fourteen `blank-sheet` slots, so what you compose against is fourteen
-  // typeset cards and what Export hands you is fourteen blank sheets, with
-  // nothing on screen saying so. Counting them is what lets the rail say it.
-  const sampledSlots = fieldPapers.filter((paper) => 'content' in paper).length
 
   const fieldZones = field.zones.map(zoneToConfig)
   const fieldScene = sceneSchema.parse(field.scene)
@@ -358,10 +348,6 @@ export function App() {
                 )
               })}
             </ul>
-            <p className="stage-note">
-              Under <strong>Content</strong>, type words and the space is rebuilt out of them — one column per
-              banner, stacked down the drop — or hang your own pictures, one per drop.
-            </p>
           </>
         ) : (
           <>
@@ -398,15 +384,6 @@ export function App() {
                 </li>
               ))}
             </ul>
-            {sampledSlots > 0 && (
-              <p className="slot-note">
-                {sampledSlots === field.slots.length ? 'Every paper is' : `${sampledSlots} papers are`}{' '}
-                showing a <strong>sample card</strong>, so an empty field reads as a drawer of records rather
-                than as blank sheets. Samples are preview only — an export carries each preset's own art
-                instead. Pick a preset that brings its own content, or edit one, and the export matches what
-                you see.
-              </p>
-            )}
           </>
         )}
       </aside>
