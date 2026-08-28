@@ -159,6 +159,15 @@ describe('stage agent payload', () => {
     expect(payload).toContain("don't add OrbitControls")
   })
 
+  it('does not ship a comment naming a figure that is not in the scene', () => {
+    // This one lands as a code comment in the receiver's own file, so it
+    // outlives the brief that carried it.
+    expect(buildStageComponentSource(base({ scroll: true }))).toContain('Scroll the section, move the camera')
+    expect(buildStageComponentSource(base({ scroll: true, stage: { showFigure: true } }))).toContain(
+      'Scroll the section, walk the figure',
+    )
+  })
+
   it('does not open by promising a figure the stage has not got', () => {
     // The first line is the one sentence a receiving agent reads before it
     // reads any code, so a figure claimed there is a figure it goes looking
