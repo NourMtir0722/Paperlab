@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.10",
-    "@changesets/cli": "^2.31.1",
+    "@changesets/cli": "^3.0.1",
     "knip": "^6.32.2",
     "playwright": "1.62.1",
     "turbo": "^2.10.11"

@@ -84,6 +84,14 @@ jobs:
             const ok=a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&a[2]>=b[2])));
             if(!ok){console.log("::error::npm "+process.argv[1]+" is below 11.5.1, which is the floor for OIDC trusted publishing.");process.exit(1)}' "$(npm --version)"
 
+          # Changesets CLI v3 is ESM-only and raised its floor to Node
+          # ^22.11 || ^24 || >=26 — a constraint v2 did not have. `node-version:
+          # 22` resolves to the newest 22.x so this passes today, but the floor
+          # is now load-bearing and nothing else here would notice it slipping.
+          node -e 'const v=process.versions.node.split(".").map(Number);
+            const ok=(v[0]===22&&v[1]>=11)||v[0]===24||v[0]>=26;
+            if(!ok){console.log("::error::node "+process.versions.node+" is below the Changesets v3 floor (^22.11 || ^24 || >=26).");process.exit(1)}'
+
           want=$(node -p "(require('./package.json').packageManager||'@').split('@')[1]||''")
           got=$(pnpm --version)
           if [ -n "$want" ] && [ "${want%%.*}" != "${got%%.*}" ]; then
@@ -127,24 +135,20 @@ jobs:
       # trusted publisher on the package. Provenance should now arrive on its
       # own — npm would not attest a build from a private repo, which is why
       # 0.2.0 carries no attestations, and this repo went public 2026-08-21.
-      # PINNED TO v1, and it is not a stale pin — v2 is unusable here.
       #
-      #   "This version of the Changesets action is designed to work with
-      #    Changesets CLI v3. Changesets CLI v2 is not supported; use
-      #    Changesets action v1 instead."
+      # On v2, paired with `@changesets/cli` v3. The two majors are a matched
+      # set — v2 refuses CLI v2 and v1 refuses CLI v3 — so they moved
+      # together, in one PR, which is why this is not a dependency bump. The
+      # dry run asserts the pairing on every run; see the step above.
       #
-      # This repo is on `@changesets/cli ^2.31.1`. Moving to the v2 action
-      # therefore means migrating the CLI to v3 FIRST, as its own deliberate
-      # piece of work — not as a dependency bump. The step below is checked
-      # against that on every dry run; see "action and CLI majors agree".
-      #
-      # When that migration happens, v2 also renamed the inputs and stopped
-      # reading the token from the environment: `publish` -> `publish-script`,
-      # and `github-token` must be passed as an input.
+      # v2 renamed the inputs to kebab-case and stopped reading the token from
+      # the environment. Only the two below are used here: `publish` became
+      # `publish-script`, and `GITHUB_TOKEN` in `env` became the `github-token`
+      # input — setting the environment variable alone is silently ignored,
+      # which would fail at the point the action tries to open the release PR.
       - name: Create release PR or publish to npm
         if: github.event_name == 'push' || inputs.publish
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          publish: pnpm exec changeset publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          publish-script: pnpm exec changeset publish
+          github-token: ${{ secrets.GITHUB_TOKEN }}
