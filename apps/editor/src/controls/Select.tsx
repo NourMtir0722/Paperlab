@@ -42,6 +42,7 @@ export function Select({ value, options, onChange, label, className, format, tit
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(() => Math.max(0, options.indexOf(value)))
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const listId = useId()
   const show = (option: string) => format?.(option) ?? option
 
@@ -64,9 +65,18 @@ export function Select({ value, options, onChange, label, className, format, tit
   // moves the trigger afterwards — scrolling the rail it lives in, resizing
   // the window — would leave the list floating somewhere it no longer
   // belongs, so those close it rather than chasing it.
+  //
+  // Scrolling *inside* the list is the exact opposite: the trigger has not
+  // moved, and the user is reading options that do not fit. This listener is
+  // on capture, so it hears that scroll too — and closing on it made every
+  // option past the fold unreachable with a mouse, silently, because the
+  // list vanished the moment you reached for the ones you could not see.
   useEffect(() => {
     if (!open) return
-    const close = () => setOpen(false)
+    const close = (e: Event) => {
+      if (e.target instanceof Node && listRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
     window.addEventListener('scroll', close, true)
     window.addEventListener('resize', close)
     return () => {
@@ -144,6 +154,7 @@ export function Select({ value, options, onChange, label, className, format, tit
           id={listId}
           label={label}
           anchor={triggerRef.current}
+          listRef={listRef}
           options={options}
           value={value}
           active={active}
@@ -165,6 +176,7 @@ interface SelectListProps {
   id: string
   label: string
   anchor: HTMLElement | null
+  listRef: React.RefObject<HTMLDivElement | null>
   options: readonly string[]
   value: string
   active: number
@@ -179,6 +191,7 @@ function SelectList({
   id,
   label,
   anchor,
+  listRef: ref,
   options,
   value,
   active,
@@ -188,7 +201,6 @@ function SelectList({
   onDismiss,
   onKeyDown,
 }: SelectListProps) {
-  const ref = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState<{ top: number; left: number; width: number; max: number } | null>(null)
 
   // Measure before paint: a list that renders at 0,0 and then jumps is worse
@@ -210,6 +222,7 @@ function SelectList({
 
   // Focus moves into the list so the arrows keep working after the mouse
   // opened it; dismissing puts focus back on the trigger.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount only — the list is unmounted when it closes, so "once, when it appears" is the whole intent.
   useEffect(() => {
     ref.current?.focus()
   }, [])

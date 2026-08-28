@@ -221,6 +221,7 @@ pnpm test           # 700+ unit tests — deformer math, schema, cloth, layouts,
 pnpm test:parity    # 37 golden-vector cases: every deformer's GLSL twin vs its JS twin
 pnpm test:drive     # the stage really walks when you drag, wheel or arrow it
 pnpm test:share     # sculpt → link → a browser that has never seen the paper
+pnpm test:dropdown  # every dropdown option is reachable, including below the fold
 pnpm typecheck
 pnpm lint
 pnpm knip           # dead code and unused exports
