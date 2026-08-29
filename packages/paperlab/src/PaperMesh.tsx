@@ -454,7 +454,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       idle?.transform?.(now, pose)
       if (hasBehaviorTransform) {
         const o = effectiveOptions(now)
-        if (o) behavior!.transform!(o, now, pose)
+        if (o) behavior!.transform!(o, now, pose, cfg.sheet)
       }
       const base = props.position ?? [0, 0, 0]
       const baseRot = props.rotation ?? [0, 0, 0]

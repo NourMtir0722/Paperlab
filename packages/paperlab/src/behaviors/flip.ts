@@ -38,7 +38,7 @@ export const flip: Behavior<FlipOptions> = {
           angle,
           boundary: start + o.progress * (end - start),
           radius: o.radius,
-          spiral: 0,
+          thickness: 0,
         },
       },
     ]

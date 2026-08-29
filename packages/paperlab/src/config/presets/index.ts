@@ -24,6 +24,23 @@ const builtins: Record<string, PaperConfigInput> = {
     behavior: { type: 'unroll', progress: 0.55, tightness: 0.55, sway: 0.3 },
     surface: { deckle: { edges: ['bottom'], roughness: 0.6 } },
   },
+  /**
+   * A long sheet on a fixed roll, meant to be driven by scroll: bind
+   * `behavior.progress` to how far down the page you are and the paper pays
+   * out while the roll runs down to its tube. `fixed` is what makes the roll
+   * stay put and the paper travel, rather than the other way round.
+   */
+  'paper-roll': {
+    meta: { name: 'Paper roll', tags: ['roll', 'unroll', 'scroll', 'hero'] },
+    sheet: { width: 1, height: 5 },
+    stock: 'newsprint',
+    content: {
+      type: 'text',
+      text: 'Keep\nscrolling.\n\nThe roll\nruns down\nas it pays\nout, and\nthen it\nis gone.',
+    },
+    behavior: { type: 'unroll', progress: 0.45, tightness: 0.8, sway: 0.15, from: 'top', fixed: true },
+    surface: { deckle: { edges: ['bottom'], roughness: 0.5 } },
+  },
   'letter-fold': {
     meta: { name: 'Letter fold', tags: ['fold', 'text'] },
     sheet: { width: 1, height: 1.4 },

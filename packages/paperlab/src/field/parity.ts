@@ -34,13 +34,13 @@ export interface ParityResult {
 export const parityCases: ParityCase[] = [
   {
     name: 'roll: defaults',
-    stack: [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.12, spiral: 0.015 } }],
+    stack: [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.12, thickness: 0.04 } }],
     sheet: { width: 1, height: 1.4 },
     t: 0,
   },
   {
     name: 'roll: tight receipt roll, rolling down',
-    stack: [{ type: 'roll', options: { angle: 270, boundary: -0.4, radius: 0.07, spiral: 0.02 } }],
+    stack: [{ type: 'roll', options: { angle: 270, boundary: -0.4, radius: 0.07, thickness: 0.006 } }],
     sheet: { width: 1, height: 2.6 },
     t: 0,
   },
@@ -183,7 +183,7 @@ export const parityCases: ParityCase[] = [
     name: 'stacked: bend ∘ roll ∘ wave',
     stack: [
       { type: 'bend', options: { curvature: 0.6, angle: 0 } },
-      { type: 'roll', options: { angle: 90, boundary: 0.1, radius: 0.15, spiral: 0 } },
+      { type: 'roll', options: { angle: 90, boundary: 0.1, radius: 0.15, thickness: 0 } },
       {
         type: 'wave',
         options: { amplitude: 0.02, wavelength: 0.6, speed: 0.7, angle: 45, pinnedEdge: 'none' },

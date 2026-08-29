@@ -409,7 +409,7 @@ describe('GLSL composition', () => {
 
   it('skips disabled instances and rejects GLSL-less deformers', () => {
     const composed = buildDisplacementGLSL(
-      [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.1, spiral: 0 }, enabled: false }],
+      [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.1, thickness: 0 }, enabled: false }],
       sheet,
     )
     expect(composed.displaceSrc).not.toContain('pl_roll')
@@ -440,7 +440,7 @@ describe('GLSL composition', () => {
 
   it('roll opts out of bias — its strength has no linear form', () => {
     const composed = buildDisplacementGLSL(
-      [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.1, spiral: 0 } }],
+      [{ type: 'roll', options: { angle: 90, boundary: 0, radius: 0.1, thickness: 0 } }],
       sheet,
     )
     expect(composed.functionsSrc).not.toContain('plBias)')
