@@ -25,20 +25,34 @@ const builtins: Record<string, PaperConfigInput> = {
     surface: { deckle: { edges: ['bottom'], roughness: 0.6 } },
   },
   /**
-   * A long sheet on a fixed roll, meant to be driven by scroll: bind
-   * `behavior.progress` to how far down the page you are and the paper pays
-   * out while the roll runs down to its tube. `fixed` is what makes the roll
-   * stay put and the paper travel, rather than the other way round.
+   * A roll on a holder with a leaf already out, meant to be driven by scroll:
+   * bind `behavior.progress` to how far down the page you are and the paper
+   * pays out while the roll runs down toward its tube.
+   *
+   * The three parts that make it read as a real roll rather than a curled
+   * sheet: `fixed` keeps the roll on its holder and moves the paper instead,
+   * `tail` means there is always a leaf to take hold of, and `floor` gives
+   * the drop somewhere to land — paper that reaches the ground creases and
+   * lies down rather than hanging into the void forever. A `core` a third of
+   * the full radius is a real cardboard tube, so the roll still looks like a
+   * roll after it has been used down.
    */
   'paper-roll': {
     meta: { name: 'Paper roll', tags: ['roll', 'unroll', 'scroll', 'hero'] },
     sheet: { width: 1, height: 5 },
     stock: 'newsprint',
-    content: {
-      type: 'text',
-      text: 'Keep\nscrolling.\n\nThe roll\nruns down\nas it pays\nout, and\nthen it\nis gone.',
+    content: { type: 'blank' },
+    behavior: {
+      type: 'unroll',
+      progress: 0.25,
+      tightness: 0.8,
+      sway: 0.15,
+      from: 'top',
+      fixed: true,
+      core: 0.12,
+      tail: 0.5,
+      floor: 2.4,
     },
-    behavior: { type: 'unroll', progress: 0.45, tightness: 0.8, sway: 0.15, from: 'top', fixed: true },
     surface: { deckle: { edges: ['bottom'], roughness: 0.5 } },
   },
   'letter-fold': {

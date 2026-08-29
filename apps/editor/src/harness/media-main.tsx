@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { useEffect, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import {
   LightRig,
   PaperFieldMesh,
@@ -49,6 +49,24 @@ const numbers = (key: string, fallback: number[]) => {
 const fov = Number(query.get('fov')) || 40
 
 /**
+ * `?look=x,y,z` aims the camera somewhere other than the origin.
+ *
+ * Without it the camera can only ever look down -Z, which is fine for a
+ * sheet standing up in the middle of the scene and useless for anything
+ * lying flat: paper pooled on a floor is edge-on to a level camera, so the
+ * one thing worth photographing about `paper-roll` was invisible. Aiming is
+ * how you get to look DOWN at it.
+ */
+const look = numbers('look', [0, 0, 0]) as [number, number, number]
+function AimCamera() {
+  const camera = useThree((state) => state.camera)
+  useEffect(() => {
+    camera.lookAt(look[0], look[1], look[2])
+  }, [camera])
+  return null
+}
+
+/**
  * `?lighting=` and `?film=` exist so the light can be JUDGED headless.
  *
  * Calibrating a preset means looking at it, and every rig in this file used
@@ -95,6 +113,7 @@ function PaperFrames() {
       gl={{ preserveDrawingBuffer: true, antialias: true }}
     >
       <color attach="background" args={[background]} />
+      <AimCamera />
       <LightRig rig={rig}>
         <PaperLighting rig={rig} floor={-1.5} scale={10} />
         <PaperMesh ref={ref} preset={preset} {...(stockOverride ? { stock: stockOverride } : {})} />

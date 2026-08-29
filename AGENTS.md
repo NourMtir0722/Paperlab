@@ -358,7 +358,7 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 | type | params (all optional, sensible defaults) | reads as |
 |---|---|---|
 | `peel` | progress, corner, radius | a corner lifts and curls back |
-| `unroll` | progress (0=rolled, 1=flat), tightness, sway | receipt unrolling from a roll |
+| `unroll` | progress (0=rolled, 1=flat), tightness, sway, from, core, tail, fixed, floor | paper coming off a roll that shrinks as it pays out. `from:'top'` hangs the paper below the roll, `fixed` keeps the roll on its holder and moves the paper instead, `tail` leaves a leaf already out, `floor` gives the drop somewhere to land |
 | `flip` | progress, spine ('left'/'right'), radius | page turn |
 | `letter-fold` | progress, crease | tri-fold letter |
 | `hang` | wind, sag | poster pinned at top, rippling |

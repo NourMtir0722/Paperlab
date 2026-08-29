@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Behavior } from './types'
-import type { SheetDims } from '../deformers/types'
+import type { DeformerInstance, SheetDims } from '../deformers/types'
 import { rollRadius } from '../deformers/roll'
 
 export const unrollOptionsSchema = z.object({
@@ -14,6 +14,23 @@ export const unrollOptionsSchema = z.object({
   from: z.enum(['bottom', 'top']).default('bottom'),
   /** Radius of the tube the paper is wound onto — the roll never shrinks past it. */
   core: z.number().min(0.005).max(0.5).default(0.03),
+  /**
+   * Paper already hanging at `progress` 0, in world units.
+   *
+   * A roll on a holder is never a bare cylinder: there is always a leaf out,
+   * because that is what you take hold of. Starting from nothing showing
+   * reads as a fresh roll still in its wrapper.
+   */
+  tail: z.number().min(0).max(20).default(0),
+  /**
+   * How far below the roll the paper lands, in world units. Omit and it
+   * hangs forever.
+   *
+   * Paper that reaches the ground does not stop and does not carry on
+   * through it: it creases and runs out flat. Everything past this distance
+   * turns a right angle and lies down.
+   */
+  floor: z.number().min(0.1).max(50).optional(),
   /**
    * Hold the roll still in space and let the paper hang off it, instead of
    * letting the roll ride along with the shrinking wound region.
@@ -38,13 +55,63 @@ function layerThickness(tightness: number): number {
  */
 function sweep(o: UnrollOptions, sheet: SheetDims): { start: number; end: number } {
   const maxRadius = rollRadius(sheet.height, o.core, layerThickness(o.tightness))
-  return { start: -sheet.height / 2, end: sheet.height / 2 + maxRadius * 2 }
+  // `tail` starts the boundary short of the far edge, so that much paper is
+  // already flat at progress 0. Capped so it cannot start past the end.
+  const tail = Math.min(o.tail, sheet.height)
+  return { start: -sheet.height / 2 + tail, end: sheet.height / 2 + maxRadius * 2 }
 }
 
 /** Where the wound region begins, as a signed distance along the roll direction. */
 function rollBoundary(o: UnrollOptions, sheet: SheetDims): number {
   const { start, end } = sweep(o, sheet)
   return start + o.progress * (end - start)
+}
+
+/** Softness of the crease where the paper meets the ground, scaled to the sheet. */
+const LANDING_RADIUS = 0.035
+
+/**
+ * The crease where the drop meets the ground: a right-angle hinge at the
+ * floor line, so the paper above stays vertical and everything below turns
+ * over and runs out flat.
+ *
+ * `fold`, not a second `roll`, and not a steeper angle — both were tried in
+ * `ribbon`, which lands a strip the same way, and the notes there are worth
+ * reading before touching this. A roll wraps the landed length up and over
+ * and ends in the air (a hook, not a pool); anything but exactly 90° either
+ * drives the paper on through the floor or floats it back up.
+ */
+function landing(
+  o: UnrollOptions,
+  sheet: SheetDims,
+  boundary: number,
+  rollRadiusNow: number,
+): DeformerInstance {
+  const radius = Math.min(0.5, Math.max(0.02, sheet.height * LANDING_RADIUS))
+  // The hinge wraps a small cylinder rather than turning on the spot, so the
+  // flap leaves it lower than the crease line by exactly that much. Raise the
+  // crease by it so the LANDED length sits on the floor, not under it.
+  const hingeDrop = radius / (Math.PI / 2)
+
+  // The floor in the sheet's own coordinates. The roll is pinned in space and
+  // the paper travels past it, so a fixed floor is a MOVING line down here —
+  // it sits `floor` below wherever the roll boundary currently is.
+  //
+  // Clamped clear of the roll itself: a floor closer than the roll's own
+  // radius would put the bottom of the roll below the crease line, and the
+  // hinge would fold the roll over instead of the paper hanging off it.
+  const below = Math.max(o.floor!, rollRadiusNow + radius)
+  const floorLine = o.from === 'top' ? boundary - below : -boundary + below
+
+  return {
+    type: 'fold',
+    // Travel points from the roll toward the floor, so "past the crease"
+    // means "the length that has arrived", not the drop above it.
+    options:
+      o.from === 'top'
+        ? { angle: -90, offset: -floorLine - hingeDrop, foldAngle: 90, radius }
+        : { angle: 90, offset: floorLine - hingeDrop, foldAngle: 90, radius },
+  }
 }
 
 /**
@@ -70,7 +137,8 @@ export const unroll: Behavior<UnrollOptions> = {
     const boundary = rollBoundary(o, sheet)
     // Paper still on the roll: the span from the boundary to the far edge.
     const wound = Math.max(0, sheet.height / 2 - boundary)
-    return [
+    const radius = rollRadius(wound, o.core, thickness)
+    const stack: DeformerInstance[] = [
       {
         type: 'roll',
         options: {
@@ -79,11 +147,13 @@ export const unroll: Behavior<UnrollOptions> = {
           // receipt feeding downward), 90 winds the top (paper hanging below).
           angle: o.from === 'top' ? 90 : 270,
           boundary,
-          radius: rollRadius(wound, o.core, thickness),
+          radius,
           thickness,
         },
       },
     ]
+    if (o.floor !== undefined) stack.push(landing(o, sheet, boundary, radius))
+    return stack
   },
   loop(o, t) {
     if (o.sway === 0) return {}

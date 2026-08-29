@@ -9,7 +9,8 @@ import { getBehavior, listBehaviors } from './registry'
 import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
 import { settle } from './settle'
 import { ribbon, ribbonOptionsSchema } from './ribbon'
-import { getDeformer } from '../deformers/registry'
+import { getDeformer, resolveDeformerStack } from '../deformers/registry'
+import { displacePoint } from '../deformers/compose'
 
 const sheet = { width: 1, height: 2.6 }
 
@@ -114,6 +115,72 @@ describe('unroll', () => {
     pose.position[1] = 0
     unroll.transform!({ ...unroll.defaults, progress: 1 }, 0, pose, sheet)
     expect(pose.position[1]).toBe(0)
+  })
+
+  it('lands the drop on the floor instead of hanging through it', () => {
+    // The reference is a roll on a wall: paper reaches the ground, creases,
+    // and runs out flat. Trace real vertices down the sheet and check the
+    // drop stops descending at the floor and travels along it instead.
+    const tall = { width: 1, height: 5 }
+    const o = {
+      ...unroll.defaults,
+      progress: 0.7,
+      tightness: 0.8,
+      from: 'top' as const,
+      fixed: true,
+      core: 0.12,
+      tail: 0.5,
+      floor: 2.4,
+    }
+    const stack = resolveDeformerStack(unroll.stack(o, tall))
+    const pose = {
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+    }
+    unroll.transform!(o, 0, pose, tall)
+    const offset = pose.position[1]
+
+    const at = (localY: number) => {
+      const v = displacePoint(new THREE.Vector3(0, localY, 0), 0.5, (localY + 2.5) / 5, stack, {
+        t: 0,
+        sheet: tall,
+      })
+      return { y: v.y + offset, z: v.z }
+    }
+
+    // The floor is fixed in world space: `floor` below the pinned roll.
+    const rollY = at(2.5).y
+    const floorY = rollY - 2.4
+
+    const samples = Array.from({ length: 25 }, (_, i) => at(2.5 - i * (5 / 24)))
+    // Nothing goes through the floor — the failure this exists to catch.
+    for (const s of samples) expect(s.y).toBeGreaterThan(floorY - 0.2)
+    // And something actually arrived: the far end lies at the floor, out
+    // along z, rather than stopping dead at the crease.
+    const last = samples.at(-1)!
+    expect(last.y).toBeLessThan(floorY + 0.4)
+    expect(last.z).toBeGreaterThan(0.5)
+  })
+
+  it('no floor means the paper hangs past where a floor would have been', () => {
+    const tall = { width: 1, height: 5 }
+    const o = { ...unroll.defaults, progress: 0.7, from: 'top' as const, tail: 0.5 }
+    expect(unroll.stack(o, tall)).toHaveLength(1)
+    expect(unroll.stack({ ...o, floor: 2.4 }, tall)).toHaveLength(2)
+  })
+
+  it('tail leaves a leaf already out at progress 0', () => {
+    const tall = { width: 1, height: 5 }
+    const bare = unroll.stack({ ...unroll.defaults, progress: 0 }, tall)[0]!.options as {
+      boundary: number
+    }
+    const withTail = unroll.stack({ ...unroll.defaults, progress: 0, tail: 0.5 }, tall)[0]!.options as {
+      boundary: number
+    }
+    // A roll with nothing showing starts wound to the very edge; a tail
+    // starts the boundary short of it by exactly that much.
+    expect(bare.boundary).toBeCloseTo(-2.5, 9)
+    expect(withTail.boundary).toBeCloseTo(-2.0, 9)
   })
 
   it('sway loop is transient and bounded', () => {
