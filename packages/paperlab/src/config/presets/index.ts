@@ -210,7 +210,24 @@ const builtins: Record<string, PaperConfigInput> = {
       text: 'Dear you,\n\nSome things are worth folding carefully.\n\nYours,\nN.',
     },
     behavior: { type: 'letter-fold', progress: 0.4, crease: 0.3 },
-    surface: { creaseLines: { angle: 0, positions: [1 / 3, 2 / 3], strength: 0.5 } },
+    // A letter that has been folded before. These were painted-on
+    // `creaseLines` until the paper could carry real ones — two marks in the
+    // shader at exactly the two places the tri-fold bends, which is a good
+    // impression of a crease right up until you unfold the letter and it
+    // comes back perfectly flat. As memory they bend the sheet as well as
+    // marking it, and folding the letter deepens the creases it already has
+    // rather than drawing a second pair on top of them.
+    //
+    // The lines are `letterFold`'s own: travel down and up, each a sixth of
+    // the sheet from the middle. Shallower than a fold leaves (printer keeps
+    // about 20°) because this letter has been folded once and put away, not
+    // folded and reopened in front of you.
+    memory: {
+      creases: [
+        { angle: 270, offset: 1.4 / 6, depth: 13 },
+        { angle: 90, offset: 1.4 / 6, depth: 11 },
+      ],
+    },
   },
   /**
    * The wash, shown rather than described.

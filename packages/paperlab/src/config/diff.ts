@@ -2,6 +2,7 @@ import {
   behaviorConfigSchema,
   clothConfigSchema,
   contentSchema,
+  memorySchema,
   paperConfigSchema,
   sceneSchema,
   sheetSchema,
@@ -70,6 +71,14 @@ export function diffConfig(config: PaperConfig): PaperConfigInput {
   if (config.deformers) out.deformers = config.deformers
 
   if (Object.keys(config.surface).length > 0) out.surface = config.surface
+
+  // Diffed like the scene below, and for the same reason it is: `memory` is
+  // going to grow fields, and a diff that names the ones it knows about
+  // silently drops the next one. Without this a creased sheet exported to a
+  // `.paper` file, a share link or a snippet came back flat — the editor
+  // showed the creases and nothing that left the editor carried them.
+  const memory = diffAgainst(config.memory as never, memorySchema.parse({}) as never)
+  if (Object.keys(memory).length > 0) out.memory = memory
 
   if (typeof config.physics === 'object') {
     const defaults = clothConfigSchema.parse({ type: 'cloth' }) as Record<string, unknown>

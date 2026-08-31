@@ -98,6 +98,16 @@ Underneath them are seven **deformers** — `roll`, `curl`, `bend`, `fold`, `wav
 
 One sheet of words, seven papers. Stock is not a colour swap: thermal takes on banding, newsprint takes grain, vellum goes translucent and lets the light through it. On top of stock sit composable surface effects — grain, torn deckle edges, crease lines, perforation, aging — as shader chunks. Alpha-affecting effects use `alphaTest` rather than blending, so shadows stay correct.
 
+### Memory — the paper keeps what you do to it
+
+Paper is plastic where cloth is elastic. Every deformer here is a pure function of its options, so a sheet folded to 180° and back to 0° used to come out pristine — right for cloth, wrong for the one material this library models. Now it creases.
+
+A fold that closes past 45° at a line that stays put leaves a crease behind at `peak × set`, where `set` is how much that paper keeps: kraft holds one hard, vellum springs back. A fold whose line *travels* leaves nothing, which is why paper coming off a roll is bent at the floor rather than creased along it. Creases bend the sheet as well as marking it, they can be handed to a paper that was never folded (a letter that arrives having been folded once), and they serialize — into a preset, and down a share link.
+
+```tsx
+<Paper preset="letter-fold" memory={{ set: 0.6 }} onCrease={save} />
+```
+
 ### Layouts — 12
 
 ![All twelve field layouts rendered side by side](docs/media/layouts.jpg)

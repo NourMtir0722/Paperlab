@@ -6,9 +6,11 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import type {
   BehaviorConfigInput,
   ClothConfig,
+  CreaseConfig,
   StripConfig,
   ContentConfigInput,
   DeformerInstanceConfigInput,
+  MemoryConfigInput,
   PaperConfig,
   PaperConfigInput,
   PhysicsConfigInput,
@@ -27,6 +29,8 @@ import { getStock } from './core/stock'
 import { getPreset } from './config/presets'
 import { useContentTexture } from './content/texture'
 import { applyDeformerStack, displacePoint, stackAutoSegments, stackMinSegments } from './deformers/compose'
+import { applyMemory, CreaseTracker } from './deformers/memory'
+import { resolveCreases } from './surface/creases'
 import { stackIsAnimated } from './deformers/registry'
 import type { DeformerInstance } from './deformers/types'
 import { getBehavior } from './behaviors/registry'
@@ -57,6 +61,13 @@ export interface PaperMeshProps {
   deformers?: DeformerInstanceConfigInput[]
   /** Fragment-side effects: grain, aging, deckle, creases, perforation. */
   surface?: SurfaceConfigInput
+  /**
+   * What the sheet remembers being folded — how much of a fold this paper
+   * keeps, and the creases it already carries. A sheet can be handed its
+   * creases (a letter that arrives having been folded once) as readily as it
+   * can be folded into them.
+   */
+  memory?: MemoryConfigInput
   /** Scene-level presentation that travels with the paper (lighting). */
   scene?: SceneConfigInput
   physics?: PhysicsConfigInput | 'cloth'
@@ -73,6 +84,17 @@ export interface PaperMeshProps {
   onProgress?(value: number): void
   /** Fires when a handle drag ends, with the params the drag changed. */
   onBehaviorChange?(patch: Record<string, unknown>): void
+  /**
+   * Fires when folding the paper leaves a crease it did not have.
+   *
+   * The sheet applies its own creases immediately — this is how they get
+   * PERSISTED. Recording happens in the frame loop, where a fold's peak
+   * actually is, and routing that through React sixty times a second would
+   * cost more than the rest of the feature; so the mesh holds the live truth
+   * and reports it, and the host writes it into config whenever it likes.
+   * The same split `onBehaviorChange` uses for handle drags.
+   */
+  onCrease?(creases: CreaseConfig[]): void
   /**
    * Interaction states: when the config carries `states`, pointer triggers
    * are live by default. Set false to sculpt a stateful paper without the
@@ -144,6 +166,7 @@ function configInputs(props: PaperMeshProps): unknown[] {
     props.behavior ?? null,
     props.deformers ?? null,
     props.surface ?? null,
+    props.memory ?? null,
     props.scene ?? null,
     props.physics ?? null,
     props.onTwos ?? null,
@@ -173,6 +196,10 @@ export function resolveConfig(props: PaperMeshProps): PaperConfig {
   // Surface merges over the stock's defaults rather than replacing them, so
   // `surface={{ grain: 0.6 }}` on thermal keeps thermal's banding.
   if (props.surface) overrides.surface = { ...base.surface, ...props.surface }
+  // Merged like surface, and for the same reason: `memory={{ set: 0.2 }}` on a
+  // preset that ships creased should turn the retention down, not flatten the
+  // paper on its way past.
+  if (props.memory) overrides.memory = { ...base.memory, ...props.memory }
   if (props.scene) overrides.scene = { ...base.scene, ...props.scene }
   if (props.physics) overrides.physics = props.physics
   if (props.onTwos !== undefined) overrides.onTwos = props.onTwos
@@ -281,16 +308,68 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
    */
   const physicsKey = typeof config.physics === 'object' ? config.physics.type : config.physics
 
+  /**
+   * The crease LINES, without their depths.
+   *
+   * Depth is exactly the part that moves while you are folding, and the only
+   * thing downstream of this key is the geometry probe — which does not care.
+   * `fold`'s appetite for segments is set by its hinge radius and its
+   * direction, never by how far it has closed, so a crease deepening from 2°
+   * to 20° cannot change the answer. Keying on the depth too would rebuild
+   * the geometry on every frame of every fold, and take the sim and the
+   * base-position buffer down with it — the same trap `physicsKey` above
+   * exists to avoid.
+   */
+  const memoryKey = config.memory.creases.map((c) => `${c.angle}:${c.offset}`).join('|')
+
+  /**
+   * The creases WITH their depths — what the sheet is actually carrying.
+   *
+   * The lines-only key above cannot serve here, and the difference is the
+   * whole reason there are two. Dragging a crease deeper changes no line, so
+   * a lines-only key never fires: the tracker would go on holding the array
+   * it was handed when the crease was created, the shading would follow the
+   * edit (it reads config) and the geometry would not, and the depth slider
+   * would darken the mark without bending the paper.
+   */
+  const creaseKey = config.memory.creases.map((c) => `${c.angle}:${c.offset}:${c.depth}`).join('|')
+
+  /**
+   * The sheet's live memory. Seeded from config and updated in the frame
+   * loop; `onCrease` is how it gets back to config.
+   */
+  const creasesRef = useRef<CreaseTracker | null>(null)
+  creasesRef.current ??= new CreaseTracker(config.memory.creases)
+  const creases = creasesRef.current
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: The keys are change triggers; the body only touches refs.
   useEffect(() => {
     if (!draggingRef.current && !playingRef.current) overridesRef.current = {}
+    // The slots track folds in a stack that no longer exists. The creases they
+    // left do not go with it — a sheet does not un-crease because you gave it
+    // a new behavior — so they carry over as the sheet's authored set.
+    creases.reset()
     dirtyRef.current = true
   }, [behaviorKey, deformersKey, sheetKey, physicsKey])
+
+  // Config-side creases changing means something outside the frame loop has an
+  // opinion: an edit, a shared link, or the host persisting what we just
+  // recorded. `adopt` works out which — an edit resets the folds it was
+  // watching, an echo of its own recording does not.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the creases themselves; the body reads them off config.
+  useEffect(() => {
+    creases.adopt(configRef.current.memory.creases)
+    dirtyRef.current = true
+  }, [creaseKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the stack shape — the probe reads config off a ref.
   const { minSegments, autoSegments, animatedStack } = useMemo(() => {
     const cfg = configRef.current
-    const probe = buildStack(cfg, {})
+    // Creases are in the probe because a crease with no live fold on its line
+    // is a fold instance the grid has never been asked about — an authored
+    // dog-ear on an otherwise flat sheet needs `fold`'s 48-segment floor as
+    // much as a real fold does, and a flat sheet is tessellated 2×2.
+    const probe = withMemory(buildStack(cfg, {}), cfg)
     if (!probe) {
       return {
         minSegments: [2, 2] as SegmentPair,
@@ -316,7 +395,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     if (cfg.behavior && !cfg.deformers) {
       const param = getBehavior(cfg.behavior.type).progressParam
       for (const p of PROGRESS_SAMPLES) {
-        const at = buildStack(cfg, { [param]: p })
+        const at = withMemory(buildStack(cfg, { [param]: p }), cfg)
         if (!at) continue
         const [x, y] = stackAutoSegments(at, cfg.sheet)
         if (x > want[0]) want[0] = x
@@ -329,7 +408,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       autoSegments: want,
       animatedStack: animated,
     }
-  }, [behaviorKey, deformersKey, physicsKey])
+  }, [behaviorKey, deformersKey, physicsKey, memoryKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the sheet — rebuilding geometry on identity would orphan GPU buffers every render.
   const geometry = useMemo(() => {
@@ -506,6 +585,21 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     returnProgrammatic: () => machineRef.current?.returnProgrammatic() ?? false,
   }))
 
+  /**
+   * The crease lines the shader draws.
+   *
+   * Off CONFIG rather than off the tracker, and that is the honest trade. The
+   * shading is a shader uniform behind a React memo, so it updates when the
+   * host writes a recorded crease back — a frame or two after the geometry
+   * has it. A crease that has just formed is a fold the sheet is still most
+   * of the way inside; the mark landing as it opens rather than as it closes
+   * is the order it happens in on real paper anyway.
+   */
+  const shadedCreases = useMemo(
+    () => resolveCreases(config.surface, config.memory.creases, config.sheet),
+    [config.surface, config.memory.creases, config.sheet],
+  )
+
   const idlePose = useRef<IdlePose>({ position: [0, 0, 0], rotation: [0, 0, 0] })
 
   useFrame(({ clock }, delta) => {
@@ -600,7 +694,20 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     const machineAnimating = Boolean(machineRef.current?.transitioning)
     if (!dirtyRef.current && !hasLoop && !animated && !machineAnimating) return
 
-    const stack = buildStack(cfg, overridesRef.current, behavior, now)
+    const raw = buildStack(cfg, overridesRef.current, behavior, now)
+
+    // How much this paper keeps: its own override, else what the stock is
+    // made of. The same shape as every other stock default in the library.
+    const setAmount = cfg.memory.set ?? stock.takesSet
+
+    // Read the folds BEFORE memory rewrites them. `applyMemory` raises a live
+    // fold to its crease's depth, and a tracker watching that would be reading
+    // its own output — the crease would hold the fold open, and the held-open
+    // fold would keep the crease alive, with nothing in the loop that is
+    // actually the paper being folded.
+    if (raw && creases.observe(raw, setAmount)) props.onCrease?.(creases.creases)
+
+    const stack = withMemory(raw, cfg, creases.creases)
     if (!stack) return
     dirtyRef.current = false
 
@@ -759,6 +866,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
           thickness={config.sheet.thickness}
           sheet={config.sheet}
           lighting={config.scene.lighting}
+          creases={shadedCreases}
         />
       </mesh>
       {props.interactive &&
@@ -802,6 +910,31 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     </group>
   )
 })
+
+/**
+ * A stack with the sheet's CONFIGURED creases folded in — the probe's view of
+ * memory.
+ *
+ * The frame loop does not use this: it has the tracker's live creases, which
+ * are ahead of config by however long the host takes to persist them. Both
+ * paths agree on the lines, which is the only thing the geometry probe reads.
+ */
+function withMemory(
+  stack: DeformerInstance[] | null,
+  config: PaperConfig,
+  creases: CreaseConfig[] = config.memory.creases,
+): DeformerInstance[] | null {
+  // A simulation owns the vertices, exactly as it does in `buildStack` — and
+  // a crease must not be the thing that hands a cloth sheet a deformer stack
+  // it would never run. The frame loop returns down the sim path long before
+  // this, so today the only reader is the segment probe; saying it here is
+  // what keeps that true when it stops being the only reader.
+  if (typeof config.physics === 'object') return null
+  const out = applyMemory(stack ?? [], creases)
+  // Empty and null mean different things upstream — null is "nothing deforms
+  // this sheet", which is the answer that gets it the flat-sheet grid.
+  return out.length > 0 ? out : null
+}
 
 /** Expand the config into the deformer stack that should run this frame. */
 function buildStack(
