@@ -114,7 +114,9 @@ export function Inspector() {
     // the paper and the panel that moves it.
     folder(
       'Memory',
-      memoryControls(config.memory, config.stock, (patch) => patchConfig({ memory: patch as never })),
+      memoryControls(config.memory, config.stock, config.sheet, (patch) =>
+        patchConfig({ memory: patch as never }),
+      ),
       { collapsed: true },
     ),
     folder('Physics', physicsControls(config.physics, setPhysics, patchSim), { collapsed: true }),
