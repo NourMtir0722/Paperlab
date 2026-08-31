@@ -1,8 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { StripSim, stripNodeCount, layerThickness } from './strip'
 import { paperConfigSchema } from '../config/schema'
 import { getPreset } from '../config/presets'
 import { rollRadius } from '../deformers/roll'
+
+/**
+ * These tests integrate real simulations, and the default five seconds is not
+ * a budget they can be held to.
+ *
+ * Every claim in this file is about where a chain SETTLES, which is only
+ * knowable by running it — there is no closed form for a pile. The heaviest
+ * cases integrate nine of them, and CI's shared runner is several times
+ * slower than a laptop: tests that measured 1.0s and 4.3s here all timed out
+ * at 5s there. Raising this is the honest answer; trimming the trajectories
+ * until they fit would trade away the coverage that catches a chaotic pile
+ * tuned to one lucky run.
+ */
+vi.setConfig({ testTimeout: 60_000 })
 
 const LENGTH = 14
 const WIDTH = 1
@@ -507,12 +521,25 @@ describe('the toilet-roll preset', () => {
   const TRAJECTORIES: [number, number][] = []
   for (const rate of [1.6, 2.7, 4.2]) for (const seconds of [7, 11, 14]) TRAJECTORIES.push([rate, seconds])
 
-  function everyTrajectory<T>(measure: (sim: StripSim) => T): T[] {
-    return TRAJECTORIES.map(([rate, seconds]) => {
-      const sim = simFromPreset()
-      run(sim, seconds, (t) => t * rate)
-      return measure(sim)
-    })
+  /**
+   * The nine runs, integrated ONCE and shared by every test below.
+   *
+   * These are the most expensive tests in the suite — nine sims of up to
+   * fourteen simulated seconds — and re-running them per test tripled that
+   * for no extra coverage, which put each one at 4.3s locally and over CI's
+   * five-second default on a slower runner. Each test asks a different
+   * question of the same settled piles.
+   */
+  let settled: { nodes: [number, number][]; floorY: number }[] | null = null
+  function everyTrajectory<T>(measure: (pile: { nodes: [number, number][]; floorY: number }) => T): T[] {
+    if (!settled) {
+      settled = TRAJECTORIES.map(([rate, seconds]) => {
+        const sim = simFromPreset()
+        run(sim, seconds, (t) => t * rate)
+        return { nodes: nodes(sim), floorY: sim.floorY }
+      })
+    }
+    return settled.map(measure)
   }
 
   /**
@@ -529,10 +556,10 @@ describe('the toilet-roll preset', () => {
     // x, and nothing was measuring x. Both axes, over every trajectory.
     const turn = (config.scene.turn * Math.PI) / 180
     const halfWidth = config.sheet.width / 2
-    const worst = everyTrajectory((sim) => {
+    const worst = everyTrajectory(({ nodes: pile }) => {
       let maxX = 0
       let maxY = 0
-      for (const [y, z] of nodes(sim)) {
+      for (const [y, z] of pile) {
         maxY = Math.max(maxY, Math.abs(y))
         // The strip keeps its full width in x, then the whole group is turned.
         for (const x of [-halfWidth, halfWidth]) {
@@ -554,9 +581,9 @@ describe('the toilet-roll preset', () => {
 
   it('reaches the floor and piles there over a page of scrolling', () => {
     const layer = layerThickness(strip.tightness)
-    for (const { landed, height } of everyTrajectory((sim) => {
-      const down = nodes(sim).filter(([y]) => y < sim.floorY + 0.3)
-      return { landed: down.length, height: Math.max(...down.map(([y]) => y - sim.floorY)) }
+    for (const { landed, height } of everyTrajectory(({ nodes: pile, floorY }) => {
+      const down = pile.filter(([y]) => y < floorY + 0.3)
+      return { landed: down.length, height: Math.max(...down.map(([y]) => y - floorY)) }
     })) {
       expect(landed).toBeGreaterThan(8)
       // A HEAP, not a runway. The old bound here was 0.02 against a layer gap
@@ -570,10 +597,8 @@ describe('the toilet-roll preset', () => {
   it('folds back on itself rather than running off across the floor', () => {
     // The failure this preset actually had: the pile paid out sideways like a
     // conveyor, three to four panel-widths of it, and left the shot.
-    for (const spread of everyTrajectory((sim) => {
-      const zs = nodes(sim)
-        .filter(([y]) => y < sim.floorY + 0.3)
-        .map(([, z]) => z)
+    for (const spread of everyTrajectory(({ nodes: pile, floorY }) => {
+      const zs = pile.filter(([y]) => y < floorY + 0.3).map(([, z]) => z)
       return (Math.max(...zs) - Math.min(...zs)) / strip.perforation
     })) {
       expect(spread).toBeLessThan(3.5)
