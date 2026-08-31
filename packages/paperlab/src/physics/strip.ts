@@ -219,13 +219,21 @@ export class StripSim {
    * empty roll looks like and the closest this library can get to drawing a
    * cardboard tube out of the one sheet it has.
    */
-  private readonly tubeStub: number
+  private tubeStub: number
   private params: StripParams
 
   /** Paid-out length: how much paper is off the roll. */
   private paid: number
   /** Angular velocity of the roll, rad/s. The thing that coasts. */
   private omega = 0
+  /**
+   * Whether anything has turned the roll yet — a scroll delta or a hand.
+   *
+   * `tail` is the opening pose, and editing it should re-pose the roll; but
+   * once the host has scrolled, `paid` is the simulation's own state and
+   * re-posing would yank the paper back out of the pile.
+   */
+  private driven = false
   private lastScroll: number
   private primed = false
 
@@ -280,9 +288,7 @@ export class StripSim {
     this.bucketItems = new Int32Array(this.count)
     this.bucketFill = new Int32Array(this.tableSize)
 
-    // One full wrap around the core, but never so much of a short sheet that
-    // there is nothing left to unroll.
-    this.tubeStub = Math.min(Math.PI * 2 * params.core, length * 0.3)
+    this.tubeStub = this.stubFor(params.core)
     this.paid = Math.min(params.tail, this.usableLength)
     this.lastScroll = params.scroll
     this.layOut()
@@ -345,6 +351,20 @@ export class StripSim {
   /** Radius of the full roll. Fixes the spiral's centre, which must not move. */
   private get outerRadius(): number {
     return rollRadius(this.totalLength, this.params.core, layerThickness(this.params.tightness))
+  }
+
+  /**
+   * The wrap that never leaves: one full turn around the core, but never so
+   * much of a short sheet that there is nothing left to unroll.
+   *
+   * A method rather than a constant because `core` is a live control. It was
+   * a constructor-time `readonly`, which meant dragging `core` moved the
+   * radius the spiral is drawn at while `usableLength` and the end stop kept
+   * answering for the old tube — the roll would run past its own floor, or
+   * stop short of it, depending on which way the slider went.
+   */
+  private stubFor(core: number): number {
+    return Math.min(Math.PI * 2 * core, this.totalLength * 0.3)
   }
 
   /** Paper that can actually leave the roll — everything but the glued stub. */
@@ -411,6 +431,7 @@ export class StripSim {
 
   setParams(params: Partial<StripParams>): void {
     let changed = false
+    const tailBefore = this.params.tail
     for (const key of [
       'scroll',
       'tightness',
@@ -431,6 +452,26 @@ export class StripSim {
     }
     // `perforation` is structural — it sets the node count and the hinge map,
     // so it cannot be patched in place. PaperMesh rebuilds the sim on it.
+
+    // Two params own derived state, and both are live sliders in the editor.
+    // Patching `this.params` alone left that state answering for the old
+    // value: `core` sizes the glued stub, and `tail` IS the paid-out length
+    // on a roll nobody has scrolled yet, so without this a tail drag did
+    // nothing at all and a core drag desynced the end stop from the spiral.
+    if (params.core !== undefined) {
+      this.tubeStub = this.stubFor(params.core)
+      // A bigger stub can leave less usable paper than is already out.
+      this.paid = Math.min(this.paid, this.usableLength)
+    }
+    if (params.tail !== undefined && tailBefore !== this.params.tail) {
+      // Only while the roll is still sitting at its opening pose. Once the
+      // host has scrolled, `paid` is the simulation's own state and a tail
+      // edit must not yank the paper back.
+      if (!this.driven) {
+        this.paid = Math.min(this.params.tail, this.usableLength)
+        this.layOut()
+      }
+    }
     if (changed) this.wake()
   }
 
@@ -569,6 +610,7 @@ export class StripSim {
     // ΔL = R·Δθ at the CURRENT radius: a nearly-empty roll spins fast and
     // gives up very little paper, which is how a roll reads as running out.
     const next = this.paid + this.radius * this.omega * dt
+    if (next !== this.paid) this.driven = true
     this.paid = Math.min(this.usableLength, Math.max(0, next))
     // Down to the tube (or fully rewound): the roll cannot keep turning.
     if (this.paid === 0 || this.paid === this.usableLength) this.omega = 0

@@ -110,8 +110,20 @@ const rig = resolveLighting(lighting, light)
  * above: a preset is data, and this makes it data you can take a photograph
  * of.
  */
-const scrollTo = Number(query.get('scroll')) || 0
-const feedSeconds = Number(query.get('feed')) || 3
+/**
+ * Both are parsed defensively because a bad one does not fail loudly. A
+ * non-finite `feed` leaves `t < 1` true forever, so the ramp schedules frames
+ * for the life of the page; a non-finite `scroll` reaches `paperConfigSchema`
+ * and throws from inside the render. A capture run would hang or crash rather
+ * than say which flag was wrong.
+ */
+const finite = (raw: string | null, fallback: number, valid: (v: number) => boolean) => {
+  if (raw === null || raw.trim() === '') return fallback
+  const value = Number(raw)
+  return Number.isFinite(value) && valid(value) ? value : fallback
+}
+const scrollTo = finite(query.get('scroll'), 0, () => true)
+const feedSeconds = finite(query.get('feed'), 3, (v) => v > 0)
 /** `?grab=1` turns on drag handles / grabbable simulations, so a pointer
  *  gesture can be driven headless and photographed. */
 const grabbable = query.get('grab') === '1'

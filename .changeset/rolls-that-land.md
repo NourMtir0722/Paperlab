@@ -31,13 +31,13 @@ scrolling up does.
 What the simulation buys over the deformer:
 
 - **The roll shrinks as it empties**, by area conservation, down to `core`. `ΔL = R·Δθ` at the *current* radius, so a nearly-empty roll spins fast and gives up very little paper — which is how a roll reads as running out.
-- **It buckles at the perforations.** Every joint wants to be straight; a joint at a perforation wants it far less, and may remember a fold. `crease` is the load-bearing number: below about 0.6 the landed paper flops over in flat panels and spreads across three panel-widths of floor, and at 0.7 it holds its folds and collapses into a one-panel-wide accordion.
+- **It buckles at the perforations.** Every joint wants to be straight; a joint at a perforation wants it far less, and may remember a fold. `crease` is the load-bearing number: low, the landed paper flops over in flat panels and runs away across the floor instead of folding back; high, the perforations hold and the pile accordions. Do not read a single number off this — see the note below on tuning a pile by worst case.
 - **Folds stack instead of passing through**, via a spatial hash. Without self-collision the pile flattens into nothing.
 - **Drag is broadside-only** — resistance along the segment normal, not along its length. At `drag: 0` every unit paid out becomes a unit straight down (a rope); at `drag: 1` the tip sits about two thirds of that and the strip sways as it falls.
 
 The roll is a flywheel driven by angular *impulse*, so `inertia` buys the coast after a flick and nothing else: how much paper a given scroll pays out is the same whether the roll coasts for a moment or half a second.
 
-**The roll stays on its holder, and the pile holds its own height.** Two
+**The roll stays on its holder, and the pile holds its own height.** Three
 faults that only showed once the roll was run all the way down:
 
 - Paying out the last of the paper left nothing wound, so every node the roll

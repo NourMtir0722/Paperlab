@@ -720,6 +720,60 @@ describe('taking hold of the paper', () => {
   })
 })
 
+describe('live parameter edits', () => {
+  // Both of these are sliders in the editor, and both own state that the
+  // constructor used to be the only thing to derive. Patching `params`
+  // without re-deriving left the sim answering for the old value.
+
+  it('re-poses the opening tail until the roll has actually been turned', () => {
+    const sim = makeSim({ tail: 1 })
+    const before = sim.remaining
+    sim.setParams({ tail: 3 })
+    run(sim, 1)
+    // More paper out means less left on the roll. Measured on `remaining`
+    // rather than on the tip: past the drop the extra paper piles, and a
+    // tip resting on its own pile sits HIGHER than a short strip hanging
+    // free, so height reads the wrong way round. Without re-deriving `paid`,
+    // a tail edit did nothing whatsoever.
+    expect(sim.remaining).toBeLessThan(before)
+  })
+
+  it('does not yank paper back out of the pile when tail changes mid-scroll', () => {
+    const sim = makeSim({ tail: 1 })
+    run(sim, 6, (t) => t * 3)
+    const paidOut = sim.remaining
+    sim.setParams({ tail: 0.2 })
+    run(sim, 1)
+    // Once the host has scrolled, `paid` is the simulation's state — the
+    // opening pose is long gone and must not be reimposed.
+    expect(sim.remaining).toBeLessThanOrEqual(paidOut + 1e-9)
+  })
+
+  it('resizes the glued stub when the core changes', () => {
+    // `core` sizes the tube the last wrap is glued to, so it sets how much
+    // paper can ever leave. A stale stub let the roll run past its own floor.
+    const small = makeSim({ core: 0.05 })
+    run(small, 12, (t) => t * 6)
+    const emptiedAtSmallCore = small.remaining
+
+    const sim = makeSim({ core: 0.05 })
+    sim.setParams({ core: 0.3 })
+    run(sim, 12, (t) => t * 6)
+    // A fatter tube keeps more paper back, so the roll cannot empty as far.
+    expect(sim.remaining).toBeGreaterThanOrEqual(emptiedAtSmallCore)
+    expect(sim.remaining).toBeGreaterThanOrEqual(0)
+  })
+
+  it('never lets a core change strand more paper out than the roll holds', () => {
+    const sim = makeSim({ core: 0.05, tail: 3 })
+    run(sim, 8, (t) => t * 5)
+    sim.setParams({ core: 0.45 })
+    run(sim, 1)
+    expect(sim.remaining).toBeGreaterThanOrEqual(0)
+    for (const v of nodes(sim).flat()) expect(Number.isFinite(v)).toBe(true)
+  })
+})
+
 describe('the wound roll', () => {
   it('draws a round roll, not a coarse polygon', () => {
     const sim = getPresetSim()

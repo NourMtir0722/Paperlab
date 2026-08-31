@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { numberSpec, numericFields, schemaControls, type Control } from './controlModel'
+import { num, numberSpec, numericFields, schemaControls, type Control } from './controlModel'
 
 const byKey = (controls: Control[], key: string) => {
   const found = controls.find((c) => c.key === key)
@@ -325,5 +325,47 @@ describe('colours', () => {
     if (ctl.kind !== 'color') throw new Error('expected color')
     ctl.onChange('#ff8800')
     expect(seen).toEqual(['#ff8800'])
+  })
+})
+
+describe('a slider can always represent the value it is showing', () => {
+  /** `num` is typed as the whole `Control` union; every case here is a slider. */
+  const slider = (c: Control) => {
+    if (c.kind !== 'number') throw new Error(`expected a number control, got ${c.kind}`)
+    return c
+  }
+
+  /**
+   * `NumberControl` clamps on both edit paths, so a range that excludes its
+   * own value rewrites the document on first touch. This is the guard for the
+   * whole class; `sheetRange.test.ts` checks the specific case that bit.
+   */
+  it('widens its range around a value from outside it', () => {
+    const control = slider(num('tail', 15, { min: 0, max: 8 }, () => {}))
+    expect(control.max).toBeGreaterThanOrEqual(15)
+    expect(control.value).toBe(15)
+  })
+
+  it('widens downward too', () => {
+    const control = slider(num('scroll', -50, { min: -20, max: 40 }, () => {}))
+    expect(control.min).toBeLessThanOrEqual(-50)
+  })
+
+  it('leaves an in-range value on the range it was given', () => {
+    const control = slider(num('crease', 0.7, { min: 0, max: 1 }, () => {}))
+    expect(control.min).toBe(0)
+    expect(control.max).toBe(1)
+  })
+
+  it('keeps the step off the authored range, so one outlier does not coarsen it', () => {
+    const normal = slider(num('tail', 4, { min: 0, max: 8 }, () => {}))
+    const widened = slider(num('tail', 15, { min: 0, max: 8 }, () => {}))
+    expect(widened.step).toBe(normal.step)
+  })
+
+  it('is not derailed by a non-finite value', () => {
+    const control = slider(num('scroll', Number.NaN, { min: -20, max: 40 }, () => {}))
+    expect(control.min).toBe(-20)
+    expect(control.max).toBe(40)
   })
 })

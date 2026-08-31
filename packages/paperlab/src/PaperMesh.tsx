@@ -688,10 +688,15 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const stripDown = (e: ThreeEvent<PointerEvent>) => {
     if (!isStrip || !stripSim || !props.interactive || !groupRef.current) return
     e.stopPropagation()
+    const local = groupRef.current.worldToLocal(worldScratch.copy(e.point))
+    // Nothing is committed until the grab lands. `grabNearest` returns -1 when
+    // there is no free paper to catch — every node still wound on the roll
+    // belongs to the spiral — and disabling the camera before finding that out
+    // left the controls dead for good: the early return skips both the pointer
+    // capture and `stripUp`, so nothing ever turned them back on.
+    if (stripSim.grabNearest(local.y, local.z) < 0) return
     if (controls) controls.enabled = false
     grabAnchor.current.copy(e.point)
-    const local = groupRef.current.worldToLocal(worldScratch.copy(e.point))
-    if (stripSim.grabNearest(local.y, local.z) < 0) return
     draggingRef.current = 'strip'
     ;(e.target as Element).setPointerCapture(e.pointerId)
   }
