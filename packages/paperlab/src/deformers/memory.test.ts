@@ -247,6 +247,35 @@ describe('CreaseTracker', () => {
     expect(tracker.creases[0]!.depth).not.toBe(999)
   })
 
+  it('lets a hand edit win over the fold that recorded the crease', () => {
+    // Dragging a crease shallower has to stick. `merge` takes the deeper of
+    // two creases on a line, so without forgetting the fold that recorded
+    // the deep one it would outvote the edit — and go on outvoting it, since
+    // the fold is still sitting in a slot.
+    const tracker = new CreaseTracker()
+    play(tracker, letterFold, { crease: 0.3 }, 0, 1, 1)
+    const recorded = Math.max(...tracker.creases.map((c) => Math.abs(c.depth)))
+    expect(recorded).toBeGreaterThan(5)
+
+    const edited = tracker.creases.map((c) => ({ ...c, depth: Math.sign(c.depth) * 5 }))
+    tracker.adopt(edited)
+    expect(tracker.creases.map((c) => Math.abs(c.depth))).toEqual(edited.map(() => 5))
+
+    // And it stays put while the paper is held where it is.
+    const held = letterFold.stack({ progress: 1, crease: 0.3 } as never, sheet)
+    expect(tracker.observe(held, 1)).toBe(false)
+    expect(tracker.creases.map((c) => Math.abs(c.depth))).toEqual(edited.map(() => 5))
+  })
+
+  it('re-creases a hand-flattened sheet when it is folded again', () => {
+    const tracker = new CreaseTracker()
+    play(tracker, letterFold, { crease: 0.3 }, 0, 1, 1)
+    tracker.adopt([])
+    expect(tracker.creases).toEqual([])
+    play(tracker, letterFold, { crease: 0.3 }, 0, 1, 1)
+    expect(tracker.creases).toHaveLength(2)
+  })
+
   it('never records more creases than the shader can draw', () => {
     const tracker = new CreaseTracker()
     // Six accordion creases across one sheet, all folded together.

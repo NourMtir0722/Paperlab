@@ -197,6 +197,8 @@ export class CreaseTracker {
   private slots = new Map<number, Slot>()
   private recorded: CreaseConfig[] = []
   private authored: CreaseConfig[] = []
+  /** What `observe` last handed out, so an echo can be told from an edit. */
+  private lastReported: CreaseConfig[] = []
 
   constructor(authored: CreaseConfig[] = []) {
     this.authored = authored
@@ -216,16 +218,31 @@ export class CreaseTracker {
   }
 
   /**
-   * Take on a crease set that came from outside — a config edit, a shared
-   * link, or this tracker's own recording after the host has persisted it.
+   * Take on a crease set that came from outside, and work out which kind of
+   * outside it was — because the two kinds want opposite things.
    *
-   * Slots are deliberately left alone. They describe the folds currently
-   * running, which is a different question from what the paper carries, and
-   * clearing them here would stall a crease mid-fold: the host writes back
-   * the moment a crease appears, and if that write reset the peak, the rest
-   * of the same fold would count as growth from a base it had already passed.
+   * It is USUALLY this tracker's own recording coming back, a frame or two
+   * after `onCrease` handed it to the host. Then the slots must survive: the
+   * fold that made the crease is very likely still closing, and resetting
+   * its peak on the host's echo would stall the crease halfway into the
+   * fold that was making it.
+   *
+   * But it can also be somebody EDITING the paper — a depth dragged down in
+   * a panel, a shared link opened, a state's overrides settling. Then the
+   * slots are the wrong story to keep. `merge` takes the deeper of two
+   * creases on a line, so a recording of 20° would quietly outvote a human
+   * asking for 5° and the slider would appear not to work; and it would go
+   * on outvoting it, because the fold that recorded the 20 is still sitting
+   * in a slot. An edit means the paper is what it is now, and the next
+   * crease has to be earned by folding it again.
+   *
+   * The two are told apart by what we last reported. Anything else is an
+   * edit, which is the safe way round: mistaking an echo for an edit costs
+   * a crease that gets re-recorded on the next fold, while mistaking an edit
+   * for an echo costs a control that does not work.
    */
   adopt(creases: CreaseConfig[]): void {
+    if (!same(creases, this.lastReported)) this.slots.clear()
     this.authored = creases
     this.recorded = []
   }
@@ -298,6 +315,7 @@ export class CreaseTracker {
 
     if (same(next, this.recorded)) return false
     this.recorded = next
+    this.lastReported = this.creases
     return true
   }
 }

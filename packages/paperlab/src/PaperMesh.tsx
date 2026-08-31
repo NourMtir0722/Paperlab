@@ -323,6 +323,18 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const memoryKey = config.memory.creases.map((c) => `${c.angle}:${c.offset}`).join('|')
 
   /**
+   * The creases WITH their depths — what the sheet is actually carrying.
+   *
+   * The lines-only key above cannot serve here, and the difference is the
+   * whole reason there are two. Dragging a crease deeper changes no line, so
+   * a lines-only key never fires: the tracker would go on holding the array
+   * it was handed when the crease was created, the shading would follow the
+   * edit (it reads config) and the geometry would not, and the depth slider
+   * would darken the mark without bending the paper.
+   */
+  const creaseKey = config.memory.creases.map((c) => `${c.angle}:${c.offset}:${c.depth}`).join('|')
+
+  /**
    * The sheet's live memory. Seeded from config and updated in the frame
    * loop; `onCrease` is how it gets back to config.
    */
@@ -342,13 +354,13 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
 
   // Config-side creases changing means something outside the frame loop has an
   // opinion: an edit, a shared link, or the host persisting what we just
-  // recorded. All three are the same instruction — this is what the paper
-  // carries now.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the lines; the body reads the depths off config.
+  // recorded. `adopt` works out which — an edit resets the folds it was
+  // watching, an echo of its own recording does not.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the creases themselves; the body reads them off config.
   useEffect(() => {
     creases.adopt(configRef.current.memory.creases)
     dirtyRef.current = true
-  }, [memoryKey])
+  }, [creaseKey])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the stack shape — the probe reads config off a ref.
   const { minSegments, autoSegments, animatedStack } = useMemo(() => {
