@@ -98,13 +98,44 @@ const light = query.has('film') ? { film: query.get('film') as never } : undefin
  */
 const rig = resolveLighting(lighting, light)
 
+/**
+ * `?scroll=N` feeds a scroll-driven simulation, ramping to N over `?feed=`
+ * seconds.
+ *
+ * `progress` cannot photograph a `strip`: that sim has no progress param, it
+ * has a scroll position it DIFFERENTIATES, so a value held still pays out no
+ * paper at all and the preset renders as a full roll with a leaf out forever.
+ * The pile is the thing worth looking at and it only exists after the roll
+ * has been turned for a while. Same argument as `?stock=` and `?lighting=`
+ * above: a preset is data, and this makes it data you can take a photograph
+ * of.
+ */
+const scrollTo = Number(query.get('scroll')) || 0
+const feedSeconds = Number(query.get('feed')) || 3
+/** `?grab=1` turns on drag handles / grabbable simulations, so a pointer
+ *  gesture can be driven headless and photographed. */
+const grabbable = query.get('grab') === '1'
+
 function PaperFrames() {
   const ref = useRef<PaperHandle>(null)
+  const [scroll, setScroll] = useState(0)
   useEffect(() => {
     window.__MEDIA__ = {
       ready: true,
       set: (p) => ref.current?.set('progress', p),
     }
+    if (!scrollTo) return
+    // Wall-clock ramp rather than a stepped one: the sim integrates, so it
+    // needs real frames between values, not a jump to the end state.
+    const start = performance.now()
+    let raf = 0
+    const tick = () => {
+      const t = Math.min(1, (performance.now() - start) / (feedSeconds * 1000))
+      setScroll(t * scrollTo)
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
   }, [])
   return (
     <Canvas
@@ -116,7 +147,13 @@ function PaperFrames() {
       <AimCamera />
       <LightRig rig={rig}>
         <PaperLighting rig={rig} floor={-1.5} scale={10} />
-        <PaperMesh ref={ref} preset={preset} {...(stockOverride ? { stock: stockOverride } : {})} />
+        <PaperMesh
+          ref={ref}
+          preset={preset}
+          {...(stockOverride ? { stock: stockOverride } : {})}
+          {...(scrollTo ? { physics: { type: 'strip' as const, scroll } } : {})}
+          {...(grabbable ? { interactive: true } : {})}
+        />
       </LightRig>
     </Canvas>
   )

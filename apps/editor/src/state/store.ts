@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import {
   behaviorConfigSchema,
   clothConfigSchema,
+  stripConfigSchema,
   diffConfig,
   getPreset,
   isBuiltinPreset,
@@ -15,6 +16,7 @@ import {
   stateDefSchema,
   uniquePresetName,
   type ClothConfig,
+  type StripConfig,
   type PaperConfig,
   type PaperConfigInput,
   type PaperStatesInput,
@@ -176,9 +178,10 @@ interface EditorState {
   setBehaviorType(type: string | null): void
   /** Shallow-merge surface effects; `undefined` removes an effect (mergeConfig can't). */
   setSurface(patch: Partial<SurfaceConfig>): void
-  /** Select 'none' | idle name | 'cloth'. Cloth clears the behavior — they're exclusive. */
+  /** Select 'none' | idle name | 'cloth' | 'strip'. A sim clears the behavior — they're exclusive. */
   setPhysics(name: string): void
-  patchCloth(patch: Partial<ClothConfig>): void
+  /** Shallow-merge into whichever object-shaped simulation is live. */
+  patchSim(patch: Partial<ClothConfig> | Partial<StripConfig>): void
 }
 
 /**
@@ -512,17 +515,21 @@ export const useEditor = create<EditorState>((set, get) => ({
   // remounting would collapse the folder the toggle lives in.
   setSurface: (patch) => set((s) => writeConfig(s, { surface: patch })),
   setPhysics: (name) =>
-    set((s) =>
-      writeConfig(
-        s,
-        // Cloth owns the vertices — Shape and Simulation are a segmented choice,
-        // not two toggles, so switching TO cloth clears behavior/deformers.
+    set((s) => {
+      // A simulation owns the vertices — Shape and Simulation are a segmented
+      // choice, not two toggles, so switching TO one clears behavior/deformers.
+      const sim =
         name === 'cloth'
-          ? { physics: clothConfigSchema.parse({ type: 'cloth' }), behavior: undefined, deformers: undefined }
-          : { physics: name },
-      ),
-    ),
-  patchCloth: (patch) =>
+          ? clothConfigSchema.parse({ type: 'cloth' })
+          : name === 'strip'
+            ? stripConfigSchema.parse({ type: 'strip' })
+            : null
+      return writeConfig(
+        s,
+        sim ? { physics: sim, behavior: undefined, deformers: undefined } : { physics: name },
+      )
+    }),
+  patchSim: (patch) =>
     set((s) => {
       if (typeof s.config.physics !== 'object') return s
       return writeConfig(s, { physics: patch })
