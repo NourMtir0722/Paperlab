@@ -19,11 +19,11 @@ peel {progress, corner ('auto' resolves outward in a sheet field), radius} · un
 
 ## Physics
 
-Idle (compose with behaviors): 'float' 'tumble' 'dangle' 'taped' 'breeze'. Cloth (exclusive with behavior — schema-enforced): physics={{type:'cloth', pins:'top-edge'|'top-corners'|'corner'|'none', wind, stiffness, gravity}}. Interactive cloth is grabbable.
+Idle (compose with behaviors): 'float' 'tumble' 'dangle' 'taped' 'breeze'. Cloth: physics={{type:'cloth', pins:'top-edge'|'top-corners'|'corner'|'none', wind, stiffness, gravity}}. Interactive cloth is grabbable. Strip: physics={{type:'strip', scroll, tightness, core, tail, perforation, crease, stiffness, drag, gravity, floor, inertia}} — a roll paying paper out as the page scrolls, buckling at its perforations into a self-colliding pile on the floor. `scroll` is a MONOTONIC world-unit number the host binds (window.scrollY/120), not a 0..1 progress; the sim differentiates it, so scrolling up rewinds. The roll shrinks by area conservation to `core`, and ΔL=R·Δθ at the current radius, so a near-empty roll gives less paper per scroll. The roll never fully empties — one wrap is glued to the tube, as on a real roll, so the roll cannot free its own nodes and fall onto the pile. With `interactive` the paper is grabbable: pulling it turns the roll (tension-driven — paper cannot stretch, so the roll must give), a yank keeps spinning after release, and pushing slack back does not rewind. Preset: toilet-roll. The strip folds in DEPTH (y/z, full width in x, no twist), so a head-on camera sees the roll end-on and the pile edge-on — `scene.turn` (degrees about the vertical axis, additive with the `rotation` prop) is what makes it readable, and the preset sets 25. Both simulations are exclusive with behavior/deformers — schema-enforced, the sim owns the vertices.
 
 ## Presets
 
-Built-ins: receipt-unroll, letter-fold, washed-letter, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note, postage-stamp, crumpled-note, settled-sheet, paper-ribbon, paper-roll. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
+Built-ins: receipt-unroll, letter-fold, washed-letter, vintage-note, hero-peel, page-flip, hanging-poster, pinned-sheet, flying-note, blank-sheet, photo-print, typed-note, postage-stamp, crumpled-note, settled-sheet, paper-ribbon, paper-roll, toilet-roll. Presets are .paper JSON validated by the exported zod paperConfigSchema; helpers: getPreset, parsePreset, serializePreset, diffConfig, buildAgentPayload, describeConfig.
 - A `.paper` file someone shares IS a preset object: `import p from './x.paper.json'` then `<Paper preset={p} />`, or `registerPreset('x', p)` to name it. `preset` accepts a string OR a config object — never expand a shared .paper into individual props.
 
 ## Interaction states
@@ -33,7 +33,7 @@ A preset may carry `states`: overrides-on-base diffs keyed rest/hover/pressed/pi
 ## Pitfalls
 
 1. Blank canvas = parent has no height (the classic R3F bug — <Paper> fills its parent).
-2. cloth + behavior together throws by design: cloth owns the vertices.
+2. cloth or strip + behavior together throws by design: the sim owns the vertices.
 3. prefers-reduced-motion freezes behaviors at their pose and disables physics/entrances automatically.
 4. No WebGL → automatic flat DOM fallback; a hidden DOM mirror of the content always renders (use it for E2E assertions).
 
