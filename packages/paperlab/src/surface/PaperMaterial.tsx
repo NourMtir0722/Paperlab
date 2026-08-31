@@ -4,6 +4,7 @@ import CustomShaderMaterial from 'three-custom-shader-material'
 import type { LightingName, SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { composeSurface } from './compose'
+import { resolveCreases, type CreaseShading } from './creases'
 import { useLightRig } from '../scene/rig'
 
 export interface PaperMaterialProps {
@@ -21,6 +22,12 @@ export interface PaperMaterialProps {
    * lit by the hall, not by the preset it was authored with.
    */
   lighting?: LightingName
+  /**
+   * Crease lines to draw, resolved from `surface.creaseLines` plus whatever
+   * the sheet remembers being folded along. Left off, only the authored ones
+   * render — which is what a material with no memory behind it should do.
+   */
+  creases?: CreaseShading[]
 }
 
 /**
@@ -38,6 +45,7 @@ export function PaperMaterial({
   thickness,
   sheet,
   lighting = 'studio',
+  creases,
 }: PaperMaterialProps) {
   const rig = useLightRig(lighting)
   const composed = composeSurface(
@@ -50,6 +58,7 @@ export function PaperMaterial({
     },
     sheet,
     rig,
+    creases ?? resolveCreases(surface, [], sheet ?? { width: 1, height: 1.4 }),
   )
 
   // Uniform objects bound to the current program; stable per structure.

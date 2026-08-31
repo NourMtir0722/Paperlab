@@ -26,6 +26,7 @@ const documented: PaperMeshProps = {
   content: { type: 'receipt', store: 'acme.dev', items: [{ name: 'Widget', price: 9.99 }] },
   behavior: { type: 'unroll', progress: 0.6 },
   surface: { grain: 0.3, deckle: { edges: ['bottom'] } },
+  memory: { set: 0.6, creases: [{ angle: 270, offset: 0.23, depth: 13 }] },
   physics: 'none',
   interactive: true,
   autoplay: true,
@@ -41,6 +42,7 @@ const minimal: PaperMeshProps = {
   content: { type: 'text', text: 'hi' },
   behavior: { type: 'peel' },
   surface: { aging: 0.5 },
+  memory: { set: 0 },
   scene: { lighting: 'noir' },
   physics: { type: 'cloth', pins: 'top-edge' },
   deformers: [{ type: 'bend' }],
@@ -54,6 +56,20 @@ describe('prop overrides reach the config', () => {
     const config = resolveConfig({ surface: { grain: 0.7, aging: 0.25 } })
     expect(config.surface.grain).toBe(0.7)
     expect(config.surface.aging).toBe(0.25)
+  })
+
+  it('carries memory, which is the same bug waiting to happen a third time', () => {
+    const config = resolveConfig({ memory: { creases: [{ angle: 90, offset: 0.2, depth: 14 }] } })
+    expect(config.memory.creases).toHaveLength(1)
+    expect(config.memory.creases[0]).toMatchObject({ angle: 90, depth: 14 })
+  })
+
+  it('merges memory over a preset’s instead of replacing it', () => {
+    // Turning the retention down on a letter that ships creased must not
+    // flatten it on the way past — `set` and `creases` are separate facts.
+    const config = resolveConfig({ preset: 'letter-fold', memory: { set: 0.2 } })
+    expect(config.memory.set).toBe(0.2)
+    expect(config.memory.creases.length).toBeGreaterThan(0)
   })
 
   it('merges surface over the stock defaults instead of replacing them', () => {

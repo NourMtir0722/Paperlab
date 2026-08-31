@@ -357,6 +357,65 @@ export type SurfaceConfig = z.infer<typeof surfaceSchema>
 export type SurfaceConfigInput = z.input<typeof surfaceSchema>
 export type PaperEdge = (typeof paperEdges)[number]
 
+// ── Memory ───────────────────────────────────────────────────────────────────
+
+/**
+ * A crease the paper carries: a line it has been folded along and did not
+ * fully come back from.
+ *
+ * `angle` and `offset` name the line exactly as {@link foldOptionsSchema}
+ * does — angle is the direction the fold TRAVELS and the crease line runs
+ * perpendicular to it, offset is the signed distance of that line from the
+ * sheet's centre along the travel direction. Naming the line in the fold
+ * deformer's own terms is what lets a remembered crease and a live fold
+ * recognise each other as the same crease rather than stack into two.
+ */
+export const creaseSchema = z.object({
+  angle: z.number().min(-360).max(360).default(90),
+  offset: z.number().min(-20).max(20).default(0),
+  /**
+   * The residual fold angle in degrees, signed — how far open the crease
+   * still sits once nothing is holding the paper. This is the whole of what
+   * a crease IS: geometry and shading both read it, and it is what makes the
+   * field authorable by hand (a dog-ear is a crease with a big `depth` near
+   * a corner) rather than only recordable.
+   */
+  depth: z.number().min(-180).max(180).default(12),
+})
+
+export type CreaseConfig = z.infer<typeof creaseSchema>
+export type CreaseConfigInput = z.input<typeof creaseSchema>
+
+/**
+ * What the sheet remembers having been done to it.
+ *
+ * Paper is PLASTIC where cloth is elastic: fold it and it keeps the fold.
+ * Every deformer in the library is a pure function of its options, so a
+ * sheet folded to 180° and back to 0° comes out of the stack pristine —
+ * which is right for cloth and wrong for the one material Paperlab models.
+ * This is the layer that remembers, and it lives beside the stack rather
+ * than inside it precisely so deformers stay pure.
+ */
+export const memorySchema = z.object({
+  /**
+   * How much of a fold this paper keeps, 0..1, over the stock's own
+   * {@link Stock.takesSet}. Kraft holds a crease hard; vellum springs most
+   * of the way back.
+   */
+  set: z.number().min(0).max(1).optional(),
+  /**
+   * The creases themselves. Recorded by folding the paper (see
+   * `onCrease`), or written by hand — a preset can ship already creased.
+   *
+   * Capped at four because that is what the crease shader carries, and a
+   * cap the schema states is better than one the renderer applies silently.
+   */
+  creases: z.array(creaseSchema).max(4).default([]),
+})
+
+export type MemoryConfig = z.infer<typeof memorySchema>
+export type MemoryConfigInput = z.input<typeof memorySchema>
+
 // ── Behavior & deformers ─────────────────────────────────────────────────────
 
 export const behaviorConfigSchema = z.discriminatedUnion('type', [
@@ -695,6 +754,15 @@ export const paperConfigSchema = z
     behavior: behaviorConfigSchema.optional(),
     deformers: z.array(deformerInstanceSchema).optional(),
     surface: surfaceSchema.default({}),
+    /**
+     * What the sheet remembers being folded — creases outlive the fold.
+     *
+     * Present by default, and on: paper that forgets is the bug this exists
+     * to fix, so remembering is not something a preset should have to ask
+     * for. `memory: { set: 0 }` is the opt-out, and it is what every sheet in
+     * the library did before this shipped.
+     */
+    memory: memorySchema.default({}),
     physics: physicsSchema.default('none'),
     scene: sceneSchema.default({}),
     onTwos: z.boolean().default(false),

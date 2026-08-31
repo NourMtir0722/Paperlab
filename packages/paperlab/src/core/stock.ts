@@ -29,6 +29,16 @@ export interface Stock {
   showThrough: number
   /** Glossy near-white glue underside (stickers) — forces showThrough 0. */
   adhesive: boolean
+  /**
+   * How hard this paper holds a crease, 0..1 — the material half of
+   * {@link MemoryConfig}. Fibrous, thick stocks take a set and keep it;
+   * coated and translucent ones spring most of the way back.
+   *
+   * Not a fraction of anything on its own: `memory.ts` scales it by
+   * `MAX_SET`, so 1 here means "as much as paper ever remembers", not "stays
+   * exactly as folded".
+   */
+  takesSet: number
 }
 
 export const stocks: Record<StockName, Stock> = {
@@ -44,6 +54,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: { grain: 0.12 },
     showThrough: 0,
     adhesive: false,
+    // Office bond creases cleanly and holds it — the reference paper.
+    takesSet: 0.6,
   },
   thermal: {
     id: 'thermal',
@@ -57,6 +69,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: { aging: 0.1 },
     showThrough: 0.06,
     adhesive: false,
+    // Thin and already curled off a roll; a fold in it stays folded.
+    takesSet: 0.65,
   },
   kraft: {
     id: 'kraft',
@@ -70,6 +84,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: { grain: 0.5 },
     showThrough: 0,
     adhesive: false,
+    // Thick and fibrous. The crease is a break, and it never comes back.
+    takesSet: 0.85,
   },
   newsprint: {
     id: 'newsprint',
@@ -83,6 +99,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: { grain: 0.7, aging: 0.15 },
     showThrough: 0.06,
     adhesive: false,
+    // Soft, short-fibred, and barely sprung — it crumples rather than resists.
+    takesSet: 0.8,
   },
   vellum: {
     id: 'vellum',
@@ -96,6 +114,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: {},
     showThrough: 0.55,
     adhesive: false,
+    // Translucent and plasticky: it fights the fold and mostly wins.
+    takesSet: 0.25,
   },
   'photo-gloss': {
     id: 'photo-gloss',
@@ -109,6 +129,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: {},
     showThrough: 0,
     adhesive: false,
+    // The coating resists, then cracks white — little angle kept, lots of mark.
+    takesSet: 0.3,
   },
   // Photo-gloss-like face, glossy near-white glue underside. The default
   // carrier for perforated stamp sheets.
@@ -124,6 +146,8 @@ export const stocks: Record<StockName, Stock> = {
     defaultSurface: {},
     showThrough: 0,
     adhesive: true,
+    // A face sheet on a release liner; the liner does most of the remembering.
+    takesSet: 0.5,
   },
 }
 

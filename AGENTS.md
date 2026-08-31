@@ -370,6 +370,30 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 | `ribbon` | pool, curl, drape | a strip hung the full drop of a room, pooling where it lands. The one behavior that reads its sheet: the pool begins a fraction above the BOTTOM edge, not at the centre |
 | `settle` | relax, lift, corner, slack | a sheet that has landed and relaxed. The pose AFTER `fall`, and everything in it is static — a settled sheet that ripples is one nobody believes |
 
+### Memory — the paper keeps what you do to it
+
+Paper is plastic where cloth is elastic: fold it and the fold stays. Every deformer is a pure function of its options, so without this a sheet folded to 180° and back to 0° comes out pristine — right for cloth, wrong for paper.
+
+```tsx
+<Paper
+  preset="letter-fold"
+  memory={{
+    set: 0.6,                                          // how much of a fold this paper keeps, 0..1
+    creases: [{ angle: 270, offset: 0.23, depth: 13 }] // and the creases it already has
+  }}
+/>
+```
+
+`set` is an override on the stock's own `takesSet` — kraft 0.85 holds a crease hard, vellum 0.25 springs back. Leave it out and the stock decides. `memory: { set: 0 }` is the opt-out, and it is exactly how every sheet behaved before this existed.
+
+A **crease** names its line the way `fold` does: `angle` is the direction the fold travels, the crease line runs perpendicular to it, `offset` is the signed distance of that line from the sheet's centre. `depth` is the signed residual fold angle — the whole of what a crease is, read by both the geometry and the shading. Four maximum, which is what the crease shader carries.
+
+Creases are **recorded by folding the paper**: a fold that closes past `CREASE_MIN_GROWTH` (45°) at a line that stays put leaves one, at `peak × set × MAX_SET`. A fold whose line *travels* leaves nothing — `unroll`'s landing hinge sits at 90° forever while it walks down the sheet, and paper coming off a roll is bent at the floor, not creased. `onCrease` fires when the set changes so a host can persist it; the sheet applies its own creases immediately either way.
+
+Applied, a crease is a **floor on the fold at its line, never an addition**. While the behavior folds that line further the crease is invisible; as it lets go the angle falls to the crease's depth and stops. That is what makes a crease appear on the way *out* of a fold with nothing detecting the release.
+
+Hero path only — a crease is per-sheet state and the field is one instanced draw call.
+
 ### Physics
 
 - Idle presets (`physics: 'float' | 'tumble' | 'dangle' | 'taped' | 'breeze'`): cheap curated motion, composes WITH a behavior.
@@ -560,6 +584,7 @@ Label **drag-to-scrub** is the interaction worth preserving: full range in ~300p
 Architecture invariants (violating these is a bug, not a style choice):
 
 - **The zod schema (`config/schema.ts`) is the single source of truth.** If a feature can't serialize into a preset, it waits.
+- **Paper memory lives ABOVE the deformer stack, never inside it.** `deformers/memory.ts` watches the stack a behavior built and rewrites it before it runs; no deformer knows memory exists. Deformer purity is what the GLSL twins are identical *to* — put state in a `displace` and `test:parity` has nothing left to check.
 - **Deformers are pure vertex functions with dual JS + GLSL implementations.** Any change to one side must change the other; `pnpm test:parity` enforces it. JS runs the hero path (CPU, ≤10 papers, interactive); GLSL runs the field path (instanced).
 - **GSAP owns animated values; `useFrame` owns uniform uploads and geometry writes.** Never both on one property.
 - **Behaviors are 3–5 human-named params** ('tightness', not 'cylinderRadius') expanding to deformer stacks.

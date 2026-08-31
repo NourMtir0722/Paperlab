@@ -7,6 +7,7 @@ import { Behaviors } from './sections/Behaviors'
 import { Deformers } from './sections/Deformers'
 import { Physics } from './sections/Physics'
 import { Surfaces } from './sections/Surfaces'
+import { Memory } from './sections/Memory'
 import { Stocks } from './sections/Stocks'
 import { Layouts } from './sections/Layouts'
 import { Stages } from './sections/Stages'
@@ -18,6 +19,7 @@ const SECTIONS = [
   ['deformers', 'Deformers'],
   ['physics', 'Physics'],
   ['surfaces', 'Surface'],
+  ['memory', 'Memory'],
   ['stocks', 'Stocks'],
   ['layouts', 'Layouts'],
   ['stages', 'Stages'],
@@ -57,6 +59,7 @@ export function App() {
         <Deformers />
         <Physics />
         <Surfaces />
+        <Memory />
         <Stocks />
         <Layouts />
         <Stages />

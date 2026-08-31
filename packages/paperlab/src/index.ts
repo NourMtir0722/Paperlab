@@ -50,6 +50,8 @@ export {
   contentNames,
   contentSchemaFor,
   washSchema,
+  creaseSchema,
+  memorySchema,
   paperEdges,
   coreStateNames,
   type PaperConfig,
@@ -66,6 +68,10 @@ export {
   type DeformerInstanceConfigInput,
   type SurfaceConfig,
   type SurfaceConfigInput,
+  type CreaseConfig,
+  type CreaseConfigInput,
+  type MemoryConfig,
+  type MemoryConfigInput,
   type PaperEdge,
   type PhysicsConfig,
   type PhysicsConfigInput,
@@ -127,6 +133,16 @@ export { idleNames, type IdleName, type IdlePreset } from './physics/idle'
  * and the roll comes apart, so a length control needs to know where to stop.
  */
 export { maxStripLength } from './physics/strip'
+
+/**
+ * Paper memory — creasing, and what a sheet keeps of a fold.
+ *
+ * `applyMemory` is exported because it is the one piece a host might need to
+ * reproduce outside the frame loop: an exporter or a thumbnailer that builds
+ * a stack by hand has to fold the creases in the same way, or a shared link
+ * renders one shape in the editor and another in the picture of it.
+ */
+export { applyMemory, CreaseTracker, MAX_SET, MAX_CREASES } from './deformers/memory'
 
 // ── Lighting is data, not an enum ───────────────────────────────────────────
 

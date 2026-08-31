@@ -38,6 +38,7 @@ import { useEditor } from '../state/store'
 import { formatItems, parseItems } from './receiptItems'
 import { pickImageAsDataUrl } from '../chrome/pickImage'
 import { lightControls } from './lightControls'
+import { memoryControls } from './memoryControls'
 import { backdropControls } from './backdropControls'
 
 /**
@@ -108,6 +109,14 @@ export function Inspector() {
     ),
     folder('Content', contentControls(config.content, patchConfig), { collapsed: true }),
     folder('Surface', surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
+    // Between Surface and Physics on purpose: a crease is half a mark on the
+    // paper and half a bend in it, so it belongs between the panel that draws
+    // the paper and the panel that moves it.
+    folder(
+      'Memory',
+      memoryControls(config.memory, config.stock, (patch) => patchConfig({ memory: patch as never })),
+      { collapsed: true },
+    ),
     folder('Physics', physicsControls(config.physics, setPhysics, patchSim), { collapsed: true }),
     // The same light panel stage mode has always had. It was never a stage
     // feature — `<PaperLighting>` has taken these overrides all along, and a

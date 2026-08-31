@@ -6,6 +6,7 @@ import {
   type SurfaceConfig,
 } from '../config/schema'
 import type { Stock } from '../core/stock'
+import { resolveCreases, type CreaseShading } from './creases'
 import type { LightingPreset } from '../scene/lighting'
 import {
   TRANSLUCENCY_FRAGMENT,
@@ -128,23 +129,29 @@ void plDeckle(inout vec4 color) {
 `
 
 const CREASE_CHUNK = /* glsl */ `
-uniform float uCreaseAngle;
-uniform float uCreaseStrength;
+uniform float uCreaseAngles[4];
+uniform float uCreaseStrengths[4];
 uniform float uCreasePositions[4];
 uniform int uCreaseCount;
 
 void plCrease(inout vec4 color, inout float rough) {
-  vec2 dir = vec2(cos(uCreaseAngle), sin(uCreaseAngle));
-  // Coordinate across the crease lines (0..1 over the sheet).
-  float t = dot(vPaperUv - 0.5, vec2(-dir.y, dir.x)) + 0.5;
   for (int i = 0; i < 4; i++) {
     if (i >= uCreaseCount) break;
+    // Per crease rather than once for the set: a remembered crease is placed
+    // by the fold that made it, and a sheet folded twice was not necessarily
+    // folded twice the same way. A map creased both directions has to draw
+    // both, and the trig is four cosines on a shader that only runs at all
+    // when the sheet has creases.
+    vec2 dir = vec2(cos(uCreaseAngles[i]), sin(uCreaseAngles[i]));
+    // Coordinate across this crease line (0..1 over the sheet).
+    float t = dot(vPaperUv - 0.5, vec2(-dir.y, dir.x)) + 0.5;
+    float strength = uCreaseStrengths[i];
     float d = abs(t - uCreasePositions[i]);
     float shadow = smoothstep(0.014, 0.0, d);
     float sheen = smoothstep(0.02, 0.006, d) - smoothstep(0.006, 0.0, d);
-    color.rgb *= 1.0 - shadow * uCreaseStrength * 0.28;
-    color.rgb += sheen * uCreaseStrength * 0.05;
-    rough = clamp(rough + shadow * uCreaseStrength * 0.2, 0.0, 1.0);
+    color.rgb *= 1.0 - shadow * strength * 0.28;
+    color.rgb += sheen * strength * 0.05;
+    rough = clamp(rough + shadow * strength * 0.2, 0.0, 1.0);
   }
 }
 `
@@ -219,11 +226,17 @@ export function composeSurface(
   sheet: { width: number; height: number } = { width: 1, height: 1.4 },
   /** Whose key light transmission is measured against — a preset name or the scene's resolved rig. */
   lighting: LightingName | LightingPreset = 'studio',
+  /**
+   * The crease lines to draw, already resolved. Authored `surface.creaseLines`
+   * and the sheet's remembered creases both arrive here as the same thing —
+   * see `resolveCreases`, which is the only place that knows they came from
+   * two different questions.
+   */
+  creases: CreaseShading[] = resolveCreases(surface, [], sheet),
 ): ComposedSurface {
   const grain = surface.grain ?? stock.defaultSurface.grain
   const aging = surface.aging ?? stock.defaultSurface.aging
   const deckle = surface.deckle
-  const creases = surface.creaseLines
   const perforation = surface.perforation
   const banding = stock.banding
   // Adhesive undersides are opaque backing-paper white — nothing shows through.
@@ -273,13 +286,18 @@ export function composeSurface(
     uniforms.uPerfSpacing = { value: perforation.spacing }
     uniforms.uSheetSize = { value: new THREE.Vector2(sheet.width, sheet.height) }
   }
-  if (creases) {
+  if (creases.length > 0) {
     chunks.push(CREASE_CHUNK)
     calls.push('plCrease(csm_DiffuseColor, csm_Roughness);')
-    uniforms.uCreaseAngle = { value: (creases.angle * Math.PI) / 180 }
-    uniforms.uCreaseStrength = { value: creases.strength }
-    uniforms.uCreasePositions = { value: padPositions(creases.positions) }
-    uniforms.uCreaseCount = { value: Math.min(creases.positions.length, 4) }
+    uniforms.uCreaseAngles = { value: pad(creases.map((c) => (c.angle * Math.PI) / 180)) }
+    uniforms.uCreaseStrengths = { value: pad(creases.map((c) => c.strength)) }
+    uniforms.uCreasePositions = {
+      value: pad(
+        creases.map((c) => c.position),
+        -1,
+      ),
+    }
+    uniforms.uCreaseCount = { value: Math.min(creases.length, 4) }
   }
   if (aging !== undefined) {
     chunks.push(AGING_CHUNK)
@@ -325,7 +343,7 @@ void main() {
     structureKey: `${[
       grain !== undefined || banding > 0 ? 'g' : '',
       deckle ? 'd' : '',
-      creases ? 'c' : '',
+      creases.length > 0 ? 'c' : '',
       aging !== undefined ? 'a' : '',
       perforation ? 'p' : '',
       stock.adhesive ? 'A' : '',
@@ -337,8 +355,8 @@ void main() {
   }
 }
 
-function padPositions(positions: number[]): number[] {
-  const out = positions.slice(0, 4)
-  while (out.length < 4) out.push(-1)
+function pad(values: number[], fill = 0): number[] {
+  const out = values.slice(0, 4)
+  while (out.length < 4) out.push(fill)
   return out
 }

@@ -460,6 +460,20 @@ export function App() {
                 coachMarkUsed()
                 patchConfig({ behavior: patch as never }, { external: true })
               }}
+              onCrease={(creases) => {
+                // A crease is a property of the PAPER, never of one interaction
+                // state: recorded while a state is being edited it would land in
+                // that state's override diff, and the letter would arrive
+                // creased only on hover. The sheet keeps showing them either
+                // way — this is persistence, and the base config is the only
+                // place they can honestly persist to.
+                if (useEditor.getState().editingState) return
+                // Not `external`: this fires repeatedly as the fold closes, and
+                // an inspector remount per frame of a fold would collapse the
+                // folder someone is reading. The panel derives its rows from
+                // the config on every render, so it follows along anyway.
+                patchConfig({ memory: { creases } as never })
+              }}
             />
           ) : (
             <PaperFieldMesh
