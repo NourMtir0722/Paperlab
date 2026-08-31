@@ -55,6 +55,152 @@ const builtins: Record<string, PaperConfigInput> = {
     },
     surface: { deckle: { edges: ['bottom'], roughness: 0.5 } },
   },
+  /**
+   * The one that is a SIMULATION rather than a shape.
+   *
+   * `paper-roll` above draws this same object with a deformer stack, and for
+   * a roll paying out against a wall that is the cheaper and better answer.
+   * This preset exists for the half that geometry cannot reach: what happens
+   * once the paper hits the ground. A deformer can bend a sheet along a curve
+   * you have already chosen; it cannot discover that a strip under
+   * compression buckles at its weakest hinge, and it cannot let one fold land
+   * on the one beneath it. Both of those are what a pile IS.
+   *
+   * Bind `physics.scroll` to the page and the roll turns:
+   *
+   * ```tsx
+   * const [scroll, setScroll] = useState(0)
+   * useEffect(() => {
+   *   const onScroll = () => setScroll(window.scrollY / 120)
+   *   window.addEventListener('scroll', onScroll, { passive: true })
+   *   return () => window.removeEventListener('scroll', onScroll)
+   * }, [])
+   * <Paper preset="toilet-roll" physics={{ type: 'strip', scroll }} />
+   * ```
+   *
+   * It is a MONOTONIC world-unit number, not a 0..1 progress — the sim
+   * differentiates it, so scrolling back up rewinds the roll and drags the
+   * pile taut before it lifts.
+   *
+   * The proportions are the real object's: a panel as wide as it is long, so
+   * `perforation` equals the sheet width and the strip tears into squares.
+   */
+  'toilet-roll': {
+    meta: { name: 'Toilet roll', tags: ['roll', 'scroll', 'simulation', 'hero'] },
+    // The proportions are a real roll's, at the scale the library is viewed
+    // at: `<Paper>` and the editor both look at the origin through about two
+    // world units and neither fits a camera to its content, so the whole
+    // composition — roll, drop and pile — has to live inside that. A panel is
+    // as wide as it is long and the roll is about a panel across, which is
+    // what a toilet roll is.
+    //
+    // Twenty-three panels of paper. Not a real roll's several hundred, but
+    // enough that a full page of scrolling does not empty it: one scroll unit
+    // is about one unit of paper on a fresh roll, so this is a couple of
+    // screens' worth before the tube shows.
+    sheet: { width: 0.6, height: 14 },
+    stock: 'printer',
+    content: { type: 'blank' },
+    physics: {
+      type: 'strip',
+      scroll: 0,
+      // Wound tightly enough to hold this much paper at a believable size: the
+      // outer radius lands at 0.61 of the panel width against a real roll's
+      // 0.57, over about nine visible turns.
+      //
+      // `tightness` is doing double duty and the trade is worth knowing about.
+      // A layer gap IS the paper's thickness, so it also sets how far apart
+      // self-collision holds two folds — wind tighter for a neater roll and
+      // the pile on the floor gets flatter, looser for a fatter pile and the
+      // roll coarsens. This is the middle of that.
+      //
+      // It is ALSO the roll's rim, and that is the reason not to raise it on
+      // looks alone. A layer gap is a real space between two wound turns, so
+      // the roll's end face is concentric rings with nothing between them,
+      // and off head-on you see between them — a fine sawtooth around the
+      // rim that winding tighter genuinely reduces. It was tried. Tightening
+      // to 0.78 also moves the roll's proportion to 0.553 of a panel width,
+      // nearer a real roll's 0.57 than this is, so it looked like a free win
+      // — and it throws the pile 1.33 units out in x against the 0.874 a
+      // square parent can see, spreading 5.9 panel-widths. Framing beats the
+      // rim. The sawtooth is what a roll wound from ONE zero-thickness
+      // ribbon costs; it is not tuned away, and a caller who wants it gone
+      // wants a thicker `stock` or fewer, fatter turns.
+      tightness: 0.65,
+      // A real cardboard tube, and a floor on how tight the spiral ever winds.
+      // The innermost wrap is the coarsest thing in the roll — the same
+      // arc-length step spans a bigger angle the smaller the radius — so the
+      // core is what stops a nearly-empty roll turning back into a polygon.
+      core: 0.12,
+      // A panel and a half already hanging. A roll on a holder always has a
+      // leaf out; starting from a bare cylinder reads as one still wrapped.
+      tail: 0.9,
+      perforation: 0.6,
+      // The four numbers below were chosen TOGETHER, and by worst case rather
+      // than by a good-looking run. A pile is chaotic: change `crease` by
+      // 0.05 and one 14-second scroll can spread 2.0 panel-widths of floor or
+      // 4.2, so a single trajectory is a sample and not a measurement. These
+      // are scored over nine — three scroll depths crossed with three feed
+      // rates — on how far the composition ever gets from the origin.
+      //
+      // What that fixed: the shipped set spread 2.9 panel-widths on average
+      // and 4.0 at worst, and threw paper 1.60 units out in z. It ran off the
+      // side of the frame and kept going. These hold 2.2 average, 2.8 worst,
+      // and 1.09 out — while keeping the pile's height (about ten layers)
+      // intact, which is the thing all of this exists to show.
+      //
+      // The most load-bearing of them. Below about 0.6 the landed paper flops
+      // over in flat panels and runs away across the floor instead of folding
+      // back; high is what makes the perforations hold and the pile
+      // accordion. A used roll remembering its creases is the whole effect.
+      crease: 0.9,
+      // Low enough that a panel buckles rather than steering the pile: at 0.5
+      // the sheet was stiff enough to push the folds already down along the
+      // floor ahead of it, which is what "spreads across four panels" was.
+      stiffness: 0.4,
+      // High: paper is light and broad, and this is what separates it from a
+      // rope hanging off a drum. It also damps the sideways travel that
+      // carried the pile out of frame.
+      drag: 0.85,
+      gravity: 1,
+      // The drop, measured from the roll's axis. Together with the roll's own
+      // radius this IS the height of the composition, which is centred on the
+      // origin — so keep their sum under about 1.7 or the roll and the pile
+      // fall outside the ~1.75 units `<Paper>`'s fixed camera can see.
+      //
+      // Shortened from 1.2, and it is the single most effective number here:
+      // a longer fall is more airtime for the strip to pick a direction and
+      // glide, so it landed still travelling and slid. Worst-case spread goes
+      // 4.2 panel-widths to 3.1 and the pile keeps its full depth. It buys
+      // vertical room as well, which is what lets the roll sit further up.
+      floor: 0.85,
+      inertia: 0.5,
+    },
+    surface: { grain: 0.25 },
+    // The preset is unreadable without this, and that is not a figure of
+    // speech: the strip sim folds in DEPTH, and every camera in the library
+    // is fixed and head-on, so `<Paper preset="toilet-roll" />` framed the
+    // roll end-on and the entire accordion edge-on and rendered a blank white
+    // column. This is the three-quarter view the pile actually reads from —
+    // enough to see along the folds and around the roll's rim, not so much
+    // that the strip's face turns away.
+    //
+    // The ceiling is framing, not taste. Turning swaps the pile's DEPTH for
+    // WIDTH, and depth is free — the camera has plenty — while width is not.
+    // Measured over fifteen scroll trajectories the pile reaches 1.27 units
+    // of depth at worst, and `halfWidth·cos θ + 1.27·sin θ` crosses the 0.874
+    // half-view a square parent gets at 28°. Twenty-five leaves real margin
+    // (0.809) and gives up almost nothing of the angle.
+    //
+    // Do not raise it without re-measuring that depth: the two numbers are
+    // coupled, and the pile's depth is not stable under small changes to the
+    // physics — see the note on `floor`.
+    //
+    // A parent narrower than square still crops the pile's far edge. That is
+    // the honest limit of a fixed camera, and the caller's answer is their
+    // own `rotation` prop, which this composes with rather than overrides.
+    scene: { turn: 25 },
+  },
   'letter-fold': {
     meta: { name: 'Letter fold', tags: ['fold', 'text'] },
     sheet: { width: 1, height: 1.4 },

@@ -56,10 +56,13 @@ export function describeConfig(config: PaperConfig): string {
   const parts = [`${contentPhrase} on ${stock.label.toLowerCase()} paper stock (${size})`]
 
   if (typeof config.physics === 'object') {
+    const sim = config.physics
     parts.push(
-      config.physics.pins === 'none'
-        ? 'falling and settling as cloth'
-        : `pinned (${config.physics.pins}) and moving like cloth in wind`,
+      sim.type === 'strip'
+        ? 'paying off a roll as the page scrolls, folding at its perforations into a pile on the floor'
+        : sim.pins === 'none'
+          ? 'falling and settling as cloth'
+          : `pinned (${sim.pins}) and moving like cloth in wind`,
     )
   } else if (config.behavior) {
     const phrase = BEHAVIOR_PHRASES[config.behavior.type]

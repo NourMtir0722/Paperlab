@@ -41,6 +41,7 @@ export {
   backdropSchema,
   behaviorConfigSchema,
   clothConfigSchema,
+  stripConfigSchema,
   paperStatesSchema,
   stateDefSchema,
   physicsNames,
@@ -69,6 +70,7 @@ export {
   type PhysicsConfig,
   type PhysicsConfigInput,
   type ClothConfig,
+  type StripConfig,
   type SceneConfig,
   type BackdropConfig,
   type SceneConfigInput,
@@ -119,6 +121,12 @@ export { registerBehavior, getBehavior, listBehaviors } from './behaviors/regist
 export { getLayout, listLayouts, registerLayout, type Layout, type PaperPose } from './field/layouts'
 export { stocks, getStock, type Stock } from './core/stock'
 export { idleNames, type IdleName, type IdlePreset } from './physics/idle'
+/**
+ * The longest strip the `strip` sim can still draw at a given perforation
+ * spacing. Exported for authoring UI: past it the chain's node count is capped
+ * and the roll comes apart, so a length control needs to know where to stop.
+ */
+export { maxStripLength } from './physics/strip'
 
 // ── Lighting is data, not an enum ───────────────────────────────────────────
 
