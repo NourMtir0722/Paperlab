@@ -762,7 +762,11 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         />
       </mesh>
       {props.interactive &&
-        !isCloth &&
+        // Any simulation, not cloth alone: a sim owns the vertices, so there
+        // is no deformer stack for a handle to drive. Harmless as `!isCloth`
+        // only because the schema makes a sim and a behavior exclusive — the
+        // intent is what is written here.
+        !simKind &&
         behavior?.handles?.map((h, i) => (
           <mesh
             key={h.id}
