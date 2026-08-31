@@ -27,19 +27,28 @@ interface TransportProps {
 export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
   const behaviorType = useEditor((s) => s.config.behavior?.type ?? null)
   const hasBehavior = Boolean(behaviorType)
-  const isCloth = useEditor((s) => typeof s.config.physics === 'object')
+  // Two object-shaped simulations now, so read the tag. `typeof === 'object'`
+  // only ever meant cloth by having no rival, and a strip told to grab itself
+  // "like cloth" describes the wrong gesture entirely.
+  const simType = useEditor((s) => (typeof s.config.physics === 'object' ? s.config.physics.type : null))
   const patchConfig = useEditor((s) => s.patchConfig)
 
   // Name the actual gesture instead of a generic "drag the handle" line.
   const behavior = behaviorType ? getBehavior(behaviorType) : null
   const hasHandles = Boolean(behavior?.handles?.length)
-  const hint = isCloth
-    ? 'Cloth simulation — grab the sheet and drag to pull it.'
-    : !behavior
-      ? 'No behavior yet — pick one in the Behavior panel to bring this paper to life.'
-      : hasHandles
-        ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'} — or press Space to autoplay.`
-        : `Space plays/pauses the ${behavior.label.toLowerCase()} · drag the timeline below to pose it by hand.`
+  const hint =
+    simType === 'cloth'
+      ? 'Cloth simulation — grab the sheet and drag to pull it.'
+      : simType === 'strip'
+        ? // The transport is no use here: a strip has no progress to scrub, only
+          // a scroll position it differentiates. Point at the control that does
+          // move it, and at the pull, which is the thing worth discovering.
+          'Strip simulation — drag `scroll` in the Physics panel to pay out paper, or grab the sheet and pull.'
+        : !behavior
+          ? 'No behavior yet — pick one in the Behavior panel to bring this paper to life.'
+          : hasHandles
+            ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'} — or press Space to autoplay.`
+            : `Space plays/pauses the ${behavior.label.toLowerCase()} · drag the timeline below to pose it by hand.`
   const [playing, setPlaying] = useState(true)
   const scrubbingRef = useRef(false)
 

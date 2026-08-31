@@ -405,10 +405,59 @@ export const clothConfigSchema = z.object({
 
 export type ClothConfig = z.infer<typeof clothConfigSchema>
 
+/**
+ * A strip of paper paying off a roll, and the pile it makes when it lands.
+ *
+ * The one simulation with a driving body: `scroll` turns the roll, the roll
+ * extrudes paper, and the paper is left to fall. Bind `scroll` to the page —
+ * it is a MONOTONIC world-unit figure, not a 0..1 progress, because the sim
+ * differentiates it and only ever reads the delta.
+ */
+export const stripConfigSchema = z.object({
+  type: z.literal('strip'),
+  /** How far the page has scrolled, in world units of paper asked for. */
+  scroll: z.number().min(-1000).max(1000).default(0),
+  /** Thin layers and many turns, or few and fat. */
+  tightness: z.number().min(0).max(1).default(0.6),
+  /** Radius of the cardboard tube — the roll never pays out past it. */
+  core: z.number().min(0.01).max(0.5).default(0.09),
+  /** Paper already hanging before the first scroll. A roll always has a leaf out. */
+  tail: z.number().min(0).max(20).default(1.1),
+  /** Spacing of the perforations: one sheet's worth of strip, in world units. */
+  perforation: z.number().min(0.05).max(5).default(1),
+  /**
+   * How much a perforation remembers being folded. 0 = a fresh roll, 1 = one
+   * that has been used.
+   *
+   * The default is high on purpose: below about 0.6 the landed paper flops
+   * over in flat panels and spreads across the floor, and at 0.7 it holds its
+   * folds and stacks into an accordion. The pile is the point.
+   */
+  crease: z.number().min(0).max(1).default(0.7),
+  /** Bend stiffness between perforations. 1 = card, 0 = cloth. */
+  stiffness: z.number().min(0).max(1).default(0.55),
+  /** Broadside air drag — what makes paper float down rather than drop. */
+  drag: z.number().min(0).max(1).default(0.55),
+  gravity: z.number().min(0).max(2).default(1),
+  /**
+   * How far below the roll the paper lands. A DISTANCE below the roll's axis,
+   * matching `unroll.floor`, not a signed y like `cloth.floor` — the roll
+   * family measures drops, and the composition is centred on the origin so
+   * an absolute y would not survive the offset anyway.
+   */
+  floor: z.number().min(0.1).max(30).default(1.2),
+  /** How long the roll coasts after the scroll stops. */
+  inertia: z.number().min(0).max(1).default(0.45),
+})
+
+export type StripConfig = z.infer<typeof stripConfigSchema>
+
 export const physicsSchema = z.union([
   z.enum(physicsNames),
   z.literal('cloth').transform(() => clothConfigSchema.parse({ type: 'cloth' })),
+  z.literal('strip').transform(() => stripConfigSchema.parse({ type: 'strip' })),
   clothConfigSchema,
+  stripConfigSchema,
 ])
 
 export type PhysicsConfig = z.infer<typeof physicsSchema>
@@ -537,6 +586,27 @@ export const sceneSchema = z.object({
   /** What is behind the sheet. Unset leaves the canvas alone. */
   backdrop: backdropSchema.optional(),
   /**
+   * Degrees the whole composition is turned about its vertical axis, so a
+   * preset can choose the angle it is READ from.
+   *
+   * Every camera in the library is fixed and head-on — `<Paper>` sits at
+   * `(0, 0.35, 2.4)` looking down -Z, and neither it nor the editor fits a
+   * camera to its content. That is the right default for a sheet, which is
+   * flat and faces you. It is the wrong one for anything whose shape lives
+   * in DEPTH: the `strip` sim folds in z by construction, so head-on its
+   * roll and the whole accordion of its pile are edge-on and the preset
+   * renders as a blank white column.
+   *
+   * A camera field would have been the other way to fix it, and is worse: it
+   * is meaningless inside `<PaperField>` and `<PaperMesh>`, where the caller
+   * owns the camera and there may be a dozen papers sharing it. Turning the
+   * paper works everywhere, because it is a property of the paper.
+   *
+   * Additive with the `rotation` prop rather than overriding it — the prop
+   * is the caller's, and a preset does not get to overrule it.
+   */
+  turn: z.number().min(-180).max(180).default(0),
+  /**
    * Overrides on the named preset — the same authorable half stage mode has
    * always had, and which a lone sheet had no way to reach.
    *
@@ -639,7 +709,7 @@ export const paperConfigSchema = z
         code: z.ZodIssueCode.custom,
         path: ['physics'],
         message:
-          'cloth physics and behavior/deformers are exclusive — cloth owns the vertices (pick Shape OR Simulation)',
+          'a simulation (cloth, strip) and behavior/deformers are exclusive — the sim owns the vertices (pick Shape OR Simulation)',
       })
     }
     // State overrides must stay serializable schema paths: merging them over

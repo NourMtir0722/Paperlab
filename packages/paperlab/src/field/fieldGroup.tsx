@@ -297,6 +297,7 @@ export function FieldGroup({
           { ...config.behavior, [behaviorTransform.progressParam]: progressRef.current },
           t,
           pose2,
+          shared.sheet,
         )
         scratchObj.position.x += pose2.position[0]
         scratchObj.position.y += pose2.position[1]

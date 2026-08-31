@@ -111,7 +111,11 @@ export function coachMarkUsed(): void {
 
 export function CoachMark() {
   const behaviorType = useEditor((s) => s.config.behavior?.type ?? null)
-  const isCloth = useEditor((s) => typeof s.config.physics === 'object')
+  // A simulation of either kind, not cloth specifically. The outcome here is
+  // the same either way — a sim and a behavior are mutually exclusive, so
+  // there is never a handle to point at — but the name reading "cloth" for
+  // any object physics is what put wrong text on screen twice elsewhere.
+  const isSimulated = useEditor((s) => typeof s.config.physics === 'object')
   const [seen, setSeen] = useState(() => {
     if (dismissed) return true
     try {
@@ -131,7 +135,7 @@ export function CoachMark() {
   }, [])
 
   const behavior = behaviorType ? getBehavior(behaviorType) : null
-  const hasHandle = Boolean(!isCloth && behavior?.handles?.length)
+  const hasHandle = Boolean(!isSimulated && behavior?.handles?.length)
   const show = !seen && hasHandle
 
   // Follow the dot. Imperative on purpose — see the note at the top.

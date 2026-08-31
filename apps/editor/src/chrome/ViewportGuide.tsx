@@ -24,7 +24,10 @@ const HANDLE_GESTURE: Record<string, string> = {
 
 export function ViewportGuide() {
   const behaviorType = useEditor((s) => s.config.behavior?.type ?? null)
-  const isCloth = useEditor((s) => typeof s.config.physics === 'object')
+  // The tag, not `typeof === 'object'`: that only ever meant cloth by having
+  // no rival, and it now matches a strip too — which is how this offered to
+  // "pull the cloth" on a roll of paper.
+  const simType = useEditor((s) => (typeof s.config.physics === 'object' ? s.config.physics.type : null))
   const [open, setOpen] = useState(false)
 
   const behavior = behaviorType ? getBehavior(behaviorType) : null
@@ -55,9 +58,14 @@ export function ViewportGuide() {
         </button>
       </div>
       <ul className="guide-steps">
-        {isCloth ? (
+        {simType === 'cloth' ? (
           <li>
             <span className="guide-dot cloth" /> Grab the sheet anywhere and drag to pull the cloth.
+          </li>
+        ) : simType === 'strip' ? (
+          <li>
+            <span className="guide-dot cloth" /> Drag <b>scroll</b> in the Physics panel to pay out paper, or
+            grab the sheet and pull it off the roll.
           </li>
         ) : hasHandles ? (
           <li>

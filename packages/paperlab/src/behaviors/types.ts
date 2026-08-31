@@ -30,10 +30,14 @@ export interface Behavior<O = AnyOptions> {
   /**
    * Whole-sheet motion written into `pose` each frame (allocation-free),
    * composed after any idle preset's transform. Must be a pure function of
-   * (options, t) — the field applies it per instance with a time offset, so
-   * it has to be deterministic (flight's travel-across-the-scene).
+   * (options, t, sheet) — the field applies it per instance with a time
+   * offset, so it has to be deterministic (flight's travel-across-the-scene).
+   *
+   * `sheet` is passed because whole-sheet motion is often only meaningful
+   * relative to the sheet's own extent: `unroll` holds the roll still in
+   * space, and where "still" is depends on how long the paper is.
    */
-  transform?(o: O, t: number, pose: AeroPose): void
+  transform?(o: O, t: number, pose: AeroPose, sheet: SheetDims): void
   handles?: HandleSpec<O>[]
   /**
    * The two or three options that ARE this behavior — the ones someone

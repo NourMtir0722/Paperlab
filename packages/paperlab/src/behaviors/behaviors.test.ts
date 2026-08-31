@@ -9,7 +9,8 @@ import { getBehavior, listBehaviors } from './registry'
 import { behaviorConfigSchema, paperConfigSchema } from '../config/schema'
 import { settle } from './settle'
 import { ribbon, ribbonOptionsSchema } from './ribbon'
-import { getDeformer } from '../deformers/registry'
+import { getDeformer, resolveDeformerStack } from '../deformers/registry'
+import { displacePoint } from '../deformers/compose'
 
 const sheet = { width: 1, height: 2.6 }
 
@@ -58,25 +59,132 @@ describe('peel', () => {
 })
 
 describe('unroll', () => {
+  const at = (o: Partial<typeof unroll.defaults>) => unroll.stack({ ...unroll.defaults, ...o }, sheet)
+  const optionOf = (o: Partial<typeof unroll.defaults>, key: 'radius' | 'boundary' | 'angle') =>
+    (at(o)[0]!.options as Record<string, number>)[key]!
+
   it('progress 0 rolls everything, progress 1 is flat', () => {
-    const rolled = unroll.stack({ progress: 0, tightness: 0.5, sway: 0 }, sheet)
-    expect(rolled[0]!.options).toMatchObject({ angle: 270, boundary: -1.3 })
-    const flat = unroll.stack({ progress: 1, tightness: 0.5, sway: 0 }, sheet)
+    expect(at({ progress: 0 })[0]!.options).toMatchObject({ angle: 270, boundary: -1.3 })
     // Boundary swept past the bottom edge (+ slack): nothing left to roll.
-    expect((flat[0]!.options as { boundary: number }).boundary).toBeGreaterThan(sheet.height / 2)
+    expect(optionOf({ progress: 1 }, 'boundary')).toBeGreaterThan(sheet.height / 2)
   })
 
   it('tightness shrinks the roll radius', () => {
-    const loose = unroll.stack({ progress: 0.5, tightness: 0, sway: 0 }, sheet)
-    const tight = unroll.stack({ progress: 0.5, tightness: 1, sway: 0 }, sheet)
-    const rLoose = (loose[0]!.options as { radius: number }).radius
-    const rTight = (tight[0]!.options as { radius: number }).radius
+    const rLoose = optionOf({ progress: 0.5, tightness: 0 }, 'radius')
+    const rTight = optionOf({ progress: 0.5, tightness: 1 }, 'radius')
     expect(rLoose).toBeGreaterThan(rTight)
     expect(rTight).toBeGreaterThan(0)
   })
 
+  it('the roll shrinks toward its core as the paper pays out', () => {
+    // The point of the whole thing: a roll that stays the same size while
+    // metres of paper leave it is the tell that it is a decoration, not a roll.
+    const radii = [0, 0.25, 0.5, 0.75, 1].map((progress) => optionOf({ progress }, 'radius'))
+    for (let i = 1; i < radii.length; i++) expect(radii[i]!).toBeLessThan(radii[i - 1]!)
+    expect(radii.at(-1)).toBeCloseTo(unroll.defaults.core, 6)
+    expect(radii[0]!).toBeGreaterThan(unroll.defaults.core)
+  })
+
+  it('`from` moves the roll to the other end without changing the sweep', () => {
+    expect(optionOf({ from: 'bottom' }, 'angle')).toBe(270)
+    expect(optionOf({ from: 'top' }, 'angle')).toBe(90)
+    expect(optionOf({ from: 'top' }, 'boundary')).toBe(optionOf({ from: 'bottom' }, 'boundary'))
+  })
+
+  it('`fixed` holds the roll still and lets the paper travel instead', () => {
+    const pose = {
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+    }
+    const offsetAt = (progress: number, o: Partial<typeof unroll.defaults> = {}) => {
+      pose.position[1] = 0
+      unroll.transform!({ ...unroll.defaults, fixed: true, progress, ...o }, 0, pose, sheet)
+      return pose.position[1]
+    }
+    // Fully paid out is the anchor: the sheet sits where an undeformed one
+    // would, so a preset using this needs no bespoke camera.
+    expect(offsetAt(1)).toBeCloseTo(0, 9)
+    // Wound up, the roll hangs off the end of that box — which end depends
+    // on which end it is wound at.
+    expect(offsetAt(0)).toBeLessThan(0)
+    expect(offsetAt(0, { from: 'top' })).toBeGreaterThan(0)
+    // And it moves monotonically between the two.
+    const walk = [0, 0.25, 0.5, 0.75, 1].map((p) => offsetAt(p))
+    for (let i = 1; i < walk.length; i++) expect(walk[i]!).toBeGreaterThan(walk[i - 1]!)
+    // Off by default, so an unroll that never asked for it does not move.
+    pose.position[1] = 0
+    unroll.transform!({ ...unroll.defaults, progress: 1 }, 0, pose, sheet)
+    expect(pose.position[1]).toBe(0)
+  })
+
+  it('lands the drop on the floor instead of hanging through it', () => {
+    // The reference is a roll on a wall: paper reaches the ground, creases,
+    // and runs out flat. Trace real vertices down the sheet and check the
+    // drop stops descending at the floor and travels along it instead.
+    const tall = { width: 1, height: 5 }
+    const o = {
+      ...unroll.defaults,
+      progress: 0.7,
+      tightness: 0.8,
+      from: 'top' as const,
+      fixed: true,
+      core: 0.12,
+      tail: 0.5,
+      floor: 2.4,
+    }
+    const stack = resolveDeformerStack(unroll.stack(o, tall))
+    const pose = {
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+    }
+    unroll.transform!(o, 0, pose, tall)
+    const offset = pose.position[1]
+
+    const at = (localY: number) => {
+      const v = displacePoint(new THREE.Vector3(0, localY, 0), 0.5, (localY + 2.5) / 5, stack, {
+        t: 0,
+        sheet: tall,
+      })
+      return { y: v.y + offset, z: v.z }
+    }
+
+    // The floor is fixed in world space: `floor` below the pinned roll.
+    const rollY = at(2.5).y
+    const floorY = rollY - 2.4
+
+    const samples = Array.from({ length: 25 }, (_, i) => at(2.5 - i * (5 / 24)))
+    // Nothing goes through the floor — the failure this exists to catch.
+    for (const s of samples) expect(s.y).toBeGreaterThan(floorY - 0.2)
+    // And something actually arrived: the far end lies at the floor, out
+    // along z, rather than stopping dead at the crease.
+    const last = samples.at(-1)!
+    expect(last.y).toBeLessThan(floorY + 0.4)
+    expect(last.z).toBeGreaterThan(0.5)
+  })
+
+  it('no floor means the paper hangs past where a floor would have been', () => {
+    const tall = { width: 1, height: 5 }
+    const o = { ...unroll.defaults, progress: 0.7, from: 'top' as const, tail: 0.5 }
+    expect(unroll.stack(o, tall)).toHaveLength(1)
+    expect(unroll.stack({ ...o, floor: 2.4 }, tall)).toHaveLength(2)
+  })
+
+  it('tail leaves a leaf already out at progress 0', () => {
+    const tall = { width: 1, height: 5 }
+    const bare = unroll.stack({ ...unroll.defaults, progress: 0 }, tall)[0]!.options as {
+      boundary: number
+    }
+    const withTail = unroll.stack({ ...unroll.defaults, progress: 0, tail: 0.5 }, tall)[0]!.options as {
+      boundary: number
+    }
+    // A roll with nothing showing starts wound to the very edge; a tail
+    // starts the boundary short of it by exactly that much.
+    expect(bare.boundary).toBeCloseTo(-2.5, 9)
+    expect(withTail.boundary).toBeCloseTo(-2.0, 9)
+  })
+
   it('sway loop is transient and bounded', () => {
-    const o = { progress: 0.5, tightness: 0.5, sway: 1 }
+    const o = { ...unroll.defaults, progress: 0.5, tightness: 0.5, sway: 1 }
     for (const t of [0, 0.7, 1.9, 3.2]) {
       const p = unroll.loop!(o, t).progress!
       expect(Math.abs(p - o.progress)).toBeLessThanOrEqual(0.01)

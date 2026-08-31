@@ -162,9 +162,9 @@ describe("the grid 'auto' picks holds the surface", () => {
     [
       'roll',
       [
-        { angle: 90, boundary: 0, radius: 0.12, spiral: 0.015 },
-        { angle: 90, boundary: 0, radius: 0.5, spiral: 0.015 },
-        { angle: 0, boundary: 0.2, radius: 0.3, spiral: 0 },
+        { angle: 90, boundary: 0, radius: 0.12, thickness: 0.02 },
+        { angle: 90, boundary: 0, radius: 0.5, thickness: 0.02 },
+        { angle: 0, boundary: 0.2, radius: 0.3, thickness: 0 },
       ],
     ],
     [

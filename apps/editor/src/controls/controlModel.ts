@@ -70,22 +70,48 @@ export type Emphasis = 'signature'
 
 // ── Constructors — the inspectors read better building trees from these. ────
 
+/**
+ * A slider's range is a SCRUBBING range, and it must still contain the value
+ * it was handed.
+ *
+ * `NumberControl` clamps on both edit paths — the label drag and the
+ * click-to-type readout — so a control showing a value from outside its own
+ * range is not merely mis-drawn: the first touch writes the clamped number
+ * back. That is data loss, and it is silent.
+ *
+ * It is also not hypothetical. `height` ran 0.2–4 while three presets shipped
+ * taller, so nudging the slider collapsed a 14-unit roll to 4; the strip's
+ * `scroll`, `tail` and `floor` each narrow their schema by an order of
+ * magnitude and would do the same to an imported value. Widening here rather
+ * than at each call site is deliberate — the ranges are chosen so the COMMON
+ * value is comfortable to scrub, and every one of them is a candidate for the
+ * same bug the moment a preset or a shared link carries something bigger.
+ *
+ * Widening rather than clamping, because between "the track looks odd" and
+ * "the document silently changed", only one of them is recoverable.
+ */
 export const num = (
   key: string,
   value: number,
   opts: { min: number; max: number; step?: number; label?: string; disabled?: boolean },
   onChange: (v: number) => void,
-): Control => ({
-  kind: 'number',
-  key,
-  label: opts.label ?? key,
-  value,
-  min: opts.min,
-  max: opts.max,
-  step: opts.step ?? (opts.max - opts.min) / 200,
-  disabled: opts.disabled,
-  onChange,
-})
+): Control => {
+  const min = Number.isFinite(value) ? Math.min(opts.min, value) : opts.min
+  const max = Number.isFinite(value) ? Math.max(opts.max, value) : opts.max
+  return {
+    kind: 'number',
+    key,
+    label: opts.label ?? key,
+    value,
+    min,
+    max,
+    // Off the AUTHORED range, so widening for one outlying value does not
+    // coarsen the step everywhere else.
+    step: opts.step ?? (opts.max - opts.min) / 200,
+    disabled: opts.disabled,
+    onChange,
+  }
+}
 
 export const select = (
   key: string,

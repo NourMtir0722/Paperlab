@@ -6,6 +6,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import type {
   BehaviorConfigInput,
   ClothConfig,
+  StripConfig,
   ContentConfigInput,
   DeformerInstanceConfigInput,
   PaperConfig,
@@ -33,6 +34,7 @@ import { resolveDeformerStack } from './deformers/registry'
 import type { Behavior } from './behaviors/types'
 import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
 import { ClothSim } from './physics/cloth'
+import { StripSim, stripNodeCount } from './physics/strip'
 import { PaperMaterial } from './surface/PaperMaterial'
 import { usePrefersReducedMotion } from './a11y'
 import { quantizeProgress, quantizeTime } from './motion/onTwos'
@@ -219,7 +221,12 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   // around so snapshot()/toJSON() never lose the state machine.
   const resolvedRef = useRef(resolved)
   resolvedRef.current = resolved
-  const isCloth = !reduced && typeof config.physics === 'object'
+  // Two object-shaped simulations now, so the kind is read off the tag rather
+  // than off `typeof` — which was only ever "cloth" by having no rival.
+  const simKind =
+    !reduced && typeof config.physics === 'object' ? (config.physics.type as 'cloth' | 'strip') : null
+  const isCloth = simKind === 'cloth'
+  const isStrip = simKind === 'strip'
   const idle =
     !reduced && typeof config.physics === 'string' && config.physics !== 'none'
       ? getIdlePreset(config.physics as IdleName)
@@ -238,13 +245,41 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const configRef = useRef(config)
   configRef.current = config
 
+  /**
+   * The caller's rotation with the preset's `scene.turn` folded in.
+   *
+   * Additive, and about Y: `turn` is how the composition wants to be READ
+   * (see `sceneSchema.turn`), while the prop is where the caller has decided
+   * to put this paper. A preset does not get to overrule that, so it leans on
+   * top of it.
+   */
+  const baseRotation = useMemo<[number, number, number]>(() => {
+    const [rx, ry, rz] = props.rotation ?? [0, 0, 0]
+    return [rx, ry + (config.scene.turn * Math.PI) / 180, rz]
+  }, [props.rotation, config.scene.turn])
+
   const controls = useThree((s) => s.controls) as { enabled?: boolean } | null
   const camera = useThree((s) => s.camera)
 
   const behaviorKey = JSON.stringify(config.behavior ?? null)
   const deformersKey = JSON.stringify(config.deformers ?? null)
   const sheetKey = JSON.stringify(config.sheet)
-  const physicsKey = JSON.stringify(config.physics)
+  /**
+   * What the SHAPE path needs to know about physics, and nothing more.
+   *
+   * Deliberately not `JSON.stringify(config.physics)`. A simulation's config
+   * is live — `strip.scroll` is rewritten every single frame by the host —
+   * and a key that moves every frame re-runs the segment probe, hands the
+   * geometry memo fresh array identities, rebuilds the geometry, and through
+   * it rebuilds the sim, which throws away everything the sim had integrated.
+   * A scroll-driven roll pinned to its own starting tail forever, sixty times
+   * a second.
+   *
+   * Nothing downstream of here reads a sim's VALUES: an object-shaped physics
+   * means there is no deformer stack at all, so the only thing that can change
+   * the shape path is whether a sim is present and which one.
+   */
+  const physicsKey = typeof config.physics === 'object' ? config.physics.type : config.physics
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: The keys are change triggers; the body only touches refs.
   useEffect(() => {
@@ -298,12 +333,27 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed on the sheet — rebuilding geometry on identity would orphan GPU buffers every render.
   const geometry = useMemo(() => {
+    if (isStrip) {
+      // A strip is a 2×N quad ribbon: one column each side, one row per chain
+      // node. The row count has to agree with the sim exactly, so both derive
+      // it from the same function.
+      const strip = configRef.current.physics as StripConfig
+      const nodes = stripNodeCount(config.sheet.height, strip.perforation)
+      return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, 1, nodes - 1)
+    }
     if (!isCloth) return createSheetGeometry(config.sheet, minSegments, autoSegments)
     // Cloth: explicit capped grid so sim particles == mesh vertices.
     const [sx, sy] = resolveSegments(config.sheet, 2)
     const capped = Math.min(Math.max(sx, sy), CLOTH_MAX_SEGMENTS)
     return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, capped, capped)
-  }, [sheetKey, minSegments, autoSegments, isCloth])
+  }, [
+    sheetKey,
+    minSegments,
+    autoSegments,
+    isCloth,
+    isStrip,
+    isStrip ? (config.physics as StripConfig).perforation : 0,
+  ])
 
   // Imperatively-created geometry is ours to free — R3F only auto-disposes
   // JSX-created objects, so a sheet change would otherwise orphan GPU buffers.
@@ -313,6 +363,25 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     () => Float32Array.from(geometry.attributes.position!.array as Float32Array),
     [geometry],
   )
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Rebuild only on geometry or pin layout change — sliders update the sim in place.
+  const stripSim = useMemo(() => {
+    if (!isStrip) return null
+    const strip = configRef.current.physics as StripConfig
+    return new StripSim(config.sheet.height, config.sheet.width, {
+      scroll: strip.scroll,
+      tightness: strip.tightness,
+      core: strip.core,
+      tail: strip.tail,
+      perforation: strip.perforation,
+      crease: strip.crease,
+      stiffness: strip.stiffness,
+      drag: strip.drag,
+      gravity: strip.gravity,
+      floor: strip.floor,
+      inertia: strip.inertia,
+    })
+  }, [geometry, isStrip])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Rebuild only on geometry or pin layout change — sliders update the sim in place.
   const sim = useMemo(() => {
@@ -454,10 +523,10 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       idle?.transform?.(now, pose)
       if (hasBehaviorTransform) {
         const o = effectiveOptions(now)
-        if (o) behavior!.transform!(o, now, pose)
+        if (o) behavior!.transform!(o, now, pose, cfg.sheet)
       }
       const base = props.position ?? [0, 0, 0]
-      const baseRot = props.rotation ?? [0, 0, 0]
+      const baseRot = baseRotation
       groupRef.current.position.set(
         base[0] + pose.position[0],
         base[1] + pose.position[1],
@@ -468,6 +537,34 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         baseRot[1] + pose.rotation[1],
         baseRot[2] + pose.rotation[2],
       )
+    }
+
+    // Simulation path: the strip owns the vertices.
+    if (isStrip && stripSim) {
+      const strip = cfg.physics as StripConfig
+      stripSim.setParams({
+        scroll: strip.scroll,
+        tightness: strip.tightness,
+        core: strip.core,
+        tail: strip.tail,
+        crease: strip.crease,
+        stiffness: strip.stiffness,
+        drag: strip.drag,
+        gravity: strip.gravity,
+        floor: strip.floor,
+        inertia: strip.inertia,
+      })
+      stripSim.step(delta)
+      if (!stripSim.asleep) {
+        const position = geometry.attributes.position as THREE.BufferAttribute
+        stripSim.writeInto(position.array as Float32Array)
+        position.needsUpdate = true
+        // Per-segment normals are what make the folds read: the underside of
+        // each turn faces away from the key and goes dark on its own.
+        computeSheetNormals(geometry)
+        geometry.computeBoundingSphere()
+      }
+      return
     }
 
     // Simulation path: cloth owns the vertices.
@@ -576,12 +673,56 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     ;(e.target as Element).releasePointerCapture(e.pointerId)
   }
 
+  /**
+   * Take hold of the paper and pull, and the roll turns.
+   *
+   * Same drag plane as cloth — camera-facing, through the point first
+   * touched — which degrades the right way for a strip. Head-on, that plane
+   * holds depth fixed and the gesture is purely up and down, which is the
+   * pull the object is famous for; from three-quarters it opens up and the
+   * paper can be drawn out toward the viewer as well.
+   *
+   * The sim reads only y and z: the strip carries its width along x and never
+   * twists, so there is nothing for a sideways drag to mean.
+   */
+  const stripDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!isStrip || !stripSim || !props.interactive || !groupRef.current) return
+    e.stopPropagation()
+    const local = groupRef.current.worldToLocal(worldScratch.copy(e.point))
+    // Nothing is committed until the grab lands. `grabNearest` returns -1 when
+    // there is no free paper to catch — every node still wound on the roll
+    // belongs to the spiral — and disabling the camera before finding that out
+    // left the controls dead for good: the early return skips both the pointer
+    // capture and `stripUp`, so nothing ever turned them back on.
+    if (stripSim.grabNearest(local.y, local.z) < 0) return
+    if (controls) controls.enabled = false
+    grabAnchor.current.copy(e.point)
+    draggingRef.current = 'strip'
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+  }
+  const stripMove = (e: ThreeEvent<PointerEvent>) => {
+    if (draggingRef.current !== 'strip' || !stripSim || !groupRef.current) return
+    camera.getWorldDirection(planeNormal)
+    dragPlane.setFromNormalAndCoplanarPoint(planeNormal, grabAnchor.current)
+    const hit = e.ray.intersectPlane(dragPlane, dragPoint)
+    if (!hit) return
+    groupRef.current.worldToLocal(hit)
+    stripSim.moveGrab(hit.y, hit.z)
+  }
+  const stripUp = (e: ThreeEvent<PointerEvent>) => {
+    if (draggingRef.current !== 'strip' || !stripSim) return
+    draggingRef.current = null
+    if (controls) controls.enabled = true
+    stripSim.release()
+    ;(e.target as Element).releasePointerCapture(e.pointerId)
+  }
+
   // Interaction-state triggers (rest ↔ hover ↔ pressed); pick/place/return
   // are driven by the field's carry controller through `sendState`.
   const sendState = (event: StateEvent) => machineRef.current?.send(event)
 
   return (
-    <group ref={groupRef} position={props.position} rotation={props.rotation}>
+    <group ref={groupRef} position={props.position} rotation={baseRotation}>
       <mesh
         ref={meshRef}
         geometry={geometry}
@@ -591,18 +732,20 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         onPointerOver={statesLive ? () => sendState('enter') : undefined}
         onPointerOut={statesLive ? () => sendState('leave') : undefined}
         onPointerDown={
-          isCloth || statesLive
+          isCloth || isStrip || statesLive
             ? (e) => {
                 if (isCloth) clothDown(e)
+                if (isStrip) stripDown(e)
                 if (statesLive) sendState('down')
               }
             : undefined
         }
-        onPointerMove={isCloth ? clothMove : undefined}
+        onPointerMove={isCloth ? clothMove : isStrip ? stripMove : undefined}
         onPointerUp={
-          isCloth || statesLive
+          isCloth || isStrip || statesLive
             ? (e) => {
                 if (isCloth) clothUp(e)
+                if (isStrip) stripUp(e)
                 if (statesLive) sendState('up')
               }
             : undefined
@@ -619,7 +762,11 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         />
       </mesh>
       {props.interactive &&
-        !isCloth &&
+        // Any simulation, not cloth alone: a sim owns the vertices, so there
+        // is no deformer stack for a handle to drive. Harmless as `!isCloth`
+        // only because the schema makes a sim and a behavior exclusive — the
+        // intent is what is written here.
+        !simKind &&
         behavior?.handles?.map((h, i) => (
           <mesh
             key={h.id}
@@ -663,7 +810,7 @@ function buildStack(
   behavior?: Behavior | null,
   t = 0,
 ): DeformerInstance[] | null {
-  // Cloth owns the vertices — no deformer stack.
+  // A simulation owns the vertices — no deformer stack.
   if (typeof config.physics === 'object') return null
   const idle =
     typeof config.physics === 'string' && config.physics !== 'none'

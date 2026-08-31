@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { roll } from './roll'
+import { roll, rollRadius, windAngle, windRadius } from './roll'
 import { curl } from './curl'
 import { bend } from './bend'
 import { applyDeformerStack, displacePoint, stackMinSegments } from './compose'
@@ -30,7 +30,7 @@ function displaceWith<O>(
 }
 
 describe('roll', () => {
-  const o = { angle: 90, boundary: 0, radius: 0.2, spiral: 0 }
+  const o = { angle: 90, boundary: 0, radius: 0.2, thickness: 0 }
 
   it('leaves the flat region untouched', () => {
     const out = displaceWith(roll, [0.3, -0.4, 0], o)
@@ -75,14 +75,89 @@ describe('roll', () => {
     expect(out.z).toBeCloseTo(0.2, 6)
   })
 
-  it('spiral grows the radius as the wrap advances', () => {
-    // At θ = π the point sits atop the cylinder: z = 2·r(θ). With spiral,
-    // r(π) = radius + spiral·π, so the layer rides higher than without.
-    const s = 0.2 * Math.PI
-    const flatSpiral = displaceWith(roll, [0, s, 0], o)
-    const withSpiral = displaceWith(roll, [0, s, 0], { ...o, spiral: 0.02 })
-    expect(flatSpiral.z).toBeCloseTo(0.4, 6)
-    expect(withSpiral.z).toBeCloseTo(2 * (0.2 + 0.02 * Math.PI), 6)
+  it('winds inward: successive wraps sit exactly `thickness` apart', () => {
+    // THE regression this file exists for. Every wrap used to be a circle
+    // tangent to the plane at the boundary, so all of them passed through
+    // that one point and the sheet intersected itself once per turn — and
+    // because the error cancelled exactly at multiples of 2π, the old
+    // "full turn returns to the boundary" vector below passed anyway.
+    const thickness = 0.004
+    const k = thickness / (2 * Math.PI)
+    const wrapped = { ...o, thickness }
+    let previous: number | null = null
+    for (let turn = 1; turn <= 4; turn++) {
+      const theta = turn * 2 * Math.PI
+      const arc = o.radius * theta - (k * theta * theta) / 2
+      const out = displaceWith(roll, [0, arc, 0], wrapped)
+      expect(out.y).toBeCloseTo(0, 6)
+      // Toward the core by one layer per turn, never back onto the boundary.
+      expect(out.z).toBeCloseTo(turn * thickness, 6)
+      if (previous !== null) expect(out.z - previous).toBeCloseTo(thickness, 6)
+      previous = out.z
+    }
+  })
+
+  it('preserves arc length once wound, not just on the first turn', () => {
+    // The old code advanced the angle by `s / radius` using the BASE radius
+    // while placing the point at a different one, so content stretched as
+    // the wrap went on. Sample deep into the roll, not near the boundary.
+    const wrapped = { ...o, thickness: 0.004 }
+    for (const s of [0.05, 0.3, 0.9]) {
+      const a = displaceWith(roll, [0, s, 0], wrapped)
+      const b = displaceWith(roll, [0, s + 0.001, 0], wrapped)
+      expect(a.distanceTo(b)).toBeCloseTo(0.001, 6)
+    }
+  })
+
+  it('thickness 0 is exactly the old cylinder', () => {
+    // The whole fix has to be invisible at thickness 0, which is what lets
+    // every golden vector above stand unchanged.
+    for (const s of [0.1, 0.2 * Math.PI, 0.2 * Math.PI * 2, 0.9]) {
+      const out = displaceWith(roll, [0, s, 0], o)
+      const theta = s / 0.2
+      expect(out.y).toBeCloseTo(0.2 * Math.sin(theta), 9)
+      expect(out.z).toBeCloseTo(0.2 * (1 - Math.cos(theta)), 9)
+    }
+  })
+
+  it('windAngle degrades to s/r0 as thickness vanishes', () => {
+    expect(windAngle(0.3, 0.17, 0)).toBeCloseTo(0.3 / 0.17, 12)
+    // Rationalized form: no catastrophic cancellation at a tiny k.
+    expect(windAngle(0.3, 0.17, 1e-12)).toBeCloseTo(0.3 / 0.17, 9)
+  })
+
+  it('over-winding coils at a floor radius instead of collapsing to a point', () => {
+    // A spiral run to zero radius puts every remaining vertex on one point:
+    // degenerate triangles and an unlit hole. `roll` is public and its
+    // options are independent numbers, so this has to stay drawable.
+    const r0 = 0.05
+    const k = 0.01
+    for (const s of [1, 100, 1e6]) {
+      const theta = windAngle(s, r0, k)
+      expect(Number.isFinite(theta)).toBe(true)
+      expect(windRadius(theta, r0, k)).toBeGreaterThan(0)
+    }
+    // Far past the floor the radius sits exactly on it, not below.
+    expect(windRadius(windAngle(1e6, r0, k), r0, k)).toBeCloseTo(r0 * 0.08, 12)
+  })
+
+  it('rollRadius is the exact inverse of the wind: the roll ends on its core', () => {
+    // Size a roll for a given length of paper and the innermost wrap lands
+    // on the core — this identity is what makes the roll shrink truthfully.
+    const core = 0.03
+    const thickness = 0.006
+    const k = thickness / (2 * Math.PI)
+    for (const length of [0.3, 1.0, 2.6]) {
+      const r0 = rollRadius(length, core, thickness)
+      const inner = r0 - k * windAngle(length, r0, k)
+      expect(inner).toBeCloseTo(core, 9)
+    }
+  })
+
+  it('rollRadius shrinks monotonically as paper leaves the roll', () => {
+    const radii = [2.6, 2.0, 1.0, 0.3, 0].map((l) => rollRadius(l, 0.03, 0.006))
+    for (let i = 1; i < radii.length; i++) expect(radii[i]!).toBeLessThan(radii[i - 1]!)
+    expect(radii.at(-1)).toBeCloseTo(0.03, 12)
   })
 })
 
@@ -193,7 +268,7 @@ describe('bend', () => {
 describe('compose', () => {
   const bendFirst = [
     { type: 'bend', options: { curvature: 1, angle: 0 } },
-    { type: 'roll', options: { angle: 90, boundary: 0, radius: 0.2, spiral: 0 } },
+    { type: 'roll', options: { angle: 90, boundary: 0, radius: 0.2, thickness: 0 } },
   ]
 
   it('order matters: bend→roll differs from roll→bend', () => {
@@ -205,7 +280,7 @@ describe('compose', () => {
 
   it('skips disabled instances', () => {
     const stack = [
-      { type: 'roll', options: { angle: 90, boundary: 0, radius: 0.2, spiral: 0 }, enabled: false },
+      { type: 'roll', options: { angle: 90, boundary: 0, radius: 0.2, thickness: 0 }, enabled: false },
     ]
     const out = displacePoint(new THREE.Vector3(0, 0.4, 0), 0.5, 0.9, stack, ctx)
     expect(out.toArray()).toEqual([0, 0.4, 0])

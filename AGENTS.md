@@ -26,7 +26,7 @@ import { Paper } from 'paperlab'
   content={{ type: 'receipt', store: 'acme.dev', items: [{ name: 'Widget', price: 9.99 }] }}
   behavior={{ type: 'unroll', progress: 0.6, tightness: 0.5, sway: 0.3 }}
   surface={{ grain: 0.3, deckle: { edges: ['bottom'], roughness: 0.5 } }}
-  physics="none"           // 'none' | float | tumble | dangle | taped | breeze | 'cloth' | {type:'cloth',...}
+  physics="none"           // 'none' | float | tumble | dangle | taped | breeze | 'cloth' | 'strip' | {type:…}
   interactive              // drag handles / grab cloth
   autoplay                 // play the behavior loop on mount
 />
@@ -358,7 +358,7 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 | type | params (all optional, sensible defaults) | reads as |
 |---|---|---|
 | `peel` | progress, corner, radius | a corner lifts and curls back |
-| `unroll` | progress (0=rolled, 1=flat), tightness, sway | receipt unrolling from a roll |
+| `unroll` | progress (0=rolled, 1=flat), tightness, sway, from, core, tail, fixed, floor | paper coming off a roll that shrinks as it pays out. `from:'top'` hangs the paper below the roll, `fixed` keeps the roll on its holder and moves the paper instead, `tail` leaves a leaf already out, `floor` gives the drop somewhere to land |
 | `flip` | progress, spine ('left'/'right'), radius | page turn |
 | `letter-fold` | progress, crease | tri-fold letter |
 | `hang` | wind, sag | poster pinned at top, rippling |
@@ -373,11 +373,110 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 ### Physics
 
 - Idle presets (`physics: 'float' | 'tumble' | 'dangle' | 'taped' | 'breeze'`): cheap curated motion, composes WITH a behavior.
-- Cloth (`physics: 'cloth'` or `{ type:'cloth', pins, wind, stiffness, gravity, floor }`): verlet simulation, pins = 'top-edge' | 'top-corners' | 'corner' | 'none'. **Cloth and `behavior` are mutually exclusive** — the schema rejects both together (cloth owns the vertices).
+- Cloth (`physics: 'cloth'` or `{ type:'cloth', pins, wind, stiffness, gravity, floor }`): verlet simulation, pins = 'top-edge' | 'top-corners' | 'corner' | 'none'.
+- Strip (`physics: 'strip'` or `{ type:'strip', scroll, tightness, core, tail, perforation, crease, stiffness, drag, gravity, floor, inertia }`): a roll paying paper out, and the pile it makes when it lands. See below.
+
+**A simulation and `behavior`/`deformers` are mutually exclusive** — the schema rejects both together, because the sim owns the vertices. Idle presets are the exception: they are a whole-object transform, so they compose with anything.
+
+#### `strip` — the one simulation with a driving body
+
+Cloth is a passive grid. `strip` is a *kinematic roll* that the host turns,
+extruding a verlet chain that is then left to fall:
+
+```tsx
+const [scroll, setScroll] = useState(0)
+useEffect(() => {
+  const onScroll = () => setScroll(window.scrollY / 120)
+  window.addEventListener('scroll', onScroll, { passive: true })
+  return () => window.removeEventListener('scroll', onScroll)
+}, [])
+
+<Paper preset="toilet-roll" physics={{ type: 'strip', scroll }} />
+```
+
+**`scroll` is a monotonic world-unit figure, not a 0..1 progress.** The sim
+differentiates it and only ever reads the delta, so the absolute value never
+matters, a big `scrollY` on the first frame is read as an origin rather than
+as one enormous delta, and scrolling back up rewinds the roll — dragging the
+pile taut before it lifts.
+
+Three things follow from the physics and are the reason to reach for it:
+
+- **The roll shrinks as it empties**, by area conservation, down to `core`.
+  `ΔL = R·Δθ` at the *current* radius, so a nearly-empty roll spins fast and
+  gives up very little paper. That is how a roll reads as running out.
+- **It buckles at the perforations.** Every joint wants to be straight;
+  a joint at a perforation wants it far less and may remember a fold
+  (`crease`). Once the tip is grounded and paper keeps feeding, compression
+  builds and the strip folds back on itself in alternating directions.
+- **Folds stack instead of passing through**, via a spatial hash. Without
+  self-collision the pile flattens into nothing, which is the entire effect.
+  Two details are load-bearing and both were learned the hard way: collision
+  tests SEGMENT against segment rather than node against node, and it is
+  interleaved with the last few constraint passes rather than run once after
+  them. Point collision leaks — paper is thinner than the chain is finely cut,
+  so a sphere per node leaves gaps between the beads and another fold threads
+  through one — and separating folds after the last iteration leaves nothing
+  to restore their rest lengths, so the next substep pulls them back through.
+- **The roll never leaves its holder.** One wrap is held back as `tubeStub` —
+  a real roll's inner end is glued down — so paying out the last of the paper
+  cannot free the nodes the roll is made of and drop the whole roll onto its
+  own pile. What is left is a cylinder at the core radius, which is as close to
+  a cardboard tube as one sheet of geometry gets.
+
+**It folds in DEPTH, and a head-on camera cannot see that.** The chain
+simulates two dimensions — it hangs in y, folds in z, keeps its full width in
+x, and never twists — which is what keeps self-collision a cheap 2D query. But
+every camera in the library is fixed and head-on, so without help the roll is
+framed end-on and the whole accordion edge-on, and the preset renders as a
+blank white column. `scene.turn` (degrees about the vertical axis, additive
+with the `rotation` prop rather than overriding it) is the answer, and
+`toilet-roll` carries 25. Raising it is not free: turning trades the pile's
+depth for WIDTH, and width is the axis a fixed camera has least of — at the
+pile's measured worst-case depth the budget runs out around 28°.
+
+**Tune a pile by worst case, never by one good-looking run.** It is chaotic:
+the same config fed a slightly different scroll ramp lands 2.0 panel-widths
+wide or 4.2, and stacking two individually-good parameter values can be worse
+than either alone. `strip.test.ts` scores the preset over nine trajectories for
+this reason, and the numbers in `toilet-roll` were chosen against fifteen.
+
+**It is grabbable.** With `interactive`, pointer-drag the paper and the roll
+turns. The pull is driven by TENSION rather than by mapping hand travel to an
+angle: paper does not stretch, so if the hand is further from the roll than
+there is paper to reach it, the only way to satisfy the constraint is for the
+roll to give up more. A slow pull feeds smoothly, a yank spins the roll and it
+carries on after release, and pushing the paper back does nothing — slack does
+not rewind a roll, only scrolling up does. `grabNearest`/`moveGrab` speak the
+mesh's own coordinates, not the solver's.
+
+`drag` is broadside-only — resistance along the segment normal, not along its
+length. That is the difference between paper that floats and sways down and a
+rope that drops: at `drag: 0` every unit paid out becomes a unit straight
+down; at `drag: 1` the tip sits about two thirds of that.
+
+The roll's tessellation is set by the ROLL, not the pile: the same nodes that
+fold on the floor draw the spiral, and a wound turn is only as round as the
+nodes spanning it. At five nodes to a panel — plenty for buckling — a full roll
+is a visible sixteen-sided polygon and its innermost turn is drawn with four
+nodes at 85° a step, coarse enough that the chords cut through the wrap beneath
+and the spiral comes apart into a sawtooth. Hence sixteen to a panel, and a
+`core` big enough that the tightest wrap is still round. It is affordable
+because the chain is one-dimensional: 198 nodes, 0.13 ms a frame.
+
+Two deliberate limits. The chain **simulates two dimensions** — it hangs in y,
+folds in z, and keeps its full width in x with no twist, which is what keeps
+self-collision a cheap 2D query. And **the node count is fixed**: nodes are
+never spawned, only reclassified between "wound on the roll" (placed
+analytically on the spiral) and "free". `stripNodeCount()` sizes the mesh and
+the chain from the same function, so the 2×N quad strip always agrees.
+
+`paper-roll` draws a similar object with a deformer stack and is cheaper; use
+it when the paper never reaches the ground. Use `strip` for the pile.
 
 ### Presets
 
-Built-ins: `receipt-unroll`, `letter-fold`, `washed-letter`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`, `crumpled-note`, `settled-sheet`, `paper-ribbon`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
+Built-ins: `receipt-unroll`, `letter-fold`, `washed-letter`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`, `crumpled-note`, `settled-sheet`, `paper-ribbon`, `paper-roll`, `toilet-roll`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
 
 **If the user hands you a `.paper` file** (they made it in the editor, or someone sent it to them), it is already a preset object — import the JSON and pass it straight through. Do NOT translate it into individual props; the whole point of the format is that it round-trips.
 
@@ -396,7 +495,7 @@ registerPreset('their-paper', theirPaper)
 
 1. **Blank canvas** → the parent container has no height. `<Paper>` fills its parent.
 2. **Text content invisible on first frame** → fonts load async; Paperlab waits for `document.fonts.ready` internally, so give it a beat before screenshotting.
-3. **`physics: 'cloth'` + `behavior` throws a zod error** → they're exclusive by design. Pick one.
+3. **`physics: 'cloth'` (or `'strip'`) + `behavior` throws a zod error** → they're exclusive by design. Pick one.
 4. **Reduced motion**: with `prefers-reduced-motion: reduce`, behaviors freeze at their configured pose and physics/entrances are disabled. Override per-instance with `reducedMotion={false}` only when you have a good reason.
 5. **No WebGL** → `<Paper>` renders a flat DOM fallback automatically; don't build your own.
 

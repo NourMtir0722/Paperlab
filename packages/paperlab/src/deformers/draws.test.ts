@@ -63,7 +63,7 @@ const SHEETS: { name: string; sheet: SheetConfig }[] = [
  * carrying the shape — those are honest defaults and a poor test subject.
  */
 const STRENGTH: Record<string, Record<string, unknown>> = {
-  roll: { angle: 90, boundary: -0.1, radius: 0.12, spiral: 0.02 },
+  roll: { angle: 90, boundary: -0.1, radius: 0.12, thickness: 0.03 },
   curl: { corner: 'bottom-right', amount: 0.6, radius: 0.25 },
   bend: { curvature: 0.8, angle: 0 },
   fold: { angle: 90, offset: 0.15, foldAngle: 110, radius: 0.06 },

@@ -274,14 +274,20 @@ function SlotStateControls({
     const value =
       (slotOverrides[key] as number | undefined) ??
       ((stateView.behavior as Record<string, unknown>)[key] as number)
+    // A native range input clamps `defaultValue` the same way `NumberControl`
+    // clamps a drag, so the range has to contain the value or the first touch
+    // rewrites it. Reachable here because `spec.min` is shifted a step inward
+    // for an exclusive bound, which can put a legal small value below it.
+    const min = Number.isFinite(value) ? Math.min(spec.min, value) : spec.min
+    const max = Number.isFinite(value) ? Math.max(spec.max, value) : spec.max
     return (
       <label key={key} className="slot-state-control">
         {key}
         <input
           type="range"
           className="slot-state-slider"
-          min={spec.min}
-          max={spec.max}
+          min={min}
+          max={max}
           step={spec.step}
           defaultValue={value}
           onChange={(e) => onPatch({ behavior: { [key]: spec.snap(Number(e.target.value)) } })}

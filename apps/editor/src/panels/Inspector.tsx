@@ -4,14 +4,17 @@ import {
   getBehavior,
   getStock,
   listBehaviors,
+  maxStripLength,
   paperEdges,
   physicsNames,
   resolveStateConfig,
   stockNames,
   washSchema,
   type ClothConfig,
+  type StripConfig,
   type ContentConfig,
   type ContentConfigInput,
+  type PaperConfig,
   type PaperEdge,
   type PhysicsConfig,
   type StockName,
@@ -55,7 +58,7 @@ export function Inspector() {
   const setBehaviorType = useEditor((s) => s.setBehaviorType)
   const setSurface = useEditor((s) => s.setSurface)
   const setPhysics = useEditor((s) => s.setPhysics)
-  const patchCloth = useEditor((s) => s.patchCloth)
+  const patchSim = useEditor((s) => s.patchSim)
 
   // The behavior's own nomination decides what gets the big controls; the
   // rest fold into "More". A behavior that nominates nothing comes back with
@@ -92,7 +95,7 @@ export function Inspector() {
         num('width', config.sheet.width, { min: 0.2, max: 4, step: 0.05 }, (v) =>
           patchConfig({ sheet: { width: v } }),
         ),
-        num('height', config.sheet.height, { min: 0.2, max: 4, step: 0.05 }, (v) =>
+        num('height', config.sheet.height, { min: 0.2, max: sheetHeightMax(config), step: 0.05 }, (v) =>
           patchConfig({ sheet: { height: v } }),
         ),
       ],
@@ -105,7 +108,7 @@ export function Inspector() {
     ),
     folder('Content', contentControls(config.content, patchConfig), { collapsed: true }),
     folder('Surface', surfaceControls(config.surface, config.stock, setSurface), { collapsed: true }),
-    folder('Physics', physicsControls(config.physics, setPhysics, patchCloth), { collapsed: true }),
+    folder('Physics', physicsControls(config.physics, setPhysics, patchSim), { collapsed: true }),
     // The same light panel stage mode has always had. It was never a stage
     // feature — `<PaperLighting>` has taken these overrides all along, and a
     // lone sheet simply had no control that wrote them.
@@ -118,9 +121,20 @@ export function Inspector() {
     ),
     folder(
       'Scene',
-      backdropControls(config.scene.backdrop, (next, opts) =>
-        patchConfig({ scene: { backdrop: next } as never }, opts),
-      ),
+      [
+        // How far the composition is turned to face the camera. It reads as a
+        // styling knob and is not one for anything whose shape lives in DEPTH:
+        // the `strip` sim folds in z, and every camera in the library is fixed
+        // and head-on, so at 0 the roll is end-on and its pile edge-on and the
+        // whole thing renders as a blank white column. First in the folder for
+        // that reason.
+        num('turn', config.scene.turn, { min: -180, max: 180, step: 1, label: 'turn°' }, (v) =>
+          patchConfig({ scene: { turn: v } as never }),
+        ),
+        ...backdropControls(config.scene.backdrop, (next, opts) =>
+          patchConfig({ scene: { backdrop: next } as never }, opts),
+        ),
+      ],
       { collapsed: true },
     ),
   ]
@@ -128,25 +142,87 @@ export function Inspector() {
   return <Panel controls={controls} />
 }
 
+/** `sheetSchema.height`'s own ceiling — nothing may offer to write past it. */
+const SHEET_MAX = 20
+
+/**
+ * How long the paper may be, which is not one number.
+ *
+ * The generic ceiling is a scrubbing range, not a schema limit — the schema
+ * allows 20, but a track that spans 0.2–20 gives a 1.4-unit letter about seven
+ * per cent of its travel, and almost every sheet in the library is a letter.
+ * Eight covers every built-in that is not a strip (`paper-ribbon` is the
+ * tallest at 6.4) and keeps the common case scrubbable.
+ *
+ * A `strip` is the exception, and a hard one: its chain has a capped node
+ * count, so past {@link maxStripLength} the nodes stop being added, the
+ * spacing between them grows instead, and the roll visibly comes apart. That
+ * is a real ceiling rather than a comfortable one, so it wins in both
+ * directions — it can be well above eight (about 16.5 at the toilet roll's
+ * perforation, which is how a 14-unit roll is authorable at all) and it could
+ * be below it for a finely perforated strip.
+ *
+ * The `Math.max` against the current value is the safety net. A control whose
+ * range cannot contain its own value is a data-destroying control, because
+ * both edit paths clamp: that is exactly how the height slider stood at
+ * `max: 4` while three presets shipped taller, so touching it collapsed a
+ * 14-unit roll to 4. A user preset or a shared link can carry anything the
+ * schema allows, so the floor under the range is the value itself.
+ */
+export function sheetHeightMax(config: PaperConfig): number {
+  const base =
+    typeof config.physics === 'object' && config.physics.type === 'strip'
+      ? // Coarsely perforated strips can compute a ceiling above what the
+        // schema will accept (27 at a spacing of 1), and a track that can
+        // write a value `paperConfigSchema` rejects is a track that throws on
+        // drag. The schema is the outer bound in every case.
+        Math.min(maxStripLength(config.physics.perforation), SHEET_MAX)
+      : 8
+  return Math.max(base, config.sheet.height)
+}
+
 function physicsControls(
   physics: PhysicsConfig,
   setPhysics: (name: string) => void,
-  patchCloth: (patch: Partial<ClothConfig>) => void,
+  patchSim: (patch: Partial<ClothConfig> | Partial<StripConfig>) => void,
 ): Control[] {
-  const isCloth = typeof physics === 'object'
+  const sim = typeof physics === 'object' ? physics : null
   const controls: Control[] = [
-    select('simulation', isCloth ? 'cloth' : physics, [...physicsNames, 'cloth'], setPhysics),
+    select(
+      'simulation',
+      typeof physics === 'object' ? physics.type : physics,
+      [...physicsNames, 'cloth', 'strip'],
+      setPhysics,
+    ),
   ]
-  if (isCloth) {
+  if (sim?.type === 'cloth') {
     controls.push(
-      select('pins', physics.pins, ['top-edge', 'top-corners', 'corner', 'none'], (v) =>
-        patchCloth({ pins: v as ClothConfig['pins'] }),
+      select('pins', sim.pins, ['top-edge', 'top-corners', 'corner', 'none'], (v) =>
+        patchSim({ pins: v as ClothConfig['pins'] }),
       ),
-      num('wind', physics.wind, { min: 0, max: 1, step: 0.01 }, (v) => patchCloth({ wind: v })),
-      num('stiffness', physics.stiffness, { min: 0, max: 1, step: 0.01 }, (v) =>
-        patchCloth({ stiffness: v }),
+      num('wind', sim.wind, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ wind: v })),
+      num('stiffness', sim.stiffness, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ stiffness: v })),
+      num('gravity', sim.gravity, { min: 0, max: 2, step: 0.01 }, (v) => patchSim({ gravity: v })),
+    )
+  }
+  if (sim?.type === 'strip') {
+    controls.push(
+      // `scroll` is the input the host binds to the page. It is a slider here
+      // because dragging it IS scrolling, which is the only way to author the
+      // thing without a page to scroll.
+      num('scroll', sim.scroll, { min: -20, max: 40, step: 0.05 }, (v) => patchSim({ scroll: v })),
+      num('tightness', sim.tightness, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ tightness: v })),
+      num('core', sim.core, { min: 0.01, max: 0.5, step: 0.005 }, (v) => patchSim({ core: v })),
+      num('tail', sim.tail, { min: 0, max: 8, step: 0.05 }, (v) => patchSim({ tail: v })),
+      num('perforation', sim.perforation, { min: 0.05, max: 5, step: 0.05 }, (v) =>
+        patchSim({ perforation: v }),
       ),
-      num('gravity', physics.gravity, { min: 0, max: 2, step: 0.01 }, (v) => patchCloth({ gravity: v })),
+      num('crease', sim.crease, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ crease: v })),
+      num('stiffness', sim.stiffness, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ stiffness: v })),
+      num('drag', sim.drag, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ drag: v })),
+      num('gravity', sim.gravity, { min: 0, max: 2, step: 0.01 }, (v) => patchSim({ gravity: v })),
+      num('inertia', sim.inertia, { min: 0, max: 1, step: 0.01 }, (v) => patchSim({ inertia: v })),
+      num('floor', sim.floor, { min: 0.1, max: 12, step: 0.05 }, (v) => patchSim({ floor: v })),
     )
   }
   return controls
