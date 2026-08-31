@@ -17,6 +17,7 @@ import { paperConfigSchema } from '../config/schema'
 import { resolveCreases } from '../surface/creases'
 import { diffConfig } from '../config/diff'
 import { getPreset } from '../config/presets'
+import { resolveConfig } from '../PaperMesh'
 
 const sheet: SheetDims = { width: 1, height: 1.4 }
 
@@ -219,6 +220,33 @@ describe('CreaseTracker', () => {
     expect(Math.max(...tracker.creases.map((c) => Math.abs(c.depth)))).toBeGreaterThan(halfway)
   })
 
+  it('goes quiet once the fold stops, even under a deeper authored crease', () => {
+    // Reading the merged view used to hand back the tracker's OWN recorded
+    // objects, and the deeper-wins step wrote through them — so reading the
+    // creases rewrote the depth that had just been recorded. The next frame
+    // then saw a change that was nothing but its own echo, and reported one
+    // every frame forever: in the editor, a config write per frame for as
+    // long as the paper was on screen.
+    const authored = crease(270, sheet.height / 6, 40)
+    const tracker = new CreaseTracker([authored])
+    const stack = (p: number) => letterFold.stack({ progress: p, crease: 0.3 } as never, sheet)
+    // `set` low enough that folding records something SHALLOWER than the
+    // authored crease, which is the only way the deeper-wins step fires.
+    for (let i = 0; i <= 20; i++) if (tracker.observe(stack(i / 20), 0.2)) void tracker.creases
+
+    expect(tracker.observe(stack(1), 0.2)).toBe(false)
+    void tracker.creases
+    expect(tracker.observe(stack(1), 0.2)).toBe(false)
+  })
+
+  it('hands out creases nobody can reach back through', () => {
+    const tracker = new CreaseTracker()
+    play(tracker, letterFold, { crease: 0.3 }, 0, 1, 1)
+    const taken = tracker.creases
+    taken[0]!.depth = 999
+    expect(tracker.creases[0]!.depth).not.toBe(999)
+  })
+
   it('never records more creases than the shader can draw', () => {
     const tracker = new CreaseTracker()
     // Six accordion creases across one sheet, all folded together.
@@ -309,6 +337,21 @@ describe('memory config', () => {
 
   it('lets a paper opt out of remembering entirely', () => {
     expect(paperConfigSchema.parse({ memory: { set: 0 } }).memory.set).toBe(0)
+  })
+})
+
+describe('a creased sheet with a simulation on it', () => {
+  it('is legal, and the sim still owns the vertices', () => {
+    // `memory` and a sim are not exclusive the way behavior and a sim are —
+    // a creased sheet can be dropped into cloth. What must not happen is the
+    // crease handing that sheet a deformer stack, because the sim writes
+    // every vertex itself and the two would fight over the same buffer.
+    const config = paperConfigSchema.parse({
+      physics: { type: 'cloth' },
+      memory: { creases: [crease(90, 0.2, 15)] },
+    })
+    expect(config.memory.creases).toHaveLength(1)
+    expect(resolveConfig({ preset: config as never }).physics).toMatchObject({ type: 'cloth' })
   })
 })
 

@@ -912,6 +912,12 @@ function withMemory(
   config: PaperConfig,
   creases: CreaseConfig[] = config.memory.creases,
 ): DeformerInstance[] | null {
+  // A simulation owns the vertices, exactly as it does in `buildStack` — and
+  // a crease must not be the thing that hands a cloth sheet a deformer stack
+  // it would never run. The frame loop returns down the sim path long before
+  // this, so today the only reader is the segment probe; saying it here is
+  // what keeps that true when it stops being the only reader.
+  if (typeof config.physics === 'object') return null
   const out = applyMemory(stack ?? [], creases)
   // Empty and null mean different things upstream — null is "nothing deforms
   // this sheet", which is the answer that gets it the flat-sheet grid.

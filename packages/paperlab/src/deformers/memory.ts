@@ -316,7 +316,14 @@ function merge(authored: CreaseConfig[], recorded: CreaseConfig[]): CreaseConfig
   for (const crease of [...recorded, ...authored]) {
     const existing = out.find((c) => sameLine(c, crease))
     if (!existing) {
-      out.push(crease)
+      // Copied, not shared. The deeper-wins line below WRITES to whatever is
+      // in `out`, and pushing the argument by reference pointed that write
+      // straight back into `this.recorded` — so reading the merged view
+      // rewrote the depth that had just been recorded, the next frame saw a
+      // change that was nothing but its own echo, and the tracker reported
+      // one every frame for as long as an authored crease sat deeper than
+      // the fold could make it.
+      out.push({ ...crease })
       continue
     }
     if (Math.abs(crease.depth) > Math.abs(existing.depth)) existing.depth = crease.depth
