@@ -71,10 +71,21 @@ jobs:
         env:
           PAPERLAB_BASE: ${{ env.BASE }}playground/
 
+      - name: Vendor the hand tracker's wasm (/hands)
+        run: pnpm hands:setup
+
       - name: Build the editor (/editor)
         run: pnpm --filter @paperlab/editor exec vite build
         env:
           PAPERLAB_BASE: ${{ env.BASE }}editor/
+
+      - name: Build the hands page (/hands)
+        # A second pass over the same app with its own base, so the route is
+        # self-contained rather than reading its JavaScript out of /editor.
+        run: pnpm --filter @paperlab/editor exec vite build
+        env:
+          PAPERLAB_HANDS: '1'
+          PAPERLAB_BASE: ${{ env.BASE }}hands/
 
       - name: Build the reference (/docs)
         run: pnpm --filter @paperlab/docs exec vite build
@@ -90,6 +101,12 @@ jobs:
           cp -r apps/playground/dist/* site/playground/
           mkdir -p site/editor
           cp -r apps/editor/dist/* site/editor/
+          # A route of its own rather than a page under /editor — it is its
+          # own thing, like the playground and the docs.
+          mkdir -p site/hands
+          cp apps/editor/dist-hands/hands/index.html site/hands/index.html
+          cp -r apps/editor/dist-hands/hands/tracker site/hands/tracker
+          cp -r apps/editor/dist-hands/assets site/hands/assets
           mkdir -p site/docs
           cp -r apps/docs/dist/* site/docs/
           # Pages serves 404.html for unknown paths; point it at the root

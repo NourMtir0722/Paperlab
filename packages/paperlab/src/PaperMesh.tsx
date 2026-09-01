@@ -421,8 +421,15 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, 1, nodes - 1)
     }
     if (!isCloth) return createSheetGeometry(config.sheet, minSegments, autoSegments)
-    // Cloth: explicit capped grid so sim particles == mesh vertices.
-    const [sx, sy] = resolveSegments(config.sheet, 2)
+    // Cloth: explicit capped grid so sim particles == mesh vertices. Square,
+    // because the sim's constraints are laid out on a square lattice.
+    //
+    // The stack's own floor is in the max now that cloth can host one: a fold
+    // needs 48 segments to bend through rather than crease along, and a
+    // crumple more, and a shape running over a simulation is no less entitled
+    // to the grid it needs than one running over a flat sheet. Still capped —
+    // every particle is a constraint solve five times a frame.
+    const [sx, sy] = resolveSegments(config.sheet, minSegments)
     const capped = Math.min(Math.max(sx, sy), CLOTH_MAX_SEGMENTS)
     return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, capped, capped)
   }, [
@@ -462,19 +469,32 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     })
   }, [geometry, isStrip])
 
+  // The sim the last committed render was running, so a rebuild can carry its
+  // drape over instead of starting flat. Written after commit, never during a
+  // render, or a render React threw away would be the one adopted from.
+  const lastSimRef = useRef<ClothSim | null>(null)
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: Rebuild only on geometry or pin layout change — sliders update the sim in place.
   const sim = useMemo(() => {
     if (!isCloth) return null
     const cloth = configRef.current.physics as ClothConfig
     const cols = (geometry.parameters as { widthSegments: number }).widthSegments + 1
     const rows = (geometry.parameters as { heightSegments: number }).heightSegments + 1
-    return new ClothSim(cols, rows, config.sheet.width, config.sheet.height, cloth.pins, {
+    const next = new ClothSim(cols, rows, config.sheet.width, config.sheet.height, cloth.pins, {
       stiffness: cloth.stiffness,
       gravity: cloth.gravity,
       wind: cloth.wind,
       floor: cloth.floor,
     })
+    // A resize keeps the drape; a restructure does not. `adopt` decides which
+    // this was — see the note on it.
+    next.adopt(lastSimRef.current)
+    return next
   }, [geometry, isCloth, isCloth ? (config.physics as ClothConfig).pins : ''])
+
+  useEffect(() => {
+    lastSimRef.current = sim
+  }, [sim])
 
   const stock = getStock(config.stock)
   const texture = useContentTexture(config.content, config.sheet, stock)
@@ -661,7 +681,63 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       return
     }
 
-    // Simulation path: cloth owns the vertices.
+    // Shape: the deformer stack, run over whatever it is given as a base.
+    //
+    // `base` is the flat rest pose for a sheet that is only a shape, and the
+    // simulation's live particles for one that is both. That substitution is
+    // the whole of the composition: a deformer is a pure map from a point to
+    // a point, so folding a draped sheet is folding the points the drape put
+    // there. `force` is the simulation saying its vertices moved even though
+    // nothing about the stack did.
+    //
+    // Decide whether there is anything to do BEFORE building it. A resting
+    // sheet — no loop, no time-driven deformer, no transition, nothing
+    // dirtied — used to expand its whole stack every frame and throw it
+    // away, which is a behavior's `stack()` call and its deformer objects
+    // sixty times a second for a picture that does not move.
+    const applyShape = (base: Float32Array, force: boolean): boolean => {
+      const animated = !reduced && animatedStack
+      const hasLoop = !reduced && Boolean(cfg.behavior && behavior?.loop)
+      // A state transition tweens numeric leaves off the React path, so the
+      // stack must re-apply every frame while the machine is transitioning.
+      const machineAnimating = Boolean(machineRef.current?.transitioning)
+      if (!force && !dirtyRef.current && !hasLoop && !animated && !machineAnimating) return false
+
+      const raw = buildStack(cfg, overridesRef.current, behavior, now)
+
+      // How much this paper keeps: its own override, else what the stock is
+      // made of. The same shape as every other stock default in the library.
+      const setAmount = cfg.memory.set ?? stock.takesSet
+
+      // Read the folds BEFORE memory rewrites them. `applyMemory` raises a live
+      // fold to its crease's depth, and a tracker watching that would be reading
+      // its own output — the crease would hold the fold open, and the held-open
+      // fold would keep the crease alive, with nothing in the loop that is
+      // actually the paper being folded.
+      if (raw && creases.observe(raw, setAmount)) props.onCrease?.(creases.creases)
+
+      const stack = withMemory(raw, cfg, creases.creases)
+      if (!stack) return false
+      dirtyRef.current = false
+
+      const ctx = { t: now, sheet: cfg.sheet }
+      applyDeformerStack(geometry, base, stack, ctx)
+
+      if (props.interactive && behavior?.handles) {
+        const o = effectiveOptions(now)
+        behavior.handles.forEach((h, i) => {
+          const mesh = handleRefs.current[i]
+          if (!mesh || !o) return
+          const [u, v] = h.anchor(o, cfg.sheet)
+          anchorScratch.set((u - 0.5) * cfg.sheet.width, (v - 0.5) * cfg.sheet.height, 0)
+          displacePoint(anchorScratch, u, v, stack, ctx)
+          mesh.position.copy(anchorScratch)
+        })
+      }
+      return true
+    }
+
+    // Simulation path: cloth writes the vertices, and may hand them on.
     if (isCloth && sim) {
       const cloth = cfg.physics as ClothConfig
       sim.setParams({
@@ -671,7 +747,12 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         floor: cloth.floor,
       })
       sim.step(delta)
-      if (!sim.asleep) {
+      const moved = !sim.asleep
+      // The stack first refusal: if there is one, it owns the write, because
+      // its base is the sim's own array and writing that array to the
+      // geometry first would only be overwritten. If there is none, the sim's
+      // positions ARE the vertices, exactly as before.
+      if (!applyShape(sim.positions, moved) && moved) {
         const position = geometry.attributes.position as THREE.BufferAttribute
         ;(position.array as Float32Array).set(sim.positions)
         position.needsUpdate = true
@@ -680,51 +761,8 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       return
     }
 
-    // Shape path: the deformer stack.
-    //
-    // Decide whether there is anything to do BEFORE building it. A resting
-    // sheet — no loop, no time-driven deformer, no transition, nothing
-    // dirtied — used to expand its whole stack every frame and throw it
-    // away, which is a behavior's `stack()` call and its deformer objects
-    // sixty times a second for a picture that does not move.
-    const animated = !reduced && animatedStack
-    const hasLoop = !reduced && Boolean(cfg.behavior && behavior?.loop)
-    // A state transition tweens numeric leaves off the React path, so the
-    // stack must re-apply every frame while the machine is transitioning.
-    const machineAnimating = Boolean(machineRef.current?.transitioning)
-    if (!dirtyRef.current && !hasLoop && !animated && !machineAnimating) return
-
-    const raw = buildStack(cfg, overridesRef.current, behavior, now)
-
-    // How much this paper keeps: its own override, else what the stock is
-    // made of. The same shape as every other stock default in the library.
-    const setAmount = cfg.memory.set ?? stock.takesSet
-
-    // Read the folds BEFORE memory rewrites them. `applyMemory` raises a live
-    // fold to its crease's depth, and a tracker watching that would be reading
-    // its own output — the crease would hold the fold open, and the held-open
-    // fold would keep the crease alive, with nothing in the loop that is
-    // actually the paper being folded.
-    if (raw && creases.observe(raw, setAmount)) props.onCrease?.(creases.creases)
-
-    const stack = withMemory(raw, cfg, creases.creases)
-    if (!stack) return
-    dirtyRef.current = false
-
-    const ctx = { t: now, sheet: cfg.sheet }
-    applyDeformerStack(geometry, basePositions, stack, ctx)
-
-    if (props.interactive && behavior?.handles) {
-      const o = effectiveOptions(now)
-      behavior.handles.forEach((h, i) => {
-        const mesh = handleRefs.current[i]
-        if (!mesh || !o) return
-        const [u, v] = h.anchor(o, cfg.sheet)
-        anchorScratch.set((u - 0.5) * cfg.sheet.width, (v - 0.5) * cfg.sheet.height, 0)
-        displacePoint(anchorScratch, u, v, stack, ctx)
-        mesh.position.copy(anchorScratch)
-      })
-    }
+    // Shape path: the deformer stack over the flat sheet.
+    applyShape(basePositions, false)
   })
 
   const localDragPoint = (e: ThreeEvent<PointerEvent>): { x: number; y: number } | null => {
@@ -750,16 +788,38 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     if (typeof p === 'number') props.onProgress?.(p)
   }
 
-  // Cloth grab: pick the nearest particle, then drag it on a camera-facing
-  // plane through the grab point — full 3D pull, not just in-plane.
+  // Cloth grab: pick the particle under the pointer, then drag it on a
+  // camera-facing plane through the grab point — full 3D pull, not just
+  // in-plane.
   const grabAnchor = useRef(new THREE.Vector3())
+  /**
+   * Where the vertex you grabbed sits relative to the particle behind it.
+   *
+   * Zero unless a deformer is running over the simulation, and then it is
+   * exactly the displacement that deformer applied at the moment of the grab.
+   * The pointer speaks in RENDERED space and the sim only understands its own,
+   * so the offset is what translates between them — carried as a constant
+   * rather than inverted every frame, because a deformer is a map with no
+   * inverse to ask for. Exact when the grab lands and honest as it drifts.
+   */
+  const grabOffset = useRef(new THREE.Vector3())
   const clothDown = (e: ThreeEvent<PointerEvent>) => {
     if (!isCloth || !sim || !props.interactive || !groupRef.current) return
     e.stopPropagation()
     if (controls) controls.enabled = false
     grabAnchor.current.copy(e.point) // world-space anchor for the drag plane
     const local = groupRef.current.worldToLocal(worldScratch.copy(e.point))
-    sim.grabNearest(local.x, local.y, local.z)
+    // Nearest RENDERED vertex, not nearest particle: they are the same sheet
+    // only when nothing is deforming it, and the pointer hit the rendered one.
+    const drawn = geometry.attributes.position!.array as Float32Array
+    const index = nearestVertex(drawn, sim.count, local.x, local.y, local.z)
+    sim.grab(index)
+    const i3 = index * 3
+    grabOffset.current.set(
+      drawn[i3]! - sim.positions[i3]!,
+      drawn[i3 + 1]! - sim.positions[i3 + 1]!,
+      drawn[i3 + 2]! - sim.positions[i3 + 2]!,
+    )
     draggingRef.current = 'cloth'
     ;(e.target as Element).setPointerCapture(e.pointerId)
   }
@@ -770,7 +830,8 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     const hit = e.ray.intersectPlane(dragPlane, dragPoint)
     if (!hit) return
     groupRef.current.worldToLocal(hit)
-    sim.moveGrab(hit.x, hit.y, hit.z)
+    const offset = grabOffset.current
+    sim.moveGrab(hit.x - offset.x, hit.y - offset.y, hit.z - offset.z)
   }
   const clothUp = (e: ThreeEvent<PointerEvent>) => {
     if (draggingRef.current !== 'cloth' || !sim) return
@@ -924,16 +985,43 @@ function withMemory(
   config: PaperConfig,
   creases: CreaseConfig[] = config.memory.creases,
 ): DeformerInstance[] | null {
-  // A simulation owns the vertices, exactly as it does in `buildStack` — and
-  // a crease must not be the thing that hands a cloth sheet a deformer stack
-  // it would never run. The frame loop returns down the sim path long before
-  // this, so today the only reader is the segment probe; saying it here is
-  // what keeps that true when it stops being the only reader.
-  if (typeof config.physics === 'object') return null
+  // A strip owns its vertices outright; cloth hands them on to the stack.
+  // Which means a crease on a CLOTH sheet is now a fold the geometry runs,
+  // not just a mark the shader draws — the paper remembers a fold whether or
+  // not it is being simulated.
+  if (isStripConfig(config.physics)) return null
   const out = applyMemory(stack ?? [], creases)
   // Empty and null mean different things upstream — null is "nothing deforms
   // this sheet", which is the answer that gets it the flat-sheet grid.
   return out.length > 0 ? out : null
+}
+
+/**
+ * The vertex nearest a local-space point, by index.
+ *
+ * Reads the array it is handed rather than the simulation, which is the point
+ * of it: what a pointer touched is what is on screen.
+ */
+function nearestVertex(array: Float32Array, count: number, x: number, y: number, z: number): number {
+  let best = -1
+  let bestDist = Infinity
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3
+    const dx = array[i3]! - x
+    const dy = array[i3 + 1]! - y
+    const dz = array[i3 + 2]! - z
+    const d = dx * dx + dy * dy + dz * dz
+    if (d < bestDist) {
+      bestDist = d
+      best = i
+    }
+  }
+  return best
+}
+
+/** The one simulation that will not share its vertices. See the schema. */
+function isStripConfig(physics: PaperConfig['physics']): boolean {
+  return typeof physics === 'object' && physics.type === 'strip'
 }
 
 /** Expand the config into the deformer stack that should run this frame. */
@@ -943,8 +1031,9 @@ function buildStack(
   behavior?: Behavior | null,
   t = 0,
 ): DeformerInstance[] | null {
-  // A simulation owns the vertices — no deformer stack.
-  if (typeof config.physics === 'object') return null
+  // A strip owns the vertices outright — no deformer stack. Cloth does not:
+  // it writes the vertices and the stack runs over what it wrote.
+  if (isStripConfig(config.physics)) return null
   const idle =
     typeof config.physics === 'string' && config.physics !== 'none'
       ? getIdlePreset(config.physics as IdleName)

@@ -1,0 +1,25 @@
+---
+'paperlab': minor
+---
+
+Creases are lit rather than painted, every surface effect is measured on the sheet instead of in UV, and the cloth learns what a hand and a gust of air actually do to paper.
+
+Five things that were done cheaply, found by looking hard at the `/hands` harness — where a camera can score a line at any angle, resize the sheet with two palms, blow at it and throw it, and so puts every one of these assumptions somewhere the built-in presets never did.
+
+**A crease had no shape.** `plCrease` multiplied a grey band into the albedo and added a fixed white sheen beside it. The mark therefore looked identical from every angle, under every lighting rig, and whichever way the paper had been folded — which is the one thing a crease is not, because a crease is two facets meeting at a line and swinging the sheet flips it from a dark line to a bright one. The effects now describe a HEIGHT and `MeshStandardMaterial` lights it, through `csm_FragNormal` and Mikkelsen's surface-gradient bump. One deliberate difference from three's own `perturbNormalArb`: three normalises the screen-space position derivatives, which keeps a bump map looking the same at any scale and is right for a texture. This is a real depth in world units, so the raw derivatives stay and the slope is a true one. Analytic height plus screen derivatives also anti-aliases itself — a crease shrinking below a pixel fades instead of crawling.
+
+The sign survives too. A fold toward the camera leaves paper concave from the front, so it draws as a valley, and the same crease from behind draws as the ridge it is. `CreaseShading.strength` is signed now; unsigned, a mountain and a valley were the identical smudge.
+
+**Every effect measured in UV.** UV divides the sheet's aspect out, so a 1.2 × 1.5 sheet is a unit square as far as the shader is concerned. Fibre came out stretched, a torn edge bit deeper into the short edge than the long one, and a crease scored at 45° rendered at 51°. All three also changed when the sheet was resized, which made the paper's own material a function of how big a piece you had cut. Grain belongs to the stock and a crease is a broken fibre; neither knows the size of the sheet. Everything now measures through `plLocal()`, in the sheet's own space.
+
+That let the crease shading and the crease GEOMETRY finally agree. `CreaseShading` carries the fold's own `{ angle, offset }` rather than a translation of them, so the shader evaluates the identical `dot(p, dir) - offset` the `fold` deformer displaces by, and the two cannot place a line differently. The shaded width comes off `CREASE_RADIUS` instead of a UV constant that agreed with it at exactly one sheet size — the mesh carries the wide hinge, the shader carries the burnished line inside it, and they add up.
+
+**A grab held one particle.** That is a pin, not a pinch: the sheet came to a point under the cursor and hung off the singularity. `ClothSim` now takes a patch about a centimetre across, measured across the grid so a fold that brings a far corner near the fingers cannot silently join the grip, with a smoothstep falloff — the centre held, the rim free, everything between partly both. The constraint solver's 0/1/2 weights became a real inverse mass, which reproduces them exactly for the two cases they could express and covers the rest.
+
+**Letting go stopped the paper dead.** A verlet particle's velocity IS the gap between its position and its last one, and the grab overwrote that gap every substep. So a sheet whipped across the frame and released came to a standstill and dropped straight down. The hand's speed is measured per second — a frame is not a fixed length and a substep is — and spent on release.
+
+**Wind was a uniform shove along +z.** Every particle got the same push whichever way its patch of paper was facing, so a sheet edge-on to the wind bellied out as hard as one square to it, a folded flap was pushed the same way as the face it was folded behind, and nothing ever turned into the wind. The force on a thin surface is the air it intercepts: the relative wind along the surface normal, pushed back out along that normal. Relative earns its keep twice — a sheet already travelling with the wind stops being pushed, so a blown sheet settles at a speed instead of accelerating away; and with no wind at all the same expression is air RESISTANCE, which the sim had none of. Paper's whole character in air is that it does not fall like a stone, and it does not because a sheet falling face-down catches what it is falling through while one falling edge-down knifes past it. That fell out for free.
+
+A small turbulent residue stays isotropic, because zero would be the textbook answer and the wrong one: a sheet lying exactly along the wind would stall in it forever, the one thing that could break the symmetry being the wind it is not feeling.
+
+**Unchanged:** the GPU field path, which composes its own shader and has no simulation in it — all 37 parity cases still compare the same twins. `ClothSim` is internal; `grab`, `moveGrab` and `release` keep their signatures.

@@ -4,6 +4,7 @@ import { composeSurface } from './compose'
 import { getStock } from '../core/stock'
 import { surfaceSchema } from '../config/schema'
 import { fold } from '../deformers/fold'
+import { CREASE_RADIUS } from '../deformers/memory'
 import { letterFold } from '../behaviors/letter-fold'
 import { receiptTotals, barcodeBars } from '../content/receipt'
 import { receiptContentSchema } from '../config/schema'
@@ -125,11 +126,57 @@ describe('composeSurface', () => {
     expect(plain.structureKey).not.toContain('A')
   })
 
-  it('pads crease positions to the fixed uniform array size', () => {
+  it('pads crease offsets to the fixed uniform array size', () => {
     const surface = surfaceSchema.parse({ creaseLines: { positions: [0.5] } })
     const out = composeSurface(surface, printer, 0.2)
-    expect(out.uniforms.uCreasePositions!.value).toEqual([0.5, -1, -1, -1])
+    // Centred, so the offset is zero; the loop stops at uCreaseCount, so what
+    // the padding holds is only ever a matter of not shipping NaN.
+    expect(out.uniforms.uCreaseOffsets!.value).toEqual([0, 0, 0, 0])
     expect(out.uniforms.uCreaseCount!.value).toBe(1)
+  })
+
+  it('sizes the shaded crease off the hinge the geometry bends over', () => {
+    // The two used to be unrelated numbers — a UV width in the shader against
+    // a world radius in the deformer — which agreed at one sheet size and
+    // drifted at every other.
+    const surface = surfaceSchema.parse({ creaseLines: { positions: [0.5] } })
+    const out = composeSurface(surface, printer, 0.2)
+    const width = out.uniforms.uCreaseWidth!.value as number
+    expect(width).toBeGreaterThan(0)
+    expect(width).toBeLessThan(CREASE_RADIUS)
+  })
+
+  it('lights the relief instead of painting it', () => {
+    // A crease that only tints the albedo looks the same from every angle. The
+    // effects describe a height now and the standard material lights it.
+    const surface = surfaceSchema.parse({ creaseLines: { positions: [0.5] } })
+    const out = composeSurface(surface, printer, 0.2)
+    expect(out.fragmentShader).toContain('csm_FragNormal = plPerturb')
+    // And a sheet with neither grain nor a crease does not pay for a
+    // perturbation with nothing in it — vellum has no tooth to describe.
+    const plain = composeSurface(
+      surfaceSchema.parse({}),
+      getStock('vellum'),
+      0.2,
+      undefined,
+      undefined,
+      'studio',
+      [],
+    )
+    expect(plain.fragmentShader).not.toContain('csm_FragNormal = plPerturb')
+  })
+
+  it('measures every effect in the sheet’s own space', () => {
+    // Not UV: UV divides the sheet's aspect out, so fibre stretches, a tear
+    // bites unevenly, and all of it changes when the sheet is resized.
+    const out = composeSurface(surfaceSchema.parse({ grain: 0.4 }), printer, 0.2, undefined, {
+      width: 2,
+      height: 0.5,
+    })
+    const size = out.uniforms.uSheetSize!.value as THREE.Vector2
+    expect(size.x).toBe(2)
+    expect(size.y).toBe(0.5)
+    expect(out.fragmentShader).toContain('plLocal()')
   })
 })
 

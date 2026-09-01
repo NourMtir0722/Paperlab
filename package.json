@@ -21,6 +21,8 @@
     "test:route": "node tools/route-check.mjs",
     "test:dropdown": "node tools/dropdown-check.mjs",
     "test:drive": "node tools/stage-drive-check.mjs",
+    "hands:setup": "node tools/hands-assets.mjs",
+    "test:hands": "node tools/hands-check.mjs",
     "shot:light": "node tools/catalogue-shot.mjs --vary=lighting --all",
     "shot:catalogue": "node tools/catalogue-shot.mjs",
     "sheet": "node tools/contact-sheet.mjs"

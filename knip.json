@@ -18,7 +18,8 @@
         "src/harness/parity-main.ts",
         "src/harness/stage-main.tsx",
         "src/harness/media-main.tsx",
-        "src/harness/field-main.tsx"
+        "src/harness/field-main.tsx",
+        "src/harness/hands-main.tsx"
       ],
       "project": "src/**"
     }
