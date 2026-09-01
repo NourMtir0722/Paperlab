@@ -770,14 +770,28 @@ export const paperConfigSchema = z
     states: paperStatesSchema.optional(),
   })
   .superRefine((config, ctx) => {
-    // Cloth owns vertex positions: Shape (behavior/deformers) and Simulation
-    // (cloth) are alternatives, not layers. Idle presets compose fine.
-    if (typeof config.physics === 'object' && (config.behavior || config.deformers)) {
+    // Cloth HOSTS a shape: the sim writes the vertices, and the deformer
+    // stack runs over what it wrote. A deformer is a pure map from a point to
+    // a point, so it does not care whether the point it was handed came from
+    // a flat rest pose or from a sheet that has spent a second falling — and
+    // "fold the paper you are holding" is the whole reason to want it.
+    //
+    // A strip does not, and the difference is not squeamishness. Cloth
+    // simulates the sheet's OWN grid, so a deformer's uv means on the sim
+    // what it means everywhere else. A strip is a 2×N ribbon whose rows are
+    // chain nodes: its uv runs along a length of paper that is partly wound
+    // on a roll, and a fold placed by uv would land somewhere the sheet is
+    // not.
+    if (
+      typeof config.physics === 'object' &&
+      config.physics.type === 'strip' &&
+      (config.behavior || config.deformers)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['physics'],
         message:
-          'a simulation (cloth, strip) and behavior/deformers are exclusive — the sim owns the vertices (pick Shape OR Simulation)',
+          "the strip simulation and behavior/deformers are exclusive — the roll owns the vertices, and its rows are chain nodes rather than the sheet's own grid (pick Shape OR Strip)",
       })
     }
     // State overrides must stay serializable schema paths: merging them over

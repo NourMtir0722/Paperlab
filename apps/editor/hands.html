@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paperlab — hands</title>
+    <!--
+      This page may not talk to anyone but its own origin.
+
+      Not a precaution — the claim in the panel, made enforceable. The page
+      says tracking runs entirely in your browser and no video leaves the
+      device. That was true of the VIDEO and not quite true of everything
+      else: MediaPipe POSTs a usage log to https://odml.pa.googleapis.com/v1/log,
+      with an API key, from inside the task runner, and there is no documented
+      way to turn it off. `connect-src` turns it off from the outside.
+
+      Worth knowing exactly how far this reaches, because it is less far than
+      it looks. It stops the telemetry, which is a main-thread request. It does
+      NOT stop the wasm loader from fetching its own glue and binary, which
+      happens inside a worker — pointing WASM_BASE back at a CDN loads
+      perfectly happily with this policy in place. So there are two layers and
+      each one covers what the other cannot: the policy stops anything the page
+      tries to SEND, and `pnpm test:hands` fails if the page fetches from any
+      third-party origin at all. Neither alone is enough.
+
+      `ws:` is for Vite's dev HMR socket, which shares the origin but not the
+      scheme; `blob:` is how the wasm loader instantiates its worker;
+      `mediastream:` is the camera feed reaching the <video> element.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' blob: data:; connect-src 'self' ws: wss: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: mediastream:"
+    />
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #0b0b0b; overflow: hidden; }
+      body { font-family: "Inter", system-ui, -apple-system, sans-serif; color: rgba(255,255,255,0.92); }
+      #root { height: 100%; }
+      .stage { position: fixed; inset: 0; }
+
+      .hud {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 260px;
+        padding: 16px;
+        border-radius: 12px;
+        background: rgba(18,18,18,0.82);
+        border: 1px solid rgba(255,255,255,0.09);
+        backdrop-filter: blur(12px);
+      }
+      .hud h1 { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; }
+      .sub { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.5); }
+      .hud button {
+        width: 100%;
+        padding: 9px 12px;
+        font: inherit;
+        font-size: 13px;
+        color: #111;
+        background: rgba(255,255,255,0.94);
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .hud button:disabled { opacity: 0.5; cursor: default; }
+      .readout {
+        margin: 12px 0 0;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        color: rgba(255,255,255,0.55);
+        min-height: 1em;
+      }
+      .note { margin: 8px 0 0; font-size: 11px; color: rgba(255,255,255,0.5); }
+      .privacy { margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: rgba(255,255,255,0.42); }
+      .legend { margin: 12px 0 0; padding: 0; font-size: 11px; line-height: 1.6; }
+      .legend dt { float: left; clear: left; width: 74px; color: rgba(255,255,255,0.9); }
+      .legend dd { margin: 0 0 0 78px; color: rgba(255,255,255,0.45); }
+      .mode { margin: 12px 0 0; font-size: 11px; color: rgba(255,255,255,0.45); }
+      .mode strong { font-weight: 600; color: rgba(255,255,255,0.85); }
+      .hud button.ghost {
+        margin-top: 10px;
+        color: rgba(255,255,255,0.8);
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.16);
+      }
+      /* The line being scored, drawn over the canvas while the finger moves. */
+      .trail { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      .trail line {
+        stroke: rgba(255,255,255,0.75);
+        stroke-width: 2;
+        stroke-dasharray: 5 4;
+        stroke-linecap: round;
+        opacity: 0;
+        transition: opacity 120ms ease;
+      }
+      .error { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: #ff8a8a; }
+
+      /* Mirrored, so the hand on screen moves the way your hand moves. */
+      .feed { width: 100%; margin-top: 12px; border-radius: 8px; transform: scaleX(-1); display: block; }
+
+      .cursor {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 22px;
+        height: 22px;
+        margin: -11px 0 0 -11px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.9);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 140ms ease, background-color 90ms ease;
+        will-change: transform;
+      }
+      .cursor[data-down="true"] { background: rgba(255,255,255,0.9); }
+      /*
+        The second hand. Dimmer and smaller on purpose: only one hand can own
+        the pointer, so two identical dots would be a puzzle about which one
+        is holding the paper.
+      */
+      .cursor.other {
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        border-color: rgba(255,255,255,0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/harness/hands-main.tsx"></script>
+  </body>
+</html>

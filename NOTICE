@@ -34,3 +34,32 @@ not appear in the published tarball — the library takes a `figure.model`
 URL and the apps host the file. Anyone consuming the library brings their
 own asset and their own licence obligations.
 
+
+
+────────────────────────────────────────────────────────────────────────
+Hand and face tracking (dev-only harness)
+────────────────────────────────────────────────────────────────────────
+
+`apps/editor/hands.html` drives paper with a camera using MediaPipe Tasks:
+
+    @mediapipe/tasks-vision — Copyright Google LLC
+    Apache License 2.0
+    https://github.com/google-ai-edge/mediapipe
+
+The wasm runtime is that npm package's own, copied out of `node_modules` by
+`pnpm hands:setup`. The two model files it also fetches —
+`hand_landmarker.task` and `face_landmarker.task` — are Google's, from
+storage.googleapis.com, and are pinned by digest in
+`tools/hands-models.sha256`.
+
+**Neither the runtime nor the weights are redistributed by this repository.**
+They are not committed, they are not in the npm package, and they are not in
+any build output: `hands.html` is a dev-only entry point, so `pnpm build`
+emits neither the page nor its assets. Each developer's `pnpm hands:setup`
+fetches them from Google directly.
+
+That is worth knowing before anyone changes it. Making `hands.html` a public
+page WOULD mean serving Google's model weights from this project's own
+origin, which is redistribution, and the model cards' licence terms would
+need reading first. The plumbing for it exists and is deliberately switched
+off — see `handsAssets()` in `apps/editor/vite.config.ts`.

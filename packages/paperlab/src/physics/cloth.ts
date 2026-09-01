@@ -35,6 +35,9 @@ export class ClothSim {
   readonly cols: number
   readonly rows: number
   readonly count: number
+  /** The sheet this grid was laid out on. Read by {@link adopt}. */
+  readonly width: number
+  readonly height: number
   readonly positions: Float32Array
   private readonly prev: Float32Array
   private readonly pinned: Uint8Array
@@ -52,6 +55,8 @@ export class ClothSim {
     this.cols = cols
     this.rows = rows
     this.count = cols * rows
+    this.width = width
+    this.height = height
     this.params = { ...params }
     this.positions = new Float32Array(this.count * 3)
     this.prev = new Float32Array(this.count * 3)
@@ -103,6 +108,59 @@ export class ClothSim {
     if (pins === 'corner') pin(0, 0)
   }
 
+  /**
+   * Carry a previous sim's drape across a rebuild.
+   *
+   * Sheet dimensions are a GEOMETRY dependency, so changing them builds a new
+   * mesh and a new sim, and a new sim starts flat — which means a draped sheet
+   * snaps rigid the instant it is resized. Nothing about the physics requires
+   * that; it is only that nobody had carried the state over.
+   *
+   * What carries is the FREE particles, scaled by how much the sheet grew:
+   * the constraints' rest lengths are laid out afresh at the new size, so
+   * scaling the drape by the same ratio leaves every constraint exactly as
+   * violated as it was and the sim simply continues. Pinned particles keep
+   * the new layout's own rest positions instead — a pin holds a CORNER, and
+   * the corner is where the resized sheet says it is.
+   *
+   * Refused in one case only: a different grid, because there is no
+   * correspondence between the two sets of particles and the nearest thing to
+   * one would be a guess. Everything else carries — a resize, a change of
+   * pins, a deformer appearing on top. The sheet's state belongs to the sheet,
+   * and none of those is a reason to have never fallen.
+   *
+   * That matters most for the one that is not a resize at all: a shape
+   * arriving over a simulation rebuilds the mesh (the stack has its own
+   * opinion about tessellation) without touching a single thing the physics
+   * knows about. Resetting there would mean the sheet snapped flat the instant
+   * you tried to fold the sheet you were holding, which is the whole point of
+   * being able to.
+   *
+   * Returns whether it took.
+   */
+  adopt(previous: ClothSim | null | undefined): boolean {
+    if (!previous || previous.cols !== this.cols || previous.rows !== this.rows) return false
+    const sx = previous.width > 0 ? this.width / previous.width : 1
+    const sy = previous.height > 0 ? this.height / previous.height : 1
+    // Depth has no dimension of its own to scale by. The mean keeps a
+    // uniform resize uniform, which is the case worth getting exactly right.
+    const sz = (sx + sy) / 2
+    for (let i = 0; i < this.count; i++) {
+      if (this.pinned[i]) continue
+      const i3 = i * 3
+      this.positions[i3] = previous.positions[i3]! * sx
+      this.positions[i3 + 1] = previous.positions[i3 + 1]! * sy
+      this.positions[i3 + 2] = previous.positions[i3 + 2]! * sz
+      // Velocity is the gap between the two, and verlet keeps it there. Carry
+      // it too, or the sheet arrives at its new size perfectly still.
+      this.prev[i3] = previous.prev[i3]! * sx
+      this.prev[i3 + 1] = previous.prev[i3 + 1]! * sy
+      this.prev[i3 + 2] = previous.prev[i3 + 2]! * sz
+    }
+    this.wake()
+    return true
+  }
+
   setParams(params: Partial<ClothParams>): void {
     // Called every frame while cloth renders — plain numeric compare, no JSON.
     let changed = false
@@ -119,6 +177,21 @@ export class ClothSim {
   wake(): void {
     this.asleep = false
     this.stillFrames = 0
+  }
+
+  /**
+   * Take hold of one particle by index.
+   *
+   * Separate from {@link grabNearest} because the particle a hand grabbed is
+   * not always the particle nearest the point it touched: with a deformer
+   * running over the simulation, what the pointer hit was a RENDERED vertex,
+   * and the vertex it hit is the particle of the same index — the stack maps
+   * a point to a point and never reorders them.
+   */
+  grab(index: number): number {
+    this.grabbedIndex = index >= 0 && index < this.count ? index : -1
+    this.wake()
+    return this.grabbedIndex
   }
 
   /** Nearest particle to a local-space point — the grab interface. */

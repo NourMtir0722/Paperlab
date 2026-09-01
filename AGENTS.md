@@ -397,10 +397,12 @@ Hero path only — a crease is per-sheet state and the field is one instanced dr
 ### Physics
 
 - Idle presets (`physics: 'float' | 'tumble' | 'dangle' | 'taped' | 'breeze'`): cheap curated motion, composes WITH a behavior.
-- Cloth (`physics: 'cloth'` or `{ type:'cloth', pins, wind, stiffness, gravity, floor }`): verlet simulation, pins = 'top-edge' | 'top-corners' | 'corner' | 'none'.
+- Cloth (`physics: 'cloth'` or `{ type:'cloth', pins, wind, stiffness, gravity, floor }`): verlet simulation, pins = 'top-edge' | 'top-corners' | 'corner' | 'none'. **A resize keeps the drape.** Sheet dimensions are a geometry dependency, so changing them builds a new mesh and a new sim — and a new sim starts flat, which snapped a hanging sheet rigid the moment it was resized. `ClothSim.adopt` now carries the free particles (and their velocity) across the rebuild, scaled by how much the sheet grew, while pins take the resized layout's own corners. It refuses a different grid, because the particles do not correspond, and it refuses a rebuild at the SAME size, because that was a change of pins or of physics — a restructuring — and those still reset the sheet by design.
 - Strip (`physics: 'strip'` or `{ type:'strip', scroll, tightness, core, tail, perforation, crease, stiffness, drag, gravity, floor, inertia }`): a roll paying paper out, and the pile it makes when it lands. See below.
 
-**A simulation and `behavior`/`deformers` are mutually exclusive** — the schema rejects both together, because the sim owns the vertices. Idle presets are the exception: they are a whole-object transform, so they compose with anything.
+**Cloth HOSTS a shape; `strip` does not.** `physics: 'cloth'` composes with `behavior`/`deformers`: the sim writes the vertices and the deformer stack runs over what it wrote, so you can fold, peel or crush the sheet that is hanging there — and it stays grabbable while you do. It works because a deformer is a pure map from a point to a point and never asked where its input came from. `strip` stays exclusive: its 2×N ribbon has chain nodes for rows, so its uv runs along a length of paper that is partly wound on a roll, and a fold placed by uv lands somewhere the sheet is not. Idle presets compose with anything — they are a whole-object transform.
+
+Three consequences worth knowing. The cloth grid honours the stack's `minSegments` (a `fold` needs 48 to bend through rather than crease along), still capped at 28. A grab finds the nearest RENDERED vertex rather than the nearest particle — same index either way, because a deformer never reorders points — and carries the displacement at grab time as a constant offset. And `memory.creases` bends a cloth sheet now instead of only shading it, which is what a crease was always defined to do.
 
 #### `strip` — the one simulation with a driving body
 
@@ -519,7 +521,7 @@ registerPreset('their-paper', theirPaper)
 
 1. **Blank canvas** → the parent container has no height. `<Paper>` fills its parent.
 2. **Text content invisible on first frame** → fonts load async; Paperlab waits for `document.fonts.ready` internally, so give it a beat before screenshotting.
-3. **`physics: 'cloth'` (or `'strip'`) + `behavior` throws a zod error** → they're exclusive by design. Pick one.
+3. **`physics: 'strip'` + `behavior` throws a zod error** → the roll owns its vertices and its rows are chain nodes, not the sheet's grid. Cloth + behavior is fine and composes.
 4. **Reduced motion**: with `prefers-reduced-motion: reduce`, behaviors freeze at their configured pose and physics/entrances are disabled. Override per-instance with `reducedMotion={false}` only when you have a good reason.
 5. **No WebGL** → `<Paper>` renders a flat DOM fallback automatically; don't build your own.
 
@@ -557,10 +559,204 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:drive` | the editor | the stage really walks when you drag, wheel or arrow it. **CI gate** |
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
+| `pnpm test:hands` | `hands.html` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you |
 | `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
 | `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
 | `pnpm media` | `media.html` | the README's GIFs and MP4s, stepped frame-exact |
+
+**`pnpm hands:setup` before `hands.html` will start.** The tracker's wasm and
+its two models are served by the page from its own origin, and they are not in
+git — 35 MB of weights is not something a library repo should make everyone
+clone. `tools/hands-assets.mjs` copies the wasm out of `node_modules` (already
+a declared dependency, so the same bytes at the same version) and fetches the
+two `.task` files once into `apps/editor/.hands/`, pinned by digest in a
+committed `tools/hands-models.sha256`. `pnpm test:hands` calls it itself, so
+the harness no longer needs anyone's CDN to be up in order to pass.
+
+**Not under `public/`, and that is load-bearing.** Vite copies `public/` into
+`dist` for every build, whether or not the page using it was an entry point —
+which put 36 MB of models into a 4 MB deploy for a page that is not emitted at
+all. A dev-server middleware in `apps/editor/vite.config.ts` serves them at
+`/hands/*` instead, and the build copies them only if `hands.html` is genuinely
+being built. If that page ever ships, that part is already right.
+
+They used to be fetched from CDNs at page load, and the note in the file saying
+that would have to stop was right for a reason worth restating: **a wasm binary
+is executable code**, and whoever serves that URL can run whatever they like
+inside a page that is holding a camera stream.
+
+**The page talks to nobody, and that took two layers.** It claims tracking runs
+entirely in your browser with no video leaving the device — and that was true
+of the video and not of everything else. MediaPipe POSTs a usage log to
+`https://odml.pa.googleapis.com/v1/log` with an API key, from inside the task
+runner, with no documented way to turn it off. A `connect-src 'self'` CSP on
+`hands.html` stops it. That policy does NOT stop the wasm loader fetching its
+own glue from a CDN — that happens in a worker and sails straight through — so
+the harness asserts separately that the page reaches no third-party origin at
+all. Neither layer alone is enough, and the assertion is the one that found the
+problem in the first place: it was written when nothing started the camera, so
+it passed while proving nothing.
+
+**The harness starts the camera for real, once.** Chromium's fake capture
+device answers `getUserMedia` with a test pattern, which is enough to prove the
+wasm and both models load from disk exactly as a viewer would load them. It has
+no hands in it, so everything after that goes back to driving `window.__HANDS__`
+with scripted ones — a webcam cannot be automated, and the tracking is not the
+part that can break.
+
+**`hands.html` — handling the paper with a camera.** Ten files, none of which
+`packages/paperlab` knows about: `landmarks.ts` is the hand as geometry (every
+measurement normalised by the palm, so leaning toward the camera is not a
+gesture), `gestures.ts` names the pose, `roles.ts` decides which of two hands
+is holding and which is acting, `marks.ts` turns a drag across the sheet into a
+crease, `flick.ts` turns a snap of the fingers into a watercolour, `dial.ts`
+turns a wrist into a stock selector, `breath.ts` turns a puckered mouth into
+wind, `span.ts` turns the gap between two hands into a size, `handPointer.ts` turns a gesture into a synthetic `PointerEvent` at the
+canvas — which R3F raycasts exactly as it does a mouse, so it reaches the cloth
+grab the paper already had — and `hands-main.tsx` is the page. Press *start the
+camera* to use it; `pnpm test:hands` drives the same paths with scripted hands
+and no camera, because the tracking is not the part that can break and the rest
+is.
+
+Twelve effects, each mapped onto something the library could already do:
+
+| | | |
+|---|---|---|
+| pinch | take hold and pull | the cloth sim's own grab |
+| point | score a line | `memory.creases` — the sheet keeps it |
+| flick | throw a watercolour at it | `content.wash` |
+| turn an open palm | change the stock under your hand | `stock`, swapped live |
+| blow at it | the wind rises | `cloth.wind`, driven continuously |
+| fist | fold along the line you scored | the `fold` deformer, over the sim |
+| fist | crush, with nothing scored | the `crumple` behavior, over the sim |
+| open palm | let go of the fold or the crush | — |
+| pull an edge | tear it ragged | `surface.deckle` |
+| pull apart, two hands | rip along the dotted line | `surface.perforation` |
+| two open palms, spread | resize the sheet | `sheet.width/height` |
+| pinch a CORNER and lift | it peels and curls back | the `peel` behavior, over the sim |
+| flick with the sheet in hand | it comes off its pins and flies | `pins`, and the sim's own throw |
+
+**The rule that decides how all of it feels: surface and memory changes are
+free, structural changes reset the sheet.** `surface.*`, `memory.creases`,
+`stock` and the live cloth parameters (`wind`, `stiffness`, `gravity`, `floor`)
+all update in place. That is the single most useful thing to know before
+designing a new gesture — and since cloth started hosting a shape, and
+`ClothSim.adopt` started carrying the particles across a rebuild, there is no
+gesture here left on the wrong side of it.
+
+**Two things used to be on the wrong side of that line and are not any more.**
+A fist swapped the simulation out for a behavior and snapped the sheet flat;
+cloth hosts a shape now, so it folds or crushes what is hanging there.
+`sheet.width/height` still rebuild the mesh, but `ClothSim.adopt` carries the
+drape across, so a hanging sheet can be resized while it hangs. As a SHAPE it
+was always free — a deformer is a pure function of its options, so the sheet
+simply redraws at the new size with the fold or the crush where it was.
+
+Five more things are worth knowing before extending it.
+
+**A fist is not a pinch, and the aperture cannot tell you which.** A closed
+fist puts the thumb against the index just as tightly as a pinch does, so
+anything thresholding thumb-to-index alone grabs the paper every time you try
+to crush it. The discriminator is the curl of the three fingers a pinch does
+not use; `gestures.test.ts` pins it.
+
+**A closed hand folds what you scored, or crushes what you did not.** This
+used to be a MODE swap and the seam in the whole harness: a fist replaced
+cloth with `crumple`, threw away the drape, and crushed a flat sheet. Cloth
+hosts a shape now, so a fist runs `fold` or `crumple` over the sheet that is
+actually hanging there and the sheet stays grabbable throughout. The fold is
+aimed at a line the sheet is already carrying — `creaseFromDrag` produced that
+`{ angle, offset }` when a fingertip scored it, and `fold` takes the identical
+pair, which is the tidiest join in this harness.
+
+**`fold` moves everything BEYOND its hinge**, so which half of the sheet
+swings is decided by which way `angle` points — and `creaseFromDrag` wraps into
+a canonical half-turn that is blind to that. A line scored below the centre
+comes back with a negative offset and folds the whole sheet about a line near
+its bottom edge, which reads as the paper swinging off its pins. `marks.foldAlong`
+picks the equivalent naming with a non-negative offset, so the flap is the side
+a person would actually lift.
+
+**A debounced gesture keeps firing after the hand has left it.** The reader
+holds a pose for a few frames so a dropped fingertip does not drop the paper,
+which means `point` is still being reported while the hand is already moving
+away — and the score followed it there, collapsing the line you drew to
+wherever you relaxed. `marks.continuesScore` rejects the jump. Anything else
+that accumulates while a gesture is held needs the same guard.
+
+**The second hand is not a second grab.** `ClothSim.grabbedIndex` is one
+`int`, so two hands pulling the sheet is not something the library can be asked
+for. What two hands unlock is the posture every physical thing you do to paper
+actually uses — one hand steadies it while the other acts — and that works
+today precisely because holding is the one grab and acting (scoring, flicking,
+turning a dial) never touches the vertices. The acting hand gets its own
+raycast through `hitUV`, which needs no pointer event at all.
+
+**The vocabulary ran out of POSES long before it ran out of things to do, and
+the way out was to stop looking for new ones.** A hand has about five shapes a
+tracker can tell apart reliably, and there are twelve effects here. What makes
+that work is that a pose is not a verb on its own:
+
+- **Where it lands.** A pinch on a CORNER peels; on an EDGE it tears; anywhere
+  else it takes hold. Same pose, three meanings, and nothing to learn — that is
+  how paper works.
+- **What the sheet already is.** A fist on a scored sheet folds along the
+  score; on an unmarked one it crushes.
+- **What is in your hand.** A fast release throws whatever you are holding —
+  the sheet if you had hold of it, paint if you did not.
+- **How many hands.** Two pinches rip along a perforation; two open palms
+  resize. That second one outranks both the stock dial and the single open palm
+  that means "put the paper back", or a resize would change the material and
+  drop you out of a crush on its way.
+
+`marks.ts` is where most of this lives, because most of it is a question about
+a point on the sheet rather than about a hand.
+
+**A pinch decides what it is when it LANDS, and never again.** A grab that
+turned into a peel because the drag pulled a corner under the hand would let go
+of the paper half way through the pull — which is what tearing an edge is, so
+it took the tear with it. `wasPinchingRef` makes the peel a rising-edge
+decision; `pnpm test:hands` catches the regression because the tear stops
+working.
+
+**The harness can drive its own clock, and a tracker has to survive that.**
+`__HANDS__.drive(hands, aspect, face, now)` takes a timestamp, because a flick
+is DEFINED by how fast it is and a test measured against wall time passes on a
+laptop and fails on a loaded CI box. The cost is that the clock can jump
+backwards between a wall-time run and a scripted one — and trimming a sample
+window by age cannot see that, because the differences come out negative and
+nothing is dropped. `FlickTracker` starts again when it sees time go backwards.
+
+**The pinch is measured in three dimensions and the curls are not.** The
+tracker reports a `z` per landmark and nothing read it. That is a live bug in
+exactly one place: a span pointing at the camera projects SHORT, so a hand
+turned side-on puts the thumb behind the finger, the aperture collapses, and
+the sheet is grabbed by a hand that never closed. `spatialDistance` fixes it
+for the aperture, where depth is also safe — a 3D distance is never shorter
+than its own projection, so a noisy `z` can only make a pinch harder to
+register, never invent one. The curls have the same geometry and the opposite
+risk: they drive continuous values through a ratchet (the crush only climbs),
+so inflation is the harm and they stay in the image plane. A finger pointed
+straight at the camera still reads as curled.
+
+**A prop written every frame re-renders the tree that owns the canvas.** The
+wind a blow drives is continuous, so `breath.ts` quantises it to steps of 0.05
+with a deadband and publishes only a step change — thirty renders a second
+becomes one or two. The same reason the crush drives `ref.set('progress')`
+imperatively rather than through a prop.
+
+**A page turn was declined, not missed.** It is the fourth behavior the plan
+listed for this batch and the one that does not survive contact with a single
+hanging sheet: a page turns ONTO something, and with nothing behind it a `flip`
+reads as a peel that went too far. It wants the field, not the hero path.
+
+Still out of reach: punch and cut. The sheet is a fixed-topology grid and
+deformers are pure vertex maps, so a hole in the middle or a split into two
+sheets needs real work in the library. A torn EDGE is reachable only because
+it is alpha on the existing mesh rather than a change to it. Burning is a
+third: `aging` is yellowing and foxing, not char, and there is no burn effect
+to drive.
 
 ### The editor, structurally
 
