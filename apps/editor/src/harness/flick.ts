@@ -32,9 +32,23 @@ import type { WashConfig } from 'paperlab'
  * page knows which, so only the page decides — see {@link isFlick}.
  */
 export interface Release {
-  /** Camera widths a second, at the moment of release. */
+  /**
+   * How fast the hand was going, in PALM LENGTHS a second.
+   *
+   * In palms because that is the ruler everything else in this harness uses,
+   * and for the reason `landmarks.ts` gives for using it: a hand leaning
+   * toward the camera covers more of the frame without moving any faster, and
+   * a gesture defined by speed must not fire because somebody sat forward.
+   * This was the one measurement here still taken in camera widths.
+   *
+   * And aspect-corrected, which the same measurement was not. Normalised
+   * landmarks divide x by the frame's WIDTH and y by its HEIGHT, so on a 4:3
+   * camera a vertical snap has to be a third faster than a horizontal one to
+   * report the same number — the flick had a preferred direction and nobody
+   * had noticed, because every scripted flick in the tests travels sideways.
+   */
   speed: number
-  /** Direction of travel in camera coordinates — mirrored, see `washFromFlick`. */
+  /** Direction of travel, aspect-corrected — mirrored, see `washFromFlick`. */
   dx: number
   dy: number
   /** How long the pinch was closed. A flick is brief; a pull is not. */
@@ -60,13 +74,20 @@ export function isFlick(release: Release): boolean {
 /** How far back to look when measuring the release. */
 export const FLICK_WINDOW_MS = 140
 
-/** Camera widths a second. A deliberate snap clears this; a drag does not. */
-export const FLICK_SPEED = 1.2
+/**
+ * Palm lengths a second. A deliberate snap clears this; a drag does not.
+ *
+ * A palm is about 10cm, so this is a hand moving at roughly 60cm a second.
+ * A wrist snap manages three times that and a drag across the sheet is well
+ * under half of it, which is the gap this sits in the middle of.
+ */
+export const FLICK_SPEED = 6
 
 /** Longer than this and the pinch was a hold, whatever speed it ended at. */
 export const FLICK_HOLD_MS = 600
 
 interface Sample {
+  /** Aspect-corrected camera coordinates — see {@link Release.speed}. */
   x: number
   y: number
   t: number
@@ -82,13 +103,30 @@ interface Sample {
 export class FlickTracker {
   private samples: Sample[] = []
   private closedAt: number | null = null
+  /** The most recent palm length, which is what the release is measured in. */
+  private palm = 1
 
-  push(anchor: { x: number; y: number } | null, closed: boolean, now: number): Release | null {
-    if (!anchor) {
+  /**
+   * Feed one frame.
+   *
+   * `palm` is the hand's own wrist-to-knuckle span, the ruler the release is
+   * measured in; a frame without one is a frame without a hand, and is treated
+   * as such. `aspect` squares the camera's coordinates up so that a snap means
+   * the same thing in every direction.
+   */
+  push(
+    anchor: { x: number; y: number } | null,
+    closed: boolean,
+    now: number,
+    aspect: number,
+    palm: number | null,
+  ): Release | null {
+    if (!anchor || palm === null || palm <= 0) {
       this.samples = []
       this.closedAt = null
       return null
     }
+    this.palm = palm
 
     // Time going BACKWARDS means this is not the same clock — the harness
     // drives `drive()` with its own timestamps so a flick can be scripted
@@ -100,7 +138,7 @@ export class FlickTracker {
       this.samples = []
       this.closedAt = null
     }
-    this.samples.push({ ...anchor, t: now })
+    this.samples.push({ x: anchor.x * aspect, y: anchor.y, t: now })
     while (this.samples.length > 1 && now - this.samples[0]!.t > FLICK_WINDOW_MS) this.samples.shift()
 
     if (closed) {
@@ -118,12 +156,13 @@ export class FlickTracker {
     if (seconds <= 0) return null
     const dx = last.x - first.x
     const dy = last.y - first.y
-    return { speed: Math.hypot(dx, dy) / seconds, dx, dy, heldMs: now - closedAt }
+    return { speed: Math.hypot(dx, dy) / this.palm / seconds, dx, dy, heldMs: now - closedAt }
   }
 
   reset(): void {
     this.samples = []
     this.closedAt = null
+    this.palm = 1
   }
 }
 
@@ -141,8 +180,8 @@ export const PIGMENTS = [
   { color: '#a83a45', secondary: '#d0a24a' }, // ↑  crimson and gold
 ] as const
 
-/** Speed at which a flick is throwing as much paint as it ever will. */
-const FASTEST = 3.5
+/** Speed at which a flick is throwing as much paint as it ever will, in palms a second. */
+const FASTEST = 18
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * Math.min(1, Math.max(0, t))

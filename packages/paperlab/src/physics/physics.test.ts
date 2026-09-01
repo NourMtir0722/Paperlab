@@ -77,6 +77,105 @@ describe('ClothSim', () => {
     expect(maxZ).toBeGreaterThan(0.05)
   })
 
+  it('catches the wind by the face it turns to it, not by its area', () => {
+    // The wind used to be a uniform shove along +z: a sheet edge-on to it
+    // bellied out exactly as hard as one square to it, which is the single
+    // most recognisable thing paper in air does NOT do. The force on a thin
+    // surface is what it intercepts — the relative wind along its own normal.
+    //
+    // Two identical free sheets, one lying in the wind's path and one turned
+    // into it. Modelled by rotating the SHEET rather than the wind, which the
+    // parameters cannot express: mapping (x, y, 0) to (x, 0, y) is a rotation,
+    // so every rest length survives it and the second sim is the first one
+    // laid on its side.
+    const settings = { stiffness: 0.8, gravity: 0, wind: 1, floor: -50 }
+    const facing = new ClothSim(11, 11, 1, 1, 'none', settings)
+    const edgeOn = new ClothSim(11, 11, 1, 1, 'none', settings)
+    const prev = (sim: ClothSim) => (sim as unknown as { prev: Float32Array }).prev
+    for (let i = 0; i < edgeOn.count; i++) {
+      const i3 = i * 3
+      const y = edgeOn.positions[i3 + 1]!
+      edgeOn.positions[i3 + 1] = 0
+      edgeOn.positions[i3 + 2] = y
+    }
+    prev(edgeOn).set(edgeOn.positions)
+    edgeOn.wake()
+
+    /** How far the sheet's middle travelled along the wind. */
+    const downwind = (sim: ClothSim, from: Float32Array) => {
+      const middle = Math.floor(sim.count / 2) * 3 + 2
+      return sim.positions[middle]! - from[middle]!
+    }
+    const flatStart = Float32Array.from(facing.positions)
+    const edgeStart = Float32Array.from(edgeOn.positions)
+    for (let i = 0; i < 60; i++) {
+      facing.step(1 / 60)
+      edgeOn.step(1 / 60)
+    }
+
+    const blown = downwind(facing, flatStart)
+    const grazed = downwind(edgeOn, edgeStart)
+    expect(blown).toBeGreaterThan(0.05)
+    // Not nothing — see AERO_TURBULENCE, which is there so a sheet lying
+    // exactly along the wind cannot stall forever — but a small fraction.
+    expect(grazed).toBeGreaterThan(0)
+    expect(grazed).toBeLessThan(blown * 0.4)
+  })
+
+  it('resists a sheet falling flat, and lets one falling edgewise past', () => {
+    // The same expression as the wind, with no wind in it: air resistance.
+    // Paper's whole character in air is that it does not fall like a stone,
+    // and it only does not because a sheet falling face-down catches the air
+    // it is going through. There was no drag of any kind here before.
+    const settings = { stiffness: 0.8, gravity: 1, wind: 0, floor: -50 }
+    const flat = new ClothSim(11, 11, 1, 1, 'none', settings)
+    const edgewise = new ClothSim(11, 11, 1, 1, 'none', settings)
+    // The first sheet is laid horizontally, face-down, by mapping (x, y, 0)
+    // to (x, 0, y) — a rotation, so every rest length survives it. It falls
+    // onto its own face; the untouched one hangs in the xy plane and falls
+    // along its own edge.
+    for (let i = 0; i < flat.count; i++) {
+      const i3 = i * 3
+      const y = flat.positions[i3 + 1]!
+      flat.positions[i3 + 1] = 0
+      flat.positions[i3 + 2] = y
+    }
+    const prev = (sim: ClothSim) => (sim as unknown as { prev: Float32Array }).prev
+    prev(flat).set(flat.positions)
+    flat.wake()
+
+    const fell = (sim: ClothSim, from: Float32Array) => {
+      const middle = Math.floor(sim.count / 2) * 3 + 1
+      return from[middle]! - sim.positions[middle]!
+    }
+    const flatStart = Float32Array.from(flat.positions)
+    const edgeStart = Float32Array.from(edgewise.positions)
+    for (let i = 0; i < 120; i++) {
+      flat.step(1 / 60)
+      edgewise.step(1 / 60)
+    }
+    expect(fell(flat, flatStart)).toBeGreaterThan(0)
+    expect(fell(flat, flatStart)).toBeLessThan(fell(edgewise, edgeStart))
+  })
+
+  it('stops pushing a sheet that is already travelling with it', () => {
+    // The relative-velocity term, which is what lets a blown sheet settle at
+    // a speed instead of accelerating away from the wind forever.
+    const sim = new ClothSim(9, 9, 1, 1, 'none', { stiffness: 0.8, gravity: 0, wind: 1, floor: -50 })
+    const middle = Math.floor(sim.count / 2) * 3 + 2
+    let last = 0
+    const speeds: number[] = []
+    for (let frame = 0; frame < 10; frame++) {
+      const before = sim.positions[middle]!
+      for (let i = 0; i < 30; i++) sim.step(1 / 60)
+      speeds.push(sim.positions[middle]! - before)
+      last = sim.positions[middle]!
+    }
+    expect(last).toBeGreaterThan(0)
+    // Later half-seconds do not cover more ground than the first ones did.
+    expect(speeds.at(-1)!).toBeLessThanOrEqual(Math.max(...speeds) + 1e-9)
+  })
+
   it('grabbed particles follow the pointer and wake a sleeping sheet', () => {
     const sim = new ClothSim(6, 6, 1, 1, 'none', { ...params, floor: -0.8 })
     runSeconds(sim, 6)
@@ -88,6 +187,55 @@ describe('ClothSim', () => {
     expect(sim.positions[idx * 3]).toBeCloseTo(0.3, 6)
     expect(sim.positions[idx * 3 + 1]).toBeCloseTo(0.5, 6)
     sim.release()
+  })
+
+  it('takes hold of a patch, not a point', () => {
+    // One particle moving alone pulls a spike out of the sheet — the look
+    // every cheap cloth grab has. Fingers hold about a centimetre of paper.
+    const sim = new ClothSim(21, 21, 1, 1, 'none', { ...params, gravity: 0, floor: -5 })
+    const centre = sim.grabNearest(0, 0, 0)
+    const flat = sim.positions[centre * 3 + 2]!
+    sim.moveGrab(0, 0, 0.4)
+    sim.step(1 / 60)
+
+    // The neighbour came with it, and not as far — a held patch with a soft
+    // rim, rather than a rigid coin punched out of the sheet.
+    const neighbour = centre + 1
+    const pulled = sim.positions[centre * 3 + 2]! - flat
+    const dragged = sim.positions[neighbour * 3 + 2]! - flat
+    expect(pulled).toBeCloseTo(0.4, 6)
+    expect(dragged).toBeGreaterThan(0.05)
+    expect(dragged).toBeLessThan(pulled)
+
+    // And it is a patch: something well away from the fingers is still free.
+    const far = sim.grabWeightAt(centre + 10)
+    expect(far).toBe(0)
+  })
+
+  it('lets go at the speed the hand was moving', () => {
+    // A verlet particle's velocity IS the gap between its position and its
+    // last one, and the grab used to overwrite that gap every substep — so a
+    // sheet whipped across the frame and released stopped dead and dropped
+    // straight down, whatever the hand had done with it.
+    const sim = new ClothSim(9, 9, 1, 1, 'none', { ...params, gravity: 0, wind: 0, floor: -5 })
+    const held = sim.grabNearest(0, 0, 0)
+    // A tenth of a unit in a sixtieth of a second: six units a second.
+    sim.moveGrab(0.1, 0, 0)
+    sim.step(1 / 60)
+    sim.release()
+    const before = sim.positions[held * 3]!
+    sim.step(1 / 60)
+    expect(sim.positions[held * 3]! - before).toBeGreaterThan(0)
+  })
+
+  it('a grab that never moved throws nothing', () => {
+    const sim = new ClothSim(9, 9, 1, 1, 'none', { ...params, gravity: 0, wind: 0, floor: -5 })
+    const held = sim.grabNearest(0, 0, 0)
+    sim.step(1 / 60)
+    sim.release()
+    const before = sim.positions[held * 3]!
+    sim.step(1 / 60)
+    expect(sim.positions[held * 3]!).toBeCloseTo(before, 6)
   })
 })
 

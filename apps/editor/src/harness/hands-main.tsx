@@ -195,11 +195,29 @@ const CAMERA_Z = 3.95
  */
 const BASE_FLOOR = -1.4
 
-/** How far a grabbed edge has to be pulled, as a fraction of the canvas, before it tears. */
-const TEAR_PULL = 0.32
+/**
+ * How far a grabbed edge has to be pulled before it tears, in palm lengths on
+ * a sheet at its base size.
+ *
+ * Both of these used to be fractions of the CANVAS DIAGONAL, in pixels, and
+ * that was wrong twice over.
+ *
+ * It was wrong about direction: a hand's travel is mapped onto the canvas
+ * per-axis, so a fraction of the diagonal is a different physical pull
+ * sideways than downward. On a 16:9 canvas the paper tore almost twice as
+ * easily across as down, which is not a property paper has.
+ *
+ * And it was wrong about the paper: what tears a sheet is STRAIN, and strain
+ * is how far you pulled measured against how big the sheet is. Two open palms
+ * can make this one twice the size, and the pull it took to tear did not
+ * change — so the bigger the sheet got, the more flimsy it became. Both are
+ * now measured in the palm lengths everything else in this harness is
+ * measured in, and scaled by the sheet.
+ */
+const TEAR_PULL = 2.2
 
-/** How far a corner has to be lifted, as a fraction of the canvas, for a full peel. */
-const PEEL_PULL = 0.3
+/** How far a corner has to be lifted for a full peel, on the same terms. */
+const PEEL_PULL = 1.6
 
 /** Both slots, always read, so a hand that leaves resets its own reader. */
 const SIDES: readonly Handedness[] = ['Left', 'Right']
@@ -520,10 +538,15 @@ function App() {
             : pinchPoint(landmarks)
           : null
 
+        // The hand's own ruler, measured before anything uses it: a flick is
+        // defined by speed, and a speed in fractions of the camera frame is a
+        // gesture that fires because somebody leaned forward.
+        const palm = landmarks ? palmLength(landmarks, aspect) : null
+
         // Every pinch opening is collected and none of them is judged here:
         // what a snap MEANS depends on whether the sheet was in that hand,
         // and this loop runs before the roles that answer it.
-        const release = flicksRef.current[side].push(anchor, frame.name === 'pinch', now)
+        const release = flicksRef.current[side].push(anchor, frame.name === 'pinch', now, aspect, palm)
         if (release) releases[side] = release
 
         if (landmarks) {
@@ -532,7 +555,7 @@ function App() {
             frame,
             anchor,
             landmarks,
-            palm: palmLength(landmarks, aspect),
+            palm,
             roll: palmRoll(landmarks, aspect),
           })
         }
@@ -662,14 +685,17 @@ function App() {
           peelRef.current = null
           setPeel(null)
         }
-      } else if (!wasPinchingRef.current && driverAt && uv && squeezeRef.current === 'none') {
+      } else if (!wasPinchingRef.current && driver?.anchor && uv && squeezeRef.current === 'none') {
         // Only on the frame the pinch CLOSES. A grab that turned into a peel
         // because the hand dragged the sheet's corner under itself would let
         // go of the paper half way through the pull — which is exactly what
         // tearing an edge is, so it took the tear with it.
         const corner = nearestCorner(uv)
         if (corner) {
-          peelRef.current = { corner, from: driverAt }
+          // Where the hand was, in the CAMERA's coordinates rather than the
+          // canvas's — the lift is measured against the hand's own palm, and
+          // a palm is not a thing the canvas knows about. See `TEAR_PULL`.
+          peelRef.current = { corner, from: driver.anchor }
           setPeel(corner)
         }
       }
@@ -679,10 +705,11 @@ function App() {
       // sim never takes hold and the two do not fight over the same corner.
       const pointer = pointerRef.current?.update(driver?.anchor ?? null, pinching && !peelRef.current) ?? null
 
-      if (peelRef.current && driverAt && rect) {
-        const lifted = Math.hypot(driverAt.x - peelRef.current.from.x, driverAt.y - peelRef.current.from.y)
-        const reach = Math.hypot(rect.width, rect.height) * PEEL_PULL
-        paperRef.current?.set('progress', Math.min(1, lifted / reach))
+      if (peelRef.current && driver?.anchor && driver.palm) {
+        const lifted = palmsApart(driver.anchor, peelRef.current.from, driver.palm, aspect)
+        // Scaled by the sheet: lifting a corner of a sheet twice the size is
+        // twice the gesture, the same way tearing one is.
+        paperRef.current?.set('progress', Math.min(1, lifted / (PEEL_PULL * scaleRef.current)))
       }
 
       // The acting hand may not be the one carrying the pointer, so it gets
@@ -738,9 +765,11 @@ function App() {
       }
 
       // ── Tear. Take an edge and pull until it gives. ───────────────────────
-      if (pointer?.down) {
+      if (pointer?.down && driver?.anchor) {
         if (!grabOriginRef.current) {
-          grabOriginRef.current = { x: pointer.x, y: pointer.y }
+          // In camera coordinates, like the peel: the pull is measured in the
+          // hand's own palms, which the canvas has never heard of.
+          grabOriginRef.current = driver.anchor
           grabEdgeRef.current = null
           grabTornRef.current = false
           heldSheetRef.current = uv !== null
@@ -754,10 +783,9 @@ function App() {
         }
         const edge = grabEdgeRef.current
         const origin = grabOriginRef.current
-        if (edge && stage && !tornRef.current.includes(edge) && !rippedRef.current.includes(edge)) {
-          const canvas = stage.canvas.getBoundingClientRect()
-          const pulled = Math.hypot(pointer.x - origin.x, pointer.y - origin.y)
-          if (pulled > Math.hypot(canvas.width, canvas.height) * TEAR_PULL) {
+        if (edge && driver.palm && !tornRef.current.includes(edge) && !rippedRef.current.includes(edge)) {
+          const pulled = palmsApart(driver.anchor, origin, driver.palm, aspect)
+          if (pulled > TEAR_PULL * scaleRef.current) {
             tornRef.current = [...tornRef.current, edge]
             setTorn(tornRef.current)
             // One edge per grab: let go and take hold again to tear another.

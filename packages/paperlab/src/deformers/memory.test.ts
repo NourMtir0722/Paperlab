@@ -302,26 +302,54 @@ describe('CreaseTracker', () => {
 })
 
 describe('crease shading', () => {
-  it('turns a fold’s travel angle into the line it leaves', () => {
-    // fold travels +y, so the crease runs horizontally.
+  it('hands the shader the fold’s own terms, untranslated', () => {
+    // The travel angle and the signed world offset pass straight through, so
+    // the shader measures a crease with the same `dot(p, dir) - offset` the
+    // deformer displaces it by. There is no conversion left to get backwards.
     const [shaded] = resolveCreases({}, [crease(90, 0, 15)], sheet)
-    expect(shaded!.angle).toBe(0)
+    expect(shaded!.angle).toBe(90)
+    expect(shaded!.offset).toBe(0)
   })
 
   it('places the line where the fold put it', () => {
-    const [centre] = resolveCreases({}, [crease(90, 0, 15)], sheet)
-    expect(centre!.position).toBeCloseTo(0.5, 6)
-    // A third of the way up a 1.4-tall sheet.
     const [third] = resolveCreases({}, [crease(90, sheet.height / 6, 15)], sheet)
-    expect(third!.position).toBeCloseTo(0.5 + 1 / 6, 6)
+    expect(third!.offset).toBeCloseTo(sheet.height / 6, 6)
+  })
+
+  it('keeps a diagonal crease diagonal', () => {
+    // The old shading measured in UV, which divides the sheet's aspect out —
+    // so on any sheet that is not square a line scored at 45° rendered at
+    // some other angle, and moved as the sheet was resized. Every built-in
+    // fold is square to an edge, so nothing caught it until a fingertip could
+    // score a line anywhere.
+    const wide: SheetDims = { width: 2, height: 1 }
+    const [a] = resolveCreases({}, [crease(45, 0.3, 15)], sheet)
+    const [b] = resolveCreases({}, [crease(45, 0.3, 15)], wide)
+    expect(a!.angle).toBe(45)
+    expect(b!.angle).toBe(45)
+    // And the same crease is in the same place whatever it was cut from.
+    expect(a!.offset).toBe(b!.offset)
   })
 
   it('saturates rather than growing without bound', () => {
     const [hard] = resolveCreases({}, [crease(90, 0, 120)], sheet)
-    expect(hard!.strength).toBe(1)
+    expect(Math.abs(hard!.strength)).toBe(1)
   })
 
-  it('draws authored crease lines and remembered ones together', () => {
+  it('tells a mountain from a valley', () => {
+    // A fold toward the camera leaves paper concave from the front, so the
+    // sign has to survive: unsigned, both folds drew the identical smudge.
+    const [valley] = resolveCreases({}, [crease(90, 0, 60)], sheet)
+    const [mountain] = resolveCreases({}, [crease(90, 0, -60)], sheet)
+    expect(valley!.strength).toBeLessThan(0)
+    expect(mountain!.strength).toBeGreaterThan(0)
+    expect(valley!.strength).toBeCloseTo(-mountain!.strength, 12)
+  })
+
+  it('converts authored crease lines out of fractions, and draws both', () => {
+    // `creaseLines` is the one thing still authored in the sheet's fractions,
+    // because that is what is sane to type by hand. It is converted here so
+    // the shader never sees two languages.
     const shaded = resolveCreases(
       { creaseLines: { angle: 0, positions: [0.25], strength: 0.5 } },
       [crease(90, 0, 15)],
@@ -330,7 +358,10 @@ describe('crease shading', () => {
     expect(shaded).toHaveLength(2)
     // Authored first: at the cap it is the recorded one that gets dropped,
     // never the one someone placed by hand.
-    expect(shaded[0]!.position).toBe(0.25)
+    // A line at angle 0 runs horizontally, so the fold across it travels +y
+    // and a quarter of the way up a 1.4-tall sheet is -0.25 × 1.4 from centre.
+    expect(shaded[0]!.angle).toBe(90)
+    expect(shaded[0]!.offset).toBeCloseTo(-0.25 * sheet.height, 6)
   })
 
   it('never hands the shader more lines than it has uniforms for', () => {
