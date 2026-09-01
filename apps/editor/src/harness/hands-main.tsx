@@ -88,38 +88,44 @@ import { Span } from './span'
  */
 
 /**
- * Served by this page, from this origin. `pnpm hands:setup` puts them there.
+ * Where the tracker's two halves come from, and why they differ.
  *
- * They used to be fetched from third-party CDNs at runtime, which was fine
- * for a spike and is not fine for anything else: a demo that dies when a CDN
- * does is not a demo, and — the part that actually matters — nothing else in
- * this repo pulls EXECUTABLE code from a third-party origin at runtime.
- * A wasm binary is executable code, and whoever serves that URL can run
- * whatever they like inside the page.
+ * The WASM is served by this page, from this origin. `pnpm hands:setup` puts
+ * it there, copied out of `node_modules` — it is executable code running in a
+ * page that holds a camera stream, nothing else in this repo pulls that from a
+ * third party at runtime, and as `@mediapipe/tasks-vision` it is Apache-2.0,
+ * so there is no question about hosting it ourselves.
  *
- * Not committed either. `tools/hands-assets.mjs` copies the wasm out of
- * `node_modules` (it is already a declared dependency, so those are the same
- * bytes at the same version) and fetches the two models once, pinned by
- * digest — 35 MB of weights is not something a library repo should make
- * everyone clone.
+ * The MODEL WEIGHTS come from Google. That is deliberate and it is the more
+ * interesting of the two: Google publishes no licence for them anywhere that
+ * can be found — not the task's docs page, not the models page, and the model
+ * card those link to is a 404. Serving them from our own origin would be
+ * redistribution under terms nobody can read. Linking to them is not. So the
+ * page makes exactly one third-party request, only when someone presses start,
+ * and says so where they can see it.
+ *
+ * Resolved against the page's own URL rather than hard-coded, so the same
+ * build works at `/hands/` in dev and on the site.
  */
-const WASM_BASE = '/hands'
-const HAND_MODEL_URL = '/hands/hand_landmarker.task'
-/** The face model. Loaded second, and the page works without it. */
-const FACE_MODEL_URL = '/hands/face_landmarker.task'
+const TRACKER_BASE = new URL('tracker/', document.baseURI).href
+
+const HAND_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+/** The face model, behind the blow gesture. Loaded second; the page works without it. */
+const FACE_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 
 /** What to say when the setup step has not been run. */
-const MISSING_ASSETS =
-  'the tracker’s wasm and models are not in apps/editor/public/hands — run `pnpm hands:setup`'
+const MISSING_ASSETS = 'the tracker’s wasm is not in apps/editor/.hands — run `pnpm hands:setup`'
 
 /**
- * Whether the assets are actually there, asked before anything tries to load
- * them. `FilesetResolver` reports a missing wasm as a stack trace out of a
- * generated glue file, which is a long way from "run the setup script".
+ * Whether the wasm is actually there, asked before anything tries to load it.
+ * `FilesetResolver` reports a missing one as a stack trace out of a generated
+ * glue file, which is a long way from "run the setup script".
  */
 async function assetsPresent(): Promise<boolean> {
   try {
-    const response = await fetch(HAND_MODEL_URL, { method: 'HEAD' })
+    const response = await fetch(`${TRACKER_BASE}vision_wasm_internal.js`, { method: 'HEAD' })
     return response.ok
   } catch {
     return false
@@ -886,7 +892,7 @@ function App() {
 
       setMessage('loading the hand model…')
       if (!(await assetsPresent())) throw new Error(MISSING_ASSETS)
-      const fileset = await FilesetResolver.forVisionTasks(WASM_BASE)
+      const fileset = await FilesetResolver.forVisionTasks(TRACKER_BASE)
       // GPU is worth trying and not worth insisting on: the delegate fails on
       // some drivers, and CPU at two hands is comfortably fast enough here.
       const options = {
@@ -1150,7 +1156,9 @@ function App() {
           </button>
         ) : null}
         <p className="privacy">
-          Tracking runs entirely in your browser. No video leaves this device, and there is no server.
+          The tracking models are downloaded from Google the first time you start the camera. After that
+          everything runs in your browser: no video, and no measurement taken from it, ever leaves this device
+          — there is no server to send it to.
         </p>
         {message ? <p className={status === 'error' ? 'error' : 'note'}>{message}</p> : null}
         {/* Mirrored to match the pointer mapping, so what you see is what you aim. */}

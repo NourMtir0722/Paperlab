@@ -38,6 +38,11 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Vendor the hand tracker's wasm
+        # A copy out of node_modules, no network: the build emits the /hands
+        # page now, and without this it would emit one that 404s its runtime.
+        run: pnpm hands:setup
+
       - name: Build
         run: pnpm build
 

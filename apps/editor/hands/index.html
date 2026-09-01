@@ -5,23 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Paperlab — hands</title>
     <!--
-      This page may not talk to anyone but its own origin.
+      This page may talk to its own origin, and to exactly one other place.
 
-      Not a precaution — the claim in the panel, made enforceable. The page
-      says tracking runs entirely in your browser and no video leaves the
-      device. That was true of the VIDEO and not quite true of everything
-      else: MediaPipe POSTs a usage log to https://odml.pa.googleapis.com/v1/log,
-      with an API key, from inside the task runner, and there is no documented
-      way to turn it off. `connect-src` turns it off from the outside.
+      Not a precaution — the claim in the panel, made enforceable. MediaPipe
+      POSTs a usage log to https://odml.pa.googleapis.com/v1/log, with an API
+      key, from inside the task runner, and there is no documented way to turn
+      it off. `connect-src` turns it off from the outside.
 
-      Worth knowing exactly how far this reaches, because it is less far than
-      it looks. It stops the telemetry, which is a main-thread request. It does
-      NOT stop the wasm loader from fetching its own glue and binary, which
-      happens inside a worker — pointing WASM_BASE back at a CDN loads
-      perfectly happily with this policy in place. So there are two layers and
-      each one covers what the other cannot: the policy stops anything the page
-      tries to SEND, and `pnpm test:hands` fails if the page fetches from any
-      third-party origin at all. Neither alone is enough.
+      storage.googleapis.com is allowed because the model WEIGHTS are loaded
+      from Google rather than served from here. Google publishes no licence for
+      them — not on the task's docs page, not on the models page, and the model
+      card those link to is a 404 — so hosting them ourselves would be
+      redistribution under terms nobody can read. Linking is not. The wasm is a
+      different matter and is served from this origin: it is executable code,
+      and it is Apache-2.0, so there is no question.
+
+      Worth knowing how far this reaches, because it is less far than it looks.
+      It stops anything the page tries to SEND. It does NOT stop the wasm
+      loader fetching its own glue from elsewhere — that happens in a worker
+      and sails straight through — so `pnpm test:hands` separately asserts that
+      the only third-party origin the page touches is the model host, and that
+      the telemetry endpoint is never among them. Neither layer alone is enough.
 
       `ws:` is for Vite's dev HMR socket, which shares the origin but not the
       scheme; `blob:` is how the wasm loader instantiates its worker;
@@ -29,7 +33,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' blob: data:; connect-src 'self' ws: wss: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: mediastream:"
+      content="default-src 'self' blob: data:; connect-src 'self' https://storage.googleapis.com ws: wss: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: mediastream:"
     />
     <style>
       :root { color-scheme: dark; }

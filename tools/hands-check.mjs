@@ -29,7 +29,7 @@ import { ensureHandsAssets } from './hands-assets.mjs'
 
 const PORT = 5187
 /** Wind off: something is trying to measure a drag, and wind is noise. */
-const URL_PATH = '/hands.html?wind=0'
+const URL_PATH = '/hands/?wind=0'
 const ASPECT = 4 / 3
 
 /**
@@ -134,12 +134,14 @@ const problems = []
 /**
  * Every origin the page reached for that was not its own.
  *
- * The whole point of `pnpm hands:setup` is that this list stays empty: the
- * wasm and the models are served from the page's own origin, so nothing here
- * depends on a third party being up — or on a third party being honest, which
- * matters more, because a wasm binary is executable code running against a
- * camera feed. Asserting it is the only way it stays true.
+ * Exactly one is allowed, and which one is the whole point. The model WEIGHTS
+ * come from Google because Google publishes no licence for them and hosting
+ * them here would be redistribution under terms nobody can read. The wasm does
+ * NOT — it is executable code in a page holding a camera stream, and it is
+ * Apache-2.0, so it is served from our own origin. Anything else at all,
+ * including MediaPipe's own telemetry endpoint, is a failure.
  */
+const MODEL_HOST = 'https://storage.googleapis.com'
 const offsite = new Set()
 page.on('request', (request) => {
   const url = request.url()
@@ -159,16 +161,24 @@ try {
 
   // ── Start the camera for real, once. ─────────────────────────────────────
   // Not to track anything — the fake device shows a test pattern with no
-  // hands in it — but to prove the wasm and both models load, from this
-  // origin, the way a viewer would load them.
+  // hands in it — but to prove the wasm loads from this origin and the models
+  // load at all, the way a viewer would load them.
+  //
+  // Waited on the BUTTON, which is the only thing on the page that changes
+  // only when the tracker is genuinely live. The obvious-looking waits are
+  // both vacuous: the readout says "hand" whether or not a camera is running,
+  // and "(model loading)" is absent before a camera starts as well as after
+  // the model arrives. Both passed instantly, the stop click then found no
+  // button, and the camera came up in the middle of the scripted gestures —
+  // where the detection loop calls the same `step()` sixty times a second
+  // with no hands in frame and resets every gesture between one scripted
+  // frame and the next. Thirteen unrelated checks failed and none of them was
+  // broken.
+  const live = page.getByRole('button', { name: 'stop the camera' })
   await page.getByRole('button', { name: 'start the camera' }).click()
   let cameraError = ''
   try {
-    await page.waitForFunction(
-      () => document.querySelector('.hud .mode')?.textContent?.includes('hand'),
-      null,
-      { timeout: 90_000 },
-    )
+    await live.waitFor({ state: 'visible', timeout: 120_000 })
   } catch {
     cameraError =
       (await page
@@ -182,15 +192,16 @@ try {
   const blowReady = cameraLive
     ? await page
         .waitForFunction(() => !document.body.textContent?.includes('(model loading)'), null, {
-          timeout: 90_000,
+          timeout: 120_000,
         })
         .then(() => true)
         .catch(() => false)
     : false
-  await page
-    .getByRole('button', { name: 'stop the camera' })
-    .click()
-    .catch(() => {})
+  // Stopping is not optional, for the reason above.
+  if (cameraLive) {
+    await live.click({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'start the camera' }).waitFor({ timeout: 15_000 })
+  }
   await page.waitForTimeout(500)
 
   const vertices = () => page.evaluate(() => window.__HANDS__.vertices())
@@ -405,13 +416,27 @@ try {
   }
 
   // ── Score. Draw a line with a fingertip, then stop pointing to commit. ────
+  // Aimed by scanning, and scanned AGAIN between the two. A crease deforms
+  // the sheet now that a simulation can host a shape — it used to be shading
+  // only — so the first score moves the target for the second, and a fixed
+  // pair of coordinates hit the paper once and the air after that.
   const beforeScore = (await release()).creases
-  await trace(POSES.point, { x: 0.56, y: 0.5 }, { x: 0.44, y: 0.5 })
+  const scoreAt = ((await scanSurface()) ?? surface).mid
+  await trace(
+    POSES.point,
+    { x: scoreAt.camX + 0.06, y: scoreAt.camY },
+    { x: scoreAt.camX - 0.06, y: scoreAt.camY },
+  )
   const scored = await hold(POSES.palm)
   await page.waitForTimeout(300)
 
   // A second score, to prove they accumulate rather than replace.
-  await trace(POSES.point, { x: 0.5, y: 0.56 }, { x: 0.5, y: 0.44 })
+  const scoreAgainAt = ((await scanSurface()) ?? surface).mid
+  await trace(
+    POSES.point,
+    { x: scoreAgainAt.camX, y: scoreAgainAt.camY + 0.06 },
+    { x: scoreAgainAt.camX, y: scoreAgainAt.camY - 0.06 },
+  )
   const scoredTwice = await hold(POSES.palm)
   await page.waitForTimeout(300)
 
@@ -855,7 +880,26 @@ try {
   check(thrown.thrown === true, 'a flick with the sheet in hand throws it off its pins', 'still pinned')
   check(flew > 0.3, 'and the sheet actually leaves', `it moved ${flew}`)
   check(capture.length === 0, 'pointer capture survives a synthetic pointer', capture[0] ?? '')
-  check(offsite.size === 0, 'the page fetches nothing from a third-party origin', [...offsite].join(', '))
+  const strangers = [...offsite].filter((origin) => origin !== MODEL_HOST)
+  check(
+    strangers.length === 0,
+    'the page reaches no third-party origin but the model host',
+    strangers.join(', '),
+  )
+  // Named separately because it is the one that was actually happening, and a
+  // rule about "third parties" is easy to loosen without noticing this went
+  // with it. MediaPipe POSTs a usage log with an API key from inside the task
+  // runner; the page's CSP is what stops it.
+  check(
+    ![...offsite].some((origin) => origin.includes('odml')),
+    'and never MediaPipe’s telemetry endpoint',
+    [...offsite].join(', '),
+  )
+  check(
+    [...offsite].every((origin) => !origin.includes('jsdelivr') && !origin.includes('unpkg')),
+    'the wasm comes from this origin, not a CDN',
+    [...offsite].join(', '),
+  )
 
   const other = problems.filter((p) => !capture.includes(p))
   if (other.length) {

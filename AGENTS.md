@@ -551,7 +551,7 @@ pnpm lint           # biome
 pnpm knip           # dead code and unused exports
 ```
 
-**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor` that is dev-only — `pnpm build` emits `index.html` and nothing else.
+**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor`. All of them are dev-only — `pnpm build` emits `index.html` and nothing else — with one exception: `hands/index.html` also ships, as the site's `/hands` route, built in a second pass (`PAPERLAB_HANDS=1`) so the default build stays lean.
 
 | | | |
 |---|---|---|
@@ -559,53 +559,61 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:drive` | the editor | the stage really walks when you drag, wheel or arrow it. **CI gate** |
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
-| `pnpm test:hands` | `hands.html` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you |
+| `pnpm test:hands` | `/hands` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you |
 | `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
 | `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
 | `pnpm media` | `media.html` | the README's GIFs and MP4s, stepped frame-exact |
 
-**`pnpm hands:setup` before `hands.html` will start.** The tracker's wasm and
-its two models are served by the page from its own origin, and they are not in
-git — 35 MB of weights is not something a library repo should make everyone
-clone. `tools/hands-assets.mjs` copies the wasm out of `node_modules` (already
-a declared dependency, so the same bytes at the same version) and fetches the
-two `.task` files once into `apps/editor/.hands/`, pinned by digest in a
-committed `tools/hands-models.sha256`. `pnpm test:hands` calls it itself, so
-the harness no longer needs anyone's CDN to be up in order to pass.
+**`/hands` is a real page on the site, and `pnpm hands:setup` before it will
+start.** The tracker's wasm is served from our own origin — it is executable
+code in a page holding a camera stream, and as `@mediapipe/tasks-vision` it is
+Apache-2.0, so there is no question about hosting it. `tools/hands-assets.mjs`
+copies it out of `node_modules` (already a declared dependency, so the same
+bytes at the same version) into `apps/editor/.hands/`, which is gitignored:
+12 MB of runtime is not something a library repo should make anyone clone.
 
-**Not under `public/`, and that is load-bearing.** Vite copies `public/` into
-`dist` for every build, whether or not the page using it was an entry point —
-which put 36 MB of models into a 4 MB deploy for a page that is not emitted at
-all. A dev-server middleware in `apps/editor/vite.config.ts` serves them at
-`/hands/*` instead, and the build copies them only if `hands.html` is genuinely
-being built. If that page ever ships, that part is already right.
+**The model weights are loaded from Google, deliberately.** Google publishes no
+licence for them — not on the task's docs page, not on the models page, and the
+model card those link to is a 404. The code is Apache-2.0; the weights are
+covered by nothing anyone can point at, so serving them from our origin would
+be redistribution under terms nobody can read. Linking is not. That costs one
+third-party request, which the page's own copy discloses. If the terms ever
+become clear, self-hosting is a two-line change and a better page.
 
-They used to be fetched from CDNs at page load, and the note in the file saying
-that would have to stop was right for a reason worth restating: **a wasm binary
-is executable code**, and whoever serves that URL can run whatever they like
-inside a page that is holding a camera stream.
+**The route is a directory, not a file.** `apps/editor/hands/index.html`, served
+at `/hands` — `/hands.html` is a file someone left lying around, `/hands` is a
+route. It also makes the dev URL and the deployed one identical, which is what
+lets the page resolve its wasm against `document.baseURI` and be right both
+times. It is built in a SECOND pass over the editor app (`PAPERLAB_HANDS=1`,
+its own base, `dist-hands/`) so the route is self-contained rather than reading
+its JavaScript out of `/editor/assets`, and so the ordinary `pnpm build` stays
+3.7 MB instead of carrying 12 MB it does not emit.
 
-**The page talks to nobody, and that took two layers.** It claims tracking runs
-entirely in your browser with no video leaving the device — and that was true
-of the video and not of everything else. MediaPipe POSTs a usage log to
-`https://odml.pa.googleapis.com/v1/log` with an API key, from inside the task
-runner, with no documented way to turn it off. A `connect-src 'self'` CSP on
-`hands.html` stops it. That policy does NOT stop the wasm loader fetching its
-own glue from a CDN — that happens in a worker and sails straight through — so
-the harness asserts separately that the page reaches no third-party origin at
-all. Neither layer alone is enough, and the assertion is the one that found the
-problem in the first place: it was written when nothing started the camera, so
-it passed while proving nothing.
+**The page talks to its own origin and one other, and that took two layers.**
+MediaPipe POSTs a usage log to `https://odml.pa.googleapis.com/v1/log` with an
+API key, from inside the task runner, with no documented way to turn it off. A
+`connect-src` CSP stops it. That policy does NOT stop the wasm loader fetching
+its own glue from a CDN — that happens in a worker and sails straight through —
+so the harness asserts separately that the only stranger the page reaches is
+the model host. Neither layer alone is enough, and the assertion is the one
+that found the telemetry in the first place.
 
 **The harness starts the camera for real, once.** Chromium's fake capture
 device answers `getUserMedia` with a test pattern, which is enough to prove the
-wasm and both models load from disk exactly as a viewer would load them. It has
-no hands in it, so everything after that goes back to driving `window.__HANDS__`
-with scripted ones — a webcam cannot be automated, and the tracking is not the
-part that can break.
+wasm and both models load the way a viewer would load them. It has no hands in
+it, so everything after that goes back to scripted ones.
 
-**`hands.html` — handling the paper with a camera.** Ten files, none of which
+Two traps in that, both of which cost an afternoon. **Wait on the BUTTON.** The
+obvious waits are vacuous — the readout says "hand" whether or not a camera is
+running, and `(model loading)` is absent before a camera starts as well as
+after the model arrives — so both passed instantly and the stop click found no
+button. **And stopping is not optional:** the detection loop calls the same
+`step()` sixty times a second with no hands in frame, which resets every
+gesture between one scripted frame and the next. Thirteen unrelated checks
+failed and none of them was broken.
+
+**`/hands` — handling the paper with a camera.** Ten files, none of which
 `packages/paperlab` knows about: `landmarks.ts` is the hand as geometry (every
 measurement normalised by the palm, so leaning toward the camera is not a
 gesture), `gestures.ts` names the pose, `roles.ts` decides which of two hands
@@ -768,7 +776,7 @@ to drive.
 | `controls/` | the schema→UI machinery. `controlModel.ts` is a **pure** function from a zod schema to a `Control[]` — no React, no DOM, and unit-tested as such; `controls.tsx` renders that tree; `Select.tsx` and `ui.tsx` are the shared primitives |
 | `panels/` | the inspectors that assemble a `Control[]` for one mode and hand it to `<Panel>` |
 | `chrome/` | everything around the canvas that is not an inspector — the view cluster, transport, coach mark, crash and small-screen screens |
-| `harness/` | the dev-only entry points `tools/` drives. Not in `pnpm build`'s output |
+| `harness/` | the entry points `tools/` drives. Dev-only and out of `pnpm build`'s output, except `hands/`, which ships as the site's `/hands` route |
 
 Two things about the control layer are load-bearing and easy to undo by accident:
 

@@ -37,29 +37,43 @@ own asset and their own licence obligations.
 
 
 ────────────────────────────────────────────────────────────────────────
-Hand and face tracking (dev-only harness)
+Hand and face tracking (the /hands page)
 ────────────────────────────────────────────────────────────────────────
 
-`apps/editor/hands.html` drives paper with a camera using MediaPipe Tasks:
+`/hands` drives paper with a camera using MediaPipe Tasks:
 
     @mediapipe/tasks-vision — Copyright Google LLC
     Apache License 2.0
     https://github.com/google-ai-edge/mediapipe
 
-The wasm runtime is that npm package's own, copied out of `node_modules` by
-`pnpm hands:setup`. The two model files it also fetches —
-`hand_landmarker.task` and `face_landmarker.task` — are Google's, from
-storage.googleapis.com, and are pinned by digest in
-`tools/hands-models.sha256`.
+The two halves are treated differently, on purpose.
 
-**Neither the runtime nor the weights are redistributed by this repository.**
-They are not committed, they are not in the npm package, and they are not in
-any build output: `hands.html` is a dev-only entry point, so `pnpm build`
-emits neither the page nor its assets. Each developer's `pnpm hands:setup`
-fetches them from Google directly.
+**The wasm runtime IS served from this site.** It is that npm package's own,
+copied out of `node_modules` by `pnpm hands:setup` and built into the page.
+Apache-2.0 covers it, so hosting it here is unambiguous — and it has to be
+hosted here, because it is executable code running in a page that holds a
+camera stream, and nothing else in this project fetches that from a third
+party at runtime.
 
-That is worth knowing before anyone changes it. Making `hands.html` a public
-page WOULD mean serving Google's model weights from this project's own
-origin, which is redistribution, and the model cards' licence terms would
-need reading first. The plumbing for it exists and is deliberately switched
-off — see `handsAssets()` in `apps/editor/vite.config.ts`.
+**The model weights are NOT.** `hand_landmarker.task` and
+`face_landmarker.task` are loaded from storage.googleapis.com at runtime,
+by the visitor's browser, only after they press start. They are not
+committed, not vendored, and not in any build output.
+
+That is deliberate rather than lazy. Google publishes no licence for the
+model files anywhere that could be found — not on the task's documentation
+page, not on the models page, and the model card those pages link to
+returns 404. The code is Apache-2.0; the weights are covered by nothing
+anyone can point at. Serving them from this origin would be redistribution
+under terms that cannot be read, so the page links to Google's own copy
+instead, and says so in the panel where a visitor can see it.
+
+If those terms ever become clear, self-hosting is a two-line change and a
+better page — one less third-party request, and it would work offline.
+Until then this is the honest arrangement.
+
+No video, and no measurement taken from it, ever leaves the device. The
+page carries a Content-Security-Policy that permits the model host and
+nothing else; MediaPipe's own usage logging (odml.pa.googleapis.com) is
+blocked by it, and `pnpm test:hands` fails if either that endpoint or any
+other stranger is contacted.
