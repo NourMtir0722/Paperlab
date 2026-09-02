@@ -28,6 +28,23 @@ import { rendererArgs, startApp } from './harness.mjs'
 import { ensureHandsAssets } from './hands-assets.mjs'
 
 const PORT = 5187
+/**
+ * How long to wait for the cloth to stop moving.
+ *
+ * This is a WALL-CLOCK number guarding a FRAME-DRIVEN simulation, which is
+ * the whole reason it needs saying out loud. The sheet comes to rest after
+ * roughly the same number of steps everywhere; how long that takes is
+ * whatever the machine's renderer can manage. This harness has run in a
+ * 65-second pass on a laptop and an 11-minute one under `--soft` on the same
+ * laptop — same SwiftShader, ten times the wall clock — and a CI runner sits
+ * somewhere in between. 30 seconds was enough for the first and not the
+ * second, which is not a fact about the sim.
+ *
+ * So it is generous on purpose. Nothing waits the full duration when the
+ * sheet settles promptly; the number only costs anything on the run that was
+ * going to fail anyway, and the job's own timeout is the real backstop.
+ */
+const SETTLE_MS = 150_000
 /** Wind off: something is trying to measure a drag, and wind is noise. */
 const URL_PATH = '/hands/?wind=0'
 const ASPECT = 4 / 3
@@ -236,20 +253,35 @@ try {
    * settles is the sim's own motion wearing the result's clothes — and the
    * edge scan further down needs a sheet that is where it is going to stay.
    */
-  const settle = () =>
-    page.waitForFunction(
-      () => {
-        const now = window.__HANDS__.vertices()
-        const before = window.__SETTLE__
-        window.__SETTLE__ = now
-        if (!before || before.length !== now.length) return false
-        let max = 0
-        for (let i = 0; i < now.length; i++) max = Math.max(max, Math.abs(now[i] - before[i]))
-        return max < 1e-4
-      },
-      null,
-      { timeout: 30_000, polling: 250 },
-    )
+  const settle = async () => {
+    try {
+      await page.waitForFunction(
+        () => {
+          const now = window.__HANDS__.vertices()
+          const before = window.__SETTLE__
+          window.__SETTLE__ = now
+          if (!before || before.length !== now.length) return false
+          let max = 0
+          for (let i = 0; i < now.length; i++) max = Math.max(max, Math.abs(now[i] - before[i]))
+          window.__SETTLE_MAX__ = max
+          return max < 1e-4
+        },
+        null,
+        { timeout: SETTLE_MS, polling: 250 },
+      )
+    } catch {
+      // A bare Playwright TimeoutError names the line and nothing else, which
+      // on a machine you cannot attach a debugger to is one round trip per
+      // question. Say how close it got instead: a max still far above the
+      // threshold means the sheet is genuinely in motion, and a max hovering
+      // just above it means this wait is short rather than the sim broken.
+      const max = await page.evaluate(() => window.__SETTLE_MAX__ ?? Number.NaN)
+      throw new Error(
+        `the sheet never came to rest: still moving ${max.toExponential(2)} per poll after ` +
+          `${SETTLE_MS / 1000}s (needs < 1e-4). Slower hardware needs longer — raise SETTLE_MS.`,
+      )
+    }
+  }
 
   await settle()
 
