@@ -218,6 +218,40 @@ body {
   background: var(--hair-2);
 }
 
+/*
+  The way out to /hands.
+
+  A peer of Save preset and Share rather than a quieter outline, because it
+  is the only chrome in the app whose job is to tell you a feature exists —
+  and it deliberately does NOT invert to a white pill: rule 5 allows one per
+  screen and Export already is it. So it sits one luminance step below the
+  primary action and level with the document verbs, which is the honest
+  place for "there is another surface over here".
+
+  The arrow is the whole new-tab affordance; a second glyph would make it
+  the only iconed control in a text-only topbar.
+*/
+.hands-link {
+  background: var(--lift-2);
+  color: var(--ink);
+  border: 1px solid var(--hair-2);
+  border-radius: 6px;
+  padding: 6px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hands-link:hover {
+  background: var(--hair-2);
+}
+
+/* Its own class, not `.hands-link span`: a bare descendant selector here
+   lands between two rules further down the sheet and quietly voids their
+   noDescendingSpecificity suppression. */
+.hands-arrow {
+  color: var(--ink-body);
+}
+
 .preset-panel.dropping {
   outline: 2px dashed var(--ink-body);
   outline-offset: -4px;

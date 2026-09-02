@@ -184,9 +184,9 @@ export const stageRoomSchema = z.object({
   height: z.number().min(1).max(6).default(2.2),
   color: z.string().default('#171310').describe('color'),
   /** Columns flanking the walk — see `stageColumnsSchema`. */
-  columns: stageColumnsSchema.default({}),
+  columns: stageColumnsSchema.prefault({}),
   /** A wall at the end of the walk with the source in it. */
-  doorway: stageDoorwaySchema.default({}),
+  doorway: stageDoorwaySchema.prefault({}),
 })
 
 /**
@@ -254,9 +254,9 @@ export const stageGradeSchema = z.object({
 })
 
 export const stageSchema = z.object({
-  path: walkPathSchema.default({}),
-  shot: shotSchema.default({}),
-  figure: figureSchema.default({}),
+  path: walkPathSchema.prefault({}),
+  shot: shotSchema.prefault({}),
+  figure: figureSchema.prefault({}),
   /** Stage mode is built for `nave`; the others are all front-lit. */
   lighting: z.enum(lightingNames).default('nave'),
   /**
@@ -283,12 +283,12 @@ export const stageSchema = z.object({
    * Still one flag away for anyone who wants it.
    */
   showFigure: z.boolean().default(false),
-  source: stageSourceSchema.default({}),
-  ground: stageGroundSchema.default({}),
+  source: stageSourceSchema.prefault({}),
+  ground: stageGroundSchema.prefault({}),
   /** Ceiling and the architecture around the walk — see `stageRoomSchema`. */
-  room: stageRoomSchema.default({}),
+  room: stageRoomSchema.prefault({}),
   /** Thread and clips — see `stageSuspensionSchema`. */
-  suspension: stageSuspensionSchema.default({}),
+  suspension: stageSuspensionSchema.prefault({}),
   /**
    * The print — bloom, vignette, grain.
    *
@@ -300,7 +300,7 @@ export const stageSchema = z.object({
    * behaviour: a stage silently losing its grade would be worse than a
    * missing-module error that names the package.
    */
-  grade: stageGradeSchema.default({}),
+  grade: stageGradeSchema.prefault({}),
 })
 
 export type StageConfig = z.infer<typeof stageSchema>

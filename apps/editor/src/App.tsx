@@ -36,6 +36,7 @@ import { CoachMark, HandleAnchor, coachMarkUsed } from './chrome/CoachMark'
 import { CameraRig, ViewCluster } from './chrome/ViewCluster'
 import { CaptureRig, type CaptureHandle } from './chrome/CaptureRig'
 import { SmallScreen } from './chrome/SmallScreen'
+import { SITE } from './chrome/site'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
@@ -247,6 +248,32 @@ export function App() {
           </button>
         )}
         <div className="spacer" />
+        {/*
+          The one surface of this product the editor cannot show you.
+
+          /hands shipped as a real route and for weeks nothing pointed at it,
+          which made it a URL you had to already know. It is here rather than
+          in a menu because the whole problem was that nobody knew the feature
+          existed — a thing you have to open a dropdown to discover is a thing
+          you discover second.
+
+          A new tab on purpose: this is somewhere you go and come back from,
+          and the return trip through a cold three.js boot is worse than the
+          tab. The sculpt survives either way (see state/session.ts), so the
+          tab is for the reload, not for the work.
+        */}
+        <a
+          className="hands-link"
+          href={`${SITE}hands/`}
+          target="_blank"
+          rel="noopener"
+          title="Handle the paper with your webcam — pinch to take hold, point to score a line, blow at it to raise the wind"
+        >
+          Use your hands{' '}
+          <span className="hands-arrow" aria-hidden="true">
+            ↗
+          </span>
+        </a>
         {mode === 'paper' && (
           <button
             type="button"

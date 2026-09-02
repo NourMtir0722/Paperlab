@@ -36,7 +36,7 @@ export interface Deformer<O = Record<string, unknown>> {
   id: string
   label: string
   defaults: O
-  optionsSchema: z.ZodType<O, z.ZodTypeDef, unknown>
+  optionsSchema: z.ZodType<O, unknown>
   /** Mutate `out` (sheet-local space; flat sheet is the XY plane facing +Z). */
   displace(out: THREE.Vector3, uv: THREE.Vector2, o: O, ctx: DeformerContext): void
   /** GPU path — arrives with field mode. */

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SITE } from './site'
 
 /**
  * What a phone gets instead of the editor.
@@ -34,9 +35,6 @@ import { useState } from 'react'
  * one, and rotating a tablet into landscape reveals the editor with no code
  * involved at all.
  */
-
-/** Sibling apps, from this one's base path — `/editor/` in production, `/` in dev. */
-const SITE = import.meta.env.BASE_URL.replace(/editor\/?$/, '')
 
 export function SmallScreen() {
   const [dismissed, setDismissed] = useState(false)

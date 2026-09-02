@@ -43,6 +43,22 @@ describe('describeSchema', () => {
     expect(row(rows, 'edges')).toMatchObject({ type: 'list', fallback: "['bottom']" })
     expect(row(rows, 'state')).toMatchObject({ type: 'object', fallback: '{}' })
   })
+
+  it('reads a .prefault() field as the object it wraps', () => {
+    // The library's nested schemas are all `.prefault({})` under zod 4, so a
+    // walk that only knows `.default()` documents each of them as an opaque
+    // 'value' with no keys and no fallback.
+    const rows = describeSchema(
+      z.object({
+        path: z.object({ closed: z.boolean().default(false), seed: z.number().default(1) }).prefault({}),
+      }),
+    )
+    expect(row(rows, 'path')).toMatchObject({
+      type: 'object',
+      options: ['closed', 'seed'],
+      fallback: '{}',
+    })
+  })
 })
 
 /**
