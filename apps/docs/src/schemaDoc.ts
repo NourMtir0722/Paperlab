@@ -67,7 +67,10 @@ function rangeOf(num: z.ZodNumber): string | undefined {
 function defaultOf(field: z.ZodType): string | undefined {
   let f = field
   while (f instanceof z.ZodOptional) f = f.unwrap() as z.ZodType
-  if (!(f instanceof z.ZodDefault)) return undefined
+  // Both wrappers store the value the same way (`def.defaultValue`); they
+  // differ only in whether it is parsed on the way through, which is not
+  // something a docs table can show.
+  if (!(f instanceof z.ZodDefault || f instanceof z.ZodPrefault)) return undefined
   try {
     // zod 3 kept this behind a thunk (`defaultValue()`); zod 4 stores the
     // value itself. Calling it here would throw on every field and this
@@ -93,7 +96,9 @@ function render(value: unknown): string {
 
 function unwrap(field: z.ZodType): z.ZodType {
   let f = field
-  while (f instanceof z.ZodDefault || f instanceof z.ZodOptional) {
+  // `.prefault()` too — see the editor walker's note. Same wrapper, and this
+  // is its read-only twin.
+  while (f instanceof z.ZodDefault || f instanceof z.ZodPrefault || f instanceof z.ZodOptional) {
     f = f.unwrap() as z.ZodType
   }
   return f

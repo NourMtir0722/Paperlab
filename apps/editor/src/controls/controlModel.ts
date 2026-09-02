@@ -407,7 +407,12 @@ function isNumberTuple(tuple: z.ZodTuple): boolean {
 
 function unwrap(field: z.ZodType): z.ZodType {
   let f = field
-  while (f instanceof z.ZodDefault || f instanceof z.ZodOptional) {
+  // `.prefault()` belongs here as much as `.default()` does. It is zod 4's
+  // name for the behaviour zod 3's `.default()` had, so the sixteen nested
+  // schemas this repo moved onto it are wrappers this walk has to see
+  // through — miss it and every one of them stops being a ZodObject here,
+  // which is the stage inspector's folders and the walk layout's path.
+  while (f instanceof z.ZodDefault || f instanceof z.ZodPrefault || f instanceof z.ZodOptional) {
     f = f.unwrap() as z.ZodType
   }
   return f

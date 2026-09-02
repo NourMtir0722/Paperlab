@@ -96,6 +96,31 @@ describe('schemaControls', () => {
     expect(edits).toEqual([['figure', { height: 2, visible: true }]])
   })
 
+  it('sees through .prefault() to the nested object, the way it does through .default()', () => {
+    // Every nested schema in the library is `.prefault({})` since zod 4 —
+    // that is what zod 3's `.default({})` meant. The walk has to unwrap it
+    // or the stage inspector loses a folder per prefaulted field, with a
+    // green typecheck and no error anywhere.
+    const schema = z.object({
+      figure: z
+        .object({ height: z.number().min(1).max(3).default(1.7), visible: z.boolean().default(true) })
+        .prefault({}),
+    })
+    const edits: [string, unknown][] = []
+    const controls = schemaControls(schema, { figure: { height: 1.7, visible: true } }, (k, v) =>
+      edits.push([k, v]),
+    )
+
+    const figure = byKey(controls, 'figure')
+    if (figure.kind !== 'folder') throw new Error('expected folder')
+
+    const height = byKey(figure.children, 'height')
+    if (height.kind !== 'number') throw new Error('expected number')
+    expect(height.min).toBe(1)
+    height.onChange(2)
+    expect(edits).toEqual([['figure', { height: 2, visible: true }]])
+  })
+
   it('keeps duplicate leaf names apart in sibling folders (the leva flatten bug this model retires)', () => {
     // A stage whose shot and figure both carry `height` used to lose one
     // silently — the tree keeps hierarchy, so both survive.
