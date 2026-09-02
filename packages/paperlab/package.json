@@ -54,7 +54,7 @@
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "three-custom-shader-material": "^6.4.0",
-    "zod": "^3.24.0"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
