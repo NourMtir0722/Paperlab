@@ -25,11 +25,11 @@ export interface ParamDoc {
   fallback?: string
 }
 
-export function describeSchema(schema: z.ZodTypeAny): ParamDoc[] {
+export function describeSchema(schema: z.ZodType): ParamDoc[] {
   if (!(schema instanceof z.ZodObject)) return []
   const rows: ParamDoc[] = []
 
-  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
+  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodType>)) {
     // `type` is the discriminator a preset needs, not a parameter anyone tunes.
     if (key === 'type') continue
     const fallback = defaultOf(field)
@@ -44,7 +44,7 @@ export function describeSchema(schema: z.ZodTypeAny): ParamDoc[] {
     } else if (inner instanceof z.ZodString) {
       rows.push({ key, type: 'text', fallback })
     } else if (inner instanceof z.ZodTuple) {
-      const items = inner._def.items as z.ZodTypeAny[]
+      const items = inner.def.items as z.ZodType[]
       rows.push({ key, type: `vector (${items.length})`, fallback })
     } else if (inner instanceof z.ZodArray) {
       rows.push({ key, type: 'list', fallback })
@@ -64,12 +64,18 @@ function rangeOf(num: z.ZodNumber): string | undefined {
   return `${min ?? '−∞'} – ${max ?? '∞'}`
 }
 
-function defaultOf(field: z.ZodTypeAny): string | undefined {
+function defaultOf(field: z.ZodType): string | undefined {
   let f = field
-  while (f instanceof z.ZodOptional) f = f.unwrap()
-  if (!(f instanceof z.ZodDefault)) return undefined
+  while (f instanceof z.ZodOptional) f = f.unwrap() as z.ZodType
+  // Both wrappers store the value the same way (`def.defaultValue`); they
+  // differ only in whether it is parsed on the way through, which is not
+  // something a docs table can show.
+  if (!(f instanceof z.ZodDefault || f instanceof z.ZodPrefault)) return undefined
   try {
-    return render(f._def.defaultValue())
+    // zod 3 kept this behind a thunk (`defaultValue()`); zod 4 stores the
+    // value itself. Calling it here would throw on every field and this
+    // whole column would quietly render empty.
+    return render(f.def.defaultValue)
   } catch {
     return undefined
   }
@@ -88,15 +94,27 @@ function render(value: unknown): string {
   return String(value)
 }
 
-function unwrap(field: z.ZodTypeAny): z.ZodTypeAny {
+function unwrap(field: z.ZodType): z.ZodType {
   let f = field
-  while (f instanceof z.ZodDefault || f instanceof z.ZodOptional) {
-    f = f instanceof z.ZodDefault ? f._def.innerType : f.unwrap()
+  // `.prefault()` too — see the editor walker's note. Same wrapper, and this
+  // is its read-only twin.
+  while (f instanceof z.ZodDefault || f instanceof z.ZodPrefault || f instanceof z.ZodOptional) {
+    f = f.unwrap() as z.ZodType
   }
   return f
 }
 
+/**
+ * A bound, off zod 4's accessor rather than out of `_def.checks`.
+ *
+ * The old walk type-checked clean against zod 4 and returned `undefined` for
+ * every bound, which would have published a reference with the range column
+ * blank on every numeric parameter.
+ */
 function checkValue(num: z.ZodNumber, kind: 'min' | 'max'): number | undefined {
-  const check = num._def.checks.find((c) => c.kind === kind)
-  return check && 'value' in check ? (check.value as number) : undefined
+  const bound = kind === 'min' ? num.minValue : num.maxValue
+  // An UNBOUNDED number reads ±Infinity here, where zod 3's empty check list
+  // read as absent. `?? undefined` does not catch it — Infinity is not
+  // nullish — and an Infinity reaching a slider is a track with no ends.
+  return Number.isFinite(bound) ? (bound as number) : undefined
 }

@@ -31,7 +31,7 @@ export interface Layout<O = Record<string, unknown>> {
   id: string
   label: string
   defaults: O
-  optionsSchema: z.ZodType<O, z.ZodTypeDef, unknown>
+  optionsSchema: z.ZodType<O, unknown>
   /**
    * `sheet` is the field's paper size. Layouts that arrange by CONTACT —
    * edges meeting, sheets resting on each other — cannot work without it,
@@ -430,7 +430,7 @@ export const rack: Layout<z.infer<typeof rackSchema>> = {
 
 const colonnadeSchema = z.object({
   /** The walk the colonnade is built along — see `stage/path`. */
-  path: walkPathSchema.default({}),
+  path: walkPathSchema.prefault({}),
   /** Half-width of the clear aisle: how far each banner stands off the walk line. */
   aisle: z.number().min(0.2).max(20).default(2.4),
   /** How much that gap opens and closes along the walk. Nothing hung by hand is a corridor. */

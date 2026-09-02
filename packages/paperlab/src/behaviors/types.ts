@@ -22,7 +22,7 @@ export interface Behavior<O = AnyOptions> {
   id: string
   label: string
   defaults: O
-  optionsSchema: z.ZodType<O, z.ZodTypeDef, unknown>
+  optionsSchema: z.ZodType<O, unknown>
   /** Expand human params to the underlying deformer stack. */
   stack(o: O, sheet: SheetDims): DeformerInstance[]
   /** Transient, time-varying option overrides (idle motion). Never persisted. */
