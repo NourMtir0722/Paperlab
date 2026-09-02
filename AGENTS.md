@@ -559,7 +559,7 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:drive` | the editor | the stage really walks when you drag, wheel or arrow it. **CI gate** |
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
-| `pnpm test:hands` | `/hands` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you |
+| `pnpm test:hands` | `/hands` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you. **Own workflow**, not the `ci` gate — see below |
 | `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground, and its nav names every route `pages.yml` deploys. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
 | `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
@@ -572,6 +572,16 @@ without either for its first weeks, deployed and unreachable, which is why
 signpost does not name one. It is never a redirect TARGET: it wants a camera
 and two model files before it does anything, so it is somewhere you choose to
 go, not somewhere you are sent.
+
+**It has CI, and deliberately not the required kind.** `.github/workflows/hands.yml`
+runs `pnpm test:hands` on the paths that can break it — the harness, the page,
+the vite wiring, and `packages/paperlab/src/**`, because every gesture lands on
+a library feature and a change to the cloth sim is exactly what breaks one
+silently — plus weekly, to catch a MediaPipe or model revision that no commit
+here caused. It is NOT in `protect-main`'s required checks: the harness fetches
+its weights from Google, and a required gate would let someone else's CDN block
+every unrelated PR in the repo. A failure is a red X somebody reads, not a veto.
+Adding `hands` to the ruleset is all it would take to change that.
 
 **Run `pnpm hands:setup` before the page will start.** The tracker's wasm is
 served from our own origin — it is executable code in a page holding a camera

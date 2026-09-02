@@ -244,7 +244,7 @@ pnpm knip           # dead code and unused exports
 pnpm build
 ```
 
-Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All of them but `test:hands` are CI gates, along with `publint` and `are-the-types-wrong` on the published package — `test:hands` fetches its models from Google, so it is run by hand rather than made to speak for someone else's uptime.
+Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All of them but `test:hands` are CI gates, along with `publint` and `are-the-types-wrong` on the published package. `test:hands` runs in [its own workflow](.github/workflows/hands.yml) instead — on the paths that can break it, and weekly — because it fetches its models from Google and a required gate would let someone else's CDN block every unrelated PR. A red X you have to read, rather than a veto.
 
 ### Measurement
 
