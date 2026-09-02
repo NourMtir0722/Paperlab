@@ -1,0 +1,90 @@
+name: Hands
+
+# `/hands` is a shipped route with a link to it from the editor's topbar, and
+# until now the only thing standing between a regression and the live site was
+# somebody remembering to run `pnpm test:hands` by hand.
+#
+# It is NOT part of the required `ci` check, and that is the whole design.
+# The harness fetches its model weights from storage.googleapis.com — Google
+# publishes no licence for them, so we link rather than host (see AGENTS.md) —
+# which means a required gate here would block every unrelated PR in the repo
+# on someone else's CDN having a good afternoon. A separate workflow gets the
+# signal without handing them a veto: a failure shows as a red X on the PR,
+# a human reads it, and the merge button still works.
+#
+# To make it blocking later, add "hands" to the required checks in the
+# `protect-main` ruleset. Nothing here needs to change for that.
+#
+# The two path lists below are identical and are written out twice on purpose:
+# GitHub Actions does not support YAML anchors, so `&x` / `*x` parses fine in
+# every local linter and then silently fails to mean anything here.
+
+on:
+  pull_request:
+    paths:
+      # The page and its gesture vocabulary.
+      - 'apps/editor/src/harness/**'
+      - 'apps/editor/hands/**'
+      # How it is served and built — the wasm middleware lives here.
+      - 'apps/editor/vite.config.ts'
+      # The harness itself, and the vendoring step it depends on.
+      - 'tools/hands-check.mjs'
+      - 'tools/hands-assets.mjs'
+      - 'tools/harness.mjs'
+      # Every gesture lands on a library feature. A change to the cloth sim,
+      # a deformer or the schema is exactly what breaks a gesture silently,
+      # so those changes are the ones most worth running this on.
+      - 'packages/paperlab/src/**'
+      - '.github/workflows/hands.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/editor/src/harness/**'
+      - 'apps/editor/hands/**'
+      - 'apps/editor/vite.config.ts'
+      - 'tools/hands-check.mjs'
+      - 'tools/hands-assets.mjs'
+      - 'tools/harness.mjs'
+      - 'packages/paperlab/src/**'
+      - '.github/workflows/hands.yml'
+  # Google ships new model revisions and MediaPipe ships new releases on their
+  # own schedule, neither of which touches this repo. Monday morning catches
+  # that drift before a visitor does.
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: hands-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hands:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Scripted hands, not a webcam: `__HANDS__.drive()` takes a timestamp so
+      # the gestures can be driven frame-exact. The camera is still started
+      # once for real, against Chromium's fake device, because that is the only
+      # way the assertions about WHERE the wasm and the models come from mean
+      # anything. `hands:setup` runs inside the harness, so it is not a step.
+      - name: Gestures reach the paper
+        run: pnpm test:hands

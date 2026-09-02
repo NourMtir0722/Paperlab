@@ -28,6 +28,32 @@ import { rendererArgs, startApp } from './harness.mjs'
 import { ensureHandsAssets } from './hands-assets.mjs'
 
 const PORT = 5187
+/**
+ * How long to wait for the cloth to stop moving.
+ *
+ * This is a WALL-CLOCK number guarding a FRAME-DRIVEN simulation, which is
+ * the whole reason it needs saying out loud. The sheet comes to rest after
+ * roughly the same number of steps everywhere; how long that takes is
+ * whatever the machine's renderer can manage. This harness has run in a
+ * 65-second pass on a laptop and an 11-minute one under `--soft` on the same
+ * laptop — same SwiftShader, ten times the wall clock — and a CI runner sits
+ * somewhere in between. 30 seconds was enough for the first and not the
+ * second, which is not a fact about the sim.
+ *
+ * So it is generous on purpose. Nothing waits the full duration when the
+ * sheet settles promptly; the number only costs anything on the run that was
+ * going to fail anyway, and the job's own timeout is the real backstop.
+ */
+const SETTLE_MS = 150_000
+/**
+ * How long to let a gesture's CONSEQUENCE arrive before calling it absent.
+ *
+ * Shorter than SETTLE_MS on purpose: this is not waiting for a sheet to fall
+ * quiet, it is waiting for a rebuild or a throw that a working page does in a
+ * handful of frames. If one has not landed in half a minute it is broken, not
+ * slow, and the check should say so.
+ */
+const CATCH_UP_MS = 30_000
 /** Wind off: something is trying to measure a drag, and wind is noise. */
 const URL_PATH = '/hands/?wind=0'
 const ASPECT = 4 / 3
@@ -236,22 +262,63 @@ try {
    * settles is the sim's own motion wearing the result's clothes — and the
    * edge scan further down needs a sheet that is where it is going to stay.
    */
-  const settle = () =>
-    page.waitForFunction(
-      () => {
-        const now = window.__HANDS__.vertices()
-        const before = window.__SETTLE__
-        window.__SETTLE__ = now
-        if (!before || before.length !== now.length) return false
-        let max = 0
-        for (let i = 0; i < now.length; i++) max = Math.max(max, Math.abs(now[i] - before[i]))
-        return max < 1e-4
-      },
-      null,
-      { timeout: 30_000, polling: 250 },
-    )
+  const settle = async () => {
+    try {
+      await page.waitForFunction(
+        () => {
+          const now = window.__HANDS__.vertices()
+          const before = window.__SETTLE__
+          window.__SETTLE__ = now
+          if (!before || before.length !== now.length) return false
+          let max = 0
+          for (let i = 0; i < now.length; i++) max = Math.max(max, Math.abs(now[i] - before[i]))
+          window.__SETTLE_MAX__ = max
+          return max < 1e-4
+        },
+        null,
+        { timeout: SETTLE_MS, polling: 250 },
+      )
+    } catch {
+      // A bare Playwright TimeoutError names the line and nothing else, which
+      // on a machine you cannot attach a debugger to is one round trip per
+      // question. Say how close it got instead: a max still far above the
+      // threshold means the sheet is genuinely in motion, and a max hovering
+      // just above it means this wait is short rather than the sim broken.
+      const max = await page.evaluate(() => window.__SETTLE_MAX__ ?? Number.NaN)
+      throw new Error(
+        `the sheet never came to rest: still moving ${max.toExponential(2)} per poll after ` +
+          `${SETTLE_MS / 1000}s (needs < 1e-4). Slower hardware needs longer — raise SETTLE_MS.`,
+      )
+    }
+  }
 
   await settle()
+
+  /**
+   * Read until the reading is the one being waited for, then return it.
+   *
+   * This replaces `waitForTimeout(n)` immediately followed by a measurement.
+   * Those numbers were wall-clock stand-ins for "the sim has caught up", and
+   * they were tuned by watching one machine: the sheet needs a number of
+   * FRAMES to rebuild at a new size or to fall off its pins, and how long
+   * those take is the renderer's business. A CI runner got 160 ms of a slower
+   * clock, measured a sheet that had not moved yet, and reported three
+   * unrelated gestures as broken while the gesture layer was reading them
+   * perfectly — the resize even computed its 1.64x correctly.
+   *
+   * It does NOT weaken anything. The deadline is a ceiling, not a pass: a
+   * thing that never happens still fails, and the last reading is returned
+   * either way so the check prints the number it actually saw.
+   */
+  const until = async (read, done, ms = CATCH_UP_MS) => {
+    const deadline = Date.now() + ms
+    let value = await read()
+    while (!done(value) && Date.now() < deadline) {
+      await page.waitForTimeout(100)
+      value = await read()
+    }
+    return value
+  }
 
   /** Sweep FROM → TO holding one pose, returning how far the sheet moved. */
   const sweep = async (pose) => {
@@ -550,9 +617,10 @@ try {
     for (let i = 0; i < 80; i++) last = window.__HANDS__.drive(null, a, { pucker: 1 })
     return last.wind
   }, ASPECT)
-  await page.waitForTimeout(900)
-  const blownShape = await vertices()
-  const blown = moved(stillShape, blownShape)
+  const blown = await until(
+    async () => moved(stillShape, await vertices()),
+    (distance) => distance > 0.02,
+  )
   const calmed = await page.evaluate((a) => {
     let last
     for (let i = 0; i < 80; i++) last = window.__HANDS__.drive(null, a, null)
@@ -611,8 +679,11 @@ try {
   // span, then three at the new width — one rebuild, not twelve.
   await spread(0.3, 5, false)
   const grown = await spread(0.6, 3, false)
-  await page.waitForTimeout(160)
-  const resized = await extent()
+  // Both halves of what `resized` is asked to prove, or this returns the
+  // instant the sheet is WIDE and hands the drape check a sheet that has not
+  // re-draped yet — which is how the first version of this reported the sim
+  // snapping flat on CI while it was merely mid-rebuild.
+  const resized = await until(extent, (e) => e.x > draped.x * 1.4 && e.z > draped.z * grown.scale * 0.5)
   await release()
 
   // ── Resize, as a shape. The case that was always free. ───────────────────
@@ -625,8 +696,7 @@ try {
   const crushedBig = await extent()
   await spread(0.6, 5, false)
   const shrunk = await spread(0.3, 3, false)
-  await page.waitForTimeout(300)
-  const crushedSmall = await extent()
+  const crushedSmall = await until(extent, (e) => e.x < crushedBig.x * 0.75)
   await release()
 
   // ── Peel. A pinch that lands on a CORNER curls it instead of dragging it. ─
@@ -675,8 +745,10 @@ try {
     },
     [POSES, ASPECT],
   )
-  await page.waitForTimeout(1400)
-  const flew = moved(hanging, await vertices())
+  const flew = await until(
+    async () => moved(hanging, await vertices()),
+    (distance) => distance > 0.3,
+  )
 
   // Sanity: the scripted hand really is on the two sides of the threshold,
   // and the gesture layer names each pose the way the unit tests say it does.
