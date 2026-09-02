@@ -99,10 +99,38 @@ console.log(failed ? `\n${failed} of ${cases.length} routes wrong` : `\nall ${ca
 // its own, which is what keeps it out of this.)
 const workflow = readFileSync(resolve(root, '.github/workflows/pages.yml'), 'utf8')
 const deployed = [...workflow.matchAll(/^\s*mkdir -p site\/(\S+)\s*$/gm)].map((m) => m[1])
-const linked = new Set([...html.matchAll(/<a href="\/([^"]*)"/g)].map((m) => m[1].replace(/\/$/, '')))
 
+/**
+ * The routes the signpost names — from the `<nav>` ONLY.
+ *
+ * Scanning the whole page would let any anchor anywhere satisfy this, and
+ * "there is an `<a>` somewhere in the file" is not the claim. The claim is
+ * that a visitor who lands on the root with the redirect not running sees a
+ * way to every route, and that is the nav or it is nothing.
+ *
+ * Returns null when there is no nav at all, which is its own failure.
+ */
+function navLinks(page) {
+  const nav = page.match(/<nav\b[^>]*>([\s\S]*?)<\/nav>/i)?.[1]
+  if (nav === undefined) return null
+  return new Set([...nav.matchAll(/<a href="\/([^"]*)"/g)].map((m) => m[1].replace(/\/$/, '')))
+}
+
+// The scoping above, asserted rather than trusted: a link outside the nav
+// must not count as a signpost.
+const decoy = navLinks('<a href="/hands/">not the nav</a><nav><a href="/editor/">e</a></nav>')
+if (decoy?.has('hands') !== false) {
+  console.error('\nthe link scan is not scoped to the <nav> — an anchor anywhere would satisfy it')
+  process.exit(1)
+}
+
+const linked = navLinks(html)
 if (deployed.length === 0) {
   console.error('\nno routes found in pages.yml — has the site assembly moved?')
+  process.exit(1)
+}
+if (linked === null) {
+  console.error('\nsite-root.html has no <nav> — nothing without JS can reach any route')
   process.exit(1)
 }
 

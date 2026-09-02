@@ -91,6 +91,27 @@ code {
   border-radius: 4px;
 }
 
+/*
+  The first links in the body copy. The rail had its own rule and the prose
+  had none, so an <a> here inherited the browser's blue — one hue past the
+  whole chroma budget, in the one app whose job is to look composed.
+
+  Hierarchy is a step, never a hue (see the ink ladder above), so a link is
+  simply the next step up out of the sentence it sits in, and the underline
+  is a hairline rather than a full-strength rule.
+*/
+main a {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--hair-2);
+  text-underline-offset: 3px;
+}
+
+main a:hover {
+  color: var(--ink);
+  text-decoration-color: var(--ink-faint);
+}
+
 .app {
   display: grid;
   grid-template-columns: 216px minmax(0, 1fr);
@@ -180,27 +201,6 @@ code {
 main {
   padding: 56px 0 120px;
   min-width: 0;
-}
-
-/*
-  The first links in the body copy. The rail had its own rule and the prose
-  had none, so an <a> here inherited the browser's blue — one hue past the
-  whole chroma budget, in the one app whose job is to look composed.
-
-  Hierarchy is a step, never a hue (see the ink ladder above), so a link is
-  simply the next step up out of the sentence it sits in, and the underline
-  is a hairline rather than a full-strength rule.
-*/
-main a {
-  color: var(--ink-2);
-  text-decoration: underline;
-  text-decoration-color: var(--hair-2);
-  text-underline-offset: 3px;
-}
-
-main a:hover {
-  color: var(--ink);
-  text-decoration-color: var(--ink-faint);
 }
 
 section {
