@@ -1,5 +1,276 @@
 # paperlab
 
+## 0.6.0
+
+### Minor Changes
+
+- 06ff0ad: A simulation and a shape are no longer alternatives. Cloth hosts a deformer stack.
+  
+  `physics: 'cloth'` and `behavior` / `deformers` used to be mutually exclusive, rejected by the schema with *the sim owns the vertices*. It was the largest single constraint in the library. Twelve behaviors ship and exactly one of them — `crumple` — could be reached from a sheet anyone could touch, and only by swapping the simulation out first: the drape the sim had spent a second building was thrown away, and the crush started from a flat sheet. Everything about holding a piece of paper and then doing something to it was out of reach, because holding it and doing something to it were different modes.
+  
+  They compose now. The sim writes the vertices and the stack runs over what it wrote:
+  
+  ```tsx
+  // Fold the sheet that is hanging there, while it hangs there.
+  <Paper
+    physics={{ type: 'cloth', pins: 'top-corners', wind: 0.3 }}
+    deformers={[{ type: 'fold', options: { angle: 90, offset: 0.2, foldAngle: 120 } }]}
+    interactive
+  />
+  ```
+  
+  The change is smaller than the constraint it lifts, which is the good news and was also the reason to look: **a deformer is a pure map from a point to a point.** It never asked where its input came from. `applyDeformerStack` already took the base array to start from, so handing it the simulation's live particles instead of the flat rest pose is the whole of the composition. What made this an invariant rather than an omission was three copies of the same early return — in the schema, in `buildStack`, and in `withMemory` — and one of those had already left a note anticipating the day it stopped being the only reader.
+  
+  Four things had to move with it:
+  
+  - **The grab has to speak in rendered space.** A pointer hits the sheet you can see, and with a shape running over the simulation that is not where the particles are. It now finds the nearest RENDERED vertex — which is the particle of the same index, because a deformer maps points and never reorders them — and carries the displacement at the moment of the grab as a constant offset. Exact when the grab lands, and honest as the deformation changes under it. Unchanged when nothing is deforming the sheet, where the offset is zero.
+  - **The cloth grid honours the stack's floor.** `fold` needs 48 segments to bend through rather than crease along. A shape running over a simulation is no less entitled to the grid it needs than one running over a flat sheet — still capped, because every particle is a constraint solve five times a frame.
+  - **A rebuild keeps the simulation's state.** A stack arriving over a sheet rebuilds the mesh without touching anything the physics knows, so `ClothSim.adopt` carries the particles across. Otherwise the sheet snapped flat at the exact moment you tried to fold the one you were holding.
+  - **`memory.creases` now bends a cloth sheet, not only shades it.** A crease was always meant to be read by the geometry and the shading both; on a simulated sheet only the shading ran, because the geometry half needed a deformer stack the sheet was not allowed to have. Paper remembers a fold whether or not it is being simulated.
+  
+  **`strip` stays exclusive, and not out of caution.** Cloth simulates the sheet's OWN grid, so a deformer's uv means on the sim what it means everywhere else. A strip is a 2×N ribbon whose rows are chain nodes: its uv runs along a length of paper that is partly wound on a roll, so a fold placed by uv would land somewhere the sheet is not. The schema says so in those terms now.
+  
+  **The GPU path is unaffected**, which is worth stating because it is the first question the parity gate raises. Deformers run on the GPU in field mode, and a field has no simulation in it — cloth is hero-path only. All 37 parity cases compare the same JS and GLSL twins over the same flat input they always did.
+  
+  One limit to know about: `fold` places its hinge by POSITION, not by uv, so over a draped sheet it folds along a line in space rather than along a line in the material. On a sheet that is roughly planar — which is most of what cloth does — those are the same line. On a deeply crumpled one they are not.
+- 06ff0ad: Creases are lit rather than painted, every surface effect is measured on the sheet instead of in UV, and the cloth learns what a hand and a gust of air actually do to paper.
+  
+  Five things that were done cheaply, found by looking hard at the `/hands` harness — where a camera can score a line at any angle, resize the sheet with two palms, blow at it and throw it, and so puts every one of these assumptions somewhere the built-in presets never did.
+  
+  **A crease had no shape.** `plCrease` multiplied a grey band into the albedo and added a fixed white sheen beside it. The mark therefore looked identical from every angle, under every lighting rig, and whichever way the paper had been folded — which is the one thing a crease is not, because a crease is two facets meeting at a line and swinging the sheet flips it from a dark line to a bright one. The effects now describe a HEIGHT and `MeshStandardMaterial` lights it, through `csm_FragNormal` and Mikkelsen's surface-gradient bump. One deliberate difference from three's own `perturbNormalArb`: three normalises the screen-space position derivatives, which keeps a bump map looking the same at any scale and is right for a texture. This is a real depth in world units, so the raw derivatives stay and the slope is a true one. Analytic height plus screen derivatives also anti-aliases itself — a crease shrinking below a pixel fades instead of crawling.
+  
+  The sign survives too. A fold toward the camera leaves paper concave from the front, so it draws as a valley, and the same crease from behind draws as the ridge it is. `CreaseShading.strength` is signed now; unsigned, a mountain and a valley were the identical smudge.
+  
+  **Every effect measured in UV.** UV divides the sheet's aspect out, so a 1.2 × 1.5 sheet is a unit square as far as the shader is concerned. Fibre came out stretched, a torn edge bit deeper into the short edge than the long one, and a crease scored at 45° rendered at 51°. All three also changed when the sheet was resized, which made the paper's own material a function of how big a piece you had cut. Grain belongs to the stock and a crease is a broken fibre; neither knows the size of the sheet. Everything now measures through `plLocal()`, in the sheet's own space.
+  
+  That let the crease shading and the crease GEOMETRY finally agree. `CreaseShading` carries the fold's own `{ angle, offset }` rather than a translation of them, so the shader evaluates the identical `dot(p, dir) - offset` the `fold` deformer displaces by, and the two cannot place a line differently. The shaded width comes off `CREASE_RADIUS` instead of a UV constant that agreed with it at exactly one sheet size — the mesh carries the wide hinge, the shader carries the burnished line inside it, and they add up.
+  
+  **A grab held one particle.** That is a pin, not a pinch: the sheet came to a point under the cursor and hung off the singularity. `ClothSim` now takes a patch about a centimetre across, measured across the grid so a fold that brings a far corner near the fingers cannot silently join the grip, with a smoothstep falloff — the centre held, the rim free, everything between partly both. The constraint solver's 0/1/2 weights became a real inverse mass, which reproduces them exactly for the two cases they could express and covers the rest.
+  
+  **Letting go stopped the paper dead.** A verlet particle's velocity IS the gap between its position and its last one, and the grab overwrote that gap every substep. So a sheet whipped across the frame and released came to a standstill and dropped straight down. The hand's speed is measured per second — a frame is not a fixed length and a substep is — and spent on release.
+  
+  **Wind was a uniform shove along +z.** Every particle got the same push whichever way its patch of paper was facing, so a sheet edge-on to the wind bellied out as hard as one square to it, a folded flap was pushed the same way as the face it was folded behind, and nothing ever turned into the wind. The force on a thin surface is the air it intercepts: the relative wind along the surface normal, pushed back out along that normal. Relative earns its keep twice — a sheet already travelling with the wind stops being pushed, so a blown sheet settles at a speed instead of accelerating away; and with no wind at all the same expression is air RESISTANCE, which the sim had none of. Paper's whole character in air is that it does not fall like a stone, and it does not because a sheet falling face-down catches what it is falling through while one falling edge-down knifes past it. That fell out for free.
+  
+  A small turbulent residue stays isotropic, because zero would be the textbook answer and the wrong one: a sheet lying exactly along the wind would stall in it forever, the one thing that could break the symmetry being the wind it is not feeling.
+  
+  **Unchanged:** the GPU field path, which composes its own shader and has no simulation in it — all 37 parity cases still compare the same twins. `ClothSim` is internal; `grab`, `moveGrab` and `release` keep their signatures.
+- b6b7502: New `strip` physics: a roll paying paper out as the page scrolls, and the pile it makes when it lands.
+  
+  `unroll` and the `paper-roll` preset draw a roll with a deformer stack, and for paper that never reaches the ground that is still the cheaper and better answer. This is the half geometry cannot reach. A deformer bends a sheet along a curve you have already chosen; it cannot discover that a strip under compression buckles at its weakest hinge, and it cannot let one fold land on the one beneath it. Both of those are what a pile IS, and the pile is the whole effect.
+  
+  ```tsx
+  const [scroll, setScroll] = useState(0)
+  useEffect(() => {
+    const onScroll = () => setScroll(window.scrollY / 120)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  
+  <Paper preset="toilet-roll" physics={{ type: 'strip', scroll }} />
+  ```
+  
+  `scroll` is a **monotonic world-unit number, not a 0..1 progress**. The sim differentiates it, so the absolute value never matters, a large `scrollY` on the first frame is read as an origin rather than as one enormous delta, and scrolling back up rewinds the roll — dragging the pile taut before it lifts.
+  
+  **The paper is grabbable.** With `interactive`, drag it and the roll turns —
+  driven by TENSION rather than by mapping hand travel to an angle. Paper does
+  not stretch, so if the hand is further from the roll than there is paper to
+  reach it, the only way to satisfy the constraint is for the roll to give up
+  more. That one rule gets the whole behaviour: a slow pull feeds smoothly, a
+  yank spins the roll and it keeps spinning after release, and pushing the paper
+  back toward the roll does nothing at all — slack does not rewind a roll, only
+  scrolling up does.
+  
+  What the simulation buys over the deformer:
+  
+  - **The roll shrinks as it empties**, by area conservation, down to `core`. `ΔL = R·Δθ` at the *current* radius, so a nearly-empty roll spins fast and gives up very little paper — which is how a roll reads as running out.
+  - **It buckles at the perforations.** Every joint wants to be straight; a joint at a perforation wants it far less, and may remember a fold. `crease` is the load-bearing number: low, the landed paper flops over in flat panels and runs away across the floor instead of folding back; high, the perforations hold and the pile accordions. Do not read a single number off this — see the note below on tuning a pile by worst case.
+  - **Folds stack instead of passing through**, via a spatial hash. Without self-collision the pile flattens into nothing.
+  - **Drag is broadside-only** — resistance along the segment normal, not along its length. At `drag: 0` every unit paid out becomes a unit straight down (a rope); at `drag: 1` the tip sits about two thirds of that and the strip sways as it falls.
+  
+  The roll is a flywheel driven by angular *impulse*, so `inertia` buys the coast after a flick and nothing else: how much paper a given scroll pays out is the same whether the roll coasts for a moment or half a second.
+  
+  **The roll stays on its holder, and the pile holds its own height.** Three
+  faults that only showed once the roll was run all the way down:
+  
+  - Paying out the last of the paper left nothing wound, so every node the roll
+    was made of became free paper — the entire roll dropped off its holder and
+    landed flat on top of its own pile. One wrap is now held back as a tube stub,
+    which is not a workaround but what a real roll does: the inner end is glued
+    to the cardboard. What is left on the holder is a cylinder at the core
+    radius, the closest a single sheet of geometry gets to drawing a tube.
+  - Self-collision ran once, after the constraint loop had finished — too late to
+    matter in a heap, because separating two folds moves them off their rest
+    lengths and with no iterations left to restore those the next substep pulled
+    them straight back through each other. It is interleaved with the last few
+    passes now: 217 interpenetrating pairs before, none after, and the heap keeps
+    half again as much height.
+  - Collision tested node against node, which cannot see two SEGMENTS crossing
+    with all four endpoints comfortably apart — and that is exactly how it
+    failed. Paper is thinner than the chain is finely cut (a layer gap of 0.027
+    against a node spacing of 0.037), so a collision sphere on each node left
+    gaps between the beads, another fold threaded straight through one, and once
+    through, the point test pushed it out the far side instead of back. It read
+    as a sheet edge buried inside another sheet. Collision now solves closest
+    approach between SEGMENTS, which has no gaps to thread; the hash cell is
+    sized to `segment + d` so a 3×3 neighbourhood is a complete search rather
+    than a hopeful one. On a full pile fed irregularly: zero crossings, and
+    nothing pressed closer than 0.8 of a sheet's thickness. It costs 0.83 ms a
+    frame against 0.37, still about a twentieth of a 60fps budget.
+  
+  **The roll's tessellation is set by the roll, not the pile.** The same nodes
+  that fold on the floor draw the spiral, and a wound turn is only as round as
+  the nodes spanning it. Five to a panel is plenty to buckle with and nowhere
+  near enough to wind with: it drew a full roll as a visible sixteen-sided
+  polygon, and its innermost turn with four nodes at 85° a step — coarse enough
+  that the chords cut clean through the wrap beneath and the spiral came apart
+  into a sawtooth. A chord of length `s` on a circle of radius `r` dips `s²/8r`
+  inside it, so a wrap is only safe while `r > s²/4t`; at the original spacing
+  that threshold sat above the core, which is exactly where it broke. The chain
+  is now cut sixteen to a panel, the spiral is floored at the radius it can
+  actually be drawn at whatever a caller configures, and the preset's core is a
+  real cardboard tube rather than a pinhole. Affordable because the chain is
+  one-dimensional: 198 nodes, 0.13 ms a frame, under a hundredth of a 60fps
+  budget.
+  
+  Bend stiffness and the broadside/along-length split are both measured over
+  fixed physical spans now rather than per-node, so raising the tessellation for
+  the roll's sake does not quietly turn every panel to cloth or change how much
+  the air resists a fall.
+  
+  Two deliberate limits. The chain simulates two dimensions — it hangs in y, folds in z, and keeps its full width in x with no twist, which is what keeps self-collision a cheap 2D query. And the node count is fixed: nodes are never spawned, only reclassified between "wound on the roll" (placed analytically on the spiral) and "free", so the vertex buffer never resizes, rewind is the same code path run backwards, and paper leaving the roll inherits its tangential velocity for free.
+  
+  New `toilet-roll` preset puts it together at the scale the library is actually viewed at: twenty-three panels of paper, wound so the outer radius lands at 0.61 of the panel width against a real roll's 0.57, over about nine visible turns. Worth knowing that `tightness` does double duty — a layer gap IS the paper's thickness, so it also sets how far apart self-collision holds two folds: wind tighter for a neater roll and the pile gets flatter, looser for a fatter pile and the roll coarsens.
+  
+  **New `scene.turn`, and the preset needs it to be visible at all.** Degrees the
+  whole composition is turned about its vertical axis, additive with the
+  `rotation` prop rather than overriding it. Every camera in the library is fixed
+  and head-on — `<Paper>` sits at `(0, 0.35, 2.4)` looking down -Z, and neither it
+  nor the editor fits a camera to its content. That is right for a sheet, which is
+  flat and faces you, and wrong for anything whose shape lives in DEPTH: the strip
+  folds in z by construction, so `<Paper preset="toilet-roll" />` framed the roll
+  end-on and the entire accordion edge-on, and rendered **a blank white column**.
+  The preset now asks for 25°. A camera field would have been the other way to fix
+  it and is worse — meaningless inside `<PaperField>` and `<PaperMesh>`, where the
+  caller owns the camera and a dozen papers may share it. Turning the paper works
+  everywhere, because it is a property of the paper.
+  
+  **The composition is centred in z as well as y, and the pile no longer walks out
+  of the shot.** Two faults that the preset's own tests could not see:
+  
+  - `centreOffset` lifted the composition in y and nothing centred it in depth,
+    but everything here is built around the DROP LINE — the z the paper leaves the
+    roll at — which starts at 0 on a full roll and travels back to
+    `core - outerRadius` as it empties. The pile builds around wherever that line
+    has been, so the composition was offset by half its travel before a fold had
+    landed. Centring that travel is a config constant, for the same reason the
+    y lift is: derived live it would slide the whole scene backwards as the roll
+    ran down, which reads far worse than sitting still slightly off centre.
+  - The shipped physics numbers spread the landed paper across 4.2 panel-widths
+    of floor at worst and threw it 1.37 units out in depth — it ran off the side
+    of the frame and kept going. `crease`, `stiffness`, `drag` and `floor` were
+    re-chosen together, and by WORST CASE: a pile is chaotic, and the same config
+    fed a slightly different scroll ramp lands 2.0 panel-widths wide or 4.2, so a
+    single trajectory is a sample and not a measurement. Scored over fifteen, the
+    new set holds 3.1 panel-widths and 1.27 units while keeping the pile's full
+    depth. Shortening the drop did most of it: a longer fall is more airtime for
+    the strip to pick a direction and glide, and it landed still travelling.
+  
+  Both preset tests were rewritten, because neither could fail on any of the
+  above: the framing test asserted on y and never looked at x or z, and "piles
+  there" wanted a height of 0.02 against a layer gap of 0.027 — one sheet lying
+  flat cleared it, so paper that spread across four panel-widths without ever
+  folding passed. They now run nine trajectories each and bound the spread.
+  
+  **New `maxStripLength(perforation)` export, and the editor controls that
+  needed it.** `stripNodeCount` is capped, and the cap does not fail loudly: past
+  it the node count stops growing, `segment` grows instead, every per-node
+  constant quietly changes meaning, and the roll comes apart into a starburst. A
+  length control has no other way to know where that is, so the derivation is
+  exported from where the constants live.
+  
+  It was needed because the editor's `height` slider ran `0.2–4` while three
+  presets shipped taller — `paper-roll` at 5, `paper-ribbon` at 6.4 and
+  `toilet-roll` at 14. Both edit paths clamp to the range, so the slider was not
+  merely mis-drawn: **the first touch collapsed a 14-unit roll to 4.** The ceiling
+  is now the strip's real limit where there is a strip (16.4 at the toilet roll's
+  spacing, itself clamped to the schema's own max of 20), 8 otherwise, and never
+  below the value being shown — a control whose range cannot contain its own value
+  destroys data, and a test now checks that against every built-in preset.
+  
+  `scene.turn` gets a row of its own, and the transport's status line no longer
+  calls a strip "Cloth simulation": it read `typeof physics === 'object'`, which
+  only ever meant cloth by having no rival, and it now names the gesture that
+  actually drives a roll.
+  
+  One limit worth stating: `turn` swaps the pile's depth for width, and width is
+  the axis a fixed camera has least of. At the measured worst-case depth the
+  budget runs out at 28°, which is why the preset asks for 25 rather than more.
+  A parent narrower than square still crops the pile's far edge — the honest limit
+  of a fixed camera, and the caller's answer is their own `rotation` prop.
+  Winding tighter would tidy the fine sawtooth on the roll's rim (the end face is
+  concentric rings with real gaps between them, so off head-on you see between
+  them), but it was tried and it throws the pile well outside the frame; framing
+  beats the rim, and the sawtooth is what a roll wound from one zero-thickness
+  ribbon costs.
+  
+  **Also fixed, and it would have bitten cloth eventually:** `PaperMesh` keyed its geometry and simulation off `JSON.stringify(config.physics)`. A simulation's config is live — `strip.scroll` is rewritten every frame by the host — so that key moved every frame, re-ran the segment probe, handed the geometry memo fresh array identities, rebuilt the geometry, and through it rebuilt the sim, throwing away everything it had integrated. A scroll-driven roll stayed pinned to its opening tail forever, sixty times a second. The key now carries only what the shape path can actually use: whether a simulation is present, and which one.
+  
+  The `media.html` dev harness gains `?grab=1` (to drive a real pointer gesture headless) and `?scroll=` (ramped over `?feed=` seconds), because `progress` cannot photograph a sim that has no progress param — only a scroll position it differentiates.
+- b6b7502: Fix the roll geometry: paper no longer passes through itself, and a roll now shrinks as it pays out.
+  
+  `roll` derived its circle's centre from the current radius, so every wrap was tangent to the sheet at the same point — a rosette of circles through one point rather than a spiral. The sheet intersected itself once per revolution, and because the error cancelled exactly at multiples of 2π it was invisible to both the golden vectors and the GPU parity gate. The centre is now fixed and only the radius varies, so the wraps are concentric and sit exactly one layer apart.
+  
+  The winding also runs the correct way round. Paper is dispensed off the outside of a roll, so the end you are holding has to be the outermost layer and the far end has to sit at the core; it used to be the other way round. Arc length is now preserved all the way in, not just on the first turn.
+  
+  **Breaking:** the `roll` deformer's `spiral` option (radius growth per radian) is replaced by `thickness` (the gap between consecutive wraps, in world units). `spiral` could not express a real roll and did nothing at all at whole turns. Serialized `.paper` configs that set `roll.spiral` need the key renamed; the value is a layer gap now, not a growth rate, so re-tune it by eye.
+  
+  `unroll` gains five options and its radius is now derived from how much paper is left rather than being a constant, so the roll visibly runs down toward its core:
+  
+  - `from` — `'bottom'` for a receipt feeding down, `'top'` for paper hanging below the roll.
+  - `core` — the tube the paper is wound onto. A third of the full radius is a real cardboard tube, and keeps the roll looking like a roll after it has been used down.
+  - `tail` — paper already hanging at `progress` 0. A roll on a holder always has a leaf out; starting from a bare cylinder reads as a roll still in its wrapper.
+  - `fixed` — hold the roll still in space and let the paper travel, rather than the other way round.
+  - `floor` — how far below the roll the paper lands. Paper that reaches the ground creases and runs out flat instead of hanging into the void, reusing the right-angle hinge `ribbon` already lands a strip with.
+  
+  New `paper-roll` preset puts all five together: bind `progress` to scroll and pay a roll out until it is a bare tube.
+  
+  The `media.html` dev harness gains `?look=x,y,z` so its camera can be aimed. Without it the camera only ever looked down -Z, which cannot photograph anything lying flat — pooled paper is edge-on to a level camera.
+- c68832a: Move to zod 4.
+  
+  `zod` is a runtime dependency of this package and its schemas are part of the
+  public API — `paperConfigSchema`, `sceneSchema`, `paperStatesSchema` and
+  `stageSchema` are all exported — so the major version is part of what Paperlab
+  promises. Anyone composing those schemas into their own zod 3 tree will need
+  to move too. Calling `.parse()` on them is unchanged in what it returns and what
+  it accepts — but zod 4 reshaped the error it throws, so anyone READING a
+  `ZodError` off these schemas rather than just letting it throw has a change to
+  make.
+  
+  The `.paper` file format does NOT change. Every built-in preset, every stage
+  preset and the empty-object case for all four exported schemas were parsed
+  under both versions and diffed: byte-identical, 1095 lines.
+  
+  That check was the point rather than a formality. zod 4 redefines `.default()`
+  to short-circuit — it hands back the literal value instead of parsing it — so
+  the sixteen `schema.default({})` calls that fill in nested defaults would have
+  silently started producing `{}`. They are `.prefault({})` now, which is the
+  old behaviour under its new name, and nothing about that is visible to a
+  typecheck.
+
+### Patch Changes
+
+- 06ff0ad: A cloth sheet no longer snaps flat when it is resized.
+  
+  `sheet.width` and `sheet.height` are a geometry dependency: changing them builds a new mesh, and with it a new `ClothSim`. A new sim starts flat — so a sheet that had spent a second falling into a drape lost all of it the instant anyone touched the size, and came back rigid. Nothing about the physics required that. Nobody had carried the state over.
+  
+  `ClothSim.adopt(previous)` does now, and `PaperMesh` calls it on every rebuild. The free particles are copied across scaled by how much the sheet grew, and their previous positions with them — velocity in a verlet integrator is the gap between the two, so carrying only the positions would have arrived at the new size perfectly still. The constraints are laid out afresh at the new dimensions, which is what makes the scaling exact rather than approximate: scaling the drape by the same ratio the rest lengths grew by leaves every constraint precisely as violated as it was, and the sim simply continues.
+  
+  Pinned particles are the exception and keep the new layout's own positions. A pin holds a CORNER, and the corner of a resized sheet is where the resized sheet says it is; carrying the old one over would hang the new sheet from a point no longer on it.
+  
+  It refuses in exactly one case: **a different grid.** The cloth grid is derived from the sheet's aspect, so a uniform resize keeps it and a lopsided one may not; with a different particle count there is no correspondence between the two sets of particles, and the nearest thing to one would be a guess. Everything else carries — a resize, a change of `pins`, a deformer arriving on top. The sheet's state belongs to the sheet, and none of those is a reason for it to have never fallen.
+  
+  What this buys is a sheet that can be resized *while it hangs* — including, in `apps/editor`'s hands harness, by spreading two hands in front of a webcam. Resizing as a SHAPE was always free, because a deformer is a pure function of its options and the sheet just redraws at the new size; this closes the gap between the two modes.
+
 ## 0.5.2
 
 ### Patch Changes
