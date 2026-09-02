@@ -245,7 +245,7 @@ describe('numberSpec', () => {
         const emitted = spec.snap(raw)
         expect(
           () => schema.parse(emitted),
-          `${JSON.stringify(schema._def.checks)} rejected ${emitted} (from ${raw})`,
+          `${JSON.stringify({ min: schema.minValue, max: schema.maxValue, format: schema.format })} rejected ${emitted} (from ${raw})`,
         ).not.toThrow()
       }
     }

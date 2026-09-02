@@ -60,7 +60,7 @@ const zoneSchema = z.object({
 
 const fieldSessionSchema = z.object({
   layout: z.string(),
-  layoutOptions: z.record(z.unknown()),
+  layoutOptions: z.record(z.string(), z.unknown()),
   count: z.number().int().min(1).max(400),
   driver: z.enum(['autoplay', 'drag', 'none']),
   speed: z.number(),
@@ -76,7 +76,7 @@ const stageSessionSchema = z.object({
   preset: z.string(),
   walk: z.enum(walkNames),
   layout: z.string(),
-  layoutOptions: z.record(z.unknown()),
+  layoutOptions: z.record(z.string(), z.unknown()),
   text: z.string(),
   count: z.number().int().min(1).max(400),
   // The walk is held as a name, so the resolved path is not part of the view.

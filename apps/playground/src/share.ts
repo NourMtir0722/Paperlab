@@ -39,9 +39,9 @@ const shareSchema = z.object({
   t: z.string().max(MAX_TEXT_LENGTH).optional(),
   n: z.number().int().min(1).max(80).optional(),
   l: z.string().optional(),
-  lo: z.record(z.unknown()).optional(),
+  lo: z.record(z.string(), z.unknown()).optional(),
   /** Stage overrides — validated against the real schema on the way out. */
-  s: z.record(z.unknown()).optional(),
+  s: z.record(z.string(), z.unknown()).optional(),
 })
 
 export interface StageShare {

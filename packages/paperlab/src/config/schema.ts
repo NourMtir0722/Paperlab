@@ -439,7 +439,7 @@ export type BehaviorConfigInput = z.input<typeof behaviorConfigSchema>
 /** Advanced escape hatch: a raw deformer stack (editing one forks the behavior). */
 export const deformerInstanceSchema = z.object({
   type: z.string(),
-  options: z.record(z.unknown()).default({}),
+  options: z.record(z.string(), z.unknown()).default({}),
   enabled: z.boolean().default(true),
 })
 
@@ -711,9 +711,9 @@ export const stateTransitionSchema = z.object({
 
 export const stateDefSchema = z.object({
   /** Deep-partial override of the paper schema (behavior params, surface, …). */
-  overrides: z.record(z.unknown()).default({}),
+  overrides: z.record(z.string(), z.unknown()).default({}),
   /** Transition INTO this state. */
-  transition: stateTransitionSchema.default({}),
+  transition: stateTransitionSchema.prefault({}),
   /** Chained actions after arriving. v1: 'emit:<event>' only. */
   onEnter: z.array(z.string().regex(/^emit:[\w-]+$/, 'v1 actions are "emit:<event>"')).default([]),
 })
@@ -746,8 +746,8 @@ export const metaSchema = z.object({
 
 export const paperConfigSchema = z
   .object({
-    meta: metaSchema.default({}),
-    sheet: sheetSchema.default({}),
+    meta: metaSchema.prefault({}),
+    sheet: sheetSchema.prefault({}),
     stock: stockSchema.default('printer'),
     content: contentSchema.default({ type: 'blank' }),
     /** A behavior OR a raw deformer stack — if both are present, `deformers` wins (it's the fork). */
@@ -762,9 +762,9 @@ export const paperConfigSchema = z
      * for. `memory: { set: 0 }` is the opt-out, and it is what every sheet in
      * the library did before this shipped.
      */
-    memory: memorySchema.default({}),
+    memory: memorySchema.prefault({}),
     physics: physicsSchema.default('none'),
-    scene: sceneSchema.default({}),
+    scene: sceneSchema.prefault({}),
     onTwos: z.boolean().default(false),
     /** Interaction state machine — overrides-on-base diffs. */
     states: paperStatesSchema.optional(),

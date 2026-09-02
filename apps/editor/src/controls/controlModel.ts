@@ -193,7 +193,7 @@ export function emphasize(controls: Control[], emphasis: Emphasis = 'signature')
  * `windY`, `windZ` and none of those is the name the behavior nominated.
  */
 export function partitionSignature(
-  schema: z.ZodTypeAny,
+  schema: z.ZodType,
   signature: readonly string[] | undefined,
   values: Record<string, unknown>,
   onChange: (key: string, value: unknown) => void,
@@ -201,7 +201,7 @@ export function partitionSignature(
   if (!(schema instanceof z.ZodObject) || !signature?.length) {
     return { signature: [], rest: schemaControls(schema, values, onChange) }
   }
-  const keys = Object.keys(schema.shape as Record<string, z.ZodTypeAny>)
+  const keys = Object.keys(schema.shape as Record<string, z.ZodType>)
   const nominated = signature.filter((key) => keys.includes(key))
   return {
     signature: emphasize(
@@ -241,7 +241,7 @@ const COLOR = 'color'
  * well-formed value.
  */
 export function schemaControls(
-  schema: z.ZodTypeAny,
+  schema: z.ZodType,
   values: Record<string, unknown>,
   onChange: (key: string, value: unknown) => void,
   skip: string[] = [],
@@ -249,7 +249,7 @@ export function schemaControls(
   if (!(schema instanceof z.ZodObject)) return []
   const controls: Control[] = []
 
-  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
+  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodType>)) {
     if (skip.includes(key)) continue
     const inner = unwrap(field)
     const value = values[key]
@@ -258,7 +258,7 @@ export function schemaControls(
       controls.push(numberControl(key, key, inner, value, (v) => onChange(key, v)))
     } else if (inner instanceof z.ZodTuple && isNumberTuple(inner)) {
       // Numeric tuples (flight's wind vector) → one slider per component.
-      const items = inner._def.items as z.ZodNumber[]
+      const items = inner.def.items as z.ZodNumber[]
       const current = Array.isArray(value) ? (value as number[]) : items.map(() => 0)
       items.forEach((item, axis) => {
         controls.push(
@@ -277,7 +277,7 @@ export function schemaControls(
         )
       })
     } else if (inner instanceof z.ZodEnum) {
-      controls.push(select(key, String(value), [...inner.options], (v) => onChange(key, v)))
+      controls.push(select(key, String(value), inner.options.map(String), (v) => onChange(key, v)))
     } else if (inner instanceof z.ZodBoolean) {
       controls.push(toggle(key, Boolean(value), (v) => onChange(key, v)))
     } else if (inner instanceof z.ZodString) {
@@ -338,7 +338,7 @@ export interface NumberSpec {
 }
 
 export function numberSpec(schema: z.ZodNumber, fallbackMin = 0): NumberSpec {
-  const integer = schema._def.checks.some((c) => c.kind === 'int')
+  const integer = schema.format === 'safeint'
   const rawMin = checkValue(schema, 'min') ?? fallbackMin
   const rawMax = checkValue(schema, 'max') ?? 1
   const step = integer ? 1 : (rawMax - rawMin) / 200
@@ -372,30 +372,43 @@ function numberControl(
  * draw their own markup rather than going through `Control` — they still do
  * not get to re-derive what the schema allows.
  */
-export function numericFields(schema: z.ZodTypeAny): { key: string; spec: NumberSpec }[] {
+export function numericFields(schema: z.ZodType): { key: string; spec: NumberSpec }[] {
   if (!(schema instanceof z.ZodObject)) return []
   const out: { key: string; spec: NumberSpec }[] = []
-  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
+  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodType>)) {
     const inner = unwrap(field)
     if (inner instanceof z.ZodNumber) out.push({ key, spec: numberSpec(inner) })
   }
   return out
 }
 
+/**
+ * Was the bound written `.gt()`/`.lt()` rather than `.min()`/`.max()`?
+ *
+ * `minValue` and `maxValue` report the number either way, so this is the one
+ * thing still read off the check list. zod 4 names them `greater_than` and
+ * `less_than` and carries `inclusive` beside the value.
+ */
 function isExclusive(schema: z.ZodNumber, kind: 'min' | 'max'): boolean {
-  const check = schema._def.checks.find((c) => c.kind === kind)
-  return Boolean(check && 'inclusive' in check && check.inclusive === false)
+  const want = kind === 'min' ? 'greater_than' : 'less_than'
+  const checks = (schema as unknown as ZodInternals)._zod?.def?.checks ?? []
+  return checks.some((c) => c._zod?.def?.check === want && c._zod?.def?.inclusive === false)
+}
+
+/** The sliver of zod 4's internals this file still has to name. */
+interface ZodInternals {
+  _zod?: { def?: { checks?: { _zod?: { def?: { check?: string; inclusive?: boolean } } }[] } }
 }
 
 function isNumberTuple(tuple: z.ZodTuple): boolean {
-  const items = tuple._def.items as z.ZodTypeAny[]
+  const items = tuple.def.items as z.ZodType[]
   return items.length > 0 && items.length <= 4 && items.every((i) => i instanceof z.ZodNumber)
 }
 
-function unwrap(field: z.ZodTypeAny): z.ZodTypeAny {
+function unwrap(field: z.ZodType): z.ZodType {
   let f = field
   while (f instanceof z.ZodDefault || f instanceof z.ZodOptional) {
-    f = f instanceof z.ZodDefault ? f._def.innerType : f.unwrap()
+    f = f.unwrap() as z.ZodType
   }
   return f
 }
@@ -408,15 +421,26 @@ function unwrap(field: z.ZodTypeAny): z.ZodTypeAny {
  * own to show — and the range is still the schema's fact to state, not
  * theirs to restate.
  */
-export function numberRange(schema: z.ZodTypeAny, key: string): { min: number; max: number } {
-  const field =
-    schema instanceof z.ZodObject ? (schema.shape as Record<string, z.ZodTypeAny>)[key] : undefined
+export function numberRange(schema: z.ZodType, key: string): { min: number; max: number } {
+  const field = schema instanceof z.ZodObject ? (schema.shape as Record<string, z.ZodType>)[key] : undefined
   const inner = field ? unwrap(field) : undefined
   if (!(inner instanceof z.ZodNumber)) return { min: 0, max: 1 }
   return { min: checkValue(inner, 'min') ?? 0, max: checkValue(inner, 'max') ?? 1 }
 }
 
+/**
+ * A bound, off zod 4's own accessor.
+ *
+ * zod 3 kept these in `_def.checks` as `{ kind: 'min', value }` and this
+ * walked that list. zod 4 exposes `minValue`/`maxValue` directly, so the
+ * internals walk is gone — which matters because that walk type-checked
+ * clean against zod 4 and returned `undefined` for every bound at runtime.
+ * Every slider in the editor would have silently fallen back to 0–1.
+ */
 function checkValue(num: z.ZodNumber, kind: 'min' | 'max'): number | undefined {
-  const check = num._def.checks.find((c) => c.kind === kind)
-  return check && 'value' in check ? check.value : undefined
+  const bound = kind === 'min' ? num.minValue : num.maxValue
+  // An UNBOUNDED number reads ±Infinity here, where zod 3's empty check list
+  // read as absent. `?? undefined` does not catch it — Infinity is not
+  // nullish — and an Infinity reaching a slider is a track with no ends.
+  return Number.isFinite(bound) ? (bound as number) : undefined
 }
