@@ -8,7 +8,7 @@
 
 A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [for coding agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
+**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [with your hands](https://paperlab.nawwara.studio/hands/) (webcam)  ·  [for coding agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
 
 | | |
 |---|---|
@@ -189,7 +189,7 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 ## The apps
 
-Three surfaces ship alongside the library, all built on its public API only.
+Four surfaces ship alongside the library, all built on its public API only.
 
 **[The playground](https://paperlab.nawwara.studio/playground/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
 
@@ -205,6 +205,10 @@ Field mode composes galleries against the same panel — swap the layout, watch 
 
 **[The reference](https://paperlab.nawwara.studio/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
+**[Your hands](https://paperlab.nawwara.studio/hands/)** — the same paper, driven by a webcam instead of a mouse. Pinch to take hold and pull, point to score a line, make a fist to fold along it, turn your palm to change the stock, flick paint at it, blow at it to raise the wind, pull an edge to tear it. Every gesture lands on a feature the library already ships — the page is a hundred percent public API, and `packages/paperlab` doesn't know it exists.
+
+The tracking is [MediaPipe](https://ai.google.dev/edge/mediapipe) (`@mediapipe/tasks-vision`, Apache-2.0) and it runs entirely in your browser: the models download from Google once, and after that no video and no measurement taken from it leaves the device. There is no server to send it to, and a `connect-src` CSP on the page makes that enforceable rather than a promise — including against MediaPipe's own usage telemetry, which the page blocks. Needs a camera, and asks before it takes one.
+
 ## Development
 
 pnpm + Turborepo, Node 22, [Biome](https://biomejs.dev) for lint and format.
@@ -217,7 +221,7 @@ pnpm dev            # the editor at localhost:5173
 | | |
 |---|---|
 | [`packages/paperlab`](https://github.com/NourMtir0722/Paperlab/blob/main/packages/paperlab/) | the npm library — the only published artifact |
-| [`apps/editor`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/editor/) | the editor — every knob, and the export |
+| [`apps/editor`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/editor/) | the editor — every knob, and the export. Also the `/hands` page, built from the same app in a second pass |
 | [`apps/playground`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/playground/) | the playground — one input, one scene, shareable by link |
 | [`apps/docs`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/docs/) | the reference site, with every behavior running live |
 | [`tools/`](https://github.com/NourMtir0722/Paperlab/blob/main/tools/) | browser harnesses — parity, perf, screenshots, the README's motion |
@@ -232,14 +236,15 @@ pnpm test:parity    # 37 golden-vector cases: every deformer's GLSL twin vs its 
 pnpm test:drive     # the stage really walks when you drag, wheel or arrow it
 pnpm test:share     # sculpt → link → a browser that has never seen the paper
 pnpm test:dropdown  # every dropdown option is reachable, including below the fold
-pnpm test:route     # the site root sends each device to the app built for it
+pnpm test:route     # the site root routes by device, and links every route it deploys
+pnpm test:hands     # scripted gestures really reach the paper (needs a camera-less Chromium)
 pnpm typecheck
 pnpm lint
 pnpm knip           # dead code and unused exports
 pnpm build
 ```
 
-Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All six test commands are CI gates, along with `publint` and `are-the-types-wrong` on the published package.
+Anything that needs a real GPU, real pointer events or a second browser profile is a browser harness in `tools/` rather than a unit test. All of them but `test:hands` are CI gates, along with `publint` and `are-the-types-wrong` on the published package — `test:hands` fetches its models from Google, so it is run by hand rather than made to speak for someone else's uptime.
 
 ### Measurement
 

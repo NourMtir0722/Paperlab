@@ -14,7 +14,16 @@
       still reads the card below.
 
       Assembled into the site by .github/workflows/pages.yml. The apps
-      themselves live at /editor/, /playground/ and /docs/.
+      themselves live at /editor/, /playground/, /docs/ and /hands/.
+
+      /hands is never a redirect TARGET and never should be: it asks for a
+      camera and fetches two model files before it does anything, which is
+      not what an unsuspecting visitor to the root asked for. It is a place
+      you choose to go, so it is a link here and in the reference's rail —
+      and, because the redirect below fires before paint, the rail is the one
+      real people see. `pnpm test:route` asserts every route the workflow
+      deploys is named in the nav below, which is what this page missed: the
+      page shipped, and nothing on the site pointed at it.
     -->
     <meta property="og:url" content="https://paperlab.nawwara.studio/" />
     <meta property="og:type" content="website" />
@@ -118,6 +127,7 @@
         <a href="/editor/">The editor <span aria-hidden="true">→</span></a>
         <a href="/playground/">The playground <span aria-hidden="true">→</span></a>
         <a href="/docs/">The reference <span aria-hidden="true">→</span></a>
+        <a href="/hands/">Your hands <span aria-hidden="true">→</span></a>
       </nav>
     </main>
   </body>

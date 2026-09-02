@@ -560,14 +560,22 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
 | `pnpm test:hands` | `/hands` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you |
-| `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground. **CI gate** |
+| `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground, and its nav names every route `pages.yml` deploys. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
 | `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
 | `pnpm media` | `media.html` | the README's GIFs and MP4s, stepped frame-exact |
 
-**`/hands` is a real page on the site, and `pnpm hands:setup` before it will
-start.** The tracker's wasm is served from our own origin — it is executable
-code in a page holding a camera stream, and as `@mediapipe/tasks-vision` it is
+**`/hands` is a real page on the site, and it is linked like one.** The
+signpost at the root names it, and so does the reference's rail — it shipped
+without either for its first weeks, deployed and unreachable, which is why
+`pnpm test:route` now reads the routes out of `pages.yml` and fails if the
+signpost does not name one. It is never a redirect TARGET: it wants a camera
+and two model files before it does anything, so it is somewhere you choose to
+go, not somewhere you are sent.
+
+**Run `pnpm hands:setup` before the page will start.** The tracker's wasm is
+served from our own origin — it is executable code in a page holding a camera
+stream, and as `@mediapipe/tasks-vision` it is
 Apache-2.0, so there is no question about hosting it. `tools/hands-assets.mjs`
 copies it out of `node_modules` (already a declared dependency, so the same
 bytes at the same version) into `apps/editor/.hands/`, which is gitignored:
