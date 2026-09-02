@@ -48,6 +48,7 @@ export function App() {
         <div className="rail-links">
           <a href="../">Playground</a>
           <a href="../editor/">Editor</a>
+          <a href="../hands/">Hands</a>
           <a href="https://github.com/NourMtir0722/Paperlab">GitHub</a>
         </div>
       </nav>
@@ -142,6 +143,13 @@ export function Hero() {
         Every one of them is configured by the same zod schema, and any paper serializes to a{' '}
         <code>.paper</code> JSON object. That is the rule the project is built on: if a feature cannot
         serialize into a preset, it does not ship.
+      </p>
+
+      <p className="note">
+        Want to feel it rather than read it? <a href="../hands/">Handle the paper with your hands</a> — a
+        webcam drives a gesture vocabulary onto this same public API: pinch to take hold, point to score a
+        line, a fist to fold along it, blow at the sheet to raise the wind. It needs a camera and it asks
+        first; the video never leaves your machine.
       </p>
     </section>
   )
