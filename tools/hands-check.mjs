@@ -683,10 +683,7 @@ try {
   // instant the sheet is WIDE and hands the drape check a sheet that has not
   // re-draped yet — which is how the first version of this reported the sim
   // snapping flat on CI while it was merely mid-rebuild.
-  const resized = await until(
-    extent,
-    (e) => e.x > draped.x * 1.4 && e.z > draped.z * grown.scale * 0.5,
-  )
+  const resized = await until(extent, (e) => e.x > draped.x * 1.4 && e.z > draped.z * grown.scale * 0.5)
   await release()
 
   // ── Resize, as a shape. The case that was always free. ───────────────────
