@@ -617,9 +617,10 @@ try {
     for (let i = 0; i < 80; i++) last = window.__HANDS__.drive(null, a, { pucker: 1 })
     return last.wind
   }, ASPECT)
-  await page.waitForTimeout(900)
-  const blownShape = await vertices()
-  const blown = moved(stillShape, blownShape)
+  const blown = await until(
+    async () => moved(stillShape, await vertices()),
+    (distance) => distance > 0.02,
+  )
   const calmed = await page.evaluate((a) => {
     let last
     for (let i = 0; i < 80; i++) last = window.__HANDS__.drive(null, a, null)
@@ -678,7 +679,14 @@ try {
   // span, then three at the new width — one rebuild, not twelve.
   await spread(0.3, 5, false)
   const grown = await spread(0.6, 3, false)
-  const resized = await until(extent, (e) => e.x > draped.x * 1.4)
+  // Both halves of what `resized` is asked to prove, or this returns the
+  // instant the sheet is WIDE and hands the drape check a sheet that has not
+  // re-draped yet — which is how the first version of this reported the sim
+  // snapping flat on CI while it was merely mid-rebuild.
+  const resized = await until(
+    extent,
+    (e) => e.x > draped.x * 1.4 && e.z > draped.z * grown.scale * 0.5,
+  )
   await release()
 
   // ── Resize, as a shape. The case that was always free. ───────────────────
