@@ -106,7 +106,7 @@ describe('the audio graph', () => {
   it('does not start a context just by existing', () => {
     // Constructing one shows an indicator in the browser tab. A library that
     // lights that up on import has taken something nobody offered.
-    expect(() => new FxAudio({})).toThrow(/needs a context/)
+    expect(() => new FxAudio({} as never)).toThrow(/needs a context/)
   })
 
   it('stays locked until a gesture resumes it', async () => {

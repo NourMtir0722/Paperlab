@@ -87,12 +87,13 @@ export interface BufferSourceLike extends AudioNodeLike {
 export interface FxAudioOptions {
   quality?: FxQualityName | FxQualitySettings
   /**
-   * The context to use. Defaults to a new one, which is why this is injected:
-   * constructing an `AudioContext` is a side effect with a user-visible cost
-   * (a browser tab shows an audio indicator), and doing it in a constructor
-   * would mean importing this module started one.
+   * The context to use. Required, and never made for you: constructing an
+   * `AudioContext` is a side effect with a user-visible cost (a browser tab
+   * shows an audio indicator), and a class that made one on construction
+   * would take that from a page that never asked. Get a browser one from
+   * `createAudioContext()`, inside the gesture that should start the sound.
    */
-  context?: AudioLike
+  context: AudioLike
   /** Master level, 0..1. */
   volume?: number
 }
@@ -152,9 +153,10 @@ export class FxAudio {
   private unlocked = false
   private noise: AudioBufferLike | null = null
 
-  constructor(options: FxAudioOptions = {}) {
+  constructor(options: FxAudioOptions) {
     const { quality = 'auto', context, volume = 0.8 } = options
     this.quality = typeof quality === 'string' ? fxQualityFor(quality) : quality
+    // The type already requires it; this is for callers without one.
     if (!context) throw new Error('FxAudio needs a context — see createAudioContext()')
     this.ctx = context
     this.master = this.ctx.createGain()

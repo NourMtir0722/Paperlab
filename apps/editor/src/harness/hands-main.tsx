@@ -1035,7 +1035,7 @@ function App() {
             </>
           ) : null}
           <br />
-          stock: <strong>{paper.stock}</strong> · s.wind: <strong>{s.wind.toFixed(2)}</strong> · size:{' '}
+          stock: <strong>{paper.stock}</strong> · wind: <strong>{s.wind.toFixed(2)}</strong> · size:{' '}
           <strong>{s.scale.toFixed(2)}×</strong>
           <br />
           scored: <strong>{s.creases.length}</strong> · washed: <strong>{s.wash ? 'yes' : 'no'}</strong>

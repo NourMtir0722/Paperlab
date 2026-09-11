@@ -64,6 +64,13 @@ function warnOnce() {
  * one.
  */
 export function GradePass(props: GradeProps) {
+  // Decided here, before the lazy import, and not only inside `Grade`: a
+  // grade of all zeros draws nothing, so it must not fetch the module that
+  // draws it — nor warn about a missing peer it never needed. Checked after
+  // the import instead, the advice in the warning below was false: zeroing
+  // the grade still imported, still failed, and still warned.
+  const { bloom, depth, vignette, grain } = props.grade
+  if (!(bloom > 0 || depth > 0 || vignette > 0 || grain > 0)) return null
   return (
     <Suspense fallback={null}>
       <Grade {...props} />
