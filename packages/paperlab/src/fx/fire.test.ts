@@ -1,0 +1,124 @@
+import { describe, expect, it, vi } from 'vitest'
+import { CHAR, DamageField, PRESENCE } from './field'
+import { FireEmitter, type SurfaceLocator } from './fire'
+import { ParticlePool, type ParticlePresetName } from './particles'
+
+/**
+ * A pool that remembers what it was asked for, at the moment it was asked.
+ *
+ * Where a particle IS cannot answer where it came from: ash drifts, and after
+ * a few seconds in the air it may well be over paper that is still there.
+ */
+class Recording extends ParticlePool {
+  readonly spawns: { name: ParticlePresetName; u: number; v: number }[] = []
+  override spawn(name: ParticlePresetName, x: number, y: number, z: number): void {
+    this.spawns.push({ name, u: x, v: y })
+    super.spawn(name, x, y, z)
+  }
+}
+
+/**
+ * What a burn throws off, and where from.
+ *
+ * The emitter's whole job is to turn the field's own numbers into places: ash
+ * from the texels that burnt through, embers and smoke from the front. So
+ * every test here checks a PLACE or a count against the field, never that
+ * "some particles appeared".
+ */
+
+vi.setConfig({ testTimeout: 30_000 })
+
+/** A sheet lying in the unit square, so a particle's position IS its UV. */
+const flat: SurfaceLocator = (u, v) => ({ x: u, y: v, z: 0 })
+
+function burning(
+  seconds: number,
+  options: { field?: DamageField; locate?: SurfaceLocator; pool?: ParticlePool } = {},
+) {
+  const field = options.field ?? new DamageField({ seed: 3 })
+  const pool = options.pool ?? new ParticlePool(2000, 9)
+  const emitter = new FireEmitter(field, pool, options.locate ?? flat)
+  field.ignite(0.5, 0.5, 0.08, 1)
+  let consumed = 0
+  for (let i = 0; i < Math.round(seconds * 60); i++) {
+    field.step(1 / 60)
+    consumed += field.consumedCount
+    emitter.update(1 / 60)
+    pool.step(1 / 60)
+  }
+  return { field, pool, emitter, consumed }
+}
+
+describe('the fire emitter', () => {
+  it('throws nothing off a sheet that is not burning', () => {
+    const field = new DamageField()
+    const pool = new ParticlePool(100)
+    const emitter = new FireEmitter(field, pool, flat)
+    for (let i = 0; i < 120; i++) {
+      field.step(1 / 60)
+      emitter.update(1 / 60)
+    }
+    expect(pool.count).toBe(0)
+  })
+
+  it('sheds ash from the texels that burnt through, and embers from paper still burning', () => {
+    const pool = new Recording(2000, 9)
+    const { field, consumed } = burning(4, { pool })
+    expect(consumed).toBeGreaterThan(0)
+
+    const ash = pool.spawns.filter((s) => s.name === 'ash')
+    expect(ash.length).toBeGreaterThan(0)
+    // One flake per consumed texel at most, and a fraction of that in practice.
+    expect(ash.length).toBeLessThanOrEqual(consumed)
+    // Every flake was born where the paper had gone — and presence never
+    // comes back, so this holds however long the burn ran afterwards.
+    for (const s of ash) expect(field.sample(s.u, s.v)[PRESENCE]).toBeLessThan(0.5)
+
+    // Embers and smoke come off paper that is burning, not paper that is
+    // already gone. Char only ever rises, so the same argument applies.
+    const front = pool.spawns.filter((s) => s.name !== 'ash')
+    expect(front.length).toBeGreaterThan(0)
+    for (const s of front) expect(field.sample(s.u, s.v)[CHAR]).toBeGreaterThan(0.08)
+  })
+
+  it('throws embers and smoke off the burn front', () => {
+    const { pool } = burning(2)
+    expect(pool.countOf('ember')).toBeGreaterThan(0)
+    expect(pool.countOf('smoke')).toBeGreaterThan(0)
+  })
+
+  it('throws more the longer the front gets', () => {
+    // The rate follows the front's LENGTH, which is the same number the
+    // sound follows: a bigger fire is busier, and a nearly-consumed sheet
+    // quietens down again.
+    const small = burning(0.8)
+    const big = burning(2.5)
+    expect(big.field.frontCount).toBeGreaterThan(small.field.frontCount)
+    expect(big.pool.countOf('ember')).toBeGreaterThan(small.pool.countOf('ember'))
+  })
+
+  it('throws nothing while the sheet has not mounted', () => {
+    // The locator answers null until there is a drawn surface to ask about.
+    const { pool } = burning(2, { locate: () => null })
+    expect(pool.count).toBe(0)
+  })
+
+  it('spawns from the same cells given the same seed', () => {
+    const positions = () => {
+      const { pool } = burning(1.5)
+      const a = {
+        position: new Float32Array(pool.capacity * 3),
+        color: new Float32Array(pool.capacity * 4),
+        extra: new Float32Array(pool.capacity * 4),
+      }
+      const n = {
+        position: new Float32Array(pool.capacity * 3),
+        color: new Float32Array(pool.capacity * 4),
+        extra: new Float32Array(pool.capacity * 4),
+      }
+      pool.write(a, n)
+      return Array.from(a.position)
+    }
+    expect(positions()).toEqual(positions())
+  })
+})

@@ -352,6 +352,20 @@ export class DamageField implements DamageSource {
     saturation: 0,
     remaining: 1,
   }
+  /**
+   * Texels whose presence reached zero during the last `step`, in the first
+   * {@link consumedCount} slots — where ash leaves from.
+   *
+   * WHERE, not just how many. The stats were enough for the sound, which
+   * wants a level; an emitter wants a place. Fixed buffers the size of the
+   * grid and written in place: a burning sheet must not allocate a list a
+   * step, and a texel is consumed once, so a step can never fill it twice.
+   */
+  readonly consumedCells = new Int32Array(FIELD_SIZE * FIELD_SIZE)
+  /** The burn front as of the last step that ran, in the first {@link frontCount} slots — where embers and smoke leave from. */
+  readonly frontCells = new Int32Array(FIELD_SIZE * FIELD_SIZE)
+  private consumedLength = 0
+  private frontLength = 0
 
   constructor(options: DamageFieldOptions = {}) {
     this.o = { ...DEFAULTS, ...options }
@@ -408,6 +422,19 @@ export class DamageField implements DamageSource {
   /** What the last `step` produced. */
   get lastStats(): FieldStats {
     return this.stats
+  }
+
+  /** How many of {@link consumedCells} the last `step` wrote. Always `lastStats.consumed`. */
+  get consumedCount(): number {
+    return this.consumedLength
+  }
+
+  /**
+   * How many of {@link frontCells} are current. `lastStats.front` times the
+   * texel count — and held, like it, across a frame too short to step.
+   */
+  get frontCount(): number {
+    return this.frontLength
   }
 
   /** Texel index for a UV, clamped to the sheet. */
@@ -521,10 +548,12 @@ export class DamageField implements DamageSource {
   step(delta: number): FieldStats {
     this.visited = 0
     if (delta <= 0) return this.stats
+    this.consumedLength = 0
     if (this.asleep) {
       // Asleep means nothing CAN change, so there is no time owed either;
       // banking it would replay a burst of steps the moment something wakes.
       this.accumulator = 0
+      this.frontLength = 0
       this.stats = { ...this.stats, front: 0, charred: 0, consumed: 0, wetted: 0 }
       return this.stats
     }
@@ -597,6 +626,8 @@ export class DamageField implements DamageSource {
     let consumed = 0
     let wetted = 0
     let front = 0
+    // This step's front replaces the last one's; see `frontCells`.
+    const { frontCells, consumedCells } = this
 
     // The diagonal the fibre leans toward, as index offsets. Constant per
     // field; hoisted so the inner loop is arithmetic and nothing else.
@@ -723,14 +754,17 @@ export class DamageField implements DamageSource {
         let p = presence
         if (c > 0.85) {
           p = Math.max(0, p - o.consumeRate * (c - 0.85) * dt)
-          if (p <= 0) consumed++
+          if (p <= 0) {
+            consumed++
+            consumedCells[this.consumedLength++] = i
+          }
         }
 
         h = Math.min(1, Math.max(0, h))
         g = Math.min(1, Math.max(0, g))
         c = Math.min(1, c)
         if (g > sat + 1e-6) wetted++
-        if (p > 0.15 && c > 0.08 && c < 0.92 && h > 0.1) front++
+        if (p > 0.15 && c > 0.08 && c < 0.92 && h > 0.1) frontCells[front++] = i
 
         next[b + CHAR] = c
         next[b + SATURATION] = g
@@ -758,6 +792,7 @@ export class DamageField implements DamageSource {
 
     grow(this.touched, region)
     this.active = awake
+    this.frontLength = front
     return { charred, consumed, wetted, front }
   }
 

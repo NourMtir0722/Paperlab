@@ -47,6 +47,18 @@ export {
 export { DAMAGE_CHANNELS, type DamageSource } from './surface/damageContract'
 
 export {
+  ParticlePool,
+  particlePresets,
+  type ParticlePreset,
+  type ParticlePresetName,
+  type ParticleTarget,
+} from './fx/particles'
+
+export { FireEmitter, type FireEmitterOptions, type SurfaceLocator } from './fx/fire'
+
+export { FxParticles, type FxParticlesProps } from './fx/FxParticles'
+
+export {
   FxAudio,
   createAudioContext,
   type AudioLike,

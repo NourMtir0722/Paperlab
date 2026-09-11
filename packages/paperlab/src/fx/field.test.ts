@@ -437,4 +437,32 @@ describe('the stats a consumer reads every frame', () => {
     // The events, by contrast, genuinely did not happen on it.
     expect(quiet.charred).toBe(0)
   })
+
+  it('says WHERE it burnt through and where the front is, not just how much', () => {
+    // The emitters need a place: ash leaves the texel that just went, embers
+    // and smoke leave the front. Counts alone could only make a fire that
+    // throws sparks from the middle of the sheet.
+    const field = new DamageField({ seed: 3 })
+    field.ignite(0.5, 0.5, 0.08, 1)
+    let consumedSeen = 0
+    for (let i = 0; i < 240; i++) {
+      const stats = field.step(1 / 60)
+      expect(field.consumedCount).toBe(stats.consumed)
+      for (let k = 0; k < field.consumedCount; k++) {
+        // Every cell it named has no paper left in it.
+        expect(field.data[field.consumedCells[k]! * 4 + PRESENCE]).toBe(0)
+        consumedSeen++
+      }
+      // The front it names is the front it counted, and every cell on it is
+      // paper that is part-burnt and still hot — the burning line itself.
+      expect(field.frontCount).toBe(Math.round(stats.front * field.size * field.size))
+      for (let k = 0; k < field.frontCount; k++) {
+        const b = field.frontCells[k]! * 4
+        expect(field.data[b + PRESENCE]!).toBeGreaterThan(0.15)
+        expect(field.data[b + HEAT]!).toBeGreaterThan(0.1)
+        expect(field.data[b + CHAR]!).toBeGreaterThan(0.08)
+      }
+    }
+    expect(consumedSeen).toBeGreaterThan(0)
+  })
 })
