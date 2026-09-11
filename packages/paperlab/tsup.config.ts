@@ -58,7 +58,11 @@ export default defineConfig([
     format: ['esm'],
     dts: true,
     sourcemap: true,
-    clean: true,
+    // Neither config cleans: tsup builds the entries of this array
+    // CONCURRENTLY (a `Promise.all` over it, as of 8.5.1), so a clean here
+    // could delete CJS output the other build had already written. The
+    // build script clears `dist` once, before tsup starts.
+    clean: false,
     external,
   },
   {
@@ -66,7 +70,7 @@ export default defineConfig([
     format: ['cjs'],
     dts: true,
     sourcemap: true,
-    // The ESM pass above cleaned; a second clean would delete it.
+    // See the ESM config: `dist` is cleared once by the build script.
     clean: false,
     external,
     noExternal: ['three-custom-shader-material'],
