@@ -6,6 +6,8 @@ import type { Stock } from '../core/stock'
 import { composeSurface } from './compose'
 import { resolveCreases, type CreaseShading } from './creases'
 import { useLightRig } from '../scene/rig'
+import type { DamageSource } from './damageContract'
+import { useDamageTexture } from './useDamageTexture'
 
 export interface PaperMaterialProps {
   stock: Stock
@@ -28,6 +30,8 @@ export interface PaperMaterialProps {
    * render — which is what a material with no memory behind it should do.
    */
   creases?: CreaseShading[]
+  /** Char, wet, heat and missing paper over the sheet's UV. See `DamageSource`. */
+  damage?: DamageSource | null
 }
 
 /**
@@ -46,8 +50,10 @@ export function PaperMaterial({
   sheet,
   lighting = 'studio',
   creases,
+  damage,
 }: PaperMaterialProps) {
   const rig = useLightRig(lighting)
+  const damageTexture = useDamageTexture(damage)
   const composed = composeSurface(
     surface,
     stock,
@@ -55,6 +61,7 @@ export function PaperMaterial({
     {
       hasFrontMap: Boolean(texture),
       hasBackMap: Boolean(backTexture),
+      hasDamage: Boolean(damageTexture),
     },
     sheet,
     rig,
@@ -66,7 +73,7 @@ export function PaperMaterial({
   const bound = useMemo(() => composed.uniforms, [composed.structureKey])
   useEffect(() => {
     for (const [key, uniform] of Object.entries(composed.uniforms)) {
-      if (!bound[key] || key === 'uFrontMap' || key === 'uBackMap') continue
+      if (!bound[key] || key === 'uFrontMap' || key === 'uBackMap' || key === 'uDamage') continue
       if (bound[key].value instanceof THREE.Color && uniform.value instanceof THREE.Color) {
         ;(bound[key].value as THREE.Color).copy(uniform.value)
       } else {
@@ -77,7 +84,8 @@ export function PaperMaterial({
   useEffect(() => {
     if (bound.uFrontMap) bound.uFrontMap.value = texture
     if (bound.uBackMap) bound.uBackMap.value = backTexture ?? null
-  }, [bound, texture, backTexture])
+    if (bound.uDamage) bound.uDamage.value = damageTexture
+  }, [bound, texture, backTexture, damageTexture])
 
   return (
     <CustomShaderMaterial

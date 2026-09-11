@@ -55,6 +55,12 @@ export interface ComposedSurface {
 export interface SurfaceMaps {
   hasFrontMap: boolean
   hasBackMap: boolean
+  /**
+   * A damage texture is attached — see `DamageSource`. Optional and false by
+   * default, so a sheet nothing has damaged compiles exactly the program it
+   * always did: same chunks, same structure key, same alpha test.
+   */
+  hasDamage?: boolean
 }
 
 const VERTEX = /* glsl */ `
@@ -380,6 +386,40 @@ void plPerforation(inout vec4 color) {
 }
 `
 
+/**
+ * What happened to the paper, read from the damage texture.
+ *
+ * Written so that an untouched field is an exact identity — char 0, wet 0,
+ * presence 1 multiplies by one and mixes by zero — because attaching a field
+ * to a sheet before anything has burnt it must not change a single pixel.
+ *
+ * Presence is cut with `step`, not multiplied into alpha. Multiplying would
+ * put the edge of a hole wherever `opacity × presence` crosses the alpha test,
+ * which is presence 0.5 on an opaque stock and 0.81 on the 0.62-opacity one:
+ * the same burn would eat further into some papers than others. The texture
+ * is filtered linearly, so the half-presence contour between texels is a
+ * curve and the hole's edge is smooth at 64².
+ *
+ * Heat is carried and not yet drawn. The glowing ignition line is fire's own
+ * chunk and arrives with fire.
+ */
+const DAMAGE_CHUNK = /* glsl */ `
+uniform sampler2D uDamage;
+
+void plDamage(inout vec4 color, inout float roughness) {
+  vec4 d = texture2D(uDamage, vPaperUv);
+  // Wet paper is darker and smoother: water fills the gaps between fibres
+  // that scatter light, which is both effects from one cause.
+  color.rgb *= 1.0 - 0.38 * d.g;
+  roughness *= 1.0 - 0.45 * d.g;
+  // Char: a brown scorch first, then black once it has really burnt.
+  vec3 scorch = mix(vec3(0.43, 0.28, 0.15), vec3(0.055, 0.045, 0.04), smoothstep(0.35, 0.9, d.r));
+  color.rgb = mix(color.rgb, scorch, smoothstep(0.02, 0.6, d.r));
+  // Missing paper: gone at half presence, on every stock alike.
+  color.a *= step(0.5, d.a);
+}
+`
+
 const AGING_CHUNK = /* glsl */ `
 uniform float uAgingAmount;
 
@@ -487,6 +527,13 @@ export function composeSurface(
     calls.push('plAging(csm_DiffuseColor);')
     uniforms.uAgingAmount = { value: aging }
   }
+  // Last, so a burn chars over the yellowing and the ink alike.
+  if (maps.hasDamage) {
+    chunks.push(DAMAGE_CHUNK)
+    calls.push('plDamage(csm_DiffuseColor, csm_Roughness);')
+    // Bound by `PaperMaterial` to the uploaded texture; null only until then.
+    uniforms.uDamage = { value: null }
+  }
 
   // Whether anything above described a SHAPE and not just a colour. The
   // perturbation is one pair of screen derivatives, which is cheap but not
@@ -537,11 +584,13 @@ ${relief ? '  // The relief every effect above described, spent once — see plP
       aging !== undefined ? 'a' : '',
       perforation ? 'p' : '',
       stock.adhesive ? 'A' : '',
-    ].join('')}:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}`,
+    ].join('')}:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}${maps.hasDamage ? 'D' : ''}`,
     vertexShader: VERTEX,
     fragmentShader,
     uniforms,
-    alphaTest: deckle || perforation ? 0.5 : 0,
+    // Anything that removes paper needs fragments discarded rather than
+    // blended — a hole has to cut the depth buffer and the shadow too.
+    alphaTest: deckle || perforation || maps.hasDamage ? 0.5 : 0,
   }
 }
 

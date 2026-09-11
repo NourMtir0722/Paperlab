@@ -255,3 +255,49 @@ describe('receipt content', () => {
     for (const width of a) expect(width).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe('the damage seam', () => {
+  const maps = { hasFrontMap: true, hasBackMap: false }
+  const plain = surfaceSchema.parse({ grain: 0.3, aging: 0.1 })
+
+  it('compiles the exact program it always did when nothing is attached', () => {
+    // The regression that matters most: a sheet nobody has damaged must not
+    // pay for the seam in a shader recompile, a new structure key or an alpha
+    // test — `hasDamage` absent and `hasDamage: false` are both today's sheet.
+    const before = composeSurface(plain, printer, 0.2, maps)
+    const off = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: false })
+    expect(off.structureKey).toBe(before.structureKey)
+    expect(off.fragmentShader).toBe(before.fragmentShader)
+    expect(off.alphaTest).toBe(before.alphaTest)
+    expect(before.fragmentShader).not.toContain('plDamage')
+    expect(before.uniforms.uDamage).toBeUndefined()
+  })
+
+  it('keys a damaged sheet as its own program, so it never reuses a plain one', () => {
+    const on = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true })
+    const off = composeSurface(plain, printer, 0.2, maps)
+    expect(on.structureKey).not.toBe(off.structureKey)
+    expect(on.structureKey.endsWith('D')).toBe(true)
+    expect(on.fragmentShader).toContain('plDamage(csm_DiffuseColor, csm_Roughness);')
+    expect(on.uniforms.uDamage).toEqual({ value: null })
+  })
+
+  it('discards missing paper rather than blending it', () => {
+    // A hole has to cut the depth buffer, not just fade — the same reason a
+    // deckle does.
+    expect(composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true }).alphaTest).toBe(0.5)
+  })
+
+  it('cuts at the same presence on every stock, however opaque', () => {
+    // `step`, not a multiply: multiplying presence into alpha would put the
+    // edge of a hole at 0.5 on opaque stock and 0.81 on a 0.62-opacity one.
+    const out = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true })
+    expect(out.fragmentShader).toContain('color.a *= step(0.5, d.a);')
+  })
+
+  it('draws the damage last, over the ageing and the ink', () => {
+    const out = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true })
+    const body = out.fragmentShader.slice(out.fragmentShader.indexOf('void main()'))
+    expect(body.indexOf('plDamage(')).toBeGreaterThan(body.indexOf('plAging('))
+  })
+})

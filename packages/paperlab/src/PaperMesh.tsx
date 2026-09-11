@@ -40,6 +40,7 @@ import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
 import { ClothSim } from './physics/cloth'
 import { StripSim, stripNodeCount } from './physics/strip'
 import { PaperMaterial } from './surface/PaperMaterial'
+import type { DamageSource } from './surface/damageContract'
 import { usePrefersReducedMotion } from './a11y'
 import { quantizeProgress, quantizeTime } from './motion/onTwos'
 import { usePaperStates } from './states/usePaperStates'
@@ -105,6 +106,18 @@ export interface PaperMeshProps {
   onStateChange?(state: string): void
   /** Fires for `onEnter` actions ('emit:<event>'). */
   onStateAction?(event: string, state: string): void
+  /**
+   * What has happened to this sheet — char, wet, heat and missing paper — as
+   * a grid over its UV.
+   *
+   * The sheet draws whatever damage it is handed and does not know what
+   * caused it, the same way it draws `content` without knowing who painted
+   * it. `DamageField` from `paperlab/fx` is one source; a baked texture or a
+   * recorded burn played back would be others. A prop and not config,
+   * because it is live state that changes every frame and does not belong in
+   * a preset or a share link. See `DamageSource`.
+   */
+  damage?: DamageSource | null
 }
 
 export interface PaperHandle {
@@ -929,6 +942,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
           sheet={config.sheet}
           lighting={config.scene.lighting}
           creases={shadedCreases}
+          damage={props.damage}
         />
       </mesh>
       {props.interactive &&

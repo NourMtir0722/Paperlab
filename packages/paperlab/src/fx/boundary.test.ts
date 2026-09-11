@@ -100,6 +100,9 @@ function reachableFrom(entry: string): Set<string> {
 
 const inFx = (file: string) => file.startsWith('fx/')
 
+/** The one file outside fx that fx may reach. */
+const CONTRACT = 'surface/damageContract.ts'
+
 describe('the fx boundary', () => {
   it('is not crossed by the main entry point', () => {
     expect([...reachableFrom('index.ts')].filter(inFx)).toEqual([])
@@ -111,12 +114,24 @@ describe('the fx boundary', () => {
     expect([...reachableFrom('stage.ts')].filter(inFx)).toEqual([])
   })
 
-  it('does not reach back into the library it sits beside', () => {
+  it('reaches back into the library through the damage contract, and nothing else', () => {
     // The other direction, and the one that decides whether fx can ever be
-    // lazy-loaded. Today the field is self-contained arithmetic; if it grows
-    // an import of `PaperMesh` or the config schema, `fx.js` stops being a
-    // 4 KB leaf and starts dragging the library in behind it.
-    expect([...reachableFrom('fx.ts')].filter((f) => !inFx(f) && f !== 'fx.ts')).toEqual([])
+    // lazy-loaded. fx depends on exactly one file outside itself — the
+    // contract that says what a damage texel means, which belongs to the
+    // sheet because the sheet draws it. If it grows an import of `PaperMesh`
+    // or the config schema, `fx.js` stops being a few-KB leaf and starts
+    // dragging the library in behind it.
+    const outside = [...reachableFrom('fx.ts')].filter((f) => !inFx(f) && f !== 'fx.ts')
+    expect(outside).toEqual([CONTRACT])
+  })
+
+  it('keeps the damage contract a leaf that imports nothing', () => {
+    // The previous test allows fx to reach this file, which is only safe
+    // while this file reaches nothing. One `import * as THREE` here and the
+    // allowance above quietly becomes an allowance for three.
+    expect(files.get(CONTRACT)).toBeDefined()
+    expect(imports(CONTRACT)).toEqual([])
+    expect(files.get(CONTRACT)).not.toMatch(/^\s*import\s/m)
   })
 
   it('walks a graph that is actually there, so a broken walk cannot pass', () => {

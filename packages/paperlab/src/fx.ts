@@ -39,9 +39,12 @@ export {
   FIELD_SIZE,
   FIXED_DT,
   type DamageFieldOptions,
-  type DamagePixels,
   type FieldStats,
 } from './fx/field'
+
+// Re-exported rather than defined here: the contract belongs to the sheet,
+// which is what draws it. See `surface/damageContract.ts`.
+export { DAMAGE_CHANNELS, type DamageSource } from './surface/damageContract'
 
 export {
   FxAudio,

@@ -37,11 +37,17 @@
  * tiers now — see `fx/quality.ts`.
  */
 
-/** Channel offsets into a texel. The shading chunk agrees with these. */
-export const CHAR = 0
-export const SATURATION = 1
-export const HEAT = 2
-export const PRESENCE = 3
+import { DAMAGE_CHANNELS, type DamageSource } from '../surface/damageContract'
+
+/**
+ * Channel offsets into a texel — the contract's, not this file's. The sheet
+ * defines what the four bytes mean because the sheet is what draws them;
+ * the field is one thing that writes them.
+ */
+export const CHAR = DAMAGE_CHANNELS.char
+export const SATURATION = DAMAGE_CHANNELS.saturation
+export const HEAT = DAMAGE_CHANNELS.heat
+export const PRESENCE = DAMAGE_CHANNELS.presence
 
 /**
  * The grid, in texels along each edge. One number for every device.
@@ -180,19 +186,6 @@ const DEFAULTS = {
   seed: 1,
 } satisfies Required<DamageFieldOptions>
 
-/**
- * What the shading reads. The whole of the contract between the sheet and
- * whatever is damaging it — see `DamageSource` in the main entry, which this
- * satisfies structurally.
- */
-export interface DamagePixels {
-  readonly size: number
-  /** RGBA per texel, 0..255: char, saturation, heat, presence. Row-major from v = 0. */
-  readonly pixels: Uint8Array
-  /** Bumped whenever `pixels` changes. Upload on a change, never otherwise. */
-  readonly version: number
-}
-
 /** What the field did this step. The numbers the sound and the emitters read. */
 export interface FieldStats {
   /**
@@ -321,7 +314,7 @@ interface Box {
 
 const EMPTY = (): Box => ({ x0: 1, y0: 1, x1: 0, y1: 0 })
 
-export class DamageField implements DamagePixels {
+export class DamageField implements DamageSource {
   readonly size = FIELD_SIZE
   /** RGBA per texel in float, row-major from v = 0. The simulation's own state. */
   readonly data: Float32Array
