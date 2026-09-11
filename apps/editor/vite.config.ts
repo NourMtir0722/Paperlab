@@ -86,6 +86,12 @@ export default defineConfig({
       // order, so a bare `paperlab` rule would rewrite the subpath into
       // `.../src/index.ts/stage` and fail to resolve.
       'paperlab/stage': fileURLToPath(new URL('../../packages/paperlab/src/stage.ts', import.meta.url)),
+      // `paperlab/fx` is BUILT but deliberately absent from the package's
+      // `exports` until fire ships, so a consumer cannot resolve it yet — see
+      // the note at the top of `src/fx.ts`. The alias is how `/hands`, which
+      // is the page fire is being built on, reaches it in the meantime. Before
+      // the bare rule below, for the reason given above it.
+      'paperlab/fx': fileURLToPath(new URL('../../packages/paperlab/src/fx.ts', import.meta.url)),
       paperlab: fileURLToPath(new URL('../../packages/paperlab/src/index.ts', import.meta.url)),
     },
     dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei', 'zustand'],

@@ -32,6 +32,18 @@ import { Breath } from './breath'
 import { Span } from './span'
 import { derive, sheetAt, type Squeeze } from './derive'
 import { Session } from './session'
+import { Match } from './match'
+import { FLAME_RADIUS, flameHeat } from './flame'
+import {
+  DamageField,
+  FireEmitter,
+  FireSound,
+  FxAudio,
+  FxParticles,
+  ParticlePool,
+  createAudioContext,
+  fxQualityFor,
+} from 'paperlab/fx'
 
 /**
  * Reach out and handle the paper.
@@ -203,6 +215,26 @@ const PEEL_PULL = 1.6
 /** Both slots, always read, so a hand that leaves resets its own reader. */
 const SIDES: readonly Handedness[] = ['Left', 'Right']
 
+/**
+ * What the effects are allowed to cost here.
+ *
+ * Fixed rather than measured, for now: this page already runs a camera, a
+ * hand tracker and a cloth simulation, and `auto` on top of that is a
+ * measurement of the wrong thing. The simulation is not tiered at all — every
+ * device burns the same fire — so this only sets how much of it is drawn.
+ */
+const FX_TIER = 'medium' as const
+
+/** How fast the air in the room moves, per unit of `cloth.wind`. */
+const SMOKE_WIND = 1.2
+
+/** A fresh field, at the tier's edge detail. */
+function newField(): DamageField {
+  const field = new DamageField()
+  field.detail = fxQualityFor(FX_TIER).detail
+  return field
+}
+
 /** What a hand looks like coming out of the tracker — or out of the harness. */
 export interface HandInput {
   landmarks: Landmark[]
@@ -260,6 +292,17 @@ interface DriveResult {
   pending: { from: UV | null; to: UV | null }
   /** The two-handed pull in progress, same reason. */
   pulling: { gap: number; edge: PaperEdge | null; now: number } | null
+  /** The fire: the flame in hand, and what it has done to the sheet. */
+  fire: {
+    /** Whether a match is lit. */
+    lit: boolean
+    /** Fraction of the sheet's texels on the burn front. */
+    front: number
+    /** Fraction of the sheet still there. */
+    remaining: number
+    /** Particles in the air. */
+    particles: number
+  }
 }
 
 declare global {
@@ -401,6 +444,17 @@ function App() {
   })
   const breathRef = useRef<Breath>(new Breath(WIND))
   const spanRef = useRef<Span>(new Span())
+  // ── Fire. The field is what has happened to the sheet; the pool and the
+  //    emitter are what the burn throws into the air; the sound reads the
+  //    same numbers the picture does.
+  const fieldRef = useRef<DamageField | null>(null)
+  const poolRef = useRef<ParticlePool | null>(null)
+  const emitterRef = useRef<FireEmitter | null>(null)
+  const audioRef = useRef<FxAudio | null>(null)
+  const fireSoundRef = useRef<FireSound | null>(null)
+  const matchRef = useRef<Match>(new Match())
+  /** Scratch for `surfacePoint`, so reading it every frame allocates nothing. */
+  const worldRef = useRef(new THREE.Vector3())
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef(0)
   // The frame loop's own copies: state reaches it a render late, and a mode
@@ -418,6 +472,30 @@ function App() {
   // A two-handed pull in progress: how far apart the hands were, and the edge.
   /** How far apart the two hands are right now — reported, not decided on. */
   // A dial in progress: the roll the palm went up at, and the stock it was on.
+
+  /**
+   * Where a point of the sheet is, for the emitters: the DRAWN surface this
+   * frame, after the cloth and whatever shape is running over it.
+   *
+   * This is what `PaperHandle.surfacePoint` exists for. Ash has to leave the
+   * paper from where the paper actually is, and a sheet that is draped, held
+   * and half crushed is nowhere a UV alone could say.
+   */
+  const locate = useCallback(
+    (u: number, v: number) => paperRef.current?.surfacePoint(u, v, worldRef.current) ?? null,
+    [],
+  )
+
+  /**
+   * The fire's three objects, made on first use and replaced together — a
+   * fresh sheet has never been burnt.
+   */
+  const fireRefs = useCallback(() => {
+    fieldRef.current ??= newField()
+    poolRef.current ??= new ParticlePool(fxQualityFor(FX_TIER).particles)
+    emitterRef.current ??= new FireEmitter(fieldRef.current, poolRef.current, locate)
+    return { field: fieldRef.current, pool: poolRef.current, emitter: emitterRef.current }
+  }, [locate])
 
   const getMesh = useCallback(() => paperRef.current?.mesh ?? null, [])
   const onReady = useCallback((api: StageApi) => {
@@ -438,6 +516,7 @@ function App() {
       pointer: PointerState | null,
       hands: number,
       otherAt: { x: number; y: number } | null,
+      fire: DriveResult['fire'],
     ) => {
       const cursor = cursorRef.current
       if (cursor) {
@@ -473,10 +552,16 @@ function App() {
       const readout = readoutRef.current
       if (readout) {
         const blow = breathRef.current.blow
+        // The fire's numbers go here rather than into the HUD's React tree
+        // for the reason everything per-frame does: a prop written sixty
+        // times a second re-renders the tree that owns the canvas.
+        const flame = fire.lit ? ' · flame lit' : ''
+        const burnt = fire.remaining < 1 ? ` · paper ${Math.round(fire.remaining * 100)}%` : ''
+        const air = fire.particles > 0 ? ` · ${fire.particles} in the air` : ''
         readout.textContent =
           frame.curl === null
-            ? `no hand in frame${blow > 0.05 ? ` · blowing ${blow.toFixed(2)}` : ''}`
-            : `${frame.name.padEnd(6)} ${hands} hand${hands === 1 ? '' : 's'} · aperture ${frame.aperture!.toFixed(2)} · curl ${frame.curl.toFixed(2)} · wind ${s.wind.toFixed(2)}`
+            ? `no hand in frame${blow > 0.05 ? ` · blowing ${blow.toFixed(2)}` : ''}${flame}${burnt}${air}`
+            : `${frame.name.padEnd(6)} ${hands} hand${hands === 1 ? '' : 's'} · aperture ${frame.aperture!.toFixed(2)} · curl ${frame.curl.toFixed(2)} · wind ${s.wind.toFixed(2)}${flame}${burnt}${air}`
       }
     },
     [s],
@@ -491,6 +576,18 @@ function App() {
       at?: number,
     ): DriveResult => {
       const now = at ?? performance.now()
+      /**
+       * The effects' own clock, in seconds.
+       *
+       * The field, the emitters and the sound all advance by a real interval
+       * rather than by a frame, so that the same burn takes the same time on
+       * any machine — and because the harness owns `now`, a scripted test
+       * owns that interval too. Capped, so a tab that was in the background
+       * does not resume by burning a tenth of a second's worth of paper per
+       * frame it missed.
+       */
+      const dt = s.frameAt === null ? 0 : Math.min(0.1, Math.max(0, (now - s.frameAt) / 1000))
+      s.frameAt = now
 
       // ── Read every hand, whether or not one is there. ─────────────────────
       const reads: Read[] = []
@@ -636,6 +733,32 @@ function App() {
       const uv = driverAt && stage ? stage.hitUV(driverAt.x, driverAt.y) : null
       const pinching = driver?.frame.name === 'pinch'
 
+      // ── The match. A pinch held still in free air is a flame. ─────────────
+      // See `match.ts` for why the dwell is the whole gesture: a flick is a
+      // pinch too, and without it every snap of the fingers would light one.
+      const flame = matchRef.current.push({
+        pinching,
+        onPaper: uv !== null,
+        at: driver?.anchor ?? null,
+        palm: driver?.palm ?? null,
+        blow: breathRef.current.blow,
+        now,
+        aspect,
+      })
+      const lit = flame === 'lit'
+
+      // Hold it against the paper and the paper lights. Keyed on where the
+      // flame is in SCREEN space — the raycast that says which part of the
+      // sheet it is over — and on how long it has been held there. Not on
+      // depth: a palm's apparent size is the only depth cue one camera has,
+      // and `landmarks.ts` records that it is far too coarse to key this on.
+      if (lit && uv) {
+        s.flameHeld += dt
+        fieldRef.current?.ignite(uv.u, uv.v, FLAME_RADIUS, flameHeat(s.flameHeld, dt))
+      } else {
+        s.flameHeld = 0
+      }
+
       // ── Peel. A pinch that lands on a CORNER curls it back. ───────────────
       // The same pose as a grab, and a different thing, because a corner is
       // not the middle of the sheet. The sim can pull a corner but it cannot
@@ -646,7 +769,7 @@ function App() {
           s.peeling = null
           s.set('peel', null)
         }
-      } else if (!s.wasPinching && driver?.anchor && uv && s.squeeze === 'none') {
+      } else if (!s.wasPinching && driver?.anchor && uv && s.squeeze === 'none' && !lit) {
         // Only on the frame the pinch CLOSES. A grab that turned into a peel
         // because the hand dragged the sheet's corner under itself would let
         // go of the paper half way through the pull — which is exactly what
@@ -664,7 +787,10 @@ function App() {
 
       // A peeling hand is not a grabbing hand: the pointer stays up, so the
       // sim never takes hold and the two do not fight over the same corner.
-      const pointer = pointerRef.current?.update(driver?.anchor ?? null, pinching && !s.peeling) ?? null
+      // A hand holding a match is not holding the paper: the pointer stays up
+      // while one is lit, so carrying a flame across the sheet cannot drag it.
+      const pointer =
+        pointerRef.current?.update(driver?.anchor ?? null, pinching && !s.peeling && !lit) ?? null
 
       if (s.peeling && driver?.anchor && driver.palm) {
         const lifted = palmsApart(driver.anchor, s.peeling.from, driver.palm, aspect)
@@ -786,7 +912,28 @@ function App() {
         s.rip = null
       }
 
-      paint(frame, pointer, reads.length, act === driver ? null : actAt)
+      // ── Fire. The field burns on its own clock; the sheet reads it. ───────
+      // Everything here is one direction: the field advances, the emitters
+      // read what it just did, the sound reads the same numbers. The PHYSICS
+      // of the burn is not here at all — `<Paper damage>` carries it, and the
+      // coupling inside the library shortens, curls and breaks the paper.
+      const { field, pool, emitter } = fireRefs()
+      const stats = field.step(dt)
+      // The same air that moves the sheet moves the smoke.
+      const air = s.wind * SMOKE_WIND
+      pool.wind[0] = air * 0.25
+      pool.wind[2] = air
+      emitter.update(dt)
+      pool.step(dt)
+      fireSoundRef.current?.update(dt, stats, locate(0.5, 0.5))
+      const fire: DriveResult['fire'] = {
+        lit,
+        front: stats.front,
+        remaining: stats.remaining,
+        particles: pool.count,
+      }
+
+      paint(frame, pointer, reads.length, act === driver ? null : actAt, fire)
       return {
         frame,
         pointer,
@@ -808,14 +955,24 @@ function App() {
         uv,
         pending: { from: s.scoreFrom, to: s.scoreTo },
         pulling: s.rip && { ...s.rip, now: s.ripGap },
+        fire,
       }
     },
-    [paint, s],
+    [paint, s, fireRefs, locate],
   )
 
   const reset = useCallback(() => {
     s.reset()
     spanRef.current.reset()
+    // A fresh sheet has never been burnt. The field is REPLACED rather than
+    // emptied, because the sheet's damage texture is keyed on the source's
+    // identity — and the coupling hands every cloth lever back when it
+    // changes, so the new sheet is not carrying the old one's broken springs.
+    fieldRef.current = newField()
+    emitterRef.current = null
+    poolRef.current?.clear()
+    matchRef.current.reset()
+    fireSoundRef.current?.stop()
   }, [s])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: as above — `s` is the stable store, its fields are not dependencies.
@@ -828,6 +985,10 @@ function App() {
       flicksRef.current[side].reset()
     }
     breathRef.current.reset()
+    // The flame is in a hand, and the hand has gone. What has already burnt
+    // stays burnt — that is the sheet's, like its creases.
+    matchRef.current.reset()
+    fireSoundRef.current?.stop()
     // Not `reset()`: the size two hands set is the sheet's, like its creases,
     // and stopping the camera is not a fresh sheet. Only the grip is dropped.
     spanRef.current.push(null)
@@ -846,6 +1007,17 @@ function App() {
   const start = useCallback(async () => {
     setStatus('starting')
     setMessage('asking for the camera…')
+    // Sound can only start from inside a user gesture, and this click is the
+    // one. It costs nothing to do here: nothing can be heard before the
+    // camera is on anyway, and an `AudioContext` made on page load would put
+    // an audio indicator in the tab of a page that has made no sound.
+    try {
+      audioRef.current ??= new FxAudio({ context: createAudioContext(), quality: FX_TIER })
+      await audioRef.current.unlock()
+      fireSoundRef.current ??= new FireSound(audioRef.current)
+    } catch {
+      // No Web Audio in this browser: everything but the sound still works.
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480, facingMode: 'user' },
@@ -960,12 +1132,19 @@ function App() {
    * answered by running a browser, a camera shim and a cloth simulation.
    */
   const paper = derive(s.sheet(dialStock(s.stockIndex)))
+  // `damage` is a PROP and not part of `derive`, because it is live state
+  // rather than config: it changes every frame of a burn and has no business
+  // in a preset or a share link. See `DamageSource`.
+  const { field, pool } = fireRefs()
 
   return (
     <>
       <div className="stage">
-        <Paper ref={paperRef} {...paper} interactive>
+        <Paper ref={paperRef} {...paper} damage={field} interactive>
           <CanvasBridge getMesh={getMesh} onReady={onReady} />
+          {/* At the canvas root, so the embers are in world space — which is
+              what `surfacePoint` hands the emitter. */}
+          <FxParticles pool={pool} />
         </Paper>
       </div>
 
@@ -999,6 +1178,11 @@ function App() {
           <dd>score a line — the sheet keeps it</dd>
           <dt>flick</dt>
           <dd>throw a watercolour at it</dd>
+          <dt>hold a pinch in the air</dt>
+          <dd>
+            a match — hold the flame against the paper and it catches, and it burns where you held it. Blow it
+            out{status === 'live' && !blowReady ? ' (model loading)' : ''}
+          </dd>
           <dt>turn a palm</dt>
           <dd>change the stock under your hand</dd>
           <dt>blow</dt>
