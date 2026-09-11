@@ -405,3 +405,36 @@ describe('the damage field', () => {
     expect(new DamageField().data.length).toBe(FIELD_SIZE * FIELD_SIZE * 4)
   })
 })
+
+describe('the stats a consumer reads every frame', () => {
+  it('forgets water that went with the paper it was in', () => {
+    // The running total used to keep water whose cell had been punched out —
+    // zeroed in the cell, never taken off the sum — so `saturation` drifted
+    // upward for good, and the coupling reads it as added mass.
+    const field = new DamageField({ drying: 0 })
+    field.wet(0.5, 0.5, 0.1, 1)
+    run(field, 0.2)
+    const wet = field.lastStats.saturation
+    field.punch(0.5, 0.5, 0.2)
+    run(field, 0.2)
+    const measured = total(field, SATURATION) / (field.size * field.size)
+    expect(field.lastStats.saturation).toBeCloseTo(measured, 6)
+    expect(field.lastStats.saturation).toBeLessThan(wet)
+  })
+
+  it('keeps reporting the front on a frame too short to step', () => {
+    // At 144 Hz roughly one frame in six runs no fixed step. Nothing about
+    // the fire changed on it, so the front has not either — reporting 0 there
+    // would drop the burn's sound to silence mid-burn.
+    const field = new DamageField({ seed: 3 })
+    field.ignite(0.5, 0.5, 0.06, 1)
+    run(field, 0.6)
+    const burning = field.lastStats.front
+    expect(burning).toBeGreaterThan(0)
+    // Less than one fixed step of time: the accumulator runs nothing.
+    const quiet = field.step(FIXED_DT * 0.25)
+    expect(quiet.front).toBe(burning)
+    // The events, by contrast, genuinely did not happen on it.
+    expect(quiet.charred).toBe(0)
+  })
+})

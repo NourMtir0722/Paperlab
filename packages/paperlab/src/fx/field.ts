@@ -527,8 +527,10 @@ export class DamageField implements DamageSource {
     let consumed = 0
     let wetted = 0
     let front = 0
+    let stepped = false
     while (this.accumulator >= FIXED_DT && !this.asleep) {
       this.accumulator -= FIXED_DT
+      stepped = true
       const done = this.substep()
       charred += done.charred
       consumed += done.consumed
@@ -539,7 +541,10 @@ export class DamageField implements DamageSource {
 
     const n = FIELD_SIZE * FIELD_SIZE
     this.stats = {
-      front: front / n,
+      // A frame shorter than one fixed step runs none — one frame in six at
+      // 144 Hz — and nothing about the fire changed on it. Reporting 0 there
+      // would drop the burn's sound to silence mid-burn, six times a second.
+      front: stepped ? front / n : this.stats.front,
       charred,
       consumed,
       wetted,
@@ -613,6 +618,10 @@ export class DamageField implements DamageSource {
         // is what makes a burnt-through region stop the fire rather than
         // carry it. The A channel is a boundary condition, not just a mask.
         if (presence <= 0) {
+          // Whatever water this cell held went with the paper. Take it off the
+          // running total as well as the cell, or `saturation` reports water
+          // that is gone — and the coupling reads that number as added mass.
+          this.wetTotal -= data[b + SATURATION]!
           next[b + HEAT] = 0
           next[b + SATURATION] = 0
           next[b + CHAR] = data[b + CHAR]!
