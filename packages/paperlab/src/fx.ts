@@ -36,6 +36,14 @@ export {
 } from './fx/field'
 
 export {
+  FxAudio,
+  createAudioContext,
+  type AudioLike,
+  type FxAudioOptions,
+  type Voice,
+} from './fx/sfx/graph'
+
+export {
   fxQualityNames,
   fxQualityFor,
   fxQualityTiers,
