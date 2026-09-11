@@ -221,9 +221,10 @@ const worldScratch = new THREE.Vector3()
 const quatScratch = new THREE.Quaternion()
 
 /**
- * The atom: one sheet of paper, hero-mode CPU path. The deformer stack (or
- * the cloth sim — never both) writes geometry positions each frame. GSAP
- * owns animated values; useFrame owns geometry writes.
+ * The atom: one sheet of paper, hero-mode CPU path. The cloth sim solves the
+ * particles and the deformer stack runs over them — both, not either; only a
+ * strip owns its vertices outright. GSAP owns animated values; useFrame owns
+ * geometry writes.
  */
 export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperMesh(props, ref) {
   // Each resolveConfig call is several zod parses (superRefine re-parses every

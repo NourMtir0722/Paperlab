@@ -1,6 +1,11 @@
 /**
  * `paperlab/fx` — what happens TO the paper.
  *
+ * **Built, not exported.** It is in the tsup entries so the boundary test and
+ * `test:consumer` cover it, and absent from `exports` so no release can
+ * publish it before it has an effect in it. Export it in the commit that
+ * ships fire, and not before.
+ *
  * The main entry point is paper as a thing: a sheet, its stock, its shape,
  * the way it moves. This one is the events that damage it — burning, soaking,
  * tearing, the particles they throw off and the sounds they make.

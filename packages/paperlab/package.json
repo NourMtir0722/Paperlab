@@ -28,16 +28,6 @@
         "types": "./dist/stage.d.cts",
         "default": "./dist/stage.cjs"
       }
-    },
-    "./fx": {
-      "import": {
-        "types": "./dist/fx.d.ts",
-        "default": "./dist/fx.js"
-      },
-      "require": {
-        "types": "./dist/fx.d.cts",
-        "default": "./dist/fx.cjs"
-      }
     }
   },
   "files": [
@@ -118,9 +108,6 @@
     "*": {
       "stage": [
         "./dist/stage.d.ts"
-      ],
-      "fx": [
-        "./dist/fx.d.ts"
       ]
     }
   }

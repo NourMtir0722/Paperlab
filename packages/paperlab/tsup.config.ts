@@ -20,6 +20,7 @@ const external = [
   'postprocessing',
 ]
 
+// fx is built but NOT in `exports` yet — see the note at the top of src/fx.ts.
 const entry = ['src/index.ts', 'src/stage.ts', 'src/fx.ts']
 
 /**

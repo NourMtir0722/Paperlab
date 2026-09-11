@@ -72,9 +72,11 @@ function grabFalloff(distance: number, radius: number): number {
  * bend springs, pins as the interface, wind as a force field, fixed timestep
  * with substeps, sleep when kinetic energy is negligible.
  *
- * Constraint (enforced in the schema): cloth OWNS vertex positions — a paper
- * runs a behavior (deformer stack) OR cloth, never both. Pure JS, no three
- * dependency: the PaperMesh adapter copies `positions` into the geometry.
+ * Cloth solves the particles and hands them on: `PaperMesh` runs the deformer
+ * stack over `positions`, so a behavior composes with the sim rather than
+ * replacing it (pinned by `cloth-hosts-a-shape.test.ts`). Only the STRIP owns
+ * its vertices outright — its rows are chain nodes, not the sheet's grid.
+ * Pure JS, no three dependency.
  */
 export class ClothSim {
   readonly cols: number
