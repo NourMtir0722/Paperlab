@@ -20,7 +20,7 @@ const external = [
   'postprocessing',
 ]
 
-const entry = ['src/index.ts', 'src/stage.ts']
+const entry = ['src/index.ts', 'src/stage.ts', 'src/fx.ts']
 
 /**
  * Two configs rather than one `format: ['esm', 'cjs']`, for exactly one

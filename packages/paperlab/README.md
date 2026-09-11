@@ -25,13 +25,15 @@ npm i paperlab three @react-three/fiber gsap
 
 Requires React ≥ 19 and three ≥ 0.162. TypeScript types ship with the package; both ESM and CJS builds are published.
 
+> **npm users:** `@react-three/fiber@9.7.0` caps React at `>=19 <19.3`, and npm installs React 19.3 by default, so the line above can fail with `ERESOLVE`. Ask for a React the renderer accepts — `npm i paperlab three @react-three/fiber gsap react@19.2 react-dom@19.2` — until fiber widens its range. pnpm and yarn resolve it without complaint. This is upstream's ceiling, not Paperlab's: the library itself supports any React ≥ 19.
+
 Stage mode lives at the `paperlab/stage` subpath and needs two more peers:
 
 ```sh
 npm i @react-three/postprocessing postprocessing
 ```
 
-They are optional. `<Paper>` and `<PaperField>` never reach for them, so a bundle that does not import `paperlab/stage` contains none of it — and the subpath is what keeps the import specifier itself out of your build graph.
+They are genuinely optional, in both directions. `<Paper>` and `<PaperField>` never reach for them, so a bundle that does not import `paperlab/stage` contains none of it — the subpath keeps the import specifier itself out of your build graph. And `paperlab/stage` loads the print pass on demand rather than at module scope, so a stage renders without them too: you lose the tone curve, bloom, vignette and grain, and the console says so once.
 
 ## Quick start
 

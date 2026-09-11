@@ -156,7 +156,11 @@ function consumer(label, peers, probe) {
 const loadProbe = `
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
-const expect = { paperlab: 'Paper', 'paperlab/stage': 'PaperStage' }
+const expect = {
+  paperlab: 'Paper',
+  'paperlab/stage': 'PaperStage',
+  'paperlab/fx': 'DamageField',
+}
 
 for (const [specifier, name] of Object.entries(expect)) {
   try {
@@ -227,4 +231,4 @@ if (failures > 0) {
   )
   process.exit(1)
 }
-console.log('Consumer install is clean: both entry points load with only the required peers.')
+console.log('Consumer install is clean: every entry point loads with only the required peers.')
