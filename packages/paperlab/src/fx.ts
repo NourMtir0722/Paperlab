@@ -1,10 +1,12 @@
 /**
  * `paperlab/fx` — what happens TO the paper.
  *
- * **Built, not exported.** It is in the tsup entries so the boundary test and
- * `test:consumer` cover it, and absent from `exports` so no release can
- * publish it before it has an effect in it. Export it in the commit that
- * ships fire, and not before.
+ * **Exported as of the release that ships fire**, and not before: it was
+ * built but deliberately absent from `exports` while there was nothing in it
+ * to use, because a subpath cannot be taken back once it is published. A
+ * missing changeset would not have held it back — the next release for any
+ * reason publishes whatever `exports` names — so the map was the thing that
+ * did, and `test:consumer` pinned that.
  *
  * The main entry point is paper as a thing: a sheet, its stock, its shape,
  * the way it moves. This one is the events that damage it — burning, soaking,

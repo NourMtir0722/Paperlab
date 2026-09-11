@@ -219,6 +219,34 @@ main entry never names those modules, so a consumer who imports only
 `<Paper>` neither ships their bytes nor has to resolve them. Tree-shaking
 alone was not enough: it removes the code but not the import specifier.
 
+### Damage, and `paperlab/fx`
+
+`<Paper damage={source}>` takes a grid of char, saturation, heat and missing
+paper over the sheet's UV — `DamageSource` is `{ size, pixels, version,
+detail? }` and `DAMAGE_CHANNELS` says which byte is which, row 0 at `v = 0`.
+The sheet draws whatever it is handed without knowing the cause, the way
+`content` is drawn without knowing who painted it, so a baked texture or a
+recorded burn played back works as well as a live simulation. A PROP and not
+config: it is live state and has no business in a preset or a share link.
+
+On a cloth sheet it reaches the solve as well as the shading — char shrinks
+the paper and curls it toward the flame, saturation adds mass, and paper that
+has burnt away leaves the simulation instead of hanging off it, invisible.
+`PaperHandle.surfacePoint(u, v, target?)` is how anything emits from a sheet
+that is draped or crumpled. One stated limit: a cut narrower than a cloth
+cell separates the picture and not the paper — splitting a sheet in two needs
+a second mesh.
+
+**The causes are `paperlab/fx`**, the third entry point: `DamageField` (CPU,
+main-thread, one untiered grid at a fixed timestep, with the paper's grain and
+fibre direction in it — `ignite`, `wet`, `cut`, `punch`, `step`, plus
+`FieldStats` and the cells it just burnt through), `ParticlePool` with
+`particlePresets` (ember, smoke, ash — one pool, presets as parameter sets),
+`FireEmitter`, `FxParticles` to draw them, `FxAudio` + `FireSound` (a bed on
+the length of the burn front, a crackle on the rate paper chars — synthesised,
+never sampled), and `fxQualityTiers`, which tier PRESENTATION only: the
+simulation is the same everywhere, so a burn replays identically on any device.
+
 `threshold` is in **linear light and defaults to 1.6**, above 1.0 on purpose.
 Bloom reads the scene BEFORE the tone curve, so 1.0 means "as bright as
 white" rather than "the brightest thing on screen". Lit near-white stock

@@ -172,22 +172,11 @@ function consumer(label, peers, probe) {
 const loadProbe = `
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
-const expect = { paperlab: 'Paper', 'paperlab/stage': 'PaperStage' }
-
-// Built and shipped in dist, deliberately NOT in \`exports\`. A missing
-// changeset does not keep a subpath off npm — the next release for any reason
-// publishes whatever \`exports\` names — so the only thing that holds fx back
-// until it has an effect in it is the map, and this pins that it does. Delete
-// this block and add fx to \`expect\` in the same commit that exports it.
-for (const specifier of ['paperlab/fx']) {
-  try {
-    await import(specifier)
-    console.log(\`FAIL '\${specifier}' is importable — it is exported before it has anything in it\`)
-  } catch (e) {
-    if (e.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED') console.log(\`OK '\${specifier}' is held back from the public surface\`)
-    else console.log(\`FAIL '\${specifier}' failed for the wrong reason — \${e.code ?? ''} \${e.message.split('\\n')[0]}\`)
-  }
-}
+// fx is exported now that fire is in it: the field, the emitters, the
+// particles and the sound. Until this release it was built but deliberately
+// absent from \`exports\`, and this gate asserted that — a missing changeset
+// does not keep a subpath off npm, the map does.
+const expect = { paperlab: 'Paper', 'paperlab/stage': 'PaperStage', 'paperlab/fx': 'DamageField' }
 
 for (const [specifier, name] of Object.entries(expect)) {
   try {

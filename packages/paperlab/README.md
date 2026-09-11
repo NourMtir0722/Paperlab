@@ -35,6 +35,8 @@ npm i @react-three/postprocessing postprocessing
 
 They are genuinely optional, in both directions. `<Paper>` and `<PaperField>` never reach for them, so a bundle that does not import `paperlab/stage` contains none of it — the subpath keeps the import specifier itself out of your build graph. And `paperlab/stage` loads the print pass on demand rather than at module scope, so a stage renders without them too: you lose the tone curve, bloom, vignette and grain, and the console says so once.
 
+`paperlab/fx` is the third entry point: what happens **to** the paper. A sheet takes `<Paper damage={source}>` — char, water, heat and missing paper over its own UV — and draws it, cuts its shadow with it, and on a simulated sheet shrinks, curls, weighs down and breaks the paper it describes. What *causes* damage lives behind the subpath: a field that burns, soaks and erodes; the embers, smoke and ash a burn throws off; and a fire synthesised from the same numbers the picture is drawn from. A `<Paper>`-only bundle resolves none of it.
+
 ## Quick start
 
 ```tsx
