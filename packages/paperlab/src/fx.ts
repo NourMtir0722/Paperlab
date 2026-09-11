@@ -62,9 +62,13 @@ export {
   FxAudio,
   createAudioContext,
   type AudioLike,
+  type BiquadFilterLike,
   type FxAudioOptions,
+  type PannerLike,
   type Voice,
 } from './fx/sfx/graph'
+
+export { FireSound, type FireSoundOptions, type SoundAt } from './fx/sfx/fire'
 
 export {
   fxQualityNames,

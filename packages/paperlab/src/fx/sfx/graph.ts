@@ -49,6 +49,18 @@ export interface AudioLike {
   readonly destination: AudioNodeLike
   createGain(): GainLike
   createBufferSource(): BufferSourceLike
+  /**
+   * Every paper sound is noise with the wrong frequencies taken out of it —
+   * a fire is a low rumble under a bright crackle, a tear is the same noise
+   * with the bottom removed. Without a filter there is one sound in the whole
+   * library: white noise at different volumes.
+   */
+  createBiquadFilter(): BiquadFilterLike
+  /**
+   * Where the sound is. A sheet you are holding at arm's length, burning at
+   * one corner, is not a sound in the middle of your head.
+   */
+  createPanner(): PannerLike
   createBuffer(channels: number, length: number, sampleRate: number): AudioBufferLike
   readonly sampleRate: number
   resume(): Promise<void>
@@ -71,6 +83,23 @@ export interface GainLike extends AudioNodeLike {
   readonly gain: AudioParamLike
 }
 
+export interface BiquadFilterLike extends AudioNodeLike {
+  type: 'lowpass' | 'highpass' | 'bandpass' | 'notch' | 'peaking' | 'lowshelf' | 'highshelf' | 'allpass'
+  readonly frequency: AudioParamLike
+  readonly Q: AudioParamLike
+}
+
+export interface PannerLike extends AudioNodeLike {
+  panningModel: 'equalpower' | 'HRTF'
+  distanceModel: 'linear' | 'inverse' | 'exponential'
+  refDistance: number
+  maxDistance: number
+  rolloffFactor: number
+  readonly positionX: AudioParamLike
+  readonly positionY: AudioParamLike
+  readonly positionZ: AudioParamLike
+}
+
 export interface AudioBufferLike {
   getChannelData(channel: number): Float32Array
   readonly length: number
@@ -79,7 +108,12 @@ export interface AudioBufferLike {
 export interface BufferSourceLike extends AudioNodeLike {
   buffer: AudioBufferLike | null
   loop: boolean
-  start(when?: number): void
+  /**
+   * `offset` and `duration` are what make one shared second of noise into
+   * every crackle in a fire: a different slice each time, ending itself
+   * without anything having to schedule a stop.
+   */
+  start(when?: number, offset?: number, duration?: number): void
   stop(when?: number): void
   onended: (() => void) | null
 }
@@ -127,6 +161,15 @@ export interface Voice {
    * released stops the source at once rather than letting it play unheard.
    */
   own(source: BufferSourceLike): void
+  /**
+   * Hand a NODE to this voice, so it is disconnected with it.
+   *
+   * The same rule as {@link own}, for the filters and panners a sound is
+   * shaped by. A crackle makes its own filter — a few dozen a second in a
+   * good burn — and a filter left connected to a freed gain is the same leak
+   * the sources used to have, in a part of the graph nothing was watching.
+   */
+  use(node: AudioNodeLike): void
   /** Stop and return this voice to the pool. */
   stop(): void
 }
@@ -148,7 +191,10 @@ export class FxAudio {
    * nodes are freed when the last source reports `ended`, not before — cut
    * sooner and the fade that stops stealing from clicking is cut with it.
    */
-  private readonly slots = new Map<number, { gain: GainLike; sources: BufferSourceLike[] }>()
+  private readonly slots = new Map<
+    number,
+    { gain: GainLike; sources: BufferSourceLike[]; nodes: AudioNodeLike[] }
+  >()
   private nextId = 1
   private unlocked = false
   private noise: AudioBufferLike | null = null
@@ -255,7 +301,7 @@ export class FxAudio {
     const gain = this.ctx.createGain()
     gain.connect(this.master)
     const id = this.nextId++
-    this.slots.set(id, { gain, sources: [] })
+    this.slots.set(id, { gain, sources: [], nodes: [] })
     const voice: Voice = {
       id,
       kind,
@@ -263,6 +309,7 @@ export class FxAudio {
       gain,
       startedAt: this.ctx.currentTime,
       own: (source) => this.own(id, source),
+      use: (node) => this.useNode(id, node),
       stop: () => this.release(id),
     }
     this.live.push(voice)
@@ -283,6 +330,17 @@ export class FxAudio {
     source.onended = () => this.ended(id, source)
   }
 
+  private useNode(id: number, node: AudioNodeLike): void {
+    const slot = this.slots.get(id)
+    const alive = this.live.some((v) => v.id === id)
+    if (!slot || !alive) {
+      // Given to a voice that has already gone: it feeds nothing, so it goes.
+      node.disconnect()
+      return
+    }
+    slot.nodes.push(node)
+  }
+
   private ended(id: number, source: BufferSourceLike): void {
     source.disconnect()
     const slot = this.slots.get(id)
@@ -300,6 +358,7 @@ export class FxAudio {
   private free(id: number): void {
     const slot = this.slots.get(id)
     if (!slot) return
+    for (const node of slot.nodes) node.disconnect()
     slot.gain.disconnect()
     this.slots.delete(id)
   }
