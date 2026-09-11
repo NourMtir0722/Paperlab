@@ -67,19 +67,26 @@ import { Span } from './span'
  * peel gesture to learn, and why `marks.ts` is where most of this lives.
  *
  * The dividing line that decides how all of it feels: SURFACE and MEMORY
- * changes are free, STRUCTURAL changes reset the sheet. `surface.*`,
+ * changes are free, and so is a STRUCTURAL one now. `surface.*`,
  * `memory.creases`, `stock` and the live cloth parameters update in place;
- * changing `pins`, the sheet's dimensions, or swapping physics for a behavior
- * rebuilds the sim and snaps the paper flat.
+ * changing `pins`, the sheet's dimensions, or putting a behavior over the sim
+ * rebuilds the mesh and the simulation, and `ClothSim.adopt` carries the
+ * particles across the rebuild, so the paper stays where it was.
  *
- * That is why scoring, tearing, painting, blowing and changing the stock all
- * feel right, and why the fist does not. The schema makes a simulation and a
- * behavior EXCLUSIVE — "the sim owns the vertices" — so a fist swaps cloth out
- * for `crumple`, which throws away the drape the sim had built and starts the
- * crush from a flat sheet. In real life you crush the paper you are holding;
- * here it snaps first. That is the library's exclusivity rule showing through,
- * not a bug in this file, and it is the one change that would turn the other
- * eleven behaviors into gesture material at a stroke.
+ * That is why scoring, tearing, painting, blowing, changing the stock AND the
+ * fist all feel right. It is worth being precise about, because this comment
+ * said the opposite for a while and the claim outlived the code by a whole
+ * commit: the schema does not make a simulation and a behavior exclusive —
+ * only the STRIP is exclusive, because its rows are chain nodes rather than
+ * the sheet's own grid. Cloth is not swapped out for `crumple`; it hosts it.
+ * `PaperMesh` solves the particles and then runs the deformer stack over
+ * them, which is why you crush the paper you are actually holding.
+ *
+ * Pinned by `physics/cloth-hosts-a-shape.test.ts` rather than by this
+ * paragraph, since a paragraph is what was wrong last time. The browser
+ * harness cannot pin it: it measures a live renderer on a wall clock and
+ * reported this same sheet's drape as 0.460 → 0.780 on one run and
+ * 1.117 → 0.170 on the next, with nothing changed in between.
  *
  * Still out of reach: punch and cut. The sheet is a fixed-topology grid, so a
  * hole in the middle or a split into two sheets needs real work in the
