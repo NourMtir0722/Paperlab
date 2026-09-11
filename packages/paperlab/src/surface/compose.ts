@@ -423,6 +423,7 @@ void plPerforation(inout vec4 color) {
  */
 const DAMAGE_CHUNK = /* glsl */ `
 uniform sampler2D uDamage;
+uniform float uDamageDetail;
 
 // The damage grid's texels sit ON the sheet — texel x at u = x / (N - 1), its
 // corners on the sheet's corners, which is how the field paints and how the
@@ -435,6 +436,16 @@ vec2 plDamageUv(vec2 uv) {
 
 void plDamage(inout vec4 color, inout float roughness) {
   vec4 d = texture2D(uDamage, plDamageUv(vPaperUv));
+  // The fray: noise that moves the scorch line and the cut WITHIN the grid's
+  // soft band, at a scale no 64-texel grid can carry — a burnt edge reads as
+  // burnt by being ragged. In sheet space, so it does not stretch with the
+  // aspect. Scaled by what is already there, so pristine paper (char 0,
+  // presence 1) is untouched to the bit, and skipped outright at detail 0.
+  if (uDamageDetail > 0.0) {
+    float fray = (plFbm(plLocal() * 38.0) - 0.47) * uDamageDetail;
+    d.r = clamp(d.r + fray * 0.3 * smoothstep(0.0, 0.15, d.r), 0.0, 1.0);
+    d.a = clamp(d.a + fray * 0.3 * (1.0 - smoothstep(0.85, 1.0, d.a)), 0.0, 1.0);
+  }
   // Wet paper is darker and smoother: water fills the gaps between fibres
   // that scatter light, which is both effects from one cause.
   color.rgb *= 1.0 - 0.38 * d.g;
@@ -609,6 +620,8 @@ export function composeSurface(
     calls.push('plDamage(csm_DiffuseColor, csm_Roughness);')
     // Bound by `PaperMaterial` to the uploaded texture; null only until then.
     uniforms.uDamage = { value: null }
+    // Set by `PaperMaterial` from the source's `detail` every frame.
+    uniforms.uDamageDetail = { value: 1 }
   }
 
   /**

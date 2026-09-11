@@ -152,6 +152,17 @@ try {
     )
   }
 
+  // The fray: a hard-edged hole, drawn with and without it. If the two match,
+  // `detail` reaches nothing and the edge is the grid's own staircase.
+  console.log('\nthe edge')
+  const frayed = await photograph('damage=hole')
+  const gridEdge = await photograph('damage=hole&detail=0')
+  check(
+    !frayed.equals(gridEdge),
+    'a cut edge is frayed finer than the grid, and detail 0 turns it off',
+    'the two photographs match, so detail reaches nothing',
+  )
+
   console.log('\nthe shadow map')
   const whole = await photograph('scene=shadow&damage=none', SHADOW_CLIP)
   const wholeAgain = await photograph('scene=shadow&damage=none', SHADOW_CLIP)

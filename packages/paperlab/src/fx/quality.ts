@@ -18,9 +18,8 @@
  *
  * What remains here is what a weaker device can genuinely show less of
  * without the effect meaning something different: how many particles are in
- * the air, and how many sounds play at once. A knob belongs here only when
- * something reads it. The shading's per-fragment edge detail will be the next
- * one, in the commit that adds the chunk which reads it — not before.
+ * the air, how many sounds play at once, and how finely a burnt edge is drawn.
+ * A knob belongs here only when something reads it.
  */
 
 export const fxQualityNames = ['auto', 'low', 'medium', 'high'] as const
@@ -44,19 +43,28 @@ export interface FxQualitySettings {
    * `FxAudio`.
    */
   voices: number
+  /**
+   * How ragged a burnt edge is drawn, 0..1 — per-fragment noise that frays
+   * the edge finer than the damage grid can. Handed to the sheet as the
+   * field's `detail`. The one part of drawing damage that costs per PIXEL,
+   * so the part a fill-rate-bound phone gives up first; at 0 the shader
+   * skips the noise outright.
+   */
+  detail: number
 }
 
 export const fxQualityTiers: Record<FxQualityTier, FxQualitySettings> = {
   /** A desktop GPU, or a phone that has measured its way up here. */
-  high: { particles: 2000, voices: 16 },
+  high: { particles: 2000, voices: 16, detail: 1 },
   /** The default worth aiming at: a recent phone, or an integrated laptop GPU. */
-  medium: { particles: 900, voices: 10 },
+  medium: { particles: 900, voices: 10, detail: 1 },
   /**
    * A throttled phone with the camera and the tracker already running, which
    * is the realistic case rather than the pessimistic one. The fire is the
-   * same fire; the shower is thinner and fewer crackles overlap.
+   * same fire; the shower is thinner, fewer crackles overlap, and its edge is
+   * the grid's own.
    */
-  low: { particles: 350, voices: 6 },
+  low: { particles: 350, voices: 6, detail: 0 },
 }
 
 /** Where `auto` starts before anything has been measured. */

@@ -320,6 +320,13 @@ export class DamageField implements DamageSource {
   readonly data: Float32Array
   /** The same, at 8 bits, for upload. Kept in step with `data` over what changed. */
   readonly pixels: Uint8Array
+  /**
+   * How ragged the sheet DRAWS this field's edges, 0..1 — see
+   * `DamageSource.detail`. Not a simulation option, because it changes
+   * nothing the field computes: set it from `fxQualityFor(tier).detail`, and
+   * again whenever the tier moves.
+   */
+  detail = 1
   private revision = 0
 
   private readonly next: Float32Array

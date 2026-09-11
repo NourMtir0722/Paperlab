@@ -21,6 +21,7 @@ import { DAMAGE_CHANNELS, Paper, PaperLighting, PaperMesh, type DamageSource, ty
  *   ?damage=glowing    the same scorch with its burning line HOT — the heat
  *                      channel drawn as light; `scorched` is its control
  *   ?damage=hole       a hole punched through the middle — for the shadow
+ *   ?detail=0          the same damage without its per-fragment fray
  *   ?stock=…           any stock; `vellum` is the one below full opacity
  *   ?scene=shadow      the sheet over a floor that RECEIVES its shadow map,
  *                      seen from above — the one place a hole's shadow shows.
@@ -42,6 +43,7 @@ const query = new URLSearchParams(window.location.search)
 const mode = query.get('damage') ?? 'none'
 const stock = (query.get('stock') ?? 'printer') as StockName
 const scene = query.get('scene') ?? 'sheet'
+const detail = Number(query.get('detail') ?? '1')
 
 const SIZE = 64
 
@@ -57,10 +59,13 @@ function field(scorch: boolean, hole = false, glow = false): DamageSource {
     if (scorch) pixels[i * 4 + DAMAGE_CHANNELS.char] = Math.max(0, Math.min(255, Math.round((12 - d) * 40)))
     // The burning line: a ring of heat at the scorch's rim, where a front is.
     if (glow) {
-      pixels[i * 4 + DAMAGE_CHANNELS.heat] = Math.max(0, Math.min(255, Math.round((1 - Math.abs(d - 10.5) / 2.5) * 255)))
+      pixels[i * 4 + DAMAGE_CHANNELS.heat] = Math.max(
+        0,
+        Math.min(255, Math.round((1 - Math.abs(d - 10.5) / 2.5) * 255)),
+      )
     }
   }
-  return { size: SIZE, pixels, version: 1 }
+  return { size: SIZE, pixels, version: 1, detail }
 }
 
 const damage =

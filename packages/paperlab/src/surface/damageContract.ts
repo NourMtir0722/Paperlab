@@ -44,6 +44,16 @@ export interface DamageSource {
   readonly pixels: Uint8Array
   /** Bumped whenever `pixels` changes. The sheet uploads on a change and never otherwise. */
   readonly version: number
+  /**
+   * How ragged a burnt or cut edge is DRAWN, 0..1; omitted means 1.
+   *
+   * Presentation only: per-fragment noise that moves the edge within the
+   * grid's soft band, finer than the grid itself can carry. The physics reads
+   * the grid and never this. It is the one part of drawing damage that costs
+   * per pixel, which is why it is a number a source can turn down — `paperlab/fx`
+   * sets it from its quality tier.
+   */
+  readonly detail?: number
 }
 
 /**

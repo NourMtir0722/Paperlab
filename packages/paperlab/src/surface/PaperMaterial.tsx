@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { useEffect, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import CustomShaderMaterial from 'three-custom-shader-material'
 import type { LightingName, SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
@@ -73,7 +74,15 @@ export function PaperMaterial({
   const bound = useMemo(() => composed.uniforms, [composed.structureKey])
   useEffect(() => {
     for (const [key, uniform] of Object.entries(composed.uniforms)) {
-      if (!bound[key] || key === 'uFrontMap' || key === 'uBackMap' || key === 'uDamage') continue
+      if (
+        !bound[key] ||
+        key === 'uFrontMap' ||
+        key === 'uBackMap' ||
+        key === 'uDamage' ||
+        key === 'uDamageDetail'
+      ) {
+        continue
+      }
       if (bound[key].value instanceof THREE.Color && uniform.value instanceof THREE.Color) {
         ;(bound[key].value as THREE.Color).copy(uniform.value)
       } else {
@@ -86,6 +95,11 @@ export function PaperMaterial({
     if (bound.uBackMap) bound.uBackMap.value = backTexture ?? null
     if (bound.uDamage) bound.uDamage.value = damageTexture
   }, [bound, texture, backTexture, damageTexture])
+  // The fray follows the quality tier, which can change at any moment, so it
+  // is read off the source each frame rather than baked into the program.
+  useFrame(() => {
+    if (bound.uDamageDetail) bound.uDamageDetail.value = damage?.detail ?? 1
+  })
 
   return (
     <>
