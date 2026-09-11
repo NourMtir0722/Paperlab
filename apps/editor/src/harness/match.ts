@@ -40,7 +40,10 @@ export type MatchState = 'none' | 'arming' | 'lit'
 export interface MatchInput {
   /** Is the acting hand pinching? */
   pinching: boolean
-  /** Did the pinch land on the paper? That is a grab, and it stays a grab. */
+  /**
+   * Is this pinch on the paper, or holding it? That is a grab, and it stays a
+   * grab for as long as the hand stays closed — see the latch in {@link Match}.
+   */
   onPaper: boolean
   /** Where the pinch is, in the camera's own coordinates. */
   at: { x: number; y: number } | null
@@ -58,6 +61,20 @@ export class Match {
   private since = 0
   /** Blown out, and not to be relit until the hand lets go. */
   private blownOut = false
+  /**
+   * This pinch took hold of the paper, so it is a grab until the hand opens —
+   * even once it has dragged the sheet off its own edge.
+   *
+   * A latch and not a per-frame test, and that distinction cost a CI run.
+   * Tearing an edge is a pinch that starts on the paper and pulls AWAY from
+   * it: a few frames in, the hand is over empty space, and it is holding
+   * still by any measure a held match would use. On a slow machine those
+   * frames span more than the dwell, so the match lit in the middle of the
+   * pull, the flame took the pointer away from the grab, and the tear could
+   * never finish. Reproduced at 100 ms a frame: lit at step 12 of 26, nothing
+   * torn. The frame rate decided whether a gesture worked.
+   */
+  private grabbed = false
 
   get lit(): boolean {
     return this.state === 'lit'
@@ -72,6 +89,7 @@ export class Match {
       this.state = 'none'
       this.origin = null
       this.blownOut = false
+      this.grabbed = false
       return this.state
     }
 
@@ -90,9 +108,10 @@ export class Match {
       return this.state
     }
 
-    // A pinch that landed on the paper is a grab, and one already blown out
-    // stays out.
-    if (this.blownOut || onPaper) {
+    // A pinch that has touched the paper is a grab for the rest of its life,
+    // and one already blown out stays out.
+    if (onPaper) this.grabbed = true
+    if (this.blownOut || this.grabbed) {
       this.state = 'none'
       this.origin = null
       return this.state
@@ -117,5 +136,6 @@ export class Match {
     this.origin = null
     this.since = 0
     this.blownOut = false
+    this.grabbed = false
   }
 }

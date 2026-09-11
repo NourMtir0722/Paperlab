@@ -738,7 +738,11 @@ function App() {
       // pinch too, and without it every snap of the fingers would light one.
       const flame = matchRef.current.push({
         pinching,
-        onPaper: uv !== null,
+        // `heldSheet` as well as the raycast, and that is the whole of a CI
+        // failure: pulling an edge off the sheet is a pinch that STARTS on the
+        // paper and ends over empty space, holding still. Without this the
+        // match lit in the middle of a tear and took the grab with it.
+        onPaper: uv !== null || s.heldSheet,
         at: driver?.anchor ?? null,
         palm: driver?.palm ?? null,
         blow: breathRef.current.blow,

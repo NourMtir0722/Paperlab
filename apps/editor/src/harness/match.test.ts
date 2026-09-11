@@ -79,6 +79,27 @@ describe('the match', () => {
     expect(dwell(match, 1000, { onPaper: true })).toBe('none')
   })
 
+  it('never lights on a pinch that has ALREADY held the paper, however long it is held after', () => {
+    // The regression, and it failed on CI rather than here. Tearing an edge is
+    // a pinch that starts on the paper and pulls away from it: within a few
+    // frames the hand is over empty space and holding as still as any match.
+    // On a slow machine those frames outlast the dwell, so the match lit in
+    // the middle of the pull and the flame took the pointer away from the
+    // grab — the tear could not finish, and the frame rate decided whether a
+    // gesture worked at all.
+    const match = new Match()
+    for (let now = 0; now < 60; now += 16) match.push(held({ onPaper: true, now }))
+    // Now off the sheet, dragging slowly — a whole second of it.
+    let state: string = 'none'
+    for (let now = 64; now < 1200; now += 100) {
+      state = match.push(held({ onPaper: false, at: { x: 0.6 - now / 20_000, y: 0.2 }, now }))
+    }
+    expect(state).toBe('none')
+    // Only opening the hand ends the grab, and then a match is available again.
+    match.push(held({ pinching: false, now: 1300 }))
+    expect(dwell(match, MATCH_DWELL_MS + 32)).toBe('lit')
+  })
+
   it('stays lit when it is carried over the paper, which is what lighting it is for', () => {
     const match = new Match()
     expect(dwell(match, MATCH_DWELL_MS + 32)).toBe('lit')
