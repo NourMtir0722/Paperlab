@@ -200,6 +200,45 @@ try {
   // with no hands in frame and resets every gesture between one scripted
   // frame and the next. Thirteen unrelated checks failed and none of them was
   // broken.
+  /**
+   * Wait for the page to actually RENDER a number of frames.
+   *
+   * The other half of the same correction. `until` fixed the measurements —
+   * read until the reading is the one being waited for — and left the INPUT
+   * pacing alone: a gesture was fed one landmark set every 24 or 30
+   * milliseconds, which is a stand-in for "once per frame" that stops being
+   * one the moment a frame costs more than 30 ms. On a loaded laptop or a CI
+   * runner it silently becomes two or three gesture frames per rendered
+   * frame, so the sheet sees a hand that moved three times as fast as the one
+   * the numbers were tuned against — and a flick threshold measured in palm
+   * widths per second fires when nobody flicked.
+   *
+   * Counting `requestAnimationFrame` instead makes the harness feed the page
+   * at exactly the rate the page can consume, on any machine. It is also
+   * strictly faster where there is headroom: a frame at 120 Hz no longer
+   * waits out a 30 ms sleep.
+   *
+   * The timeout is a backstop for a tab that has stopped painting entirely —
+   * a throttled background tab returns no frames at all, and waiting forever
+   * for one is how a harness hangs instead of failing.
+   */
+  const frames = (count = 1) =>
+    page.evaluate(
+      (n) =>
+        new Promise((resolve) => {
+          let seen = 0
+          const bail = setTimeout(() => resolve(seen), 5000)
+          const tick = () => {
+            if (++seen >= n) {
+              clearTimeout(bail)
+              resolve(seen)
+            } else requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }),
+      count,
+    )
+
   const live = page.getByRole('button', { name: 'stop the camera' })
   await page.getByRole('button', { name: 'start the camera' }).click()
   let cameraError = ''
@@ -228,7 +267,7 @@ try {
     await live.click({ timeout: 15_000 })
     await page.getByRole('button', { name: 'start the camera' }).waitFor({ timeout: 15_000 })
   }
-  await page.waitForTimeout(500)
+  await frames(31)
 
   const vertices = () => page.evaluate(() => window.__HANDS__.vertices())
   const release = () => page.evaluate((a) => window.__HANDS__.drive(null, a), ASPECT)
@@ -297,7 +336,7 @@ try {
   /**
    * Read until the reading is the one being waited for, then return it.
    *
-   * This replaces `waitForTimeout(n)` immediately followed by a measurement.
+   * This replaced `waitForTimeout(n)` immediately followed by a measurement.
    * Those numbers were wall-clock stand-ins for "the sim has caught up", and
    * they were tuned by watching one machine: the sheet needs a number of
    * FRAMES to rebuild at a new size or to fall off its pins, and how long
@@ -305,6 +344,12 @@ try {
    * clock, measured a sheet that had not moved yet, and reported three
    * unrelated gestures as broken while the gesture layer was reading them
    * perfectly — the resize even computed its 1.64x correctly.
+   *
+   * There is no wall clock left in this file. Measurements wait on `until`,
+   * everything else counts rendered frames with `frames`, and the only
+   * durations remaining are DEADLINES — ceilings on how long a thing may take
+   * before it is called broken, which is what a timeout should have been all
+   * along.
    *
    * It does NOT weaken anything. The deadline is a ceiling, not a pass: a
    * thing that never happens still fails, and the last reading is returned
@@ -314,7 +359,7 @@ try {
     const deadline = Date.now() + ms
     let value = await read()
     while (!done(value) && Date.now() < deadline) {
-      await page.waitForTimeout(100)
+      await frames(2)
       value = await read()
     }
     return value
@@ -329,12 +374,17 @@ try {
         ([x, y, p, a]) => window.__HANDS__.drive([window.__hand__(x, y, p)], a),
         [FROM.x + (TO.x - FROM.x) * t, FROM.y + (TO.y - FROM.y) * t, pose, ASPECT],
       )
-      await page.waitForTimeout(24)
+      await frames()
     }
     const after = await vertices()
     // Let go and let it settle again, so the next pass starts from rest.
+    // `settle` rather than a sleep: "at rest" is a state the sheet reaches
+    // after a number of steps, and 1200 ms was one machine's guess at how
+    // long that takes. The next pass measures a DIFFERENCE from here, so
+    // starting it from a sheet still in motion is how a control pass comes
+    // out looking like a grab.
     await release()
-    await page.waitForTimeout(1200)
+    await settle()
     return moved(before, after)
   }
 
@@ -456,14 +506,14 @@ try {
   if (!surface) throw new Error('the scan never hit the sheet — is it rendering?')
 
   /** Hold a pose at one spot for a few frames. */
-  const hold = async (pose, at = { x: 0.5, y: 0.5 }, frames = 6, roll = 0) => {
+  const hold = async (pose, at = { x: 0.5, y: 0.5 }, count = 6, roll = 0) => {
     let result
-    for (let i = 0; i < frames; i++) {
+    for (let i = 0; i < count; i++) {
       result = await page.evaluate(
         ([p, x, y, r, a]) => window.__HANDS__.drive([window.__hand__(x, y, p, 'Right', r)], a),
         [pose, at.x, at.y, roll, ASPECT],
       )
-      await page.waitForTimeout(30)
+      await frames()
     }
     return result
   }
@@ -477,7 +527,7 @@ try {
         ([p, x, y, a]) => window.__HANDS__.drive([window.__hand__(x, y, p)], a),
         [pose, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, ASPECT],
       )
-      await page.waitForTimeout(24)
+      await frames()
     }
     return result
   }
@@ -495,7 +545,7 @@ try {
     { x: scoreAt.camX - 0.06, y: scoreAt.camY },
   )
   const scored = await hold(POSES.palm)
-  await page.waitForTimeout(300)
+  await frames(19)
 
   // A second score, to prove they accumulate rather than replace.
   const scoreAgainAt = ((await scanSurface()) ?? surface).mid
@@ -505,7 +555,7 @@ try {
     { x: scoreAgainAt.camX, y: scoreAgainAt.camY - 0.06 },
   )
   const scoredTwice = await hold(POSES.palm)
-  await page.waitForTimeout(300)
+  await frames(19)
 
   // ── The dial. An open palm, turned, changes what the paper is made of. ────
   const beforeDial = (await hold(POSES.palm, { x: 0.5, y: 0.5 }, 5)).stock
@@ -544,10 +594,10 @@ try {
           ),
         [ripAt.x + away * 0.34 * t, ripAt.y - 0.18 * t, POSES.pinch, ASPECT],
       )
-      await page.waitForTimeout(24)
+      await frames(2)
     }
     await release()
-    await page.waitForTimeout(400)
+    await frames(25)
     return result
   })()
 
@@ -559,7 +609,7 @@ try {
   const tearAt = { x: edges.left.camX, y: edges.left.camY }
   const tornResult = await trace(POSES.pinch, tearAt, { x: tearAt.x - 0.42, y: tearAt.y - 0.3 }, 26)
   await hold(POSES.palm)
-  await page.waitForTimeout(400)
+  await frames(25)
 
   // ── Fold. Close your hand and the sheet folds along the line it was ──────
   //    scored on. Two creases were scored above, so this is what a fist does
@@ -570,7 +620,7 @@ try {
   // doubled flat against itself, and the point of the next check is to grab
   // it, not to find out where a closed sheet went.
   const folding = await hold(POSES.fistLight)
-  await page.waitForTimeout(400)
+  await frames(25)
   const folded = await vertices()
   const foldMoved = moved(beforeFold, folded)
   // Still cloth underneath, so still grabbable — the thing the mode swap used
@@ -585,20 +635,20 @@ try {
     await hold(POSES.pinch, at, 4)
     await trace(POSES.pinch, at, { x: at.x - 0.05, y: at.y - 0.05 }, 10)
   }
-  await page.waitForTimeout(200)
+  await frames(12)
   const draggedFolded = onFolded ? moved(folded, await vertices()) : 0
   const unfolded = await hold(POSES.palm)
-  await page.waitForTimeout(400)
+  await frames(25)
 
   // ── Crush. With nothing scored, a fist crumples instead. ─────────────────
   await page.evaluate(() => document.querySelector('.hud .ghost')?.click())
-  await page.waitForTimeout(200)
+  await frames(12)
   await settle()
   const lightFist = await hold(POSES.fistLight)
-  await page.waitForTimeout(300)
+  await frames(19)
   const lightShape = await vertices()
   const tightFist = await hold(POSES.fistTight)
-  await page.waitForTimeout(300)
+  await frames(19)
   const tightShape = await vertices()
   const squeeze = moved(lightShape, tightShape)
   const backToCloth = await hold(POSES.palm)
@@ -666,7 +716,7 @@ try {
     }, ASPECT)
 
   await blowHard()
-  await page.waitForTimeout(1300)
+  await frames(81)
   // And then the wind OFF, with the sheet still swinging. This is what makes
   // the check binary rather than a judgement about magnitudes: with nothing
   // pushing on it, a sheet that snapped flat has no way back to a drape, so
@@ -692,7 +742,7 @@ try {
   // two open palms are a RESIZE rather than the single open palm that means
   // "put the paper back" — otherwise this could not happen at all.
   await hold(POSES.fistTight)
-  await page.waitForTimeout(300)
+  await frames(19)
   const crushedBig = await extent()
   await spread(0.6, 5, false)
   const shrunk = await spread(0.3, 3, false)
@@ -704,7 +754,7 @@ try {
   // answer to a vocabulary that ran out of hand shapes: paper is indexed by
   // where you take hold of it.
   await page.evaluate(() => document.querySelector('.hud .ghost')?.click())
-  await page.waitForTimeout(200)
+  await frames(12)
   const corners = await scanSurface()
   const cornerAt = corners?.corner ? { x: corners.corner.camX, y: corners.corner.camY } : null
   let peeling = null
@@ -715,16 +765,16 @@ try {
     // Lift it away from the sheet. The pointer must stay UP throughout — a
     // peeling hand is not a grabbing hand, or the two fight over one corner.
     peeling = await trace(POSES.pinch, cornerAt, { x: cornerAt.x + 0.16, y: cornerAt.y - 0.16 }, 14)
-    await page.waitForTimeout(300)
+    await frames(19)
     peelMoved = moved(flat, await vertices())
     await hold(POSES.palm)
-    await page.waitForTimeout(300)
+    await frames(19)
   }
 
   // ── Throw. The same snap of the fingers, with the paper in your hand. ─────
   // Last, because it takes the sheet off the wall and leaves it there.
   await page.evaluate(() => document.querySelector('.hud .ghost')?.click())
-  await page.waitForTimeout(200)
+  await frames(12)
   await settle()
   const hanging = await vertices()
   const thrown = await page.evaluate(
