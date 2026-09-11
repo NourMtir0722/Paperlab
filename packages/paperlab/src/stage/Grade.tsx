@@ -14,9 +14,12 @@ import type { StageGradeConfig } from './schema'
  * The print pass: tone curve, bloom, vignette, grain.
  *
  * Kept in its own module for one reason — it is the ONLY file in the library
- * that imports `@react-three/postprocessing`, and it is reached only from
- * `<PaperStage>`. Adding an import here is fine; importing this from
- * anywhere outside stage mode is not.
+ * that imports `@react-three/postprocessing`, and nothing imports it
+ * statically. `GradeLazy` reaches it through a dynamic import, which is what
+ * lets the two peers stay genuinely optional; importing this module directly
+ * from anywhere would put the specifier back into stage's module graph and
+ * undo that. Adding an import here is fine. Importing this from anywhere but
+ * `GradeLazy` is not.
  *
  * **The composer takes the tone curve away from the renderer, so this file
  * has to give it back.** `<EffectComposer>` sets `gl.toneMapping =

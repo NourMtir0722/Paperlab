@@ -58,6 +58,16 @@ jobs:
       - name: Package publish safety (publint + arethetypeswrong)
         run: pnpm --filter paperlab run check:package
 
+      # publint and arethetypeswrong read the manifest and the types. They
+      # cannot load the files, and the workspace always has every optional
+      # peer installed, so neither has ever run this package from a tree that
+      # looks like a consumer's. Two bugs shipped through that gap — stage's
+      # module-scope import of an OPTIONAL peer, and a CJS build that could
+      # not be `require`d at all — and both were invisible here until
+      # something actually installed the tarball somewhere else.
+      - name: Consumer install gate
+        run: pnpm test:consumer
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 

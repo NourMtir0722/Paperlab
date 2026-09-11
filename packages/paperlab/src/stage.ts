@@ -9,6 +9,12 @@
  * but it cannot remove the import SPECIFIER, so the main entry naming the
  * module means a `<Paper>`-only consumer must still be able to resolve it.
  *
+ * The subpath is necessary and it was never sufficient: it keeps the
+ * specifier out of the MAIN entry's graph, and for two releases nothing kept
+ * it out of STAGE's, so `import 'paperlab/stage'` threw for any consumer who
+ * believed the `optional` flag and installed neither peer. A dynamic import
+ * in `stage/GradeLazy` is the other half of the fix — see the note there.
+ *
  * That is the whole argument, and it is a different argument from the one
  * that first settled this, when stage was deliberately NOT split into a
  * subpath. That decision was about BYTES, and it was correct about bytes:
