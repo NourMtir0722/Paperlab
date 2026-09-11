@@ -1,8 +1,8 @@
 import { createRoot } from 'react-dom/client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Paper, type PaperEdge, type PaperHandle, type StockName, type WashConfig } from 'paperlab'
+import { Paper, type PaperEdge, type PaperHandle, type StockName } from 'paperlab'
 import { FaceLandmarker, FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
 import { HandPointer, toClient, type PointerState } from './handPointer'
 import { GestureReader, NO_GESTURE, type GestureFrame } from './gestures'
@@ -19,11 +19,9 @@ import {
   addCrease,
   continuesScore,
   creaseFromDrag,
-  foldAlong,
   nearestCorner,
   nearestEdge,
   ripsApart,
-  type Crease,
   type PaperCorner,
   type UV,
 } from './marks'
@@ -32,6 +30,8 @@ import { FLICK_SPEED, FlickTracker, isFlick, washFromFlick, type Release } from 
 import { DIAL, dialIndex, dialStock, turnedBy } from './dial'
 import { Breath } from './breath'
 import { Span } from './span'
+import { derive, sheetAt, type Squeeze } from './derive'
+import { Session } from './session'
 
 /**
  * Reach out and handle the paper.
@@ -67,19 +67,26 @@ import { Span } from './span'
  * peel gesture to learn, and why `marks.ts` is where most of this lives.
  *
  * The dividing line that decides how all of it feels: SURFACE and MEMORY
- * changes are free, STRUCTURAL changes reset the sheet. `surface.*`,
+ * changes are free, and so is a STRUCTURAL one now. `surface.*`,
  * `memory.creases`, `stock` and the live cloth parameters update in place;
- * changing `pins`, the sheet's dimensions, or swapping physics for a behavior
- * rebuilds the sim and snaps the paper flat.
+ * changing `pins`, the sheet's dimensions, or putting a behavior over the sim
+ * rebuilds the mesh and the simulation, and `ClothSim.adopt` carries the
+ * particles across the rebuild, so the paper stays where it was.
  *
- * That is why scoring, tearing, painting, blowing and changing the stock all
- * feel right, and why the fist does not. The schema makes a simulation and a
- * behavior EXCLUSIVE — "the sim owns the vertices" — so a fist swaps cloth out
- * for `crumple`, which throws away the drape the sim had built and starts the
- * crush from a flat sheet. In real life you crush the paper you are holding;
- * here it snaps first. That is the library's exclusivity rule showing through,
- * not a bug in this file, and it is the one change that would turn the other
- * eleven behaviors into gesture material at a stroke.
+ * That is why scoring, tearing, painting, blowing, changing the stock AND the
+ * fist all feel right. It is worth being precise about, because this comment
+ * said the opposite for a while and the claim outlived the code by a whole
+ * commit: the schema does not make a simulation and a behavior exclusive —
+ * only the STRIP is exclusive, because its rows are chain nodes rather than
+ * the sheet's own grid. Cloth is not swapped out for `crumple`; it hosts it.
+ * `PaperMesh` solves the particles and then runs the deformer stack over
+ * them, which is why you crush the paper you are actually holding.
+ *
+ * Pinned by `physics/cloth-hosts-a-shape.test.ts` rather than by this
+ * paragraph, since a paragraph is what was wrong last time. The browser
+ * harness cannot pin it: it measures a live renderer on a wall clock and
+ * reported this same sheet's drape as 0.460 → 0.780 on one run and
+ * 1.117 → 0.170 on the next, with nothing changed in between.
  *
  * Still out of reach: punch and cut. The sheet is a fixed-topology grid, so a
  * hole in the middle or a split into two sheets needs real work in the
@@ -143,8 +150,6 @@ type Status = 'idle' | 'starting' | 'live' | 'error'
  * single tidiest join in this whole harness. With nothing scored there is no
  * line to close along, and a fist on unmarked paper crumples it.
  */
-type Squeeze = 'none' | 'fold' | 'crush'
-
 /**
  * Degrees of fold per published step.
  *
@@ -154,19 +159,6 @@ type Squeeze = 'none' | 'fold' | 'crush'
  * the tree that owns the canvas. Five degrees is finer than a hand is steady.
  */
 const FOLD_STEP = 5
-
-/**
- * The sheet the `pinned-sheet` preset defines, at rest.
- *
- * Not a constant any more: two hands can resize it, and a crease is a signed
- * WORLD offset, so a crease measured against yesterday's dimensions lands in
- * the wrong place on a sheet that has since grown.
- */
-const BASE_SHEET = { width: 1.2, height: 1.5 }
-
-function sheetAt(scale: number): { width: number; height: number } {
-  return { width: BASE_SHEET.width * scale, height: BASE_SHEET.height * scale }
-}
 
 /**
  * How far back the camera stands.
@@ -183,17 +175,6 @@ function sheetAt(scale: number): { width: number; height: number } {
  * gesture must not have.
  */
 const CAMERA_Z = 3.95
-
-/**
- * The ground, in proportion to the sheet.
- *
- * A fixed floor is a floor at a fixed height, so a sheet twice the size hangs
- * through it and piles up on it. Scaling it with the sheet keeps the drop
- * proportional, which is what makes a big sheet read as a big sheet rather
- * than as a sheet in a smaller room. It is a live cloth parameter, so this
- * costs no rebuild.
- */
-const BASE_FLOOR = -1.4
 
 /**
  * How far a grabbed edge has to be pulled before it tears, in palm lengths on
@@ -371,18 +352,31 @@ function CanvasBridge({ getMesh, onReady }: { getMesh(): THREE.Mesh | null; onRe
 function App() {
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState('')
-  const [squeeze, setSqueeze] = useState<Squeeze>('none')
-  const [fold, setFold] = useState(0)
-  const [peel, setPeel] = useState<PaperCorner | null>(null)
-  const [thrown, setThrown] = useState(false)
-  const [creases, setCreases] = useState<Crease[]>([])
-  const [torn, setTorn] = useState<PaperEdge[]>([])
-  const [ripped, setRipped] = useState<PaperEdge[]>([])
-  const [stockIndex, setStockIndex] = useState(DIAL.indexOf('printer'))
-  const [wash, setWash] = useState<WashConfig | null>(null)
-  const [wind, setWind] = useState(WIND)
-  const [scale, setScale] = useState(1)
   const [blowReady, setBlowReady] = useState(false)
+
+  /**
+   * Everything about the sheet, in one mutable object the frame loop writes
+   * directly and React subscribes to.
+   *
+   * The eleven `useState` pairs this replaces each had a shadow `useRef`,
+   * because React state is far too slow to read per frame and a ref was the
+   * available escape — so every value lived twice and every change had to
+   * write both. Forty lines that had to agree, with nothing checking they
+   * did, and both halves of the disagreement invisible until you looked at
+   * the right frame. See `session.ts`.
+   *
+   * `useSyncExternalStore` over a version counter rather than a snapshot
+   * object: the state is mutable by design, so there is nothing to compare
+   * structurally, and a counter is exactly what "something a render reads has
+   * changed" means.
+   */
+  const sessionRef = useRef<Session>(new Session({ stockIndex: DIAL.indexOf('printer'), wind: WIND }))
+  const s = sessionRef.current
+  useSyncExternalStore(s.subscribe, s.version)
+  // `s` is the only dependency any callback below has on the session: it is
+  // one object for the component's whole life and its fields are mutable by
+  // design. Depending on a FIELD would rebuild the callback every time the
+  // sheet changed, which is the per-frame churn the store exists to remove.
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const cursorRef = useRef<HTMLDivElement | null>(null)
@@ -411,44 +405,19 @@ function App() {
   const rafRef = useRef(0)
   // The frame loop's own copies: state reaches it a render late, and a mode
   // read a render late swaps twice.
-  const squeezeRef = useRef<Squeeze>('none')
-  const foldRef = useRef(0)
-  const crushRef = useRef(0)
   // A peel in progress: the corner it took hold of and where on screen.
-  const peelRef = useRef<{ corner: PaperCorner; from: { x: number; y: number } } | null>(null)
-  const thrownRef = useRef(false)
   // Whether the driving hand was already pinching last frame — a peel is a
   // decision made when a pinch lands, not one revisited every frame.
-  const wasPinchingRef = useRef(false)
   // Whether the grab that is live right now actually landed on the paper.
   // A snap of the fingers over empty space throws paint; the same snap with
   // the sheet in your hand throws the SHEET.
-  const heldSheetRef = useRef(false)
-  const creasesRef = useRef<Crease[]>([])
-  const tornRef = useRef<PaperEdge[]>([])
-  const rippedRef = useRef<PaperEdge[]>([])
-  const stockRef = useRef(stockIndex)
-  const windRef = useRef(WIND)
-  const scaleRef = useRef(1)
-  const rolesRef = useRef<Roles>(NO_ROLES)
-  const washSeedRef = useRef(0)
-  const washCountRef = useRef(0)
   // A score in progress: where the fingertip landed, and where it is now.
-  const scoreFromRef = useRef<(UV & { clientX: number; clientY: number }) | null>(null)
-  const scoreToRef = useRef<UV | null>(null)
   /** Where the acting hand is on the canvas, for the score trail to follow. */
-  const scoreAtRef = useRef<{ x: number; y: number } | null>(null)
   // A grab in progress: the edge it started on, and where on screen.
-  const grabEdgeRef = useRef<PaperEdge | null>(null)
-  const grabOriginRef = useRef<{ x: number; y: number } | null>(null)
   /** Whether this grab has already torn something — one edge per grab. */
-  const grabTornRef = useRef(false)
   // A two-handed pull in progress: how far apart the hands were, and the edge.
-  const ripRef = useRef<{ gap: number; edge: PaperEdge | null } | null>(null)
   /** How far apart the two hands are right now — reported, not decided on. */
-  const ripGapRef = useRef(0)
   // A dial in progress: the roll the palm went up at, and the stock it was on.
-  const dialFromRef = useRef<{ roll: number; index: number } | null>(null)
 
   const getMesh = useCallback(() => paperRef.current?.mesh ?? null, [])
   const onReady = useCallback((api: StageApi) => {
@@ -489,16 +458,16 @@ function App() {
       // it you are drawing blind and only find out where the crease went after
       // you lift, which is not a thing you can aim.
       const trail = trailRef.current
-      const from = scoreFromRef.current
-      const to = scoreToRef.current
+      const from = s.scoreFrom
+      const to = s.scoreTo
       if (trail) {
         const drawing = frame.name === 'point' && from !== null && to !== null
         trail.style.opacity = drawing ? '1' : '0'
         if (drawing && from) {
           trail.setAttribute('x1', String(from.clientX))
           trail.setAttribute('y1', String(from.clientY))
-          trail.setAttribute('x2', String(scoreAtRef.current?.x ?? from.clientX))
-          trail.setAttribute('y2', String(scoreAtRef.current?.y ?? from.clientY))
+          trail.setAttribute('x2', String(s.scoreAt?.x ?? from.clientX))
+          trail.setAttribute('y2', String(s.scoreAt?.y ?? from.clientY))
         }
       }
       const readout = readoutRef.current
@@ -507,10 +476,10 @@ function App() {
         readout.textContent =
           frame.curl === null
             ? `no hand in frame${blow > 0.05 ? ` · blowing ${blow.toFixed(2)}` : ''}`
-            : `${frame.name.padEnd(6)} ${hands} hand${hands === 1 ? '' : 's'} · aperture ${frame.aperture!.toFixed(2)} · curl ${frame.curl.toFixed(2)} · wind ${windRef.current.toFixed(2)}`
+            : `${frame.name.padEnd(6)} ${hands} hand${hands === 1 ? '' : 's'} · aperture ${frame.aperture!.toFixed(2)} · curl ${frame.curl.toFixed(2)} · wind ${s.wind.toFixed(2)}`
       }
     },
-    [],
+    [s],
   )
 
   /** One frame of hands → gestures → paper. Shared by the camera and the harness hook. */
@@ -561,17 +530,16 @@ function App() {
         }
       }
 
-      const roles = assignRoles(reads, rolesRef.current)
-      rolesRef.current = roles
+      const roles = assignRoles(reads, s.roles)
+      s.roles = roles
       const hold = handFor(reads, roles.hold)
       const act = handFor(reads, roles.act)
       const frame = act?.frame ?? NO_GESTURE
 
       // ── Blow. The one gesture that is not a hand at all. ──────────────────
       const nextWind = breathRef.current.push(face?.pucker ?? null)
-      if (nextWind !== windRef.current) {
-        windRef.current = nextWind
-        setWind(nextWind)
+      if (nextWind !== s.wind) {
+        s.set('wind', nextWind)
       }
 
       // ── Resize. Two open hands, spread. ──────────────────────────────────
@@ -586,18 +554,16 @@ function App() {
           ? palmsApart(reads[0]!.anchor, reads[1]!.anchor, reads[0]!.palm, aspect)
           : null
       const nextScale = spanRef.current.push(gap)
-      if (nextScale !== scaleRef.current) {
+      if (nextScale !== s.scale) {
         // A crease is a signed world offset from the sheet's centre, so the
         // creases have to grow with the sheet or they slide off it.
-        const ratio = nextScale / scaleRef.current
-        scaleRef.current = nextScale
-        setScale(nextScale)
-        if (creasesRef.current.length) {
-          creasesRef.current = creasesRef.current.map((crease) => ({
-            ...crease,
-            offset: crease.offset * ratio,
-          }))
-          setCreases(creasesRef.current)
+        const ratio = nextScale / s.scale
+        s.set('scale', nextScale)
+        if (s.creases.length) {
+          s.set(
+            'creases',
+            s.creases.map((crease) => ({ ...crease, offset: crease.offset * ratio })),
+          )
         }
       }
 
@@ -605,32 +571,28 @@ function App() {
       //    crushes it. No mode swap either way: the sheet stays cloth, stays
       //    grabbable, and keeps the drape it is hanging in, because the stack
       //    now runs OVER the simulation rather than instead of it.
-      if (frame.name === 'fist' && squeezeRef.current === 'none') {
-        squeezeRef.current = creasesRef.current.length ? 'fold' : 'crush'
-        setSqueeze(squeezeRef.current)
-      } else if (frame.name === 'palm' && !spanning && squeezeRef.current !== 'none') {
-        squeezeRef.current = 'none'
-        foldRef.current = 0
-        crushRef.current = 0
-        setSqueeze('none')
-        setFold(0)
+      if (frame.name === 'fist' && s.squeeze === 'none') {
+        s.set('squeeze', s.creases.length ? 'fold' : 'crush')
+      } else if (frame.name === 'palm' && !spanning && s.squeeze !== 'none') {
+        s.set('squeeze', 'none')
+        s.set('fold', 0)
+        s.crush = 0
       }
 
-      if (frame.curl !== null && squeezeRef.current === 'crush') {
+      if (frame.curl !== null && s.squeeze === 'crush') {
         // Imperatively, not through props: a behavior's progress is what
         // `ref.set` is for, and routing it through React every frame would
         // re-render the tree that owns the canvas.
-        crushRef.current = Math.max(crushRef.current, crushFromCurl(frame.curl))
-        paperRef.current?.set('progress', crushRef.current)
-      } else if (frame.curl !== null && squeezeRef.current === 'fold') {
+        s.crush = Math.max(s.crush, crushFromCurl(frame.curl))
+        paperRef.current?.set('progress', s.crush)
+      } else if (frame.curl !== null && s.squeeze === 'fold') {
         // A fold angle is a deformer OPTION, and there is no imperative door
         // to one — so it goes through React, quantised, and only on a change.
         // Highest reached, not current: paper does not unfold because your
         // hand relaxed.
-        const next = Math.max(foldRef.current, foldFromCurl(frame.curl))
-        if (next !== foldRef.current) {
-          foldRef.current = next
-          setFold(next)
+        const next = Math.max(s.fold, foldFromCurl(frame.curl))
+        if (next !== s.fold) {
+          s.set('fold', next)
         }
       }
 
@@ -642,19 +604,18 @@ function App() {
       // you like and still whip it away at the end.
       for (const [side, release] of Object.entries(releases) as [Handedness, Release][]) {
         const wasDriving = side === (roles.hold ?? roles.act)
-        if (wasDriving && heldSheetRef.current && release.speed >= FLICK_SPEED) {
-          heldSheetRef.current = false
-          if (!thrownRef.current) {
-            thrownRef.current = true
-            setThrown(true)
+        if (wasDriving && s.heldSheet && release.speed >= FLICK_SPEED) {
+          s.heldSheet = false
+          if (!s.thrown) {
+            s.set('thrown', true)
           }
         } else if (isFlick(release)) {
           // The seed has to move or the wash paints the same picture twice —
           // it is a pure function of its options, so an identical seed reads
           // as nothing having happened.
-          washSeedRef.current += 17
-          washCountRef.current += 1
-          setWash(washFromFlick(release, washSeedRef.current))
+          s.washSeed += 17
+          s.washCount += 1
+          s.set('wash', washFromFlick(release, s.washSeed))
         }
       }
 
@@ -680,12 +641,12 @@ function App() {
       // not the middle of the sheet. The sim can pull a corner but it cannot
       // curl one — `peel` rolls it, which is the whole reason to reach for a
       // behavior rather than let the physics have it.
-      if (!pinching || squeezeRef.current !== 'none') {
-        if (peelRef.current) {
-          peelRef.current = null
-          setPeel(null)
+      if (!pinching || s.squeeze !== 'none') {
+        if (s.peeling) {
+          s.peeling = null
+          s.set('peel', null)
         }
-      } else if (!wasPinchingRef.current && driver?.anchor && uv && squeezeRef.current === 'none') {
+      } else if (!s.wasPinching && driver?.anchor && uv && s.squeeze === 'none') {
         // Only on the frame the pinch CLOSES. A grab that turned into a peel
         // because the hand dragged the sheet's corner under itself would let
         // go of the paper half way through the pull — which is exactly what
@@ -695,21 +656,21 @@ function App() {
           // Where the hand was, in the CAMERA's coordinates rather than the
           // canvas's — the lift is measured against the hand's own palm, and
           // a palm is not a thing the canvas knows about. See `TEAR_PULL`.
-          peelRef.current = { corner, from: driver.anchor }
-          setPeel(corner)
+          s.peeling = { corner, from: driver.anchor }
+          s.set('peel', corner)
         }
       }
-      wasPinchingRef.current = pinching
+      s.wasPinching = pinching
 
       // A peeling hand is not a grabbing hand: the pointer stays up, so the
       // sim never takes hold and the two do not fight over the same corner.
-      const pointer = pointerRef.current?.update(driver?.anchor ?? null, pinching && !peelRef.current) ?? null
+      const pointer = pointerRef.current?.update(driver?.anchor ?? null, pinching && !s.peeling) ?? null
 
-      if (peelRef.current && driver?.anchor && driver.palm) {
-        const lifted = palmsApart(driver.anchor, peelRef.current.from, driver.palm, aspect)
+      if (s.peeling && driver?.anchor && driver.palm) {
+        const lifted = palmsApart(driver.anchor, s.peeling.from, driver.palm, aspect)
         // Scaled by the sheet: lifting a corner of a sheet twice the size is
         // twice the gesture, the same way tearing one is.
-        paperRef.current?.set('progress', Math.min(1, lifted / (PEEL_PULL * scaleRef.current)))
+        paperRef.current?.set('progress', Math.min(1, lifted / (PEEL_PULL * s.scale)))
       }
 
       // The acting hand may not be the one carrying the pointer, so it gets
@@ -717,30 +678,29 @@ function App() {
       // what makes a second hand possible against a library with one grab.
       const actAt = act?.anchor && rect ? toClient(act.anchor, rect) : null
       const actUV = act === driver ? uv : actAt && stage ? stage.hitUV(actAt.x, actAt.y) : null
-      scoreAtRef.current = actAt
+      s.scoreAt = actAt
 
       // ── Score. Draw with a fingertip; the sheet keeps the line. ───────────
-      if (squeezeRef.current === 'none' && frame.name === 'point' && actAt) {
-        if (!scoreFromRef.current && actUV) {
-          scoreFromRef.current = { ...actUV, clientX: actAt.x, clientY: actAt.y }
+      if (s.squeeze === 'none' && frame.name === 'point' && actAt) {
+        if (!s.scoreFrom && actUV) {
+          s.scoreFrom = { ...actUV, clientX: actAt.x, clientY: actAt.y }
         }
         // Only if the fingertip actually travelled there. The reader keeps
         // saying `point` for a few frames after the hand has stopped
         // pointing, and those frames would otherwise drag the line's end to
         // wherever the hand relaxed to.
-        if (actUV && (!scoreToRef.current || continuesScore(scoreToRef.current, actUV))) {
-          scoreToRef.current = actUV
+        if (actUV && (!s.scoreTo || continuesScore(s.scoreTo, actUV))) {
+          s.scoreTo = actUV
         }
-      } else if (scoreFromRef.current) {
+      } else if (s.scoreFrom) {
         // The finger stopped pointing: commit whatever line it drew.
-        const from = scoreFromRef.current
-        const to = scoreToRef.current
-        scoreFromRef.current = null
-        scoreToRef.current = null
-        const crease = to && creaseFromDrag(from, to, sheetAt(scaleRef.current))
+        const from = s.scoreFrom
+        const to = s.scoreTo
+        s.scoreFrom = null
+        s.scoreTo = null
+        const crease = to && creaseFromDrag(from, to, sheetAt(s.scale))
         if (crease) {
-          creasesRef.current = addCrease(creasesRef.current, crease)
-          setCreases(creasesRef.current)
+          s.set('creases', addCrease(s.creases, crease))
         }
       }
 
@@ -752,51 +712,49 @@ function App() {
       // because an open palm ALSO means "put the paper back" — an absolute
       // dial would change the material every time somebody came out of a
       // crush, at whatever angle their wrist happened to be.
-      if (squeezeRef.current === 'none' && frame.name === 'palm' && !spanning && act?.roll != null) {
-        dialFromRef.current ??= { roll: act.roll, index: stockRef.current }
-        const origin = dialFromRef.current
-        const next = dialIndex(turnedBy(origin.roll, act.roll), origin.index, stockRef.current)
-        if (next !== stockRef.current) {
-          stockRef.current = next
-          setStockIndex(next)
+      if (s.squeeze === 'none' && frame.name === 'palm' && !spanning && act?.roll != null) {
+        s.dialFrom ??= { roll: act.roll, index: s.stockIndex }
+        const origin = s.dialFrom
+        const next = dialIndex(turnedBy(origin.roll, act.roll), origin.index, s.stockIndex)
+        if (next !== s.stockIndex) {
+          s.set('stockIndex', next)
         }
       } else {
-        dialFromRef.current = null
+        s.dialFrom = null
       }
 
       // ── Tear. Take an edge and pull until it gives. ───────────────────────
       if (pointer?.down && driver?.anchor) {
-        if (!grabOriginRef.current) {
+        if (!s.grabOrigin) {
           // In camera coordinates, like the peel: the pull is measured in the
           // hand's own palms, which the canvas has never heard of.
-          grabOriginRef.current = driver.anchor
-          grabEdgeRef.current = null
-          grabTornRef.current = false
-          heldSheetRef.current = uv !== null
+          s.grabOrigin = driver.anchor
+          s.grabEdge = null
+          s.grabTorn = false
+          s.heldSheet = uv !== null
         }
         // The edge is the last one the hand was SEEN over, not whichever it
         // was over on the single frame the grab landed. A raycast against a
         // draped sheet misses now and then, and losing a tear to one of those
         // reads as tearing being unreliable — which is how it read.
-        if (!grabTornRef.current && !grabEdgeRef.current && uv) {
-          grabEdgeRef.current = nearestEdge(uv)
+        if (!s.grabTorn && !s.grabEdge && uv) {
+          s.grabEdge = nearestEdge(uv)
         }
-        const edge = grabEdgeRef.current
-        const origin = grabOriginRef.current
-        if (edge && driver.palm && !tornRef.current.includes(edge) && !rippedRef.current.includes(edge)) {
+        const edge = s.grabEdge
+        const origin = s.grabOrigin
+        if (edge && driver.palm && !s.torn.includes(edge) && !s.ripped.includes(edge)) {
           const pulled = palmsApart(driver.anchor, origin, driver.palm, aspect)
-          if (pulled > TEAR_PULL * scaleRef.current) {
-            tornRef.current = [...tornRef.current, edge]
-            setTorn(tornRef.current)
+          if (pulled > TEAR_PULL * s.scale) {
+            s.set('torn', [...s.torn, edge])
             // One edge per grab: let go and take hold again to tear another.
-            grabEdgeRef.current = null
-            grabTornRef.current = true
+            s.grabEdge = null
+            s.grabTorn = true
           }
         }
       } else {
-        grabOriginRef.current = null
-        grabEdgeRef.current = null
-        heldSheetRef.current = false
+        s.grabOrigin = null
+        s.grabEdge = null
+        s.heldSheet = false
       }
 
       // ── Rip. Two hands, pulling apart, along the dotted line. ─────────────
@@ -807,10 +765,10 @@ function App() {
         hold !== null && act !== null && hold !== act && act.frame.name === 'pinch' && hold.palm !== null
       if (ripping && hold.anchor && act.anchor && hold.palm !== null) {
         const gap = palmsApart(hold.anchor, act.anchor, hold.palm, aspect)
-        ripGapRef.current = gap
-        const edgeNow = (actUV && nearestEdge(actUV)) ?? grabEdgeRef.current
-        if (!ripRef.current) ripRef.current = { gap, edge: edgeNow }
-        const started = ripRef.current
+        s.ripGap = gap
+        const edgeNow = (actUV && nearestEdge(actUV)) ?? s.grabEdge
+        if (!s.rip) s.rip = { gap, edge: edgeNow }
+        const started = s.rip
         // The edge is the last one the pulling hand was SEEN over, not
         // whatever it happened to be over on the one frame the pull armed. A
         // raycast against a draped sheet misses for a frame here and there,
@@ -819,67 +777,48 @@ function App() {
         if (!started.edge && edgeNow) started.edge = edgeNow
         if (started.edge && ripsApart(started.gap, gap)) {
           const edge = started.edge
-          if (!rippedRef.current.includes(edge) && !tornRef.current.includes(edge)) {
-            rippedRef.current = [...rippedRef.current, edge]
-            setRipped(rippedRef.current)
+          if (!s.ripped.includes(edge) && !s.torn.includes(edge)) {
+            s.set('ripped', [...s.ripped, edge])
           }
-          ripRef.current = null
+          s.rip = null
         }
       } else {
-        ripRef.current = null
+        s.rip = null
       }
 
       paint(frame, pointer, reads.length, act === driver ? null : actAt)
       return {
         frame,
         pointer,
-        squeeze: squeezeRef.current,
-        fold: foldRef.current,
-        crush: crushRef.current,
-        peel: peelRef.current?.corner ?? null,
-        thrown: thrownRef.current,
-        holding: heldSheetRef.current,
-        creases: creasesRef.current.length,
-        torn: tornRef.current,
-        ripped: rippedRef.current,
-        stock: dialStock(stockRef.current),
-        wind: windRef.current,
-        scale: scaleRef.current,
-        washes: washCountRef.current,
+        squeeze: s.squeeze,
+        fold: s.fold,
+        crush: s.crush,
+        peel: s.peeling?.corner ?? null,
+        thrown: s.thrown,
+        holding: s.heldSheet,
+        creases: s.creases.length,
+        torn: s.torn,
+        ripped: s.ripped,
+        stock: dialStock(s.stockIndex),
+        wind: s.wind,
+        scale: s.scale,
+        washes: s.washCount,
         hands: reads.length,
         roles,
         uv,
-        pending: { from: scoreFromRef.current, to: scoreToRef.current },
-        pulling: ripRef.current && { ...ripRef.current, now: ripGapRef.current },
+        pending: { from: s.scoreFrom, to: s.scoreTo },
+        pulling: s.rip && { ...s.rip, now: s.ripGap },
       }
     },
-    [paint],
+    [paint, s],
   )
 
   const reset = useCallback(() => {
-    thrownRef.current = false
-    peelRef.current = null
-    heldSheetRef.current = false
-    setThrown(false)
-    setPeel(null)
-    squeezeRef.current = 'none'
-    foldRef.current = 0
-    crushRef.current = 0
-    setSqueeze('none')
-    setFold(0)
+    s.reset()
     spanRef.current.reset()
-    scaleRef.current = 1
-    setScale(1)
-    creasesRef.current = []
-    tornRef.current = []
-    rippedRef.current = []
-    washCountRef.current = 0
-    setCreases([])
-    setTorn([])
-    setRipped([])
-    setWash(null)
-  }, [])
+  }, [s])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: as above — `s` is the stable store, its fields are not dependencies.
   const stop = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
     pointerRef.current?.dispose()
@@ -892,9 +831,8 @@ function App() {
     // Not `reset()`: the size two hands set is the sheet's, like its creases,
     // and stopping the camera is not a fresh sheet. Only the grip is dropped.
     spanRef.current.push(null)
-    squeezeRef.current = 'none'
-    setSqueeze('none')
-    rolesRef.current = NO_ROLES
+    s.set('squeeze', 'none')
+    s.roles = NO_ROLES
     landmarkerRef.current?.close()
     landmarkerRef.current = null
     faceRef.current?.close()
@@ -1013,87 +951,20 @@ function App() {
     }
   }, [step])
 
-  const stock = dialStock(stockIndex)
-  const perforated: Partial<Record<PaperEdge, 'torn'>> = {}
-  for (const edge of ripped) perforated[edge] = 'torn'
+  /**
+   * The last stage of the frame pipeline, and the only one that is a pure
+   * function of the session: what the paper IS, turned into what `<Paper>` is
+   * told. It used to be eighty lines of conditional JSX right here, which
+   * meant the question you most want to ask of a gesture — given that the
+   * sheet is in this state, what does the library get — could only be
+   * answered by running a browser, a camera shim and a cloth simulation.
+   */
+  const paper = derive(s.sheet(dialStock(s.stockIndex)))
 
   return (
     <>
       <div className="stage">
-        <Paper
-          ref={paperRef}
-          preset="pinned-sheet"
-          // Two hands set this. A rebuild is invisible on a shape — a deformer
-          // is a pure function of its options — and on cloth the drape now
-          // survives it, because `ClothSim.adopt` carries the particles over.
-          sheet={sheetAt(scale)}
-          stock={stock}
-          content={{
-            type: 'text',
-            text: 'Pinch to hold.\nPoint to score.\nFlick to paint.',
-            size: 40,
-            ...(wash ? { wash } : {}),
-          }}
-          // Creases and surface effects live BESIDE the vertices rather than
-          // owning them, so unlike a behavior they compose with the sim.
-          memory={{ creases }}
-          surface={{
-            ...(torn.length ? { deckle: { edges: torn, roughness: 0.6 } } : {}),
-            // Perforated from the start, because a dotted line you cannot see
-            // is not an affordance. The defaults are tuned to a postage
-            // stamp, and at this sheet's size they scallop the edges like one
-            // — fine holes read as a tear line, coarse ones read as a stamp.
-            perforation: {
-              edges: 'all',
-              holeRadius: 0.007,
-              spacing: 0.026,
-              state: perforated,
-            },
-          }}
-          // Cloth, always — it is never swapped out for a shape now, it
-          // HOSTS one. The sheet stays grabbable through a fold and a crush.
-          //
-          // `pins` is the one thing a gesture takes AWAY: flick the sheet
-          // while you are holding it and it lets go of the wall. The rebuild
-          // that costs is free of consequence now — `ClothSim.adopt` carries
-          // the drape and the velocity across it, so the sheet leaves at the
-          // speed your hand gave it instead of dropping from a standstill.
-          physics={{
-            type: 'cloth',
-            pins: thrown ? 'none' : 'top-corners',
-            wind,
-            stiffness: 0.75,
-            floor: BASE_FLOOR * scale,
-          }}
-          // The shape running over the simulation. Folds are raw deformers
-          // because they are aimed at lines the SHEET is carrying —
-          // `creaseFromDrag` produced each `{ angle, offset }` when a
-          // fingertip scored it, and `fold` takes the identical pair.
-          {...(squeeze === 'fold' && creases.length
-            ? {
-                deformers: creases.map((crease, index) => ({
-                  type: 'fold' as const,
-                  options: {
-                    // Named so each flap is the smaller side — see `foldAlong`.
-                    ...foldAlong(crease),
-                    // Alternating, so two scored lines concertina instead of
-                    // rolling the same way twice — which is what a hand does
-                    // to paper and what makes a second fold legible as one.
-                    // Negative first because the flap should fold AWAY from
-                    // the camera: swung forward it comes at the lens and shows
-                    // you its back.
-                    foldAngle: index % 2 === 0 ? -fold : fold,
-                    radius: 0.05,
-                  },
-                })),
-              }
-            : squeeze === 'crush'
-              ? { behavior: { type: 'crumple' as const, progress: 0 } }
-              : peel
-                ? { behavior: { type: 'peel' as const, corner: peel, progress: 0, radius: 0.2 } }
-                : {})}
-          interactive
-        >
+        <Paper ref={paperRef} {...paper} interactive>
           <CanvasBridge getMesh={getMesh} onReady={onReady} />
         </Paper>
       </div>
@@ -1149,36 +1020,36 @@ function App() {
         <p className="mode">
           hand:{' '}
           <strong>
-            {squeeze === 'fold'
-              ? `folding ${fold}° along ${creases.length} scored ${creases.length === 1 ? 'line' : 'lines'}`
-              : squeeze === 'crush'
+            {s.squeeze === 'fold'
+              ? `folding ${s.fold}° along ${s.creases.length} scored ${s.creases.length === 1 ? 'line' : 'lines'}`
+              : s.squeeze === 'crush'
                 ? 'crushing'
-                : peel
-                  ? `peeling the ${peel} corner`
+                : s.peel
+                  ? `peeling the ${s.peel} corner`
                   : 'open'}
           </strong>
-          {thrown ? (
+          {s.thrown ? (
             <>
               <br />
               the sheet is off its pins
             </>
           ) : null}
           <br />
-          stock: <strong>{stock}</strong> · wind: <strong>{wind.toFixed(2)}</strong> · size:{' '}
-          <strong>{scale.toFixed(2)}×</strong>
+          stock: <strong>{paper.stock}</strong> · wind: <strong>{s.wind.toFixed(2)}</strong> · size:{' '}
+          <strong>{s.scale.toFixed(2)}×</strong>
           <br />
-          scored: <strong>{creases.length}</strong> · washed: <strong>{wash ? 'yes' : 'no'}</strong>
+          scored: <strong>{s.creases.length}</strong> · washed: <strong>{s.wash ? 'yes' : 'no'}</strong>
           <br />
-          torn: <strong>{torn.join(', ') || 'nothing'}</strong> · ripped:{' '}
-          <strong>{ripped.join(', ') || 'nothing'}</strong>
+          torn: <strong>{s.torn.join(', ') || 'nothing'}</strong> · ripped:{' '}
+          <strong>{s.ripped.join(', ') || 'nothing'}</strong>
         </p>
-        {creases.length ||
-        torn.length ||
-        ripped.length ||
-        wash ||
-        scale !== 1 ||
-        squeeze !== 'none' ||
-        thrown ? (
+        {s.creases.length ||
+        s.torn.length ||
+        s.ripped.length ||
+        s.wash ||
+        s.scale !== 1 ||
+        s.squeeze !== 'none' ||
+        s.thrown ? (
           <button type="button" className="ghost" onClick={reset}>
             fresh sheet
           </button>

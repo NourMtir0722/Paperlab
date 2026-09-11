@@ -126,6 +126,10 @@ export type { Behavior, HandleSpec } from './behaviors/types'
 export { registerBehavior, getBehavior, listBehaviors } from './behaviors/registry'
 export { getLayout, listLayouts, registerLayout, type Layout, type PaperPose } from './field/layouts'
 export { stocks, getStock, type Stock } from './core/stock'
+// The seam between the sheet and whatever damages it. One interface and the
+// meaning of its four bytes — see `surface/damageContract.ts` for why this and
+// not a plugin API for the composer and the solver.
+export { DAMAGE_CHANNELS, type DamageSource } from './surface/damageContract'
 export { idleNames, type IdleName, type IdlePreset } from './physics/idle'
 /**
  * The longest strip the `strip` sim can still draw at a given perforation

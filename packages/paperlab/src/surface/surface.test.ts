@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { composeSurface } from './compose'
+import { composeSurface, DEPTH_HELPERS } from './compose'
 import { getStock } from '../core/stock'
 import { surfaceSchema } from '../config/schema'
 import { fold } from '../deformers/fold'
@@ -253,5 +253,99 @@ describe('receipt content', () => {
     expect(a.slice(0, 4)).toEqual([2, 1, 1, 4])
     expect(a.slice(-6)).toEqual([2, 3, 3, 1, 1, 2])
     for (const width of a) expect(width).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('the damage seam', () => {
+  const maps = { hasFrontMap: true, hasBackMap: false }
+  const plain = surfaceSchema.parse({ grain: 0.3, aging: 0.1 })
+
+  it('compiles the exact program it always did when nothing is attached', () => {
+    // The regression that matters most: a sheet nobody has damaged must not
+    // pay for the seam in a shader recompile, a new structure key or an alpha
+    // test — `hasDamage` absent and `hasDamage: false` are both today's sheet.
+    const before = composeSurface(plain, printer, 0.2, maps)
+    const off = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: false })
+    expect(off.structureKey).toBe(before.structureKey)
+    expect(off.fragmentShader).toBe(before.fragmentShader)
+    expect(off.alphaTest).toBe(before.alphaTest)
+    expect(before.fragmentShader).not.toContain('plDamage')
+    expect(before.uniforms.uDamage).toBeUndefined()
+  })
+
+  it('keys a damaged sheet as its own program, so it never reuses a plain one', () => {
+    const on = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true })
+    const off = composeSurface(plain, printer, 0.2, maps)
+    expect(on.structureKey).not.toBe(off.structureKey)
+    expect(on.structureKey.endsWith('D')).toBe(true)
+    expect(on.fragmentShader).toContain('plDamage(csm_DiffuseColor, csm_Roughness);')
+    expect(on.uniforms.uDamage).toEqual({ value: null })
+  })
+
+  it('discards missing paper rather than blending it', () => {
+    // A hole has to cut the depth buffer, not just fade — the same reason a
+    // deckle does.
+    expect(composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true }).alphaTest).toBe(0.5)
+  })
+
+  it('cuts at the same presence on every stock, however opaque', () => {
+    // `step`, not a multiply: multiplying presence into alpha would put the
+    // edge of a hole at 0.5 on opaque stock and 0.81 on a 0.62-opacity one.
+    const out = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true })
+    expect(out.fragmentShader).toContain('color.a *= step(0.5, d.a);')
+  })
+
+  it('draws the damage last, over the ageing and the ink', () => {
+    const out = composeSurface(plain, printer, 0.2, { ...maps, hasDamage: true })
+    const body = out.fragmentShader.slice(out.fragmentShader.indexOf('void main()'))
+    expect(body.indexOf('plDamage(')).toBeGreaterThan(body.indexOf('plAging('))
+  })
+})
+
+describe('the shadow pass', () => {
+  const maps = { hasFrontMap: true, hasBackMap: false }
+  const cutting = [
+    ['a torn edge', surfaceSchema.parse({ deckle: { edges: ['left'] } }), maps],
+    ['a perforation', surfaceSchema.parse({ perforation: { edges: 'all' } }), maps],
+    ['a damaged sheet', surfaceSchema.parse({}), { ...maps, hasDamage: true }],
+  ] as const
+
+  it.each(cutting)('gives %s a depth program that discards where the paper is gone', (_, surface, m) => {
+    // Three's own shadow material knows nothing of alpha computed in shader
+    // code, so without this every hole casts a solid shadow.
+    const out = composeSurface(surface, printer, 0.2, m)
+    expect(out.depth).not.toBeNull()
+    expect(out.depth!.fragmentShader).toContain('if (color.a < 0.5) discard;')
+  })
+
+  it('leaves a sheet that removes no paper to three, which is already right', () => {
+    const out = composeSurface(surfaceSchema.parse({ grain: 0.3, aging: 0.2 }), printer, 0.2, maps)
+    expect(out.depth).toBeNull()
+  })
+
+  it('runs only what cuts — colour-only effects cost a shadow pass nothing', () => {
+    const surface = surfaceSchema.parse({ grain: 0.3, aging: 0.2, deckle: { edges: ['top'] } })
+    const depth = composeSurface(surface, printer, 0.2, maps).depth!.fragmentShader
+    expect(depth).toContain('plDeckle(color)')
+    expect(depth).not.toContain('plGrain(')
+    expect(depth).not.toContain('plAging(')
+  })
+
+  it('carries the sheet-space helpers and none of the lighting', () => {
+    // `plPerturb` reads vViewPosition, which a depth material does not have —
+    // and GLSL compiles a function whether or not it is called.
+    expect(DEPTH_HELPERS).toContain('vec2 plLocal()')
+    expect(DEPTH_HELPERS).toContain('float plFbm(')
+    expect(DEPTH_HELPERS).toContain('float plNoise(')
+    expect(DEPTH_HELPERS).not.toContain('vViewPosition')
+    expect(DEPTH_HELPERS).not.toContain('plPerturb')
+    expect(DEPTH_HELPERS).not.toContain('uBackDarken')
+  })
+
+  it('does not touch the colour program to get there', () => {
+    // The carve is taken from HELPERS, never written back into it.
+    const out = composeSurface(surfaceSchema.parse({ deckle: { edges: ['left'] } }), printer, 0.2, maps)
+    expect(out.fragmentShader).toContain('plPerturb')
+    expect(out.fragmentShader).toContain('uniform float uBackDarken;')
   })
 })

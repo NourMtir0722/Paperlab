@@ -47,14 +47,35 @@ export interface ComposedSurface {
   vertexShader: string
   fragmentShader: string
   uniforms: Record<string, { value: unknown }>
-  /** Deckle discards via alphaTest (not blending) so shadows stay correct. */
+  /**
+   * Anything that removes paper discards via alphaTest rather than blending.
+   * That keeps the depth buffer right for the colour pass; it never made the
+   * SHADOW right on its own — three's shadow material ignores alpha computed
+   * in shader code. `depth`, below, is what does.
+   */
   alphaTest: number
+  /**
+   * A depth-only program for the SHADOW MAP, or null when nothing on this
+   * sheet removes paper and three's own depth material is already right.
+   *
+   * Shadow maps only. drei's `ContactShadows` renders the whole scene through
+   * one override material and never reads a mesh's `customDepthMaterial`, so
+   * the soft contact shadow under a `<Paper>` still ignores holes — that is a
+   * separate pass and a separate fix.
+   */
+  depth: { vertexShader: string; fragmentShader: string } | null
 }
 
 /** Which content textures exist — part of the shader structure. */
 export interface SurfaceMaps {
   hasFrontMap: boolean
   hasBackMap: boolean
+  /**
+   * A damage texture is attached — see `DamageSource`. Optional and false by
+   * default, so a sheet nothing has damaged compiles exactly the program it
+   * always did: same chunks, same structure key, same alpha test.
+   */
+  hasDamage?: boolean
 }
 
 const VERTEX = /* glsl */ `
@@ -380,6 +401,77 @@ void plPerforation(inout vec4 color) {
 }
 `
 
+/**
+ * What happened to the paper, read from the damage texture.
+ *
+ * Written so that an untouched field is an exact identity — char 0, wet 0,
+ * presence 1 multiplies by one and mixes by zero — because attaching a field
+ * to a sheet before anything has burnt it must not change a single pixel.
+ *
+ * Presence is cut with `step`, not multiplied into alpha. Multiplying would
+ * put the edge of a hole wherever `opacity × presence` crosses the alpha test,
+ * which is presence 0.5 on an opaque stock and 0.81 on the 0.62-opacity one:
+ * the same burn would eat further into some papers than others. The texture
+ * is filtered linearly, so the half-presence contour runs in straight
+ * segments between texels rather than in a staircase of them. A hard-edged
+ * presence field still shows those segments as facets at 64²; a graded one
+ * — which a real burn is — shows far less, and fire's own chunk adds
+ * per-fragment edge detail on top.
+ *
+ * Heat is carried and not yet drawn. The glowing ignition line is fire's own
+ * chunk and arrives with fire.
+ */
+const DAMAGE_CHUNK = /* glsl */ `
+uniform sampler2D uDamage;
+
+void plDamage(inout vec4 color, inout float roughness) {
+  vec4 d = texture2D(uDamage, vPaperUv);
+  // Wet paper is darker and smoother: water fills the gaps between fibres
+  // that scatter light, which is both effects from one cause.
+  color.rgb *= 1.0 - 0.38 * d.g;
+  roughness *= 1.0 - 0.45 * d.g;
+  // Char: a brown scorch first, then black once it has really burnt.
+  vec3 scorch = mix(vec3(0.43, 0.28, 0.15), vec3(0.055, 0.045, 0.04), smoothstep(0.35, 0.9, d.r));
+  color.rgb = mix(color.rgb, scorch, smoothstep(0.02, 0.6, d.r));
+  // Missing paper: gone at half presence, on every stock alike.
+  color.a *= step(0.5, d.a);
+}
+`
+
+/**
+ * The sheet-space half of `HELPERS`, for the shadow pass.
+ *
+ * `HELPERS` is written for the colour program, and part of it cannot compile
+ * anywhere else: `plPerturb` reads `vViewPosition`, which a depth material
+ * does not have — and GLSL compiles a function whether or not anything calls
+ * it. So the depth program gets everything the CUTTING chunks need (the UV
+ * varying, the sheet size, `plLocal`, the noise) and none of the lighting.
+ *
+ * Carved out of the one string at load time rather than written twice, so the
+ * two can never drift, and so the colour program stays byte-for-byte what it
+ * was. If an anchor below ever moves, this throws on import rather than
+ * compiling a shadow program that silently differs.
+ */
+function carveDepthHelpers(helpers: string): string {
+  const darken = 'uniform float uBackDarken;\n'
+  const relief = helpers.indexOf("/**\n * The paper's relief")
+  const bell = helpers.lastIndexOf('/**', helpers.indexOf('float plBell('))
+  if (!helpers.includes(darken) || relief < 0 || bell <= relief) {
+    throw new Error('compose: HELPERS changed shape — update carveDepthHelpers')
+  }
+  return (helpers.slice(0, relief) + helpers.slice(bell)).replace(darken, '')
+}
+
+/** Exported for its test, which pins what the shadow pass can and cannot see. */
+export const DEPTH_HELPERS = carveDepthHelpers(HELPERS)
+
+const DEPTH_VERTEX = /* glsl */ `
+varying vec2 vPaperUv;
+void main() {
+  vPaperUv = uv;
+}
+`
+
 const AGING_CHUNK = /* glsl */ `
 uniform float uAgingAmount;
 
@@ -487,6 +579,59 @@ export function composeSurface(
     calls.push('plAging(csm_DiffuseColor);')
     uniforms.uAgingAmount = { value: aging }
   }
+  // Last, so a burn chars over the yellowing and the ink alike.
+  if (maps.hasDamage) {
+    chunks.push(DAMAGE_CHUNK)
+    calls.push('plDamage(csm_DiffuseColor, csm_Roughness);')
+    // Bound by `PaperMaterial` to the uploaded texture; null only until then.
+    uniforms.uDamage = { value: null }
+  }
+
+  /**
+   * The shadow pass, for any sheet that removes paper.
+   *
+   * Holes cut in the colour program by alpha are invisible to the shadow
+   * map: three renders shadows with its own depth material, which alpha-tests
+   * a `map` if there is one and knows nothing of alpha computed in shader
+   * code. So a torn edge, a perforation and a burnt-through hole all cast a
+   * solid shadow — the most obvious fake a burn can have, and one the
+   * deckle and perforation had been shipping since before this seam.
+   *
+   * The fix is the same chunks, run again in a depth program that DISCARDS
+   * wherever the colour program would have cut. Only what cuts: grain,
+   * creases and ageing change colour and not coverage, and a depth program
+   * pays per fragment for everything in it.
+   */
+  const cutting: string[] = []
+  const cuts: string[] = []
+  if (deckle) {
+    cutting.push(DECKLE_CHUNK)
+    cuts.push('plDeckle(color);')
+  }
+  if (perforation) {
+    cutting.push(PERFORATION_CHUNK)
+    cuts.push('plPerforation(color);')
+  }
+  if (maps.hasDamage) {
+    cutting.push(DAMAGE_CHUNK)
+    cuts.push('plDamage(color, roughness);')
+  }
+  const depth =
+    cutting.length > 0
+      ? {
+          vertexShader: DEPTH_VERTEX,
+          fragmentShader: /* glsl */ `
+${DEPTH_HELPERS}
+${cutting.join('\n')}
+void main() {
+  vec4 color = vec4(1.0);
+  float roughness = 1.0;
+  ${cuts.join('\n  ')}
+  if (color.a < 0.5) discard;
+}
+`,
+        }
+      : null
 
   // Whether anything above described a SHAPE and not just a colour. The
   // perturbation is one pair of screen derivatives, which is cheap but not
@@ -537,11 +682,14 @@ ${relief ? '  // The relief every effect above described, spent once — see plP
       aging !== undefined ? 'a' : '',
       perforation ? 'p' : '',
       stock.adhesive ? 'A' : '',
-    ].join('')}:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}`,
+    ].join('')}:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}${maps.hasDamage ? 'D' : ''}`,
     vertexShader: VERTEX,
     fragmentShader,
     uniforms,
-    alphaTest: deckle || perforation ? 0.5 : 0,
+    // Anything that removes paper needs fragments discarded rather than
+    // blended — a hole has to cut the depth buffer and the shadow too.
+    alphaTest: deckle || perforation || maps.hasDamage ? 0.5 : 0,
+    depth,
   }
 }
 

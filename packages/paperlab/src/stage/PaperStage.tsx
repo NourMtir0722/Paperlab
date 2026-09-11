@@ -18,7 +18,7 @@ import { Figure } from './Figure'
 import { Source, Surround } from './Surround'
 import { Ceiling, Columns, Doorway, Floor } from './Room'
 import { Suspension } from './Suspension'
-import { Grade } from './Grade'
+import { GradePass } from './GradeLazy'
 import { stageSchema, type StageConfig, type StageConfigInput } from './schema'
 import { stageMotionSchema, type StageMotionInput } from './navigate'
 import { useWalk } from './useWalk'
@@ -644,7 +644,7 @@ export function PaperStageScene({
         `settings.grade` is the tier's switch: the bottom tier skips the
         whole composer rather than running it cheaply.
       */}
-      {settings.grade && <Grade grade={stage.grade} film={rig.film} />}
+      {settings.grade && <GradePass grade={stage.grade} film={rig.film} />}
     </LightRig>
   )
 }

@@ -37,7 +37,7 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "node ../../tools/sync-readme.mjs && tsup",
+    "build": "node ../../tools/sync-readme.mjs && node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

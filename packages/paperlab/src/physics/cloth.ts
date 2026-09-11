@@ -9,14 +9,6 @@ export interface ClothParams {
   floor: number
 }
 
-interface Constraint {
-  a: number
-  b: number
-  rest: number
-  /** 0 = structural, 1 = shear, 2 = bend (scaled by stiffness at solve time). */
-  kind: 0 | 1 | 2
-}
-
 const FIXED_DT = 1 / 120
 const SOLVER_ITERATIONS = 5
 
@@ -72,9 +64,11 @@ function grabFalloff(distance: number, radius: number): number {
  * bend springs, pins as the interface, wind as a force field, fixed timestep
  * with substeps, sleep when kinetic energy is negligible.
  *
- * Constraint (enforced in the schema): cloth OWNS vertex positions — a paper
- * runs a behavior (deformer stack) OR cloth, never both. Pure JS, no three
- * dependency: the PaperMesh adapter copies `positions` into the geometry.
+ * Cloth solves the particles and hands them on: `PaperMesh` runs the deformer
+ * stack over `positions`, so a behavior composes with the sim rather than
+ * replacing it (pinned by `cloth-hosts-a-shape.test.ts`). Only the STRIP owns
+ * its vertices outright — its rows are chain nodes, not the sheet's grid.
+ * Pure JS, no three dependency.
  */
 export class ClothSim {
   readonly cols: number
@@ -87,7 +81,53 @@ export class ClothSim {
   private readonly prev: Float32Array
   private readonly pinned: Uint8Array
   private readonly pinTargets: Float32Array
-  private readonly constraints: Constraint[] = []
+  /**
+   * The constraints, one typed array per field rather than one object each.
+   *
+   * Because the effects layer has to vary them across the sheet, and an
+   * object with a fixed `rest` cannot be varied cheaply. Paper that chars
+   * SHRINKS — that is what curls it toward the flame, not softening — which
+   * is a shorter rest length on exactly the constraints the heat reached.
+   * Burnt-through paper has to stop pulling on what is left, which is a
+   * broken flag. A wet corner is floppier than the dry sheet above it, which
+   * is a per-constraint stiffness. None of that is in this file; this file
+   * only makes it possible, and at the defaults below the solve is
+   * bit-identical to the object version it replaces.
+   */
+  readonly constraintCount: number
+  readonly constraintA: Uint32Array
+  readonly constraintB: Uint32Array
+  /** 0 = structural, 1 = shear, 2 = bend (scaled by `stiffness` at solve time). */
+  readonly constraintKind: Uint8Array
+  /**
+   * The length each constraint is laid out at. Never changes; the reference
+   * to shrink from.
+   *
+   * Float64, not Float32, and that is measured rather than cautious: with
+   * single-precision rest lengths every one of them rounded, and the first
+   * typed-array version of this solve disagreed with the object version it
+   * replaced in 476–711 of 714 coordinates after five seconds. The object
+   * version held a JS number, which is a double.
+   */
+  readonly naturalLength: Float64Array
+  /** The length it pulls toward now. `naturalLength` until something shrinks or stretches it. */
+  readonly restLength: Float64Array
+  /** A multiplier on the constraint's own strength. 1 is the paper as built. */
+  readonly constraintStiffness: Float64Array
+  /** Non-zero where the paper between two particles is gone. Skipped by the solve. */
+  readonly broken: Uint8Array
+  /**
+   * How easily each particle is moved, 0..1: one over its mass, relative to
+   * dry paper.
+   *
+   * Mass matters in exactly two places here, and both are wired, because a
+   * "heavier" that touched neither would be another knob that does nothing.
+   * Gravity is an acceleration, so weight alone does not make wet paper fall
+   * differently. What does: the air pushes a heavy particle less (the aero
+   * term is divided by mass), and the constraint solve moves a heavy particle
+   * less than a light one it is tied to. Zero is infinite mass: static, moved by nothing — not the air, not the solve, and not gravity either.
+   */
+  readonly invMass: Float32Array
   private params: ClothParams
   private time = 0
   private accumulator = 0
@@ -150,10 +190,9 @@ export class ClothSim {
     this.prev.set(this.positions)
 
     const idx = (r: number, c: number) => r * cols + c
+    const links: number[] = []
     const link = (a: number, b: number, kind: 0 | 1 | 2) => {
-      const dx = this.positions[a * 3]! - this.positions[b * 3]!
-      const dy = this.positions[a * 3 + 1]! - this.positions[b * 3 + 1]!
-      this.constraints.push({ a, b, rest: Math.hypot(dx, dy), kind })
+      links.push(a, b, kind)
     }
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -167,6 +206,29 @@ export class ClothSim {
         if (r + 2 < rows) link(idx(r, c), idx(r + 2, c), 2)
       }
     }
+
+    const m = links.length / 3
+    this.constraintCount = m
+    this.constraintA = new Uint32Array(m)
+    this.constraintB = new Uint32Array(m)
+    this.constraintKind = new Uint8Array(m)
+    this.naturalLength = new Float64Array(m)
+    this.restLength = new Float64Array(m)
+    this.constraintStiffness = new Float64Array(m).fill(1)
+    this.broken = new Uint8Array(m)
+    for (let k = 0; k < m; k++) {
+      const a = links[k * 3]!
+      const b = links[k * 3 + 1]!
+      this.constraintA[k] = a
+      this.constraintB[k] = b
+      this.constraintKind[k] = links[k * 3 + 2]!
+      const dx = this.positions[a * 3]! - this.positions[b * 3]!
+      const dy = this.positions[a * 3 + 1]! - this.positions[b * 3 + 1]!
+      const rest = Math.hypot(dx, dy)
+      this.naturalLength[k] = rest
+      this.restLength[k] = rest
+    }
+    this.invMass = new Float32Array(this.count).fill(1)
 
     // Pins hold their rest-pose position.
     const pin = (r: number, c: number) => {
@@ -519,12 +581,25 @@ export class ClothSim {
       const ax = nx * facing * (1 - AERO_TURBULENCE) + gust * 0.25 * AERO_TURBULENCE
       const ay = ny * facing * (1 - AERO_TURBULENCE)
       const az = nz * facing * (1 - AERO_TURBULENCE) + gust * AERO_TURBULENCE
+      // The air's push is a force, so it moves a heavy particle less. Gravity
+      // is an acceleration and does not care — see `invMass`.
+      const im = this.invMass[i]!
+      // Zero inverse mass is infinite mass, and nothing moves it — gravity
+      // included. The convention every solver shares, and the one a caller
+      // reaching for "hold this particle still" will assume. `prev` is synced
+      // so it leaves the moment it was frozen carrying no velocity.
+      if (im <= 0) {
+        this.prev[i3] = x
+        this.prev[i3 + 1] = y
+        this.prev[i3 + 2] = z
+        continue
+      }
       this.prev[i3] = x
       this.prev[i3 + 1] = y
       this.prev[i3 + 2] = z
-      p[i3] = x + vx + ax * dt2
-      p[i3 + 1] = y + vy + (ay - gravity * 3.2) * dt2
-      p[i3 + 2] = z + vz + az * dt2
+      p[i3] = x + vx + ax * im * dt2
+      p[i3 + 1] = y + vy + (ay * im - gravity * 3.2) * dt2
+      p[i3 + 2] = z + vz + az * im * dt2
       maxTravel = Math.max(maxTravel, vx * vx + vy * vy + vz * vz)
     }
 
@@ -547,11 +622,19 @@ export class ClothSim {
       }
     }
 
+    const { constraintA, constraintB, constraintKind, restLength, constraintStiffness, broken, invMass } =
+      this
+    const bend = 0.25 + stiffness * 0.7
     for (let iter = 0; iter < SOLVER_ITERATIONS; iter++) {
-      for (const c of this.constraints) {
-        const k = c.kind === 2 ? 0.25 + stiffness * 0.7 : c.kind === 1 ? 0.85 : 1
-        const a3 = c.a * 3
-        const b3 = c.b * 3
+      for (let c = 0; c < this.constraintCount; c++) {
+        // Paper that is not there any more does not hold anything up.
+        if (broken[c]) continue
+        const kind = constraintKind[c]!
+        const k = (kind === 2 ? bend : kind === 1 ? 0.85 : 1) * constraintStiffness[c]!
+        const ia = constraintA[c]!
+        const ib = constraintB[c]!
+        const a3 = ia * 3
+        const b3 = ib * 3
         const dx = p[b3]! - p[a3]!
         const dy = p[b3 + 1]! - p[a3 + 1]!
         const dz = p[b3 + 2]! - p[a3 + 2]!
@@ -561,11 +644,11 @@ export class ClothSim {
         // soft edge of a grab is honestly somewhere between. The old 0/1/2
         // weights were this same split for the two cases it could express;
         // the ratio reproduces them exactly and covers the rest.
-        const ma = this.pinned[c.a] ? 0 : 1 - this.grabWeights[c.a]!
-        const mb = this.pinned[c.b] ? 0 : 1 - this.grabWeights[c.b]!
+        const ma = this.pinned[ia] ? 0 : invMass[ia]! * (1 - this.grabWeights[ia]!)
+        const mb = this.pinned[ib] ? 0 : invMass[ib]! * (1 - this.grabWeights[ib]!)
         const total = ma + mb
         if (total <= 0) continue
-        const diff = ((dist - c.rest) / dist / total) * k
+        const diff = ((dist - restLength[c]!) / dist / total) * k
         const aw = ma
         const bw = mb
         p[a3] = p[a3]! + dx * diff * aw
