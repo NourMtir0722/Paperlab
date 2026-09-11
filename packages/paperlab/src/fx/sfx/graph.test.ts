@@ -183,8 +183,13 @@ describe('the audio graph', () => {
   })
 
   it('fades a voice out instead of cutting it, because a cut is a click', () => {
-    const { audio } = make('low')
+    // Only a voice with something playing through it has anything to fade —
+    // an empty one is freed at once (see "what a voice leaves behind").
+    const { context, audio } = make('low')
     const voice = audio.take('crumple', 0.5)!
+    const source = context.createBufferSource()
+    source.start(0)
+    voice.own(source)
     const param = voice.gain.gain as unknown as { calls: string[] }
     voice.stop()
     expect(audio.voices.length).toBe(0)
@@ -256,5 +261,104 @@ describe('the audio graph', () => {
     await audio.dispose()
     expect(audio.voices.length).toBe(0)
     expect(context.closed).toBe(true)
+  })
+})
+
+/**
+ * The leak. Stealing used to fade a voice's gain and do nothing else: its
+ * sources kept running behind a silent gain, and its nodes stayed connected,
+ * for the life of the page. Fire and crumple are grain clouds of dozens of
+ * voices a second, so the node count only ever went up.
+ */
+describe('what a voice leaves behind', () => {
+  /** Let simulated time pass: every source that was told to stop, ends. */
+  const finish = (context: FakeContext) => {
+    for (const source of context.sources) {
+      if (source.stopped !== null && !source.disconnected) source.onended?.()
+    }
+  }
+  /** Voice gains still connected — every gain but the master. */
+  const liveGains = (context: FakeContext) => context.gains.slice(1).filter((g) => !g.disconnected).length
+  /** Sources started and never let go of. */
+  const liveSources = (context: FakeContext) =>
+    context.sources.filter((s) => s.started !== null && !s.disconnected).length
+
+  /** A looping bed, the case the old release could never end. */
+  const bed = (audio: FxAudio, context: FakeContext, priority = 0.5) => {
+    const voice = audio.take('bed', priority)
+    if (!voice) return null
+    const source = context.createBufferSource() as FakeSource
+    source.loop = true
+    source.connect(voice.gain)
+    source.start(context.currentTime)
+    voice.own(source)
+    return { voice, source }
+  }
+
+  it('stops a looping bed when its voice is stolen', () => {
+    const { context, audio } = make('low')
+    const first = bed(audio, context)!
+    for (let i = 0; i < 6; i++) bed(audio, context)
+    // The first voice was stolen. Its bed has been told to stop…
+    expect(first.source.stopped).not.toBeNull()
+    finish(context)
+    // …and once it has, the bed and the voice's gain are both let go.
+    expect(first.source.disconnected).toBe(true)
+    expect(first.voice.gain as unknown as { disconnected: boolean }).toMatchObject({ disconnected: true })
+  })
+
+  it('holds the node count at the ceiling across a thousand steals', () => {
+    const { context, audio } = make('low')
+    for (let i = 0; i < 1000; i++) {
+      context.currentTime = i * 0.01
+      bed(audio, context)
+      if (i % 7 === 0) finish(context)
+    }
+    finish(context)
+    expect(audio.voices.length).toBe(6)
+    expect(liveGains(context)).toBeLessThanOrEqual(6)
+    expect(liveSources(context)).toBeLessThanOrEqual(6)
+  })
+
+  it('stops the source at the end of the fade, not before it', () => {
+    // Cut at once and the fade that keeps stealing from clicking is cut too.
+    const { context, audio } = make('low')
+    const first = bed(audio, context)!
+    context.currentTime = 2
+    first.voice.stop()
+    expect(first.source.stopped).toBeGreaterThan(2)
+  })
+
+  it('frees a one-shot when it ends on its own', () => {
+    const { context, audio } = make()
+    audio.test(0.1)
+    finish(context)
+    expect(audio.voices.length).toBe(0)
+    expect(liveGains(context)).toBe(0)
+    expect(liveSources(context)).toBe(0)
+  })
+
+  it('frees a voice nothing ever played through, at once', () => {
+    const { context, audio } = make()
+    audio.take('empty')!.stop()
+    expect(liveGains(context)).toBe(0)
+  })
+
+  it('never plays a source handed to a voice that has already gone', () => {
+    const { context, audio } = make()
+    const voice = audio.take('late')!
+    voice.stop()
+    const source = context.createBufferSource() as FakeSource
+    source.start(0)
+    voice.own(source)
+    expect(source.stopped).not.toBeNull()
+    expect(source.disconnected).toBe(true)
+  })
+
+  it('lets go of everything on dispose, without waiting for ended', async () => {
+    const { context, audio } = make('low')
+    for (let i = 0; i < 4; i++) bed(audio, context)
+    await audio.dispose()
+    expect(liveGains(context)).toBe(0)
   })
 })

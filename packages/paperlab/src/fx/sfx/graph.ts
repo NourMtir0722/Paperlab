@@ -113,6 +113,19 @@ export interface Voice {
   priority: number
   readonly gain: GainLike
   readonly startedAt: number
+  /**
+   * Hand a source to this voice, so it lives and dies with it.
+   *
+   * Every source that plays through a voice must be given to it, because the
+   * voice is the only thing that knows when to stop it. A voice that did not
+   * own its sources could only fade its gain when stolen — and a looping bed
+   * behind a silent gain keeps running, and keeps its nodes, for the life of
+   * the page.
+   *
+   * A one-shot that ends on its own ends the voice with it; a voice already
+   * released stops the source at once rather than letting it play unheard.
+   */
+  own(source: BufferSourceLike): void
   /** Stop and return this voice to the pool. */
   stop(): void
 }
@@ -125,6 +138,16 @@ export class FxAudio {
   private readonly ctx: AudioLike
   private readonly master: GainLike
   private readonly live: Voice[] = []
+  /**
+   * What each voice owns, until the last of it has actually stopped.
+   *
+   * Outlives the voice's place in `live` on purpose: a stolen voice leaves the
+   * pool at once, so the new sound can have its slot, but its sources are
+   * still fading for a few milliseconds and its gain is still connected. The
+   * nodes are freed when the last source reports `ended`, not before — cut
+   * sooner and the fade that stops stealing from clicking is cut with it.
+   */
+  private readonly slots = new Map<number, { gain: GainLike; sources: BufferSourceLike[] }>()
   private nextId = 1
   private unlocked = false
   private noise: AudioBufferLike | null = null
@@ -230,16 +253,53 @@ export class FxAudio {
     const gain = this.ctx.createGain()
     gain.connect(this.master)
     const id = this.nextId++
+    this.slots.set(id, { gain, sources: [] })
     const voice: Voice = {
       id,
       kind,
       priority,
       gain,
       startedAt: this.ctx.currentTime,
+      own: (source) => this.own(id, source),
       stop: () => this.release(id),
     }
     this.live.push(voice)
     return voice
+  }
+
+  private own(id: number, source: BufferSourceLike): void {
+    const slot = this.slots.get(id)
+    const alive = this.live.some((v) => v.id === id)
+    if (!slot || !alive) {
+      // A source given to a voice that has already gone: it must not play
+      // through a gain that is fading out, or through nothing at all.
+      stopNow(source)
+      source.disconnect()
+      return
+    }
+    slot.sources.push(source)
+    source.onended = () => this.ended(id, source)
+  }
+
+  private ended(id: number, source: BufferSourceLike): void {
+    source.disconnect()
+    const slot = this.slots.get(id)
+    if (!slot) return
+    const at = slot.sources.indexOf(source)
+    if (at >= 0) slot.sources.splice(at, 1)
+    if (slot.sources.length > 0) return
+    // The last of it. If the voice is still in the pool it finished on its
+    // own — a one-shot — and is done; if it was released, its fade is over.
+    if (this.live.some((v) => v.id === id)) this.release(id)
+    else this.free(id)
+  }
+
+  /** Disconnect a voice's gain. Only once nothing that feeds it is still running. */
+  private free(id: number): void {
+    const slot = this.slots.get(id)
+    if (!slot) return
+    slot.gain.disconnect()
+    this.slots.delete(id)
   }
 
   /**
@@ -255,10 +315,29 @@ export class FxAudio {
     if (index < 0) return
     const [voice] = this.live.splice(index, 1)
     if (!voice) return
+    const slot = this.slots.get(id)
+    // Nothing is playing through it, so there is nothing to fade and nothing
+    // to wait for.
+    if (!slot || slot.sources.length === 0) {
+      this.free(id)
+      return
+    }
     const now = this.ctx.currentTime
     voice.gain.gain.cancelScheduledValues(now)
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now)
     voice.gain.gain.linearRampToValueAtTime(0, now + STEAL_FADE)
+    // Stopped at the END of the fade, which is what lets `ended` free the
+    // nodes without cutting the ramp short. This is the half the first
+    // version was missing: it faded the gain and never stopped a thing, so a
+    // looping bed on a stolen voice ran silently forever.
+    for (const source of [...slot.sources]) {
+      try {
+        source.stop(now + STEAL_FADE)
+      } catch {
+        // Never started: nothing will ever report `ended`, so do it here.
+        this.ended(id, source)
+      }
+    }
   }
 
   /** Stop everything. The panic button, and what unmounting calls. */
@@ -287,15 +366,28 @@ export class FxAudio {
     voice.gain.gain.linearRampToValueAtTime(0, now + duration)
     source.start(now)
     source.stop(now + duration)
-    source.onended = () => voice.stop()
+    // Owned, so its end frees the voice and every node it used.
+    voice.own(source)
     return voice
   }
 
   /** Release the context. Nothing survives this. */
   async dispose(): Promise<void> {
     this.stopAll()
+    // Closing the context ends every source at once, and `ended` may never
+    // arrive after that — so let go of everything here rather than wait.
+    for (const id of [...this.slots.keys()]) this.free(id)
     this.master.disconnect()
     await this.ctx.close()
+  }
+}
+
+/** Stop a source that may or may not have been started. */
+function stopNow(source: BufferSourceLike): void {
+  try {
+    source.stop()
+  } catch {
+    // Never started — which is the same as stopped.
   }
 }
 
