@@ -98,7 +98,10 @@ describe('cloth coupling levers', () => {
   })
 
   it('does not move a particle of infinite mass, whatever pulls on it', () => {
-    const sim = new ClothSim(6, 6, 1, 1, 'none', { ...still, gravity: 0 })
+    // Gravity ON, which the first version of this test left off — and so
+    // missed that an infinitely heavy particle still fell and kept its
+    // velocity. Inverse mass zero is static, full stop.
+    const sim = new ClothSim(6, 6, 1, 1, 'none', { ...still })
     const i = 0
     sim.invMass[i] = 0
     const before = [sim.positions[0]!, sim.positions[1]!, sim.positions[2]!]

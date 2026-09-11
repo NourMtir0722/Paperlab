@@ -225,15 +225,32 @@ try {
   const frames = (count = 1) =>
     page.evaluate(
       (n) =>
-        new Promise((resolve) => {
+        new Promise((resolve, reject) => {
           let seen = 0
-          const bail = setTimeout(() => resolve(seen), 5000)
+          let stall = 0
+          // Per FRAME, not per call. A slow renderer can take far longer than
+          // five seconds to draw eighty frames and is still drawing; a tab
+          // that has stopped painting draws none at all. Only the second is a
+          // failure — and it has to FAIL: the first version resolved with
+          // however many frames it had and every caller carried on as if it
+          // had waited, which is the wall-clock bug in a new coat.
+          const arm = () => {
+            clearTimeout(stall)
+            stall = setTimeout(
+              () => reject(new Error(`rendering stopped after ${seen} of ${n} frames`)),
+              5000,
+            )
+          }
           const tick = () => {
             if (++seen >= n) {
-              clearTimeout(bail)
+              clearTimeout(stall)
               resolve(seen)
-            } else requestAnimationFrame(tick)
+            } else {
+              arm()
+              requestAnimationFrame(tick)
+            }
           }
+          arm()
           requestAnimationFrame(tick)
         }),
       count,

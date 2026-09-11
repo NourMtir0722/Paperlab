@@ -119,7 +119,23 @@ function consumer(label, peers, probe) {
     console.log(`\n${label}`)
     console.log(`  installing: ${peers.join(' ')}`)
     try {
-      run('npm', ['install', '--no-audit', '--no-fund', '--no-package-lock', tarball, ...pinned(peers)], dir)
+      run(
+        'npm',
+        [
+          'install',
+          '--no-audit',
+          '--no-fund',
+          '--no-package-lock',
+          // Promised by the note above and, until a review caught it, never
+          // passed. npm's default hoisting can put a transitive dependency at
+          // the consumer's root, where a packed module could import something
+          // it never declared and the probe would still pass.
+          '--install-strategy=nested',
+          tarball,
+          ...pinned(peers),
+        ],
+        dir,
+      )
     } catch (error) {
       fail(
         `npm install failed — a consumer cannot install this at all\n${error.stdout ?? ''}${error.stderr ?? ''}`,

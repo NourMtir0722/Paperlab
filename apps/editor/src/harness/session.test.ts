@@ -160,3 +160,46 @@ describe('the session store', () => {
     expect(seen.size).toBe(4)
   })
 })
+
+describe('a fresh sheet mid-gesture', () => {
+  it('drops whatever a hand was in the middle of', () => {
+    // The button is pressed with a mouse while a hand may still be scoring,
+    // pulling, ripping or turning the dial — and none of that may finish
+    // against the new sheet.
+    const s = make()
+    s.wasPinching = true
+    s.scoreFrom = { u: 0.2, v: 0.3, clientX: 10, clientY: 20 }
+    s.scoreTo = { u: 0.4, v: 0.3 }
+    s.scoreAt = { x: 10, y: 20 }
+    s.grabEdge = 'left'
+    s.grabOrigin = { x: 5, y: 5 }
+    s.grabTorn = true
+    s.rip = { gap: 1.2, edge: 'top' }
+    s.ripGap = 1.4
+    s.dialFrom = { roll: 12, index: 1 }
+    s.reset()
+    expect({
+      wasPinching: s.wasPinching,
+      scoreFrom: s.scoreFrom,
+      scoreTo: s.scoreTo,
+      scoreAt: s.scoreAt,
+      grabEdge: s.grabEdge,
+      grabOrigin: s.grabOrigin,
+      grabTorn: s.grabTorn,
+      rip: s.rip,
+      ripGap: s.ripGap,
+      dialFrom: s.dialFrom,
+    }).toEqual({
+      wasPinching: false,
+      scoreFrom: null,
+      scoreTo: null,
+      scoreAt: null,
+      grabEdge: null,
+      grabOrigin: null,
+      grabTorn: false,
+      rip: null,
+      ripGap: 0,
+      dialFrom: null,
+    })
+  })
+})

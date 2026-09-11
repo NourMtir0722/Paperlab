@@ -39,14 +39,21 @@ export interface GradeProps {
 const Grade = lazy(() =>
   import('./Grade')
     .then((m) => ({ default: m.Grade as ComponentType<GradeProps> }))
-    .catch(() => {
-      warnOnce()
+    .catch((error: unknown) => {
+      warnOnce(error)
       return { default: (() => null) as ComponentType<GradeProps> }
     }),
 )
 
 let warned = false
-function warnOnce() {
+/**
+ * Says why, not just what. The catch above takes EVERY rejection — a chunk
+ * that failed to load over the network, or `./Grade` throwing as it evaluates,
+ * as well as the missing peers — and a message telling someone to install two
+ * packages they already have, with the real error thrown away, is worse than
+ * no message. So the cause rides along.
+ */
+function warnOnce(cause?: unknown) {
   if (warned) return
   warned = true
   console.warn(
@@ -54,6 +61,7 @@ function warnOnce() {
       'They need two optional peers:\n' +
       '  npm i @react-three/postprocessing postprocessing\n' +
       'Set `grade` to all zeros to turn the pass off deliberately and silence this.',
+    ...(cause === undefined ? [] : [cause]),
   )
 }
 

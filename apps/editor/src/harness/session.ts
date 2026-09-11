@@ -166,6 +166,21 @@ export class Session {
     this.ripped = []
     this.wash = null
     this.washCount = 0
+    // Whatever a hand was in the middle of belongs to the old sheet. The
+    // button is pressed with a mouse, so a hand can easily still be
+    // mid-gesture — and a half-drawn score, a half-pulled edge, a half-open
+    // rip or a half-turned dial would otherwise finish against the fresh
+    // one. A pinch still held starts over, as a pinch landing on new paper.
+    this.wasPinching = false
+    this.scoreFrom = null
+    this.scoreTo = null
+    this.scoreAt = null
+    this.grabEdge = null
+    this.grabOrigin = null
+    this.grabTorn = false
+    this.rip = null
+    this.ripGap = 0
+    this.dialFrom = null
     this.revision++
     for (const listener of this.listeners) listener()
   }

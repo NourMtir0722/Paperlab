@@ -125,7 +125,7 @@ export class ClothSim {
    * Gravity is an acceleration, so weight alone does not make wet paper fall
    * differently. What does: the air pushes a heavy particle less (the aero
    * term is divided by mass), and the constraint solve moves a heavy particle
-   * less than a light one it is tied to. Zero is immovable by either.
+   * less than a light one it is tied to. Zero is infinite mass: static, moved by nothing — not the air, not the solve, and not gravity either.
    */
   readonly invMass: Float32Array
   private params: ClothParams
@@ -584,6 +584,16 @@ export class ClothSim {
       // The air's push is a force, so it moves a heavy particle less. Gravity
       // is an acceleration and does not care — see `invMass`.
       const im = this.invMass[i]!
+      // Zero inverse mass is infinite mass, and nothing moves it — gravity
+      // included. The convention every solver shares, and the one a caller
+      // reaching for "hold this particle still" will assume. `prev` is synced
+      // so it leaves the moment it was frozen carrying no velocity.
+      if (im <= 0) {
+        this.prev[i3] = x
+        this.prev[i3 + 1] = y
+        this.prev[i3 + 2] = z
+        continue
+      }
       this.prev[i3] = x
       this.prev[i3 + 1] = y
       this.prev[i3 + 2] = z
