@@ -19,7 +19,6 @@ import {
   addCrease,
   continuesScore,
   creaseFromDrag,
-  foldAlong,
   nearestCorner,
   nearestEdge,
   ripsApart,
@@ -32,6 +31,7 @@ import { FLICK_SPEED, FlickTracker, isFlick, washFromFlick, type Release } from 
 import { DIAL, dialIndex, dialStock, turnedBy } from './dial'
 import { Breath } from './breath'
 import { Span } from './span'
+import { derive, sheetAt, type Squeeze } from './derive'
 
 /**
  * Reach out and handle the paper.
@@ -150,8 +150,6 @@ type Status = 'idle' | 'starting' | 'live' | 'error'
  * single tidiest join in this whole harness. With nothing scored there is no
  * line to close along, and a fist on unmarked paper crumples it.
  */
-type Squeeze = 'none' | 'fold' | 'crush'
-
 /**
  * Degrees of fold per published step.
  *
@@ -161,19 +159,6 @@ type Squeeze = 'none' | 'fold' | 'crush'
  * the tree that owns the canvas. Five degrees is finer than a hand is steady.
  */
 const FOLD_STEP = 5
-
-/**
- * The sheet the `pinned-sheet` preset defines, at rest.
- *
- * Not a constant any more: two hands can resize it, and a crease is a signed
- * WORLD offset, so a crease measured against yesterday's dimensions lands in
- * the wrong place on a sheet that has since grown.
- */
-const BASE_SHEET = { width: 1.2, height: 1.5 }
-
-function sheetAt(scale: number): { width: number; height: number } {
-  return { width: BASE_SHEET.width * scale, height: BASE_SHEET.height * scale }
-}
 
 /**
  * How far back the camera stands.
@@ -190,17 +175,6 @@ function sheetAt(scale: number): { width: number; height: number } {
  * gesture must not have.
  */
 const CAMERA_Z = 3.95
-
-/**
- * The ground, in proportion to the sheet.
- *
- * A fixed floor is a floor at a fixed height, so a sheet twice the size hangs
- * through it and piles up on it. Scaling it with the sheet keeps the drop
- * proportional, which is what makes a big sheet read as a big sheet rather
- * than as a sheet in a smaller room. It is a live cloth parameter, so this
- * costs no rebuild.
- */
-const BASE_FLOOR = -1.4
 
 /**
  * How far a grabbed edge has to be pulled before it tears, in palm lengths on
@@ -1020,87 +994,32 @@ function App() {
     }
   }, [step])
 
-  const stock = dialStock(stockIndex)
-  const perforated: Partial<Record<PaperEdge, 'torn'>> = {}
-  for (const edge of ripped) perforated[edge] = 'torn'
+  /**
+   * The last stage of the frame pipeline, and the only one that is a pure
+   * function of the session: what the paper IS, turned into what `<Paper>` is
+   * told. It used to be eighty lines of conditional JSX right here, which
+   * meant the question you most want to ask of a gesture — given that the
+   * sheet is in this state, what does the library get — could only be
+   * answered by running a browser, a camera shim and a cloth simulation.
+   */
+  const paper = derive({
+    scale,
+    stock: dialStock(stockIndex),
+    squeeze,
+    fold,
+    peel,
+    thrown,
+    wind,
+    creases,
+    torn,
+    ripped,
+    wash,
+  })
 
   return (
     <>
       <div className="stage">
-        <Paper
-          ref={paperRef}
-          preset="pinned-sheet"
-          // Two hands set this. A rebuild is invisible on a shape — a deformer
-          // is a pure function of its options — and on cloth the drape now
-          // survives it, because `ClothSim.adopt` carries the particles over.
-          sheet={sheetAt(scale)}
-          stock={stock}
-          content={{
-            type: 'text',
-            text: 'Pinch to hold.\nPoint to score.\nFlick to paint.',
-            size: 40,
-            ...(wash ? { wash } : {}),
-          }}
-          // Creases and surface effects live BESIDE the vertices rather than
-          // owning them, so unlike a behavior they compose with the sim.
-          memory={{ creases }}
-          surface={{
-            ...(torn.length ? { deckle: { edges: torn, roughness: 0.6 } } : {}),
-            // Perforated from the start, because a dotted line you cannot see
-            // is not an affordance. The defaults are tuned to a postage
-            // stamp, and at this sheet's size they scallop the edges like one
-            // — fine holes read as a tear line, coarse ones read as a stamp.
-            perforation: {
-              edges: 'all',
-              holeRadius: 0.007,
-              spacing: 0.026,
-              state: perforated,
-            },
-          }}
-          // Cloth, always — it is never swapped out for a shape now, it
-          // HOSTS one. The sheet stays grabbable through a fold and a crush.
-          //
-          // `pins` is the one thing a gesture takes AWAY: flick the sheet
-          // while you are holding it and it lets go of the wall. The rebuild
-          // that costs is free of consequence now — `ClothSim.adopt` carries
-          // the drape and the velocity across it, so the sheet leaves at the
-          // speed your hand gave it instead of dropping from a standstill.
-          physics={{
-            type: 'cloth',
-            pins: thrown ? 'none' : 'top-corners',
-            wind,
-            stiffness: 0.75,
-            floor: BASE_FLOOR * scale,
-          }}
-          // The shape running over the simulation. Folds are raw deformers
-          // because they are aimed at lines the SHEET is carrying —
-          // `creaseFromDrag` produced each `{ angle, offset }` when a
-          // fingertip scored it, and `fold` takes the identical pair.
-          {...(squeeze === 'fold' && creases.length
-            ? {
-                deformers: creases.map((crease, index) => ({
-                  type: 'fold' as const,
-                  options: {
-                    // Named so each flap is the smaller side — see `foldAlong`.
-                    ...foldAlong(crease),
-                    // Alternating, so two scored lines concertina instead of
-                    // rolling the same way twice — which is what a hand does
-                    // to paper and what makes a second fold legible as one.
-                    // Negative first because the flap should fold AWAY from
-                    // the camera: swung forward it comes at the lens and shows
-                    // you its back.
-                    foldAngle: index % 2 === 0 ? -fold : fold,
-                    radius: 0.05,
-                  },
-                })),
-              }
-            : squeeze === 'crush'
-              ? { behavior: { type: 'crumple' as const, progress: 0 } }
-              : peel
-                ? { behavior: { type: 'peel' as const, corner: peel, progress: 0, radius: 0.2 } }
-                : {})}
-          interactive
-        >
+        <Paper ref={paperRef} {...paper} interactive>
           <CanvasBridge getMesh={getMesh} onReady={onReady} />
         </Paper>
       </div>
@@ -1171,7 +1090,7 @@ function App() {
             </>
           ) : null}
           <br />
-          stock: <strong>{stock}</strong> · wind: <strong>{wind.toFixed(2)}</strong> · size:{' '}
+          stock: <strong>{paper.stock}</strong> · wind: <strong>{wind.toFixed(2)}</strong> · size:{' '}
           <strong>{scale.toFixed(2)}×</strong>
           <br />
           scored: <strong>{creases.length}</strong> · washed: <strong>{wash ? 'yes' : 'no'}</strong>
