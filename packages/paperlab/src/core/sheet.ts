@@ -61,6 +61,56 @@ function spreadByAspect(sheet: SheetConfig, target: number): [number, number] {
 }
 
 /**
+ * The point on a sheet's drawn surface at `(u, v)`, in the geometry's local
+ * space, written into `out`.
+ *
+ * `positions` is a `PlaneGeometry`-ordered grid of `cols × rows` vertices —
+ * the order every sheet in the library is built in, cloth particles and strip
+ * nodes included. That order runs its rows TOP first, while `v` runs from the
+ * BOTTOM: `v = 0` is the bottom edge, as it is in the mesh's own `uv`
+ * attribute and in row 0 of a `DamageSource`. The flip is done here, once, so
+ * that nothing reading damage at a UV and asking where that is has to know.
+ *
+ * Interpolated across the TRIANGLE three draws, not bilinearly across the
+ * cell. On a flat grid the two agree; on a deformed one they do not, and the
+ * triangle is what is on screen — an ember that leaves a point a millimetre
+ * inside the paper is an ember that leaves from behind it.
+ *
+ * `u` and `v` are clamped to the sheet.
+ */
+export function surfacePointAt(
+  positions: ArrayLike<number>,
+  cols: number,
+  rows: number,
+  u: number,
+  v: number,
+  out: THREE.Vector3,
+): THREE.Vector3 {
+  const fx = Math.min(1, Math.max(0, u)) * (cols - 1)
+  const fy = (1 - Math.min(1, Math.max(0, v))) * (rows - 1)
+  const ix = Math.min(Math.floor(fx), cols - 2)
+  const iy = Math.min(Math.floor(fy), rows - 2)
+  const tx = fx - ix
+  const ty = fy - iy
+  // PlaneGeometry's cell: a (ix, iy), b (ix, iy+1), c (ix+1, iy+1),
+  // d (ix+1, iy), drawn as the triangles a-b-d and b-c-d — split along b-d.
+  const a = (iy * cols + ix) * 3
+  const b = a + cols * 3
+  const c = b + 3
+  const d = a + 3
+  for (let axis = 0; axis < 3; axis++) {
+    const pa = positions[a + axis]!
+    const pb = positions[b + axis]!
+    const pc = positions[c + axis]!
+    const pd = positions[d + axis]!
+    const value =
+      tx + ty <= 1 ? pa + tx * (pd - pa) + ty * (pb - pa) : pc + (1 - tx) * (pb - pc) + (1 - ty) * (pd - pc)
+    out.setComponent(axis, value)
+  }
+  return out
+}
+
+/**
  * Geometry factory. The sheet lives in its local XY plane, centered on the
  * origin, facing +Z. Deformers displace these vertices; the base (flat)
  * positions are kept by the caller for re-deformation each frame.
