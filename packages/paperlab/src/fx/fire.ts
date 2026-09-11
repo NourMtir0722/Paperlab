@@ -30,6 +30,17 @@ export interface FireEmitterOptions {
 const DEFAULTS: Required<FireEmitterOptions> = { embers: 0.25, smoke: 0.12, ash: 0.35, seed: 7 }
 
 /**
+ * The most of each kind one `update` may emit.
+ *
+ * A caller's `dt` is not a promise: this is public API, and a tab returning
+ * from the background can hand it a delta of minutes. Without a ceiling the
+ * debt loop below runs once per whole unit of it — which is a frozen page for
+ * a shower of particles the pool would immediately throw away, since it only
+ * holds `capacity` of them. An infinite delta never left the loop at all.
+ */
+const PER_UPDATE = 24
+
+/**
  * What a burn throws into the air, read off the field that is burning.
  *
  * Nothing here decides where a fire IS — the field does. Embers and smoke
@@ -79,8 +90,10 @@ export class FireEmitter {
     }
 
     if (front > 0 && dt > 0) {
-      this.emberDebt += front * o.embers * dt
-      this.smokeDebt += front * o.smoke * dt
+      // Capped rather than trusted — see `PER_UPDATE`. A NaN delta falls
+      // through both loops on its own, which is the right answer for it.
+      this.emberDebt = Math.min(this.emberDebt + front * o.embers * dt, PER_UPDATE)
+      this.smokeDebt = Math.min(this.smokeDebt + front * o.smoke * dt, PER_UPDATE)
       while (this.emberDebt >= 1) {
         this.emberDebt -= 1
         this.emit('ember', field.frontCells[Math.floor(this.next() * front)]!)

@@ -547,8 +547,18 @@ export class DamageField implements DamageSource {
    */
   step(delta: number): FieldStats {
     this.visited = 0
-    if (delta <= 0) return this.stats
+    // The transient outputs belong to the step that produced them, and they
+    // are cleared BEFORE the guards below rather than after. A frame with no
+    // time in it — the first one, or one whose clock went backwards — used to
+    // hand back the LAST frame's `consumed` cells and charred count, and the
+    // emitters and the sound duly shed the same ash and played the same
+    // crackles a second time. `front` is not transient: it is the state of
+    // the burn, and it is held across a frame too short to step on purpose.
     this.consumedLength = 0
+    if (delta <= 0) {
+      this.stats = { ...this.stats, charred: 0, consumed: 0, wetted: 0 }
+      return this.stats
+    }
     if (this.asleep) {
       // Asleep means nothing CAN change, so there is no time owed either;
       // banking it would replay a burst of steps the moment something wakes.

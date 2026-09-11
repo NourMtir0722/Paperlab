@@ -104,9 +104,12 @@ export class FireSound {
       budget--
       this.crackle()
     }
-    // Whatever is left over past what a frame can play is a sound nobody will
-    // miss; carrying it would pay it back as a burst later.
-    if (this.debt > CRACKLES_PER_FRAME) this.debt = CRACKLES_PER_FRAME
+    // Whatever the budget could not play is dropped outright, down to the
+    // fraction still accumulating toward the next one. A crackle carried into
+    // a frame where nothing charred is a sound with no cause — and a sheet
+    // that flashes over would otherwise go on crackling after it had stopped
+    // burning.
+    if (budget === 0) this.debt %= 1
   }
 
   /** Silence, now — the flame blown out, or the page going away. */

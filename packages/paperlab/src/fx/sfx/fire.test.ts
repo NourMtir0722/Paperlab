@@ -123,10 +123,12 @@ describe('the fire voice', () => {
     fire.update(1 / 60, burning(0.02, 500))
     // The bed, and no more than the per-frame ceiling of crackles.
     expect(context.sources.filter((s) => s.duration !== null).length).toBe(4)
-    // And the backlog is not paid back as a burst on the next frame either.
+    // And the backlog is DROPPED, not paid back: the next frame chars nothing,
+    // so it must crackle not at all. A sheet that flashes over would
+    // otherwise go on crackling after it had finished burning.
     context.currentTime += 1 / 60
     fire.update(1 / 60, burning(0.02, 0))
-    expect(context.sources.filter((s) => s.duration !== null).length).toBe(8)
+    expect(context.sources.filter((s) => s.duration !== null).length).toBe(4)
   })
 
   it('keeps the bed when crackles fill the pool', () => {

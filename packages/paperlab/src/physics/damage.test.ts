@@ -232,8 +232,18 @@ describe('damage → cloth', () => {
     new DamageCoupling(sim).update(src)
     const middle = 6 * 12 + 6
     expect(sim.invMass[middle]).toBe(0)
-    sim.grab(middle)
+    // The pinch still catches the live paper around the hole — a hand holds a
+    // patch, not a point — but nothing of the hole itself.
+    expect(sim.grab(middle)).toBe(middle)
     expect(sim.grabWeightAt(middle)).toBe(0)
+
+    // A hole wider than the patch is different: the pinch closes on nothing,
+    // and has to say so rather than report a grab that can never move.
+    const wide = source()
+    wide.paint(DAMAGE_CHANNELS.presence, 0.2, 0.8, 0)
+    const gone = new ClothSim(12, 12, 1, 1, 'none', still)
+    new DamageCoupling(gone).update(wide)
+    expect(gone.grab(middle)).toBe(-1)
   })
 
   it('reads only when the source changes, and hands every lever back when it goes', () => {

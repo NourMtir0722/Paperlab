@@ -40,10 +40,18 @@ void main() {
   vColor = pColor;
   vExtra = pExtra.yzw;
   vec4 view = modelViewMatrix * vec4(position, 1.0);
-  // A diameter in world units, in pixels at this distance: the perspective
-  // scale the camera already describes, so a flake is the same size in the
-  // world however far away it is drawn.
-  gl_PointSize = max(1.0, pExtra.x * uScale / max(0.0001, -view.z));
+  // A diameter in world units, drawn in pixels: the camera's own scale, so a
+  // flake is the same size in the world however far away it is.
+  //
+  // Perspective divides by depth and orthographic has no depth to divide by —
+  // ask which, the way three's own shaders do. uScale is right for both: the
+  // projection's vertical scale times half the framebuffer's height, which is
+  // pixels per world unit at unit depth under perspective, and pixels per
+  // world unit outright under orthographic. (No backticks in here: this is a
+  // template literal, and one would end it.)
+  bool perspective = projectionMatrix[2][3] == -1.0;
+  float depth = perspective ? max(0.0001, -view.z) : 1.0;
+  gl_PointSize = max(1.0, pExtra.x * uScale / depth);
   gl_Position = projectionMatrix * view;
 }
 `

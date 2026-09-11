@@ -396,6 +396,17 @@ function App() {
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState('')
   const [blowReady, setBlowReady] = useState(false)
+  /**
+   * Whether this sheet has been burnt at all.
+   *
+   * React state, set ONCE, and the only thing about the fire that is: the
+   * rest of it is read straight off the field every frame, because a number
+   * that changes sixty times a second has no business re-rendering the tree
+   * that owns the canvas. This one has to, because it decides whether the
+   * "fresh sheet" button exists.
+   */
+  const [burnt, setBurnt] = useState(false)
+  const burntRef = useRef(false)
 
   /**
    * Everything about the sheet, in one mutable object the frame loop writes
@@ -930,6 +941,12 @@ function App() {
       emitter.update(dt)
       pool.step(dt)
       fireSoundRef.current?.update(dt, stats, locate(0.5, 0.5))
+      // Once, not per frame: the guard is a ref precisely so that this cannot
+      // become a setState in the frame loop.
+      if (!burntRef.current && (stats.charred > 0 || stats.remaining < 1)) {
+        burntRef.current = true
+        setBurnt(true)
+      }
       const fire: DriveResult['fire'] = {
         lit,
         front: stats.front,
@@ -977,6 +994,8 @@ function App() {
     poolRef.current?.clear()
     matchRef.current.reset()
     fireSoundRef.current?.stop()
+    burntRef.current = false
+    setBurnt(false)
   }, [s])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: as above — `s` is the stable store, its fields are not dependencies.
@@ -1112,6 +1131,19 @@ function App() {
 
   useEffect(() => stop, [stop])
 
+  // The audio context outlives the camera on purpose — stopping the camera is
+  // not a fresh sheet, and unlocking one costs a gesture. Unmounting is
+  // different: nothing is coming back, so close it and let the graph go.
+  useEffect(
+    () => () => {
+      fireSoundRef.current?.stop()
+      void audioRef.current?.dispose()
+      fireSoundRef.current = null
+      audioRef.current = null
+    },
+    [],
+  )
+
   // The scripted-hand hook. Same shape as the other harnesses' `__PERF__` and
   // `__PARITY__` globals, and dev-only for the same reason they are.
   useEffect(() => {
@@ -1231,13 +1263,20 @@ function App() {
           torn: <strong>{s.torn.join(', ') || 'nothing'}</strong> · ripped:{' '}
           <strong>{s.ripped.join(', ') || 'nothing'}</strong>
         </p>
+        {/*
+          `burnt` is here because a fire touches none of the session's fields:
+          the damage lives in the field, so a sheet that had ONLY been burnt
+          offered no way back at all — and the button is the only way back
+          from a burn, since nothing on this page puts a fire out.
+        */}
         {s.creases.length ||
         s.torn.length ||
         s.ripped.length ||
         s.wash ||
         s.scale !== 1 ||
         s.squeeze !== 'none' ||
-        s.thrown ? (
+        s.thrown ||
+        burnt ? (
           <button type="button" className="ghost" onClick={reset}>
             fresh sheet
           </button>

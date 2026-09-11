@@ -28,13 +28,15 @@ export const FLAME_HEAT = 5
 export const FLAME_RADIUS = 0.055
 
 /**
- * How long the flame has to sit on one spot to deposit at its full rate, in
- * seconds.
+ * How long the flame has to be in contact with the paper to deposit at its
+ * full rate, in seconds.
  *
- * This is what keeps a flame waved past from setting the sheet alight, and it
- * is the reason the rate above can be generous: a hand crossing the paper
- * spends a few frames over any one place and leaves a scorch, while a hand
- * holding still lights a fire.
+ * It gates the flame's ARRIVAL, which is what keeps a hand crossing the sheet
+ * from setting it alight: a few frames over any one place, at the bottom of
+ * this ramp, leave a scorch rather than a fire. It deliberately does not
+ * reset as the flame moves ALONG the paper — a match already in contact
+ * lights a trail behind it, which is what a match does — and it starts again
+ * from zero the moment the flame leaves the sheet or goes out.
  */
 export const FLAME_DWELL = 0.35
 

@@ -103,6 +103,22 @@ describe('the fire emitter', () => {
     expect(pool.count).toBe(0)
   })
 
+  it('survives a delta no caller should have passed it', () => {
+    // It is public API, and a tab coming back from the background hands out
+    // deltas of minutes. The emission loop runs once per whole unit of debt,
+    // so an unbounded delta is a frozen page — and an infinite one never left
+    // the loop at all. The assertion is really that this test RETURNS.
+    const field = new DamageField({ seed: 3 })
+    const pool = new ParticlePool(500, 4)
+    const emitter = new FireEmitter(field, pool, flat)
+    field.ignite(0.5, 0.5, 0.08, 1)
+    for (let i = 0; i < 90; i++) field.step(1 / 60)
+    emitter.update(Number.POSITIVE_INFINITY)
+    emitter.update(3600)
+    emitter.update(Number.NaN)
+    expect(pool.count).toBeLessThanOrEqual(pool.capacity)
+  })
+
   it('spawns from the same cells given the same seed', () => {
     const positions = () => {
       const { pool } = burning(1.5)

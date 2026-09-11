@@ -413,6 +413,18 @@ export class ClothSim {
         )
       }
     }
+    // A pinch that closed on nothing is not a grab, and must not report
+    // itself as one: a hole wider than the patch, or a patch entirely pinned,
+    // leaves no particle to hold. `grabNearest`'s callers read the return to
+    // decide whether anything was caught (see `StripSim`'s, and the comment
+    // on it), so saying yes here would be a grab that moves nothing and never
+    // lets go.
+    if (this.grabbed.length === 0) {
+      this.grabbedIndex = -1
+      this.grabOffsets = new Float32Array(0)
+      this.wake()
+      return -1
+    }
     this.grabOffsets = Float32Array.from(offsets)
     this.grabAt.set(this.positions.subarray(anchor, anchor + 3))
     this.grabWas.set(this.grabAt)

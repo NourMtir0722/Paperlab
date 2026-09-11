@@ -43,7 +43,11 @@ const query = new URLSearchParams(window.location.search)
 const mode = query.get('damage') ?? 'none'
 const stock = (query.get('stock') ?? 'printer') as StockName
 const scene = query.get('scene') ?? 'sheet'
-const detail = Number(query.get('detail') ?? '1')
+// Clamped, because it comes off a URL: `?detail=Infinity` would otherwise
+// reach the shader, where the fray is multiplied by a zero on pristine paper
+// and NaN is what lands on the sheet.
+const asked = Number(query.get('detail') ?? '1')
+const detail = Number.isFinite(asked) ? Math.min(1, Math.max(0, asked)) : 1
 
 const SIZE = 64
 

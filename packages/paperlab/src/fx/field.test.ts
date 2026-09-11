@@ -438,6 +438,31 @@ describe('the stats a consumer reads every frame', () => {
     expect(quiet.charred).toBe(0)
   })
 
+  it('does not hand the same fire back twice on a frame with no time in it', () => {
+    // The emitters shed a flake for every cell in `consumedCells`, and the
+    // sound plays a crackle per texel that chars. So a frame with no time in
+    // it — the first one, or one whose clock ran backwards — has to report
+    // that nothing happened, or both replay the last frame's fire.
+    const field = new DamageField({ seed: 3 })
+    field.ignite(0.5, 0.5, 0.08, 1)
+    let consumed = 0
+    for (let i = 0; i < 600 && consumed === 0; i++) consumed = field.step(1 / 60).consumed
+    expect(consumed).toBeGreaterThan(0)
+    expect(field.consumedCount).toBe(consumed)
+    const burning = field.lastStats.front
+    expect(burning).toBeGreaterThan(0)
+
+    const idle = field.step(0)
+    expect(idle.consumed).toBe(0)
+    expect(idle.charred).toBe(0)
+    expect(idle.wetted).toBe(0)
+    expect(field.consumedCount).toBe(0)
+    // The front is not transient — it is the state of the burn, and it is
+    // held across a frame too short to step, as it always was.
+    expect(idle.front).toBe(burning)
+    expect(field.frontCount).toBeGreaterThan(0)
+  })
+
   it('says WHERE it burnt through and where the front is, not just how much', () => {
     // The emitters need a place: ash leaves the texel that just went, embers
     // and smoke leave the front. Counts alone could only make a fire that

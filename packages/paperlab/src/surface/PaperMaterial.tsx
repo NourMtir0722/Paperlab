@@ -98,7 +98,12 @@ export function PaperMaterial({
   // The fray follows the quality tier, which can change at any moment, so it
   // is read off the source each frame rather than baked into the program.
   useFrame(() => {
-    if (bound.uDamageDetail) bound.uDamageDetail.value = damage?.detail ?? 1
+    if (!bound.uDamageDetail) return
+    // Clamped rather than trusted: `detail` is a number on a public
+    // interface, and an infinite one reaching the shader is multiplied by a
+    // zero somewhere in the fray and paints NaN across the whole sheet.
+    const detail = damage?.detail ?? 1
+    bound.uDamageDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 1
   })
 
   return (
