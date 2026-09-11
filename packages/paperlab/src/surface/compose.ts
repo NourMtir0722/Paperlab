@@ -424,8 +424,17 @@ void plPerforation(inout vec4 color) {
 const DAMAGE_CHUNK = /* glsl */ `
 uniform sampler2D uDamage;
 
+// The damage grid's texels sit ON the sheet — texel x at u = x / (N - 1), its
+// corners on the sheet's corners, which is how the field paints and how the
+// physics reads it. A texture puts texel x at (x + 0.5) / N. Sampled straight,
+// the picture of a burn sat up to half a texel off the burn the paper feels.
+vec2 plDamageUv(vec2 uv) {
+  vec2 n = vec2(textureSize(uDamage, 0));
+  return (uv * (n - 1.0) + 0.5) / n;
+}
+
 void plDamage(inout vec4 color, inout float roughness) {
-  vec4 d = texture2D(uDamage, vPaperUv);
+  vec4 d = texture2D(uDamage, plDamageUv(vPaperUv));
   // Wet paper is darker and smoother: water fills the gaps between fibres
   // that scatter light, which is both effects from one cause.
   color.rgb *= 1.0 - 0.38 * d.g;
@@ -435,6 +444,21 @@ void plDamage(inout vec4 color, inout float roughness) {
   color.rgb = mix(color.rgb, scorch, smoothstep(0.02, 0.6, d.r));
   // Missing paper: gone at half presence, on every stock alike.
   color.a *= step(0.5, d.a);
+}
+
+// The burning line itself: heat, drawn as light. Returned rather than written,
+// because transmission OWNS csm_Emissive — it assigns it, and anything put
+// there before it runs is thrown away. The caller adds this after.
+vec3 plDamageGlow() {
+  vec4 d = texture2D(uDamage, plDamageUv(vPaperUv));
+  // Nothing glows where there is no paper left to be hot.
+  float h = d.b * step(0.5, d.a);
+  // Dull red, then orange, then toward yellow as it gets hotter — the order
+  // a real ember runs through. Past 1 in linear light on purpose: the front
+  // is the brightest thing in the frame, and a bloom pass should catch it.
+  vec3 ember = mix(vec3(0.9, 0.12, 0.02), vec3(1.0, 0.55, 0.12), smoothstep(0.35, 0.8, h));
+  ember = mix(ember, vec3(1.0, 0.85, 0.5), smoothstep(0.8, 1.0, h));
+  return ember * smoothstep(0.08, 0.6, h) * (0.6 + 2.4 * h);
 }
 `
 
@@ -671,6 +695,7 @@ ${relief ? '  // The relief every effect above described, spent once — see plP
   ${stock.adhesive ? '// Adhesive underside: higher specular than the printed face.\n  if (!gl_FrontFacing) csm_Roughness = 0.18;' : ''}
   // What the key light pushes through the sheet, filtered by the ink on it.
   csm_Emissive = plTransmission(front);
+${maps.hasDamage ? '  // A burn glows through whatever the lamp is doing — after, never before.\n  csm_Emissive += plDamageGlow();' : ''}
 }
 `
 

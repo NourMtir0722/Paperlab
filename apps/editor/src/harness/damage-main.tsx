@@ -18,6 +18,8 @@ import { DAMAGE_CHANNELS, Paper, PaperLighting, PaperMesh, type DamageSource, ty
  *   ?damage=untouched  a texture with nothing in it
  *   ?damage=scorched   a texture with a burn in the middle — the CONTROL:
  *                      if this matched too, the check could not see anything
+ *   ?damage=glowing    the same scorch with its burning line HOT — the heat
+ *                      channel drawn as light; `scorched` is its control
  *   ?damage=hole       a hole punched through the middle — for the shadow
  *   ?stock=…           any stock; `vellum` is the one below full opacity
  *   ?scene=shadow      the sheet over a floor that RECEIVES its shadow map,
@@ -43,17 +45,19 @@ const scene = query.get('scene') ?? 'sheet'
 
 const SIZE = 64
 
-function field(scorch: boolean, hole = false): DamageSource {
+function field(scorch: boolean, hole = false, glow = false): DamageSource {
   const pixels = new Uint8Array(SIZE * SIZE * 4)
   for (let i = 0; i < SIZE * SIZE; i++) {
     const x = i % SIZE
     const y = (i / SIZE) | 0
+    const d = Math.hypot(x - SIZE / 2, y - SIZE / 2)
     // A hole: the middle of the sheet gone. Its shadow is the question —
     // a hole that casts a solid shadow is the most obvious fake a burn has.
-    pixels[i * 4 + DAMAGE_CHANNELS.presence] = hole && Math.hypot(x - SIZE / 2, y - SIZE / 2) < 14 ? 0 : 255
-    if (scorch) {
-      const d = Math.hypot(x - SIZE / 2, y - SIZE / 2)
-      pixels[i * 4 + DAMAGE_CHANNELS.char] = Math.max(0, Math.min(255, Math.round((12 - d) * 40)))
+    pixels[i * 4 + DAMAGE_CHANNELS.presence] = hole && d < 14 ? 0 : 255
+    if (scorch) pixels[i * 4 + DAMAGE_CHANNELS.char] = Math.max(0, Math.min(255, Math.round((12 - d) * 40)))
+    // The burning line: a ring of heat at the scorch's rim, where a front is.
+    if (glow) {
+      pixels[i * 4 + DAMAGE_CHANNELS.heat] = Math.max(0, Math.min(255, Math.round((1 - Math.abs(d - 10.5) / 2.5) * 255)))
     }
   }
   return { size: SIZE, pixels, version: 1 }
@@ -64,9 +68,11 @@ const damage =
     ? field(false)
     : mode === 'scorched'
       ? field(true)
-      : mode === 'hole'
-        ? field(false, true)
-        : undefined
+      : mode === 'glowing'
+        ? field(true, false, true)
+        : mode === 'hole'
+          ? field(false, true)
+          : undefined
 
 /**
  * Ready after the content texture exists and a run of frames has been drawn.

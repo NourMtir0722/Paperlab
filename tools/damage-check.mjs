@@ -74,6 +74,40 @@ async function photograph(query, clip) {
   }
 }
 
+/** The middle of the sheet, where the harness puts its scorch and its burning ring. */
+const CENTRE = { x: 200, y: 200, width: 240, height: 240 }
+
+/**
+ * How warm a region of a photograph is: mean red minus mean blue, 0..255.
+ *
+ * Decoded by a browser page because that is the PNG decoder already here —
+ * Node has none, and one dependency for one number is not worth it.
+ */
+async function warmth(png, clip) {
+  const page = await browser.newPage()
+  try {
+    return await page.evaluate(
+      async ({ src, clip }) => {
+        const image = new Image()
+        image.src = src
+        await image.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const context = canvas.getContext('2d')
+        context.drawImage(image, 0, 0)
+        const { data } = context.getImageData(clip.x, clip.y, clip.width, clip.height)
+        let sum = 0
+        for (let i = 0; i < data.length; i += 4) sum += data[i] - data[i + 2]
+        return sum / (data.length / 4)
+      },
+      { src: `data:image/png;base64,${png.toString('base64')}`, clip },
+    )
+  } finally {
+    await page.close()
+  }
+}
+
 const keep = mkdtempSync(join(tmpdir(), 'paperlab-damage-'))
 
 try {
@@ -101,6 +135,20 @@ try {
       !none.equals(scorched),
       'and a scorched one does not — the texture reaches the shader',
       'the control matched, so the check is blind',
+    )
+
+    // Heat is drawn as light. Its control is the same scorch with the heat
+    // left out, so the glow is the only thing that can tell them apart.
+    const glowing = await photograph(`stock=${stock}&damage=glowing`)
+    const warmer = (await warmth(glowing, CENTRE)) - (await warmth(scorched, CENTRE))
+    if (!(warmer > 2)) {
+      writeFileSync(join(keep, `${stock}-scorched.png`), scorched)
+      writeFileSync(join(keep, `${stock}-glowing.png`), glowing)
+    }
+    check(
+      warmer > 2,
+      `a burning line glows, and glows warm (red over blue +${warmer.toFixed(1)})`,
+      `see ${keep}`,
     )
   }
 
