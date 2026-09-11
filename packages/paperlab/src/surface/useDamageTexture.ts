@@ -12,9 +12,10 @@ import type { DamageSource } from './damageContract'
  * uploads nothing, which is the same "costs nothing at rest" rule the field
  * itself follows.
  *
- * Linear filtering is what makes a 64² grid read as a smooth burn edge: the
- * shader cuts the hole at presence one half, and bilinear interpolation turns
- * that into a curve between texels instead of a staircase of them. No
+ * Linear filtering is what keeps a 64² grid from cutting holes as a staircase:
+ * the shader cuts at presence one half, and bilinear interpolation turns that
+ * into straight segments between texels. A hard-edged field still shows them
+ * as facets; a graded one, which a real burn is, shows far fewer. No
  * mipmaps — the sheet is never far enough away for a 64² grid to alias.
  */
 export function useDamageTexture(source: DamageSource | null | undefined): THREE.DataTexture | null {

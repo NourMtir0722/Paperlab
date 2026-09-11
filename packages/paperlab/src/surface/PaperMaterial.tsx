@@ -88,19 +88,40 @@ export function PaperMaterial({
   }, [bound, texture, backTexture, damageTexture])
 
   return (
-    <CustomShaderMaterial
-      key={composed.structureKey}
-      baseMaterial={THREE.MeshStandardMaterial}
-      vertexShader={composed.vertexShader}
-      fragmentShader={composed.fragmentShader}
-      uniforms={bound}
-      color="#ffffff"
-      roughness={stock.roughness}
-      metalness={0}
-      transparent={stock.opacity < 1}
-      opacity={stock.opacity}
-      alphaTest={composed.alphaTest}
-      side={THREE.DoubleSide}
-    />
+    <>
+      <CustomShaderMaterial
+        key={composed.structureKey}
+        baseMaterial={THREE.MeshStandardMaterial}
+        vertexShader={composed.vertexShader}
+        fragmentShader={composed.fragmentShader}
+        uniforms={bound}
+        color="#ffffff"
+        roughness={stock.roughness}
+        metalness={0}
+        transparent={stock.opacity < 1}
+        opacity={stock.opacity}
+        alphaTest={composed.alphaTest}
+        side={THREE.DoubleSide}
+      />
+      {/*
+        What the shadow pass draws, when this sheet removes paper — see
+        `ComposedSurface.depth`. Same uniforms object as the colour program,
+        so the damage texture, the deckle and the perforation state are the
+        ones the viewer sees. RGBA packing, which is what three's shadow maps
+        read; three copies `side` and `alphaTest` over from the colour
+        material itself.
+      */}
+      {composed.depth ? (
+        <CustomShaderMaterial
+          key={`${composed.structureKey}:depth`}
+          attach="customDepthMaterial"
+          baseMaterial={THREE.MeshDepthMaterial}
+          vertexShader={composed.depth.vertexShader}
+          fragmentShader={composed.depth.fragmentShader}
+          uniforms={bound}
+          depthPacking={THREE.RGBADepthPacking}
+        />
+      ) : null}
+    </>
   )
 }

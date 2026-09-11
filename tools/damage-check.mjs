@@ -18,6 +18,15 @@
  * the texture is not reaching the shader at all, and "identical" meant
  * "ignored".
  *
+ * Then the shadow. A hole cut by alpha in the colour program is invisible to
+ * the shadow map — three's own depth material ignores alpha computed in
+ * shader code — so every hole in paper used to cast a solid shadow. The sheet
+ * now carries a depth program that discards where paper is gone. Checked on a
+ * floor that RECEIVES the shadow map (contact shadows off: they are a
+ * separate pass that never reads a mesh's depth material), photographing only
+ * the floor beside the sheet — so the hole in the paper itself cannot be what
+ * makes the two photographs differ. Only light through the hole can.
+ *
  * Runs in CI as `pnpm test:damage`.
  */
 import { mkdtempSync, writeFileSync } from 'node:fs'
@@ -40,15 +49,24 @@ const check = (ok, label, detail = '') => {
   if (!ok) failed++
 }
 
-/** One photograph of the sheet in a fresh page, so nothing carries over. */
-async function photograph(stock, damage) {
+/**
+ * The floor beside the sheet in `?scene=shadow`, where its shadow falls under
+ * the studio key: left of the sheet and clear of it. Tied to that camera and
+ * that preset — move either and this has to be re-aimed, which the
+ * photographed-twice baseline and the hole check will say loudly rather than
+ * pass quietly.
+ */
+const SHADOW_CLIP = { x: 100, y: 245, width: 112, height: 130 }
+
+/** One photograph in a fresh page, so nothing carries over. */
+async function photograph(query, clip) {
   const page = await browser.newPage({ viewport: { width: 640, height: 640 }, deviceScaleFactor: 1 })
   const errors = []
   page.on('pageerror', (error) => errors.push(String(error)))
   try {
-    await page.goto(`${base}/damage.html?stock=${stock}&damage=${damage}`, { waitUntil: 'networkidle' })
+    await page.goto(`${base}/damage.html?${query}`, { waitUntil: 'networkidle' })
     await page.waitForFunction(() => window.__DAMAGE__?.ready === true, null, { timeout: 120_000 })
-    const shot = await page.locator('canvas').first().screenshot()
+    const shot = clip ? await page.screenshot({ clip }) : await page.locator('canvas').first().screenshot()
     if (errors.length) throw new Error(errors.join('\n'))
     return shot
   } finally {
@@ -61,10 +79,10 @@ const keep = mkdtempSync(join(tmpdir(), 'paperlab-damage-'))
 try {
   for (const stock of STOCKS) {
     console.log(`\n${stock}`)
-    const none = await photograph(stock, 'none')
-    const untouched = await photograph(stock, 'untouched')
-    const again = await photograph(stock, 'none')
-    const scorched = await photograph(stock, 'scorched')
+    const none = await photograph(`stock=${stock}&damage=none`)
+    const untouched = await photograph(`stock=${stock}&damage=untouched`)
+    const again = await photograph(`stock=${stock}&damage=none`)
+    const scorched = await photograph(`stock=${stock}&damage=scorched`)
 
     // The baseline has to be repeatable, or a mismatch below means nothing.
     check(
@@ -85,6 +103,25 @@ try {
       'the control matched, so the check is blind',
     )
   }
+
+  console.log('\nthe shadow map')
+  const whole = await photograph('scene=shadow&damage=none', SHADOW_CLIP)
+  const wholeAgain = await photograph('scene=shadow&damage=none', SHADOW_CLIP)
+  const holed = await photograph('scene=shadow&damage=hole', SHADOW_CLIP)
+  check(
+    whole.equals(wholeAgain),
+    'the floor beside the sheet photographs the same twice',
+    'the shadow render is not deterministic here',
+  )
+  if (whole.equals(holed)) {
+    writeFileSync(join(keep, 'shadow-whole.png'), whole)
+    writeFileSync(join(keep, 'shadow-holed.png'), holed)
+  }
+  check(
+    !whole.equals(holed),
+    'light comes through a hole in the paper and reaches the floor',
+    `the hole cast a solid shadow — see ${keep}`,
+  )
 } finally {
   await browser.close()
   stop()
