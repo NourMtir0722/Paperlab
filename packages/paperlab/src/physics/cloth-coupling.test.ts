@@ -50,6 +50,7 @@ describe('cloth coupling levers', () => {
     expect(Array.from(sim.invMass).every((m) => m === 1)).toBe(true)
     expect(Array.from(sim.constraintStiffness).every((s) => s === 1)).toBe(true)
     expect(Array.from(sim.broken).every((b) => b === 0)).toBe(true)
+    expect(Array.from(sim.restBend).every((b) => b === 0)).toBe(true)
     expect(Array.from(sim.restLength)).toEqual(Array.from(sim.naturalLength))
   })
 
@@ -138,5 +139,33 @@ describe('cloth coupling levers', () => {
       return hi - lo
     }
     expect(push(wet)).not.toBeCloseTo(push(dry), 3)
+  })
+
+  it('curls a sheet the way its rest bend is signed, and moves it nowhere', () => {
+    // The one lever with a sign. Positive is the front — the face a flat sheet
+    // turns to +z — and the two signs must curl opposite ways, or the sign is
+    // decoration and the buckle is still a coin toss.
+    const curled = (sign: number) => {
+      const sim = new ClothSim(10, 10, 1, 1, 'none', { ...still, gravity: 0 })
+      for (let k = 0; k < sim.constraintCount; k++) {
+        if (sim.constraintKind[k] === 2) sim.restBend[k] = sign * 0.01
+      }
+      run(sim, 1)
+      let mean = 0
+      for (let i = 0; i < sim.count; i++) mean += sim.positions[i * 3 + 2]!
+      mean /= sim.count
+      // Edges against the middle: a sheet curled toward +z has its rim ahead
+      // of its centre.
+      const rim = sim.positions[2]! - mean
+      return { rim, mean }
+    }
+    const front = curled(1)
+    const back = curled(-1)
+    expect(front.rim).toBeGreaterThan(0.02)
+    expect(back.rim).toBeLessThan(-0.02)
+    // A couple, not a push: the sheet bends in place. (Not to the last digit:
+    // the air resists a curling sheet unevenly once its faces disagree.)
+    expect(Math.abs(front.mean)).toBeLessThan(Math.abs(front.rim) * 0.1)
+    expect(Math.abs(back.mean)).toBeLessThan(Math.abs(back.rim) * 0.1)
   })
 })

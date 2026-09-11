@@ -38,6 +38,7 @@ import { resolveDeformerStack } from './deformers/registry'
 import type { Behavior } from './behaviors/types'
 import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
 import { ClothSim } from './physics/cloth'
+import { DamageCoupling } from './physics/damage'
 import { StripSim, stripNodeCount } from './physics/strip'
 import { PaperMaterial } from './surface/PaperMaterial'
 import type { DamageSource } from './surface/damageContract'
@@ -525,6 +526,9 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     lastSimRef.current = sim
   }, [sim])
 
+  // What the sim feels of `damage`. Per sim, so a rebuilt one reads it afresh.
+  const coupling = useMemo(() => (sim ? new DamageCoupling(sim) : null), [sim])
+
   const stock = getStock(config.stock)
   const texture = useContentTexture(config.content, config.sheet, stock)
   const backTexture = useContentTexture(config.content.back, config.sheet, stock)
@@ -793,8 +797,12 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         stiffness: cloth.stiffness,
         floor: cloth.floor,
       })
+      // Damage first — char, heat, wet and missing paper are levers on the
+      // solve, and a free read when the source has not moved.
+      coupling?.update(props.damage)
       sim.step(delta)
       const moved = !sim.asleep
+      if (moved) coupling?.follow()
       // The stack first refusal: if there is one, it owns the write, because
       // its base is the sim's own array and writing that array to the
       // geometry first would only be overwritten. If there is none, the sim's

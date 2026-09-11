@@ -49,9 +49,9 @@ export interface DamageSource {
 /**
  * Which byte of a texel means what.
  *
- * char — scorch colour, the brown halo, eventually lost stiffness.
- * saturation — wet darkening and smoothing, eventually added mass and sag.
- * heat — the glowing ignition line, eventually the curl toward the flame.
+ * char — scorch colour, the brown halo; on cloth, shrinkage and a curl toward the front.
+ * saturation — wet darkening and smoothing; on cloth, added mass.
+ * heat — the glowing ignition line.
  * presence — how much paper is there at all; below half, none is drawn.
  */
 export const DAMAGE_CHANNELS = { char: 0, saturation: 1, heat: 2, presence: 3 } as const

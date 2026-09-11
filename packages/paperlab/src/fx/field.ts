@@ -8,9 +8,9 @@
  * and a set of paint operations, which is the whole reason the second effect
  * costs a chunk and a preset instead of a new system.
  *
- *   R  char        scorch colour, the brown halo, lost stiffness, smoke density
+ *   R  char        scorch colour, the brown halo, shrinkage and curl, smoke density
  *   G  saturation  wet darkening, roughness, translucency, added mass, sag
- *   B  heat        the glowing ignition line, the curl toward the flame
+ *   B  heat        the glowing ignition line
  *   A  presence    alpha erosion — burn-away, tear-away, punched holes
  *
  * **It runs on the CPU because of who reads it.** Three of the four layers an

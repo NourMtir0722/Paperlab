@@ -128,6 +128,35 @@ export class ClothSim {
    * less than a light one it is tied to. Zero is infinite mass: static, moved by nothing — not the air, not the solve, and not gravity either.
    */
   readonly invMass: Float32Array
+  /**
+   * How far the middle of each BEND spring sits off the line between its ends
+   * when relaxed, along the sheet's normal — a signed rest curvature, as a
+   * sagitta in world units. Ignored on every other kind of constraint.
+   *
+   * Positive curls the paper toward its FRONT, the face a flat sheet turns to
+   * +z — which puts the middle of each span that far BEHIND its ends. Paper
+   * curling toward you is hollow on the side you see; the first cut of this
+   * had the middle in front, which is a dome, and a dome's rim goes the other
+   * way.
+   *
+   * The only lever here with a sign, and the sign is why it exists. A bend
+   * spring is a distance, and a distance cannot tell paper curled toward you
+   * from paper curled away: shorten it and the sheet buckles, but which way
+   * is a coin toss, and gravity can flip it through later. Measured on the
+   * first version, which pushed hot paper toward the front along its normal
+   * and left the char to hold it — the curl held while the heat did and
+   * snapped through to the BACK the moment the front had passed. Charred
+   * paper stays curled toward the side that burnt because that side shrank
+   * more: a curvature built into the material, which is what this is.
+   *
+   * Solved as a couple — the middle moves one way, the two ends half as far
+   * the other — so it bends the sheet and never pushes it anywhere. A push
+   * cannot do this job: it moves paper, and a uniformly curled sheet in still
+   * air has no business going anywhere.
+   */
+  readonly restBend: Float64Array
+  /** For each bend spring, the particle between its ends; -1 for every other kind. */
+  readonly constraintMiddle: Int32Array
   private params: ClothParams
   private time = 0
   private accumulator = 0
@@ -216,12 +245,17 @@ export class ClothSim {
     this.restLength = new Float64Array(m)
     this.constraintStiffness = new Float64Array(m).fill(1)
     this.broken = new Uint8Array(m)
+    this.restBend = new Float64Array(m)
+    this.constraintMiddle = new Int32Array(m).fill(-1)
     for (let k = 0; k < m; k++) {
       const a = links[k * 3]!
       const b = links[k * 3 + 1]!
       this.constraintA[k] = a
       this.constraintB[k] = b
       this.constraintKind[k] = links[k * 3 + 2]!
+      // A bend spring runs two cells straight along a row or a column, so the
+      // particle it bends around is the one halfway between, by index too.
+      if (this.constraintKind[k] === 2) this.constraintMiddle[k] = (a + b) / 2
       const dx = this.positions[a * 3]! - this.positions[b * 3]!
       const dy = this.positions[a * 3 + 1]! - this.positions[b * 3 + 1]!
       const rest = Math.hypot(dx, dy)
@@ -361,7 +395,9 @@ export class ClothSim {
       for (let c = centreCol - spanCols; c <= centreCol + spanCols; c++) {
         if (c < 0 || c >= this.cols) continue
         const i = r * this.cols + c
-        if (this.pinned[i]) continue
+        // A pin is already held, and a particle with no mass to move is paper
+        // that is not there — a pinch on a burnt-through hole closes on air.
+        if (this.pinned[i] || this.invMass[i]! <= 0) continue
         const distance = Math.hypot((c - centreCol) * cellX, (r - centreRow) * cellY)
         const weight = i === this.grabbedIndex ? 1 : grabFalloff(distance, radius)
         if (weight <= 0) continue
@@ -622,8 +658,18 @@ export class ClothSim {
       }
     }
 
-    const { constraintA, constraintB, constraintKind, restLength, constraintStiffness, broken, invMass } =
-      this
+    const {
+      constraintA,
+      constraintB,
+      constraintKind,
+      restLength,
+      constraintStiffness,
+      broken,
+      invMass,
+      restBend,
+      constraintMiddle,
+      normals,
+    } = this
     const bend = 0.25 + stiffness * 0.7
     for (let iter = 0; iter < SOLVER_ITERATIONS; iter++) {
       for (let c = 0; c < this.constraintCount; c++) {
@@ -657,6 +703,40 @@ export class ClothSim {
         p[b3] = p[b3]! - dx * diff * bw
         p[b3 + 1] = p[b3 + 1]! - dy * diff * bw
         p[b3 + 2] = p[b3 + 2]! - dz * diff * bw
+
+        // The signed half of a bend — see `restBend`. After the distance, so
+        // the spring's length decides how far the paper bends and this only
+        // which way. Behind a test, so an uncurled sheet runs exactly the
+        // arithmetic it always has.
+        const sag = restBend[c]!
+        if (sag !== 0) {
+          const im = constraintMiddle[c]!
+          const m3 = im * 3
+          const nx = normals[m3]!
+          const ny = normals[m3 + 1]!
+          const nz = normals[m3 + 2]!
+          const offset =
+            (p[m3]! - (p[a3]! + p[b3]!) / 2) * nx +
+            (p[m3 + 1]! - (p[a3 + 1]! + p[b3 + 1]!) / 2) * ny +
+            (p[m3 + 2]! - (p[a3 + 2]! + p[b3 + 2]!) / 2) * nz
+          const mm = this.pinned[im] ? 0 : invMass[im]! * (1 - this.grabWeights[im]!)
+          const weight = mm + (ma + mb) / 4
+          if (weight > 0) {
+            // The middle belongs `sag` BEHIND its ends — see `restBend`.
+            const lambda = ((-sag - offset) / weight) * k
+            const along = lambda * mm
+            const back = lambda / 2
+            p[m3] = p[m3]! + nx * along
+            p[m3 + 1] = p[m3 + 1]! + ny * along
+            p[m3 + 2] = p[m3 + 2]! + nz * along
+            p[a3] = p[a3]! - nx * back * ma
+            p[a3 + 1] = p[a3 + 1]! - ny * back * ma
+            p[a3 + 2] = p[a3 + 2]! - nz * back * ma
+            p[b3] = p[b3]! - nx * back * mb
+            p[b3 + 1] = p[b3 + 1]! - ny * back * mb
+            p[b3 + 2] = p[b3 + 2]! - nz * back * mb
+          }
+        }
       }
     }
 
