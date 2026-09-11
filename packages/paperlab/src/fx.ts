@@ -36,7 +36,10 @@ export {
   SATURATION,
   HEAT,
   PRESENCE,
+  FIELD_SIZE,
+  FIXED_DT,
   type DamageFieldOptions,
+  type DamagePixels,
   type FieldStats,
 } from './fx/field'
 
