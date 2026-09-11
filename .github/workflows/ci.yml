@@ -103,3 +103,12 @@ jobs:
       # list is reachable.
       - name: Dropdown reach gate
         run: pnpm test:dropdown
+
+      # `<Paper damage>` compiles a different program — another chunk, another
+      # sampler, a different alpha test — and claims that on an untouched field
+      # it draws exactly what the sheet drew without one. That is an argument
+      # about arithmetic until something renders both and compares them; this
+      # does, on the opaque stock and the one below full opacity, with a
+      # scorched field as the control that proves it can see a difference.
+      - name: Damage seam gate
+        run: pnpm test:damage
