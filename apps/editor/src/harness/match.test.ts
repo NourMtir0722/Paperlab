@@ -127,6 +127,18 @@ describe('the match', () => {
     expect(dwell(match, MATCH_DWELL_MS + 32, {})).toBe('lit')
   })
 
+  it('can be lit, and blown out, by a face whose breath never reads zero', () => {
+    // What the level-only rule cost: `mouthPucker` does not rest at zero for
+    // everybody — lighting, a beard, the shape of a mouth all move it — so a
+    // viewer whose rest sat above the old threshold had every match blown out
+    // on the frame it lit, and nothing on screen said why. A RISE can tell
+    // blowing from a face that always reads high; a level cannot.
+    const match = new Match()
+    expect(dwell(match, MATCH_DWELL_MS + 32, { blow: 0.6 })).toBe('lit')
+    expect(match.push(held({ blow: 0.6, now: 420 }))).toBe('lit')
+    expect(match.push(held({ blow: 0.85, now: 440 }))).toBe('none')
+  })
+
   it('is not put out by a breath too light to matter', () => {
     const match = new Match()
     dwell(match, MATCH_DWELL_MS + 32)

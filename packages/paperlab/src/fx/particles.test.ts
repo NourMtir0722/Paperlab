@@ -109,7 +109,7 @@ describe('the particle pool', () => {
     pool.spawn('ash', 0, 0, 0)
     const a = target(30)
     const n = target(30)
-    expect(pool.write(a, n)).toEqual({ additive: 2, normal: 2 })
+    expect(pool.write(a, n)).toEqual({ additive: 2, normal: 2, flakes: 0 })
   })
 
   it('fades a particle in, then out, and sizes it over its life', () => {

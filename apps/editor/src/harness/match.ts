@@ -32,8 +32,25 @@ export const MATCH_DWELL_MS = 320
  */
 export const MATCH_STILL = 0.5
 
-/** How hard you have to blow to put it out. Well under a gale. */
-export const BLOW_OUT = 0.3
+/**
+ * How hard you have to blow to put it out.
+ *
+ * Raised from 0.3, and paired with {@link BLOW_RISE}, because the first
+ * version could not be lit at all by some people. `mouthPucker` does not read
+ * zero on a resting face — lighting, a beard, the shape of a mouth all move
+ * it — and a viewer whose rest sat above the old threshold had every match
+ * blown out on the frame it lit, with nothing on screen saying why.
+ */
+export const BLOW_OUT = 0.55
+
+/**
+ * How much harder than it already was you have to blow, on top of that.
+ *
+ * A level alone cannot tell blowing from a face that always reads high. A
+ * RISE can, whatever the rest reads: the match remembers what the breath was
+ * when it lit, and only goes out if it climbs from there.
+ */
+export const BLOW_RISE = 0.15
 
 export type MatchState = 'none' | 'arming' | 'lit'
 
@@ -75,6 +92,8 @@ export class Match {
    * torn. The frame rate decided whether a gesture worked.
    */
   private grabbed = false
+  /** What the breath read when this match lit — see {@link BLOW_RISE}. */
+  private blowWhenLit = 0
 
   get lit(): boolean {
     return this.state === 'lit'
@@ -97,7 +116,7 @@ export class Match {
     // the entire point of holding one, so the grab test below cannot apply
     // to it.
     if (this.state === 'lit') {
-      if (blow >= BLOW_OUT) {
+      if (blow >= BLOW_OUT && blow >= this.blowWhenLit + BLOW_RISE) {
         this.state = 'none'
         this.origin = null
         // Out until the hand opens: a blow that merely paused it would let it
@@ -127,7 +146,12 @@ export class Match {
       this.state = 'arming'
       return this.state
     }
-    this.state = now - this.since >= MATCH_DWELL_MS ? 'lit' : 'arming'
+    if (now - this.since >= MATCH_DWELL_MS) {
+      this.state = 'lit'
+      this.blowWhenLit = blow
+    } else {
+      this.state = 'arming'
+    }
     return this.state
   }
 

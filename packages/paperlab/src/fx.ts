@@ -46,7 +46,12 @@ export {
 
 // Re-exported rather than defined here: the contract belongs to the sheet,
 // which is what draws it. See `surface/damageContract.ts`.
-export { DAMAGE_CHANNELS, type DamageSource } from './surface/damageContract'
+export {
+  DAMAGE_CHANNELS,
+  DAMAGE_LOOK_DEFAULTS,
+  type DamageLook,
+  type DamageSource,
+} from './surface/damageContract'
 
 export {
   ParticlePool,
@@ -59,6 +64,44 @@ export {
 export { FireEmitter, type FireEmitterOptions, type SurfaceLocator } from './fx/fire'
 
 export { FxParticles, type FxParticlesProps } from './fx/FxParticles'
+
+export { FxPost, type FxFilm, type FxPostProps } from './fx/FxPost'
+
+/**
+ * How bright fire is, in one unit. The threshold lives here rather than in the
+ * post pass so that a consumer authoring their own emissive can read it
+ * without installing the pass's optional peers.
+ */
+export {
+  PAPER_WHITE,
+  FX_BLOOM,
+  FX_BLOOM_THRESHOLD,
+  FIRE_HEAT_SCALE,
+  FIRE_GLOW,
+  FIRE_BODY,
+  FIRE_CORE,
+  emit,
+  emitHex,
+  luminance,
+  srgbToLinear,
+  timesPaperWhite,
+} from './fx/emission'
+
+export { Afterglow, type AfterglowOptions } from './fx/afterglow'
+export { FxFlames, type FxFlamesProps } from './fx/FxFlames'
+export { FxWisps, type FxWispsProps } from './fx/FxWisps'
+export { FxFireFluid, type FxFireFluidProps } from './fx/FxFireFluid'
+export { FireFluid, type FluidGrid } from './fx/fluid/FireFluid'
+export {
+  fireFluidControls,
+  fireFluidDefaults,
+  solverUniforms,
+  type FireFluidParams,
+  type SolverUniforms,
+} from './fx/fluid/params'
+export { FxFireLight, type FxFireLightProps } from './fx/FxFireLight'
+export { FxMatchFlame, type FxMatchFlameProps, type MatchFlameState } from './fx/FxMatchFlame'
+export { flameAnchors, flamePuff, FLAME_HEIGHT, type FlameAnchor } from './fx/flames'
 
 export {
   FxAudio,

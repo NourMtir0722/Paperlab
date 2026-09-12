@@ -129,7 +129,12 @@ export { stocks, getStock, type Stock } from './core/stock'
 // The seam between the sheet and whatever damages it. One interface and the
 // meaning of its four bytes — see `surface/damageContract.ts` for why this and
 // not a plugin API for the composer and the solver.
-export { DAMAGE_CHANNELS, type DamageSource } from './surface/damageContract'
+export {
+  DAMAGE_CHANNELS,
+  DAMAGE_LOOK_DEFAULTS,
+  type DamageLook,
+  type DamageSource,
+} from './surface/damageContract'
 export { idleNames, type IdleName, type IdlePreset } from './physics/idle'
 /**
  * The longest strip the `strip` sim can still draw at a given perforation

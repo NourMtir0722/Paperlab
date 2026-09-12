@@ -118,6 +118,13 @@
       }
       .cursor[data-down="true"] { background: rgba(255,255,255,0.9); }
       /*
+        The match, while it is being struck and once it is lit. A gesture with
+        no feedback is a gesture nobody finds: holding a pinch still for a
+        third of a second showed absolutely nothing until this.
+      */
+      /* The match is drawn in the scene now — sparks, a strike, a flame (FxMatchFlame).
+         The amber dot that stood in for it is gone (fire spec §10.1). */
+      /*
         The second hand. Dimmer and smaller on purpose: only one hand can own
         the pointer, so two identical dots would be a puzzle about which one
         is holding the paper.

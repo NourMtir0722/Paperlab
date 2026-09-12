@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { createReadStream, cpSync, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { fireRefsDir } from '../../tools/fx-refs.mjs'
 
 /**
  * Whether this is the /hands pass.
@@ -61,10 +62,43 @@ function handsAssets(): Plugin {
   }
 }
 
+/**
+ * Serve the fire references to `/fx-lab` in dev.
+ *
+ * `paperlab-fx-fire-spec.md` is written against twelve stills, and the lab's
+ * whole point is to put a render beside the one it is meant to look like. The
+ * stills are 20 MB and live with the spec, outside this repo — see
+ * `tools/fx-refs.mjs` — so they are neither in `public/` (which is copied into
+ * every build, for every page, whether or not the page that wanted it was an
+ * entry point) nor in git.
+ *
+ * Dev only, and deliberately: `/fx-lab` is a dev page and is in no build's
+ * input list, so there is nothing to copy at `closeBundle` the way the hand
+ * tracker's wasm has to be.
+ */
+function fxRefs(): Plugin {
+  return {
+    name: 'paperlab-fx-refs',
+    configureServer(server) {
+      const refs = fireRefsDir()
+      if (!refs) return
+      server.middlewares.use('/fx-refs/fire', (req, res, next) => {
+        // Same shape as the tracker's middleware above, and for the same
+        // reason: this path comes off a URL, so `..` is the attack surface.
+        const file = resolve(refs, `.${normalize(req.url ?? '/')}`)
+        if (!file.startsWith(refs) || !existsSync(file) || !statSync(file).isFile()) return next()
+        res.setHeader('Content-Type', 'image/png')
+        res.setHeader('Content-Length', String(statSync(file).size))
+        createReadStream(file).pipe(res)
+      })
+    },
+  }
+}
+
 export default defineConfig({
   // The editor ships under /editor on the public site; '/' for local dev.
   base: process.env.PAPERLAB_BASE ?? '/',
-  plugins: [react(), handsAssets()],
+  plugins: [react(), handsAssets(), fxRefs()],
   build: {
     outDir: HANDS_BUILD ? 'dist-hands' : 'dist',
     rollupOptions: {

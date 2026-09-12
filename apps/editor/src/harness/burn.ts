@@ -213,6 +213,7 @@ export function phasesFor(config: Partial<BurnSettings> = {}): Phase[] {
   const burn = new ScriptedBurn(() => null, config)
   const settings = { ...BURN_DEFAULTS, ...config }
   let caught = -1
+  let holed = -1
   let browned = -1
   let peakAt = 0
   let best = -1
@@ -222,6 +223,14 @@ export function phasesFor(config: Partial<BurnSettings> = {}): Phase[] {
     const s = burn.stats
     if (browned < 0 && s.charred > 0) browned = burn.time
     if (caught < 0 && s.remaining < 1) caught = burn.time
+    // A HOLE, not the first texel starting to go. `flameAnchors` stands a
+    // flame on hot paper with a cut beside it, and "a cut" means a neighbour
+    // under half presence — so until one texel is actually through, there is
+    // no rim and the fire has no flames to draw. `caught` is the first loss
+    // of any presence at all, which at the field's dilated clock is most of a
+    // second earlier: the "catch · first flames" frame photographed a scorch
+    // mark with nothing standing on it.
+    if (holed < 0 && s.consumed > 0) holed = burn.time
     if (s.front > best) {
       best = s.front
       peakAt = burn.time
@@ -231,7 +240,7 @@ export function phasesFor(config: Partial<BurnSettings> = {}): Phase[] {
   const out = burn.wentOut
   const from = burn.decayStarted
   const peak = moment(peakAt)
-  const catchAt = moment(Math.min(Math.max(caught, 0) + 0.35, peakAt - 0.3))
+  const catchAt = moment(Math.min(Math.max(holed, caught, 0) + 0.35, peakAt - 0.3))
   // Measured, like every moment below it. These two were the last constants in
   // this table — 0.25 s and 0.45 s, written down when the field's clock ran six
   // times too fast. At the pace it runs now the paper first browns at 0.35 s

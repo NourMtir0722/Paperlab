@@ -87,21 +87,6 @@ export class Session {
   /** Moved on every flick, because a wash is a pure function of its seed. */
   washSeed = 0
   washCount = 0
-  /**
-   * When the last frame was, in the page's own clock.
-   *
-   * The effects step in SECONDS — a damage field, a particle pool and a sound
-   * all advance by a real interval — while everything else here is a pose read
-   * off a frame. Null until the first frame, because the first interval is not
-   * a number anyone knows.
-   */
-  frameAt: number | null = null
-  /**
-   * How long the flame has been held against one part of the sheet, in
-   * seconds. Paper takes a moment to catch; a flame waved past leaves a mark
-   * and no fire.
-   */
-  flameHeld = 0
 
   /** Bumped when something `derive` reads has changed. React watches this. */
   private revision = 0
@@ -196,7 +181,6 @@ export class Session {
     this.rip = null
     this.ripGap = 0
     this.dialFrom = null
-    this.flameHeld = 0
     this.revision++
     for (const listener of this.listeners) listener()
   }

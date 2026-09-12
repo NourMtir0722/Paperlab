@@ -54,6 +54,81 @@ export interface DamageSource {
    * sets it from its quality tier.
    */
   readonly detail?: number
+  /**
+   * The burn's own clock, in seconds; omitted means the frame clock.
+   *
+   * Presentation only. The ember line on a burning edge is beaded and alive —
+   * its beads flicker and crawl — and a source that can be replayed wants
+   * that motion to replay too: the same moment of the same burn should draw
+   * the same beads, which the frame clock cannot promise. `DamageField`
+   * hands over its simulated time.
+   */
+  readonly time?: number
+  /**
+   * How a burn is DRAWN — widths, intensities and shapes the sheet's damage
+   * shading reads each frame. Presentation only; the physics never sees it.
+   * Anything left out takes {@link DAMAGE_LOOK_DEFAULTS}.
+   */
+  readonly look?: DamageLook
+}
+
+/**
+ * The knobs on what a burn looks like, in the units a person tunes by —
+ * millimetres of A4 and plain multipliers. Every one is optional.
+ */
+export interface DamageLook {
+  /** The ember line's widest bead, mm. */
+  emberWidth?: number
+  /** How bright the beads burn, × the default. */
+  emberIntensity?: number
+  /** How much of the edge is lit at once, 0..1. */
+  emberCoverage?: number
+  /** How fast the beads flicker and crawl, × the default. */
+  emberFlicker?: number
+  /** The dim crimson glow beside the beads, reaching into the char, 0..2. */
+  emberGlow?: number
+  /** Specks of glowing fibre along the edge, 0..2. */
+  sparkle?: number
+  /** The pale ash lip's widest point, mm. */
+  lipWidth?: number
+  /** How pale the ash lip is, × the sampled grey. */
+  lipBrightness?: number
+  /** 0 is grey char, 1 is dark orange to deep brown. */
+  charWarmth?: number
+  /** How visible the crack network in the char is, 0..1. */
+  charCracks?: number
+  /** How far the scorch reaches UP past the burn, mm. */
+  scorchReach?: number
+  /** How dark the scorch browns go, × the sampled ramp. */
+  scorchDarkness?: number
+  /** How strongly the scorch front breaks into fingers, × the default. */
+  fingers?: number
+  /** The burnt edge's long waves, ±mm. */
+  edgeWave?: number
+  /** The burnt edge's small bites in and out, ±mm. */
+  edgeBite?: number
+}
+
+/**
+ * What every burn is drawn with unless told otherwise — the combination Noor
+ * tuned in the lab's sidebar on 2026-09-12, which is the look this ships.
+ */
+export const DAMAGE_LOOK_DEFAULTS: Required<DamageLook> = {
+  emberWidth: 1.8,
+  emberIntensity: 1.45,
+  emberCoverage: 0.6,
+  emberFlicker: 1.65,
+  emberGlow: 1.25,
+  sparkle: 0.5,
+  lipWidth: 1.55,
+  lipBrightness: 1.5,
+  charWarmth: 1,
+  charCracks: 1,
+  scorchReach: 30,
+  scorchDarkness: 1.17,
+  fingers: 1.25,
+  edgeWave: 8.5,
+  edgeBite: 3.6,
 }
 
 /**
@@ -61,7 +136,7 @@ export interface DamageSource {
  *
  * char — scorch colour, the brown halo; on cloth, shrinkage and a curl toward the front.
  * saturation — wet darkening and smoothing; on cloth, added mass.
- * heat — the glowing ignition line.
+ * heat — how hot the paper is. Drawn only where it burns: the ember line, not the sheet.
  * presence — how much paper is there at all; below half, none is drawn.
  */
 export const DAMAGE_CHANNELS = { char: 0, saturation: 1, heat: 2, presence: 3 } as const

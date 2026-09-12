@@ -112,6 +112,34 @@ export class FireSound {
     if (budget === 0) this.debt %= 1
   }
 
+  /**
+   * A match struck: the scratch of the head across the box, then the hiss of
+   * it flaring as the head burns off (spec §10.2). Two bursts of the shared
+   * noise, one bright and short, one breathier and longer.
+   */
+  strike(): void {
+    this.burst('fire-strike', 0.9, { type: 'bandpass', frequency: 3200, q: 1.1 }, 0.004, 0.07, 0.8)
+    this.burst('fire-flare', 0.8, { type: 'highpass', frequency: 1800, q: 0.7 }, 0.03, 0.45, 0.45, 0.05)
+  }
+
+  /** Blown out: a soft, low breath of noise (spec §10.6). */
+  puff(): void {
+    this.burst('fire-puff', 0.6, { type: 'lowpass', frequency: 520, q: 0.6 }, 0.02, 0.28, 0.55)
+  }
+
+  /** One ember popping in the air — a tiny click on the frame it flashes (spec §8.1). */
+  pop(): void {
+    const f = 3000 + this.next() * 3000
+    this.burst(
+      'fire-pop',
+      0.2,
+      { type: 'bandpass', frequency: f, q: 3 },
+      0.001,
+      0.012 + this.next() * 0.01,
+      0.35,
+    )
+  }
+
   /** Silence, now — the flame blown out, or the page going away. */
   stop(): void {
     this.stopBed()
@@ -202,6 +230,43 @@ export class FireSound {
     gain.linearRampToValueAtTime(0, now + duration)
     // A different slice of the shared noise every time, ending itself.
     source.start(now, this.next() * Math.max(0, seconds - duration), duration)
+    voice.own(source)
+    voice.use(filter)
+  }
+
+  /**
+   * One shaped burst of the shared noise through one filter — what strike,
+   * puff and pop are made of. `delay` starts it a moment late, which is how
+   * the flare follows the scratch.
+   */
+  private burst(
+    name: string,
+    priority: number,
+    filterSpec: { type: 'bandpass' | 'highpass' | 'lowpass'; frequency: number; q: number },
+    attack: number,
+    duration: number,
+    level: number,
+    delay = 0,
+  ): void {
+    const voice = this.audio.take(name, priority)
+    if (!voice) return
+    const ctx = this.audio.context
+    const now = ctx.currentTime + delay
+    const buffer = this.audio.noiseBuffer()
+    const seconds = buffer.length / ctx.sampleRate
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    const filter = ctx.createBiquadFilter()
+    filter.type = filterSpec.type
+    filter.frequency.value = filterSpec.frequency
+    filter.Q.value = filterSpec.q
+    source.connect(filter)
+    filter.connect(voice.gain)
+    const gain = voice.gain.gain
+    gain.setValueAtTime(0, now)
+    gain.linearRampToValueAtTime(level * this.o.volume, now + attack)
+    gain.linearRampToValueAtTime(0, now + attack + duration)
+    source.start(now, this.next() * Math.max(0, seconds - attack - duration), attack + duration)
     voice.own(source)
     voice.use(filter)
   }

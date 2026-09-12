@@ -1,3 +1,5 @@
+import { emitHex } from './emission'
+
 /**
  * Particles: one pool, and presets that are only parameter sets.
  *
@@ -63,8 +65,23 @@ export interface ParticlePreset {
  */
 export const particlePresets = {
   /**
-   * A spark off the burning line. Short-lived, bright past 1 so a bloom pass
-   * catches it, shrinking as it cools, carried up and sideways by the heat.
+   * A spark off the burning line. Short-lived, shrinking as it cools, carried
+   * up and sideways by the heat.
+   *
+   * Authored through `emission.ts`, in multiples of paper white, which is what
+   * caught the bug in the version before this one. That version said "the hot
+   * end is now ~5.6, well over the bloom threshold" — and 5.6 was an ABSOLUTE
+   * luminance, while paper white under `window` is 1.6. So the hottest spark
+   * in the frame was **3.5× paper, under the spec's own 4× floor**, and its
+   * own comment said otherwise. A number that cannot be compared to anything
+   * is a number nobody can check.
+   *
+   * It was also too red. `[12, 4.2, 0.9]` is a saturated red at high
+   * intensity, and the tone curve takes a bright red-dominant colour to
+   * SALMON — which is `Never_this.png`. The hue is now a blackbody's: a spark
+   * leaving the fire is yellow-orange, about 2200 K, and cools to a deep
+   * orange-red as it dies. Hue and brightness are separate arguments now, and
+   * `emit` keeps them that way.
    */
   ember: {
     life: [0.5, 1.4],
@@ -75,10 +92,13 @@ export const particlePresets = {
     drag: 0.8,
     jitter: 1.5,
     windCatch: 0.8,
-    size: [0.012, 0.004],
+    size: [0.005, 0.0018],
     color: [
-      [4, 1.4, 0.3],
-      [1.2, 0.2, 0.02],
+      // 6× paper white: inside §4.3's 4–8 band, so it blooms.
+      emitHex('#FFC271', 6),
+      // 0.7× — UNDER the bloom threshold on purpose, so a dying spark stops
+      // glowing rather than merely fading.
+      emitHex('#FF5512', 0.7),
     ],
     alpha: [1, 0],
     spin: 0,
@@ -101,11 +121,12 @@ export const particlePresets = {
     jitter: 0.3,
     windCatch: 1,
     size: [0.05, 0.35],
+    // #6B6560 grey-brown, linear, and thin — the background stays clear.
     color: [
-      [0.35, 0.33, 0.31],
-      [0.6, 0.6, 0.6],
+      [0.147, 0.13, 0.117],
+      [0.2, 0.19, 0.18],
     ],
-    alpha: [0.35, 0],
+    alpha: [0.08, 0],
     spin: 0.4,
     blend: 'normal',
     shape: 'soft',
@@ -152,6 +173,8 @@ export interface ParticleTarget {
   readonly position: Float32Array
   readonly color: Float32Array
   readonly extra: Float32Array
+  /** Velocity, xyz, if the target wants it — an ember is drawn stretched along its own. */
+  readonly velocity?: Float32Array
 }
 
 /** A small, fast, seeded generator — the same seed makes the same fire. */
@@ -182,6 +205,10 @@ export class ParticlePool {
   private readonly spin: Float32Array
   private readonly seed: Float32Array
   private live = 0
+  /** Live particles of each preset, kept as they come and go, so a cap costs nothing to check. */
+  private readonly perKind = new Int32Array(PRESET_NAMES.length)
+  /** Embers that popped in the air since the last `takePops` — the sound follows the picture. */
+  private pops = 0
   private readonly random: () => number
 
   constructor(capacity: number, seed = 1) {
@@ -205,10 +232,7 @@ export class ParticlePool {
 
   /** How many live particles are of one preset. For tests and for a HUD. */
   countOf(name: ParticlePresetName): number {
-    const k = PRESET_NAMES.indexOf(name)
-    let n = 0
-    for (let i = 0; i < this.live; i++) if (this.kind[i] === k) n++
-    return n
+    return this.perKind[PRESET_NAMES.indexOf(name)]!
   }
 
   /** Launch one particle from a point. Never allocates; at capacity it takes the most-spent slot. */
@@ -229,9 +253,11 @@ export class ParticlePool {
           i = j
         }
       }
+      this.perKind[this.kind[i]!] = this.perKind[this.kind[i]!]! - 1
     }
     const r = this.random
     this.kind[i] = PRESET_NAMES.indexOf(name)
+    this.perKind[this.kind[i]!] = this.perKind[this.kind[i]!]! + 1
     const i3 = i * 3
     this.position[i3] = x
     this.position[i3 + 1] = y
@@ -274,7 +300,13 @@ export class ParticlePool {
     const r = this.random
     const [wx, wy, wz] = this.wind
     for (let i = 0; i < this.live; i++) {
+      const before = this.age[i]! / this.life[i]!
       this.age[i] = this.age[i]! + dt
+      // The one ember in ten that dies in the air flashes as it crosses 0.86
+      // of its life (see `write`); count it as it does, for the sound.
+      if (this.seed[i]! < 0.1 && before < 0.86 && this.age[i]! / this.life[i]! >= 0.86) {
+        if (PRESETS[this.kind[i]!]!.blend === 'additive') this.pops++
+      }
       if (this.age[i]! >= this.life[i]!) {
         this.remove(i)
         i--
@@ -307,19 +339,35 @@ export class ParticlePool {
    * Write every live particle into the target for its blend mode. Returns how
    * many went into each — the draw ranges.
    */
-  write(additive: ParticleTarget, normal: ParticleTarget): { additive: number; normal: number } {
+  write(
+    additive: ParticleTarget,
+    normal: ParticleTarget,
+    /**
+     * Where flakes go, if they are to be drawn apart from the smoke — ash is
+     * a tumbling plane and smoke is a soft sprite, and one blend mode is not
+     * one way of drawing. Omitted, flakes go with `normal` as they always did.
+     */
+    flakes?: ParticleTarget,
+  ): { additive: number; normal: number; flakes: number } {
     let a = 0
     let n = 0
+    let f = 0
     for (let i = 0; i < this.live; i++) {
       const preset = PRESETS[this.kind[i]!]!
-      const target = preset.blend === 'additive' ? additive : normal
-      const k = preset.blend === 'additive' ? a++ : n++
+      const flake = flakes !== undefined && preset.shape === 'flake'
+      const target = preset.blend === 'additive' ? additive : flake ? flakes : normal
+      const k = preset.blend === 'additive' ? a++ : flake ? f++ : n++
       const t = this.age[i]! / this.life[i]!
       const i3 = i * 3
       const k3 = k * 3
       target.position[k3] = this.position[i3]!
       target.position[k3 + 1] = this.position[i3 + 1]!
       target.position[k3 + 2] = this.position[i3 + 2]!
+      if (target.velocity) {
+        target.velocity[k3] = this.velocity[i3]!
+        target.velocity[k3 + 1] = this.velocity[i3 + 1]!
+        target.velocity[k3 + 2] = this.velocity[i3 + 2]!
+      }
       const [c0, c1] = preset.color
       const fadeIn = Math.min(1, t / 0.1)
       const flicker =
@@ -327,25 +375,40 @@ export class ParticlePool {
           ? 1 - preset.flicker * (0.5 + 0.5 * Math.sin(this.age[i]! * 41 + this.seed[i]! * 97))
           : 1
       const k4 = k * 4
-      target.color[k4] = c0[0] + (c1[0] - c0[0]) * t
-      target.color[k4 + 1] = c0[1] + (c1[1] - c0[1]) * t
-      target.color[k4 + 2] = c0[2] + (c1[2] - c0[2]) * t
+      // One ember in ten dies in the air with a flash — a tiny pop at the end
+      // of its life (spec §8.1), which the sound can follow.
+      const pop = preset.blend === 'additive' && this.seed[i]! < 0.1 && t > 0.86 ? 2.6 : 1
+      target.color[k4] = (c0[0] + (c1[0] - c0[0]) * t) * pop
+      target.color[k4 + 1] = (c0[1] + (c1[1] - c0[1]) * t) * pop
+      target.color[k4 + 2] = (c0[2] + (c1[2] - c0[2]) * t) * pop
       target.color[k4 + 3] = (preset.alpha[0] + (preset.alpha[1] - preset.alpha[0]) * t) * fadeIn * flicker
       target.extra[k4] = preset.size[0] + (preset.size[1] - preset.size[0]) * t
       target.extra[k4 + 1] = this.angle[i]!
       target.extra[k4 + 2] = preset.shape === 'flake' ? 1 : 0
       target.extra[k4 + 3] = this.seed[i]!
     }
-    return { additive: a, normal: n }
+    return { additive: a, normal: n, flakes: f }
+  }
+
+  /**
+   * How many embers popped in the air since the last call, and reset — one
+   * `FireSound.pop()` each keeps the sound on the frame the flash is on.
+   */
+  takePops(): number {
+    const n = this.pops
+    this.pops = 0
+    return n
   }
 
   /** Empty the air — a fresh sheet. */
   clear(): void {
     this.live = 0
+    this.perKind.fill(0)
   }
 
   /** Swap the last live particle into slot `i`. Order does not matter; density does. */
   private remove(i: number): void {
+    this.perKind[this.kind[i]!] = this.perKind[this.kind[i]!]! - 1
     const last = --this.live
     if (i === last) return
     this.kind[i] = this.kind[last]!

@@ -18,8 +18,8 @@ import { DAMAGE_CHANNELS, Paper, PaperLighting, PaperMesh, type DamageSource, ty
  *   ?damage=untouched  a texture with nothing in it
  *   ?damage=scorched   a texture with a burn in the middle — the CONTROL:
  *                      if this matched too, the check could not see anything
- *   ?damage=glowing    the same scorch with its burning line HOT — the heat
- *                      channel drawn as light; `scorched` is its control
+ *   ?damage=glowing    the same scorch with its burning line HOT — which must
+ *                      draw exactly `scorched`: heat paints nothing on paper
  *   ?damage=hole       a hole punched through the middle — for the shadow
  *   ?detail=0          the same damage without its per-fragment fray
  *   ?stock=…           any stock; `vellum` is the one below full opacity
