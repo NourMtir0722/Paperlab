@@ -216,6 +216,8 @@ export function FxFireFluid({
     key: Symbol('unset') as unknown,
     time: 0,
     owed: 0,
+    /** The fire's clock when the rim last released anything — flame or smoulder. */
+    lastGas: Number.NEGATIVE_INFINITY,
     origin: new THREE.Vector3(),
     right: new THREE.Vector3(1, 0, 0),
     normal: new THREE.Vector3(0, 0, 1),
@@ -344,24 +346,47 @@ export function FxFireFluid({
       place()
       fluid.reset(u.ambient)
       for (const slot of smoulder) slot.seen = Number.NEGATIVE_INFINITY
-      // Warm up from the rim as it stands, on the burn's own clock, so the
-      // same moment of the same burn draws the same fire.
       const end = field.time
-      const steps = Math.round(warm / WARM_STEP)
-      for (let k = 0; k < steps; k++) {
-        const t = end - warm + k * WARM_STEP
-        fluid.step(WARM_STEP, u, sources, across, gather(t), t)
+      // Warm up from the rim as it stands, on the burn's own clock, so the
+      // same moment of the same burn draws the same fire. Not when nothing is
+      // burning: the warm-up replays THIS field at earlier times, so with no
+      // front it would run 180 steps releasing nothing — which /hands paid on
+      // every fresh sheet.
+      if (field.frontCount > 0) {
+        const steps = Math.round(warm / WARM_STEP)
+        for (let k = 0; k < steps; k++) {
+          const t = end - warm + k * WARM_STEP
+          fluid.step(WARM_STEP, u, sources, across, gather(t), t)
+        }
+        s.lastGas = end
+      } else {
+        s.lastGas = Number.NEGATIVE_INFINITY
       }
       s.time = end
       s.owed = 0
     }
-    if (running) {
+    // Idle: nothing burning, and nothing released for long enough that the
+    // smoke left is under 1% (five of its lifetimes). Then the fire costs
+    // nothing — no solver steps, no plane drawn. It used to step every frame
+    // from mount, so a page that mounts the fire before anything burns (/hands
+    // does, from the first frame) ran an empty simulation for as long as it
+    // was open: on a GPU a waste, and on CI's CPU-drawn WebGL the reason the
+    // Hands check went from under 5 minutes to over 20. A new front wakes it.
+    const idle = field.frontCount === 0 && s.time - s.lastGas > Math.max(2, merged.smokeFade * 5)
+    const m = mesh.current
+    if (m) m.visible = !idle
+    if (running && idle) {
+      s.owed = 0
+      s.time += Math.min(0.1, Math.max(0, delta))
+    } else if (running) {
       s.owed += Math.min(0.1, Math.max(0, delta))
       let taken = 0
       while (s.owed >= STEP && taken < MAX_STEPS) {
         s.owed -= STEP
         s.time += STEP
-        fluid.step(STEP, u, sources, across, gather(field.time), s.time)
+        const count = gather(field.time)
+        fluid.step(STEP, u, sources, across, count, s.time)
+        if (count > 0) s.lastGas = s.time
         taken++
       }
     }
