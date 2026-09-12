@@ -64,7 +64,31 @@ for (const origin of ['center', 'corner']) {
   const src = join(dir, webm)
   try {
     const mp4 = join(out, `${origin}.mp4`)
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-vf', 'scale=1200:-2', '-crf', '20', mp4])
+    // Cut the dead lead-in. Recording starts when the page opens, and the
+    // page then sits on a paused sheet for as long as its shaders take to
+    // compile and its frames take to settle — about 38 s here, more than the
+    // burn itself. Everything before the last SECONDS is that wait, so it
+    // goes; a film that is 60% a still frame hides the burn it exists to show.
+    const length = Number(
+      execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', src])
+        .toString()
+        .trim(),
+    )
+    const lead = Math.max(0, length - SECONDS)
+    execFileSync('ffmpeg', [
+      '-y',
+      '-loglevel',
+      'error',
+      '-ss',
+      String(lead),
+      '-i',
+      src,
+      '-vf',
+      'scale=1200:-2',
+      '-crf',
+      '20',
+      mp4,
+    ])
     rmSync(dir, { recursive: true, force: true })
     console.log(`  ${origin} → ${mp4}`)
   } catch {

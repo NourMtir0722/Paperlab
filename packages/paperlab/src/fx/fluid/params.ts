@@ -65,7 +65,12 @@ export const fireFluidDefaults: FireFluidParams = {
   radialImpulse: 0.8,
   initialVelocity: [0, 0.5, 0],
   burnRate: 6.1,
-  gasExpansion: 0.65,
+  // Was 0.65. Expansion is divergence where the gas burns, and it pushes the
+  // gas SIDEWAYS as much as up: at 0.65 each tongue swelled into a puff and
+  // the smoke billowed out over the paper. Your web reference is thin licking
+  // tongues, and swept at 0.2 / 0.65 / 1.3 the low end is the one that looks
+  // like it.
+  gasExpansion: 0.3,
   // Was 1.9. With the flame body authored below paper white (see
   // `fx/emission.ts`) a tongue stops registering sooner, so it needs to be
   // carried further before it cools out of sight — 3 puts the tall ones back

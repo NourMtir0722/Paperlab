@@ -7,6 +7,7 @@ import {
   FILL,
   FORCES,
   GRADIENT,
+  MACCORMACK,
   MAX_SOURCES,
   PASS_VERTEX,
   PRESSURE,
@@ -86,6 +87,15 @@ export class FireFluid {
   readonly pressure: Pair
   private readonly divergence: THREE.WebGLRenderTarget
   private readonly curl: THREE.WebGLRenderTarget
+  /** The two intermediate advections the MacCormack step compares. */
+  private readonly forward: THREE.WebGLRenderTarget
+  private readonly backward: THREE.WebGLRenderTarget
+  /**
+   * Error-compensated advection for the drawn fields. On by default; off is
+   * a single semi-Lagrangian step, which is two passes a step cheaper and
+   * visibly softer — a knob for the lowest tier, and for an A/B.
+   */
+  sharp = true
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   private readonly mesh: THREE.Mesh
@@ -115,6 +125,8 @@ export class FireFluid {
     this.pressure = new Pair(vw, vh)
     this.divergence = target(vw, vh)
     this.curl = target(vw, vh)
+    this.forward = target(dw, dh)
+    this.backward = target(dw, dh)
 
     const aspect = domain.width / domain.height
     const vTexel = new THREE.Vector2(1 / vw, 1 / vh)
@@ -189,6 +201,15 @@ export class FireFluid {
         uCell: { value: cell },
       }),
       fill: pass(FILL, { uValue: { value: new THREE.Vector4() } }),
+      maccormack: pass(MACCORMACK, {
+        uVelocity: { value: null },
+        uSource: { value: null },
+        uForward: { value: null },
+        uBackward: { value: null },
+        uDomain: { value: new THREE.Vector2(domain.width, domain.height) },
+        uTexel: { value: new THREE.Vector2(1 / dw, 1 / dh) },
+        uDt: { value: 0 },
+      }),
     }
     const triangle = new THREE.BufferGeometry()
     triangle.setAttribute(
@@ -239,8 +260,26 @@ export class FireFluid {
       this.velocity.swap()
       advect.uniforms.uVelocity!.value = this.velocity.read.texture
       ;(advect.uniforms.uKeep!.value as THREE.Vector4).set(1, 1, 1, 1)
-      advect.uniforms.uSource!.value = this.scalars.read.texture
-      this.run(advect, this.scalars.write)
+      if (this.sharp) {
+        // What is drawn, advected with its own error given back — see
+        // MACCORMACK. Forward, back again, then the corrected, clamped result.
+        advect.uniforms.uSource!.value = this.scalars.read.texture
+        this.run(advect, this.forward)
+        advect.uniforms.uDt!.value = -dt
+        advect.uniforms.uSource!.value = this.forward.texture
+        this.run(advect, this.backward)
+        advect.uniforms.uDt!.value = dt
+        const mc = m.maccormack!
+        mc.uniforms.uDt!.value = dt
+        mc.uniforms.uVelocity!.value = this.velocity.read.texture
+        mc.uniforms.uSource!.value = this.scalars.read.texture
+        mc.uniforms.uForward!.value = this.forward.texture
+        mc.uniforms.uBackward!.value = this.backward.texture
+        this.run(mc, this.scalars.write)
+      } else {
+        advect.uniforms.uSource!.value = this.scalars.read.texture
+        this.run(advect, this.scalars.write)
+      }
       this.scalars.swap()
       advect.uniforms.uSource!.value = this.air.read.texture
       this.run(advect, this.air.write)
@@ -322,6 +361,8 @@ export class FireFluid {
     for (const p of [this.scalars, this.air, this.velocity, this.pressure]) p.dispose()
     this.divergence.dispose()
     this.curl.dispose()
+    this.forward.dispose()
+    this.backward.dispose()
     for (const m of Object.values(this.m)) m.dispose()
     this.mesh.geometry.dispose()
   }

@@ -255,6 +255,7 @@ const FIRE_OVERRIDES: {
   contrast?: number
   detail?: number
   opacity?: number
+  sharp?: number
 } = (() => {
   const raw = query.get('fire')
   if (!raw) return {}
@@ -265,6 +266,7 @@ const FIRE_OVERRIDES: {
     contrast?: number
     detail?: number
     opacity?: number
+    sharp?: number
   } = {}
   for (const pair of raw.split(',')) {
     const [key, value] = pair.split(':')
@@ -276,6 +278,7 @@ const FIRE_OVERRIDES: {
     if (key === 'contrast') out.contrast = n
     if (key === 'detail') out.detail = n
     if (key === 'opacity') out.opacity = n
+    if (key === 'sharp') out.sharp = n
   }
   return out
 })()
@@ -1035,6 +1038,7 @@ function Lab() {
               contrast={FIRE_OVERRIDES.contrast}
               detail={FIRE_OVERRIDES.detail}
               opacity={FIRE_OVERRIDES.opacity}
+              sharp={FIRE_OVERRIDES.sharp === undefined ? undefined : FIRE_OVERRIDES.sharp !== 0}
               running={playing}
               // Every seek starts the fire over, warmed up from the rim as it
               // stands; paused, a slider change does too, so it shows at once.

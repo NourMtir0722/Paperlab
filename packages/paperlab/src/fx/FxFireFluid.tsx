@@ -51,6 +51,12 @@ export interface FxFireFluidProps {
   /** How opaque the densest flame gas is; 0 is purely additive fire. */
   opacity?: number
   /**
+   * Error-compensated (MacCormack) advection for what is drawn. Defaults to
+   * on everywhere but the `low` tier, where the two extra passes a step are
+   * the first thing a throttled phone should give back.
+   */
+  sharp?: boolean
+  /**
    * What to draw where the simulator cannot run (no half-float render
    * targets) — typically `<FxFlames>`. Drawn INSTEAD, never as well.
    */
@@ -98,6 +104,7 @@ export function FxFireFluid({
   contrast = FIRE_CONTRAST,
   detail = FIRE_DETAIL,
   opacity = FIRE_OPACITY,
+  sharp,
   fallback,
 }: FxFireFluidProps) {
   const gl = useThree((s) => s.gl)
@@ -204,6 +211,7 @@ export function FxFireFluid({
     if (!fluid) return
     const s = state.current
     const u = solverUniforms(merged)
+    fluid.sharp = sharp ?? quality !== 'low'
     if (s.key !== resetKey) {
       s.key = resetKey
       place()

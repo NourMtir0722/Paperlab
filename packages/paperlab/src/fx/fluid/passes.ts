@@ -80,6 +80,46 @@ void main() {
 `
 
 /**
+ * The MacCormack correction, for what is drawn.
+ *
+ * One semi-Lagrangian back-trace loses about half a cell of detail a step,
+ * because every read is a bilinear average of four cells; at sixty steps a
+ * second, anything the solver resolves is butter within a few frames. That
+ * is the dominant reason the flames were soft, and no finer grid fixes it —
+ * the loss is per step, not per cell.
+ *
+ * MacCormack measures its own error and gives it back: advect forward
+ * (uForward), advect THAT back again (uBackward), and the difference between
+ * where it ended up and where it started is twice the error one step made.
+ * Half of it is added back. Then the result is clamped to the four cells the
+ * forward step actually read from, because an uncorrected overshoot is worse
+ * than a blur — it grows hot spots brighter than anything the rim ever
+ * released, and they ring.
+ */
+export const MACCORMACK = /* glsl */ `
+uniform sampler2D uVelocity;
+uniform sampler2D uSource;
+uniform sampler2D uForward;
+uniform sampler2D uBackward;
+uniform vec2 uDomain;
+uniform vec2 uTexel;
+uniform float uDt;
+varying vec2 vUv;
+void main() {
+  vec4 forward = texture2D(uForward, vUv);
+  vec4 phi = forward + 0.5 * (texture2D(uSource, vUv) - texture2D(uBackward, vUv));
+  vec2 v = texture2D(uVelocity, vUv).xy;
+  vec2 back = vUv - v * uDt / uDomain;
+  vec2 corner = (floor(back / uTexel - 0.5) + 0.5) * uTexel;
+  vec4 a = texture2D(uSource, corner);
+  vec4 b = texture2D(uSource, corner + vec2(uTexel.x, 0.0));
+  vec4 c = texture2D(uSource, corner + vec2(0.0, uTexel.y));
+  vec4 d = texture2D(uSource, corner + uTexel);
+  gl_FragColor = clamp(phi, min(min(a, b), min(c, d)), max(max(a, b), max(c, d)));
+}
+`
+
+/**
  * Emission and combustion, for the fine grid. Run twice with `uOut` 0 and 1:
  * once to write (fuel, heat, smoke, flame), once for (premixed, oxygen,
  * burn rate, –). The same arithmetic both times, so the two agree.
