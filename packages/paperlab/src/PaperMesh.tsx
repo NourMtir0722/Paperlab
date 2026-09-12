@@ -23,7 +23,7 @@ import { paperConfigSchema } from './config/schema'
 import { mergeConfig, parsePreset, serializePreset } from './config/serialize'
 import { computeSheetNormals } from './core/normals'
 import { useStable } from './core/stable'
-import { createSheetGeometry, resolveSegments } from './core/sheet'
+import { createSheetGeometry, resolveSegments, surfacePointAt } from './core/sheet'
 import { FLAT_SEGMENTS, type SegmentPair } from './core/tessellation'
 import { getStock } from './core/stock'
 import { getPreset } from './config/presets'
@@ -38,6 +38,7 @@ import { resolveDeformerStack } from './deformers/registry'
 import type { Behavior } from './behaviors/types'
 import { getIdlePreset, type IdleName, type IdlePose } from './physics/idle'
 import { ClothSim } from './physics/cloth'
+import { DamageCoupling } from './physics/damage'
 import { StripSim, stripNodeCount } from './physics/strip'
 import { PaperMaterial } from './surface/PaperMaterial'
 import type { DamageSource } from './surface/damageContract'
@@ -145,6 +146,21 @@ export interface PaperHandle {
    * allocate a vector sixty times a second.
    */
   handlePoint(id?: string, target?: THREE.Vector3): THREE.Vector3 | null
+  /**
+   * Where a point of the sheet is right now, in world space: `(u, v)` over
+   * the sheet, `v = 0` its bottom edge — the same UV the damage grid is laid
+   * out on, so a cell of damage can be asked where it is. Null before the
+   * sheet has mounted.
+   *
+   * On the DRAWN surface, after this frame's simulation and deformer stack,
+   * which is the reason it is a method: an ember that leaves the burn front
+   * has to leave from where the paper is, and a draped or crumpled sheet is
+   * nowhere a UV alone could say. Interpolated across the triangle the GPU
+   * draws, so the point is on the paper and not a hair behind it.
+   *
+   * Written into `target` when one is passed, like {@link handlePoint}.
+   */
+  surfacePoint(u: number, v: number, target?: THREE.Vector3): THREE.Vector3 | null
   /** Interaction-state machine access (null when the config has no states). */
   readonly state: string
   sendState(event: StateEvent): string | null
@@ -510,6 +526,9 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     lastSimRef.current = sim
   }, [sim])
 
+  // What the sim feels of `damage`. Per sim, so a rebuilt one reads it afresh.
+  const coupling = useMemo(() => (sim ? new DamageCoupling(sim) : null), [sim])
+
   const stock = getStock(config.stock)
   const texture = useContentTexture(config.content, config.sheet, stock)
   const backTexture = useContentTexture(config.content.back, config.sheet, stock)
@@ -609,6 +628,24 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       const mesh = handleRefs.current[index]
       if (!mesh) return null
       return mesh.getWorldPosition(target ?? new THREE.Vector3())
+    },
+    surfacePoint(u: number, v: number, target?: THREE.Vector3) {
+      const mesh = meshRef.current
+      if (!mesh) return null
+      // Every sheet is a PlaneGeometry — shape, cloth and strip alike — so its
+      // grid is on the parameters, and the position attribute is whatever this
+      // frame wrote there.
+      const { widthSegments, heightSegments } = geometry.parameters
+      const out = surfacePointAt(
+        geometry.attributes.position!.array,
+        widthSegments + 1,
+        heightSegments + 1,
+        u,
+        v,
+        target ?? new THREE.Vector3(),
+      )
+      mesh.updateWorldMatrix(true, false)
+      return out.applyMatrix4(mesh.matrixWorld)
     },
     get state() {
       return machineState
@@ -760,8 +797,12 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
         stiffness: cloth.stiffness,
         floor: cloth.floor,
       })
+      // Damage first — char, heat, wet and missing paper are levers on the
+      // solve, and a free read when the source has not moved.
+      coupling?.update(props.damage)
       sim.step(delta)
       const moved = !sim.asleep
+      if (moved) coupling?.follow()
       // The stack first refusal: if there is one, it owns the write, because
       // its base is the sim's own array and writing that array to the
       // geometry first would only be overwritten. If there is none, the sim's

@@ -150,10 +150,18 @@ describe('the damage field', () => {
       // The clamp is a safety net for extreme options. The first version
       // needed it on every tier at 60 fps, which is what made the fire's speed
       // a function of the frame rate in the first place.
+      //
+      // The first number is the field's own `heatDiffusion` default and the
+      // second its `wicking`. Heat's was 0.0035 until the clock was dilated;
+      // the old value is kept below as a HEADROOM case, because a test that
+      // only ever tried the current default would stop saying anything the
+      // moment the default moved further from the bound.
       for (let degrees = 0; degrees < 180; degrees += 15) {
         const fibre = (degrees * Math.PI) / 180
-        expect(stencil(0.0035, 3, fibre).clamped).toBe(false)
+        expect(stencil(0.00058, 3, fibre).clamped).toBe(false)
         expect(stencil(0.0045, 3, fibre).clamped).toBe(false)
+        // Six times heat's default, and still clear of the bound.
+        expect(stencil(0.0035, 3, fibre).clamped).toBe(false)
       }
     })
 
@@ -257,7 +265,12 @@ describe('the damage field', () => {
     it('goes back to sleep once a fire has burnt itself out', () => {
       const field = new DamageField({ seed: 8 })
       field.ignite(0.5, 0.5, 0.06, 1)
-      run(field, 20)
+      // 20 s while the field's clock ran six times faster. Measured at the
+      // pace it runs now: still awake at 24 s, asleep at 26. The lag from the
+      // last flame to sleep is about a second either way — heat leaves with
+      // the paper it was sitting on — so what grew is how long the fire takes,
+      // not how long the field lingers after it.
+      run(field, 28)
       expect(field.asleep).toBe(true)
       field.step(1 / 60)
       expect(field.cellsVisited).toBe(0)
@@ -344,7 +357,10 @@ describe('the damage field', () => {
       gap.cut(0, 0.5, 1, 0.5, 0.05)
       for (const f of [gap, solid]) {
         f.ignite(0.5, 0.2, 0.05, 1)
-        run(f, 5)
+        // The front has to cross 0.42 of the sheet (about 88 mm) to reach the
+        // band this counts. At 6.8 mm/s that is 13 s, not 5 — measured, the
+        // solid sheet first chars past 0.62 between 18 and 22 s.
+        run(f, 24)
       }
       expect(beyond(solid)).toBeGreaterThan(0)
       expect(beyond(gap)).toBeLessThan(beyond(solid) * 0.5)
@@ -358,7 +374,11 @@ describe('the damage field', () => {
     field.ignite(0.5, 0.5, 0.06, 1)
     let peak = 0
     let atPeak = 0
-    const frames = 60 * 8
+    // 8 s caught this fire still growing at the pace the field runs now — the
+    // front peaked on the very last frame, so "and then falls away" had
+    // nothing to stand on. Measured: the peak is at 10.2 s and the front is
+    // back to zero by 26.
+    const frames = 60 * 26
     for (let i = 0; i < frames; i++) {
       const stats = field.step(1 / 60)
       if (stats.front > peak) {
@@ -436,5 +456,58 @@ describe('the stats a consumer reads every frame', () => {
     expect(quiet.front).toBe(burning)
     // The events, by contrast, genuinely did not happen on it.
     expect(quiet.charred).toBe(0)
+  })
+
+  it('does not hand the same fire back twice on a frame with no time in it', () => {
+    // The emitters shed a flake for every cell in `consumedCells`, and the
+    // sound plays a crackle per texel that chars. So a frame with no time in
+    // it — the first one, or one whose clock ran backwards — has to report
+    // that nothing happened, or both replay the last frame's fire.
+    const field = new DamageField({ seed: 3 })
+    field.ignite(0.5, 0.5, 0.08, 1)
+    let consumed = 0
+    for (let i = 0; i < 600 && consumed === 0; i++) consumed = field.step(1 / 60).consumed
+    expect(consumed).toBeGreaterThan(0)
+    expect(field.consumedCount).toBe(consumed)
+    const burning = field.lastStats.front
+    expect(burning).toBeGreaterThan(0)
+
+    const idle = field.step(0)
+    expect(idle.consumed).toBe(0)
+    expect(idle.charred).toBe(0)
+    expect(idle.wetted).toBe(0)
+    expect(field.consumedCount).toBe(0)
+    // The front is not transient — it is the state of the burn, and it is
+    // held across a frame too short to step, as it always was.
+    expect(idle.front).toBe(burning)
+    expect(field.frontCount).toBeGreaterThan(0)
+  })
+
+  it('says WHERE it burnt through and where the front is, not just how much', () => {
+    // The emitters need a place: ash leaves the texel that just went, embers
+    // and smoke leave the front. Counts alone could only make a fire that
+    // throws sparks from the middle of the sheet.
+    const field = new DamageField({ seed: 3 })
+    field.ignite(0.5, 0.5, 0.08, 1)
+    let consumedSeen = 0
+    for (let i = 0; i < 240; i++) {
+      const stats = field.step(1 / 60)
+      expect(field.consumedCount).toBe(stats.consumed)
+      for (let k = 0; k < field.consumedCount; k++) {
+        // Every cell it named has no paper left in it.
+        expect(field.data[field.consumedCells[k]! * 4 + PRESENCE]).toBe(0)
+        consumedSeen++
+      }
+      // The front it names is the front it counted, and every cell on it is
+      // paper that is part-burnt and still hot — the burning line itself.
+      expect(field.frontCount).toBe(Math.round(stats.front * field.size * field.size))
+      for (let k = 0; k < field.frontCount; k++) {
+        const b = field.frontCells[k]! * 4
+        expect(field.data[b + PRESENCE]!).toBeGreaterThan(0.15)
+        expect(field.data[b + HEAT]!).toBeGreaterThan(0.1)
+        expect(field.data[b + CHAR]!).toBeGreaterThan(0.08)
+      }
+    }
+    expect(consumedSeen).toBeGreaterThan(0)
   })
 })

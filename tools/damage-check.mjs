@@ -102,7 +102,32 @@ try {
       'and a scorched one does not — the texture reaches the shader',
       'the control matched, so the check is blind',
     )
+
+    // Heat on its own draws NOTHING. This used to check that a burning line
+    // glowed warm, and the glow it passed was paint — a warm band added over
+    // paper that had not burnt, which is what made the first fire's rim read
+    // salmon (paperlab-fx-fire-spec.md §0). §13.2: no emissive light on
+    // unburnt paper. Heat emits only from the ember line, flames and embers,
+    // and through bloom. `scorched` is the same field with the heat left out.
+    const glowing = await photograph(`stock=${stock}&damage=glowing`)
+    const cold = glowing.equals(scorched)
+    if (!cold) {
+      writeFileSync(join(keep, `${stock}-scorched.png`), scorched)
+      writeFileSync(join(keep, `${stock}-glowing.png`), glowing)
+    }
+    check(cold, 'heat alone paints nothing onto the sheet — no glow on paper', `see ${keep}`)
   }
+
+  // The fray: a hard-edged hole, drawn with and without it. If the two match,
+  // `detail` reaches nothing and the edge is the grid's own staircase.
+  console.log('\nthe edge')
+  const frayed = await photograph('damage=hole')
+  const gridEdge = await photograph('damage=hole&detail=0')
+  check(
+    !frayed.equals(gridEdge),
+    'a cut edge is frayed finer than the grid, and detail 0 turns it off',
+    'the two photographs match, so detail reaches nothing',
+  )
 
   console.log('\nthe shadow map')
   const whole = await photograph('scene=shadow&damage=none', SHADOW_CLIP)

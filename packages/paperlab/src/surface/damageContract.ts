@@ -44,14 +44,110 @@ export interface DamageSource {
   readonly pixels: Uint8Array
   /** Bumped whenever `pixels` changes. The sheet uploads on a change and never otherwise. */
   readonly version: number
+  /**
+   * How ragged a burnt or cut edge is DRAWN, 0..1; omitted means 1.
+   *
+   * Presentation only: per-fragment noise that moves the edge within the
+   * grid's soft band, finer than the grid itself can carry. The physics reads
+   * the grid and never this. It is the one part of drawing damage that costs
+   * per pixel, which is why it is a number a source can turn down — `paperlab/fx`
+   * sets it from its quality tier.
+   */
+  readonly detail?: number
+  /**
+   * The burn's own clock, in seconds; omitted means the frame clock.
+   *
+   * Presentation only. The ember line on a burning edge is beaded and alive —
+   * its beads flicker and crawl — and a source that can be replayed wants
+   * that motion to replay too: the same moment of the same burn should draw
+   * the same beads, which the frame clock cannot promise. `DamageField`
+   * hands over its simulated time.
+   */
+  readonly time?: number
+  /**
+   * How a burn is DRAWN — widths, intensities and shapes the sheet's damage
+   * shading reads each frame. Presentation only; the physics never sees it.
+   * Anything left out takes {@link DAMAGE_LOOK_DEFAULTS}.
+   */
+  readonly look?: DamageLook
+}
+
+/**
+ * The knobs on what a burn looks like, in the units a person tunes by —
+ * millimetres of A4 and plain multipliers. Every one is optional.
+ */
+export interface DamageLook {
+  /** The ember line's widest bead, mm. */
+  emberWidth?: number
+  /** How bright the beads burn, × the default. */
+  emberIntensity?: number
+  /** How much of the edge is lit at once, 0..1. */
+  emberCoverage?: number
+  /** How fast the beads flicker and crawl, × the default. */
+  emberFlicker?: number
+  /** The dim crimson glow beside the beads, reaching into the char, 0..2. */
+  emberGlow?: number
+  /** Specks of glowing fibre along the edge, 0..2. */
+  sparkle?: number
+  /** The pale ash lip's widest point, mm. */
+  lipWidth?: number
+  /** How pale the ash lip is, × the sampled grey. */
+  lipBrightness?: number
+  /** 0 is grey char, 1 is dark orange to deep brown. */
+  charWarmth?: number
+  /** How visible the crack network in the char is, 0..1. */
+  charCracks?: number
+  /** How far the scorch reaches UP past the burn, mm. */
+  scorchReach?: number
+  /** How dark the scorch browns go, × the sampled ramp. */
+  scorchDarkness?: number
+  /** How strongly the scorch front breaks into fingers, × the default. */
+  fingers?: number
+  /** The burnt edge's long waves, ±mm. */
+  edgeWave?: number
+  /** The burnt edge's small bites in and out, ±mm. */
+  edgeBite?: number
+}
+
+/**
+ * What every burn is drawn with unless told otherwise — the combination Noor
+ * tuned in the lab's sidebar on 2026-09-12, which is the look this ships.
+ */
+export const DAMAGE_LOOK_DEFAULTS: Required<DamageLook> = {
+  // §5 asks for 0.3–1 mm. 1.8 was outside it, and outside the slider's range
+  // it was tuned in — a control at its limit is a report that something
+  // underneath is wrong, which in this case was a fire nothing could see.
+  emberWidth: 0.9,
+  emberIntensity: 1.45,
+  emberCoverage: 0.6,
+  emberFlicker: 1.65,
+  emberGlow: 1.25,
+  sparkle: 0.5,
+  lipWidth: 1.2,
+  // Was 1.5, its slider's ceiling, which made the ash lip brighter than the
+  // paper it sits on. Ash is pale GREY; the reference's lip is dimmer than
+  // the sheet, not a highlight drawn on it.
+  lipBrightness: 0.85,
+  // Was 1, also a ceiling. At full warmth the char is milk chocolate —
+  // closer to cardboard than to charcoal (§5). Burnt paper keeps a little
+  // warmth in the plates and reads near black in a frame with a fire in it.
+  charWarmth: 0.3,
+  // Was 1, also a ceiling. The cracks are drawn as thin polygon outlines, so
+  // at full strength the char reads as a mosaic rather than as broken plates.
+  charCracks: 0.55,
+  scorchReach: 30,
+  scorchDarkness: 1.17,
+  fingers: 1.25,
+  edgeWave: 8.5,
+  edgeBite: 3.6,
 }
 
 /**
  * Which byte of a texel means what.
  *
- * char — scorch colour, the brown halo, eventually lost stiffness.
- * saturation — wet darkening and smoothing, eventually added mass and sag.
- * heat — the glowing ignition line, eventually the curl toward the flame.
+ * char — scorch colour, the brown halo; on cloth, shrinkage and a curl toward the front.
+ * saturation — wet darkening and smoothing; on cloth, added mass.
+ * heat — how hot the paper is. Drawn only where it burns: the ember line, not the sheet.
  * presence — how much paper is there at all; below half, none is drawn.
  */
 export const DAMAGE_CHANNELS = { char: 0, saturation: 1, heat: 2, presence: 3 } as const

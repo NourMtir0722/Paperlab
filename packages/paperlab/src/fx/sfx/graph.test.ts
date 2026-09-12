@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  FxAudio,
-  type AudioBufferLike,
-  type AudioLike,
-  type AudioNodeLike,
-  type BufferSourceLike,
-  type GainLike,
-} from './graph'
+import { FakeContext, type FakeFilter, type FakeSource } from './fixtures'
+import { FxAudio } from './graph'
 
 /**
  * Everything here is POLICY — how many voices there may be, which one gets
@@ -19,83 +13,6 @@ import {
  * The DSP — which filter, what envelope — is the part only a browser can run
  * and the part you can hear is wrong. That is what `FxAudio.test()` is for.
  */
-
-class FakeParam {
-  value = 1
-  readonly calls: string[] = []
-  setValueAtTime(value: number, when: number) {
-    this.value = value
-    this.calls.push(`set ${value} @${when}`)
-  }
-  linearRampToValueAtTime(value: number, when: number) {
-    this.calls.push(`ramp ${value} @${when}`)
-  }
-  cancelScheduledValues(when: number) {
-    this.calls.push(`cancel @${when}`)
-  }
-}
-
-class FakeNode implements AudioNodeLike {
-  connected: AudioNodeLike[] = []
-  disconnected = false
-  connect(destination: AudioNodeLike) {
-    this.connected.push(destination)
-  }
-  disconnect() {
-    this.disconnected = true
-  }
-}
-
-class FakeGain extends FakeNode implements GainLike {
-  readonly gain = new FakeParam()
-}
-
-class FakeSource extends FakeNode implements BufferSourceLike {
-  buffer: AudioBufferLike | null = null
-  loop = false
-  started: number | null = null
-  stopped: number | null = null
-  onended: (() => void) | null = null
-  start(when = 0) {
-    this.started = when
-  }
-  stop(when = 0) {
-    this.stopped = when
-  }
-}
-
-class FakeContext implements AudioLike {
-  currentTime = 0
-  state: 'suspended' | 'running' | 'closed' = 'suspended'
-  readonly sampleRate = 48000
-  readonly destination = new FakeNode()
-  readonly gains: FakeGain[] = []
-  readonly sources: FakeSource[] = []
-  closed = false
-  resumes = 0
-  createGain(): GainLike {
-    const gain = new FakeGain()
-    this.gains.push(gain)
-    return gain
-  }
-  createBufferSource(): BufferSourceLike {
-    const source = new FakeSource()
-    this.sources.push(source)
-    return source
-  }
-  createBuffer(_channels: number, length: number): AudioBufferLike {
-    const data = new Float32Array(length)
-    return { getChannelData: () => data, length }
-  }
-  async resume() {
-    this.resumes++
-    this.state = 'running'
-  }
-  async close() {
-    this.closed = true
-    this.state = 'closed'
-  }
-}
 
 const make = (quality: 'low' | 'medium' | 'high' = 'low') => {
   const context = new FakeContext()
@@ -342,6 +259,29 @@ describe('what a voice leaves behind', () => {
     const { context, audio } = make()
     audio.take('empty')!.stop()
     expect(liveGains(context)).toBe(0)
+  })
+
+  it('lets go of a node a voice was shaped by, and of one handed over too late', () => {
+    // A filter is not a source: nothing about it ever "ends", so the voice
+    // that used it is the only thing that can let it go. Fire makes one per
+    // crackle, dozens a second.
+    const { context, audio } = make()
+    const voice = audio.take('shaped')!
+    const filter = context.createBiquadFilter() as FakeFilter
+    const source = context.createBufferSource() as FakeSource
+    source.connect(filter)
+    filter.connect(voice.gain)
+    source.start(0)
+    voice.own(source)
+    voice.use(filter)
+    voice.stop()
+    finish(context)
+    expect(filter.disconnected).toBe(true)
+
+    // One given to a voice that has already gone feeds nothing, so it goes now.
+    const late = context.createBiquadFilter() as FakeFilter
+    voice.use(late)
+    expect(late.disconnected).toBe(true)
   })
 
   it('never plays a source handed to a voice that has already gone', () => {

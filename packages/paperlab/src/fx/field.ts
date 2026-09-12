@@ -8,9 +8,9 @@
  * and a set of paint operations, which is the whole reason the second effect
  * costs a chunk and a preset instead of a new system.
  *
- *   R  char        scorch colour, the brown halo, lost stiffness, smoke density
+ *   R  char        scorch colour, the brown halo, shrinkage and curl, smoke density
  *   G  saturation  wet darkening, roughness, translucency, added mass, sag
- *   B  heat        the glowing ignition line, the curl toward the flame
+ *   B  heat        the glowing ignition line
  *   A  presence    alpha erosion — burn-away, tear-away, punched holes
  *
  * **It runs on the CPU because of who reads it.** Three of the four layers an
@@ -171,15 +171,53 @@ export interface DamageFieldOptions {
   seed?: number
 }
 
+/**
+ * **Fire's four rates were all six times too fast, and they were wrong
+ * together.**
+ *
+ * Measured on the scripted burn: the front spread at 39 mm/s from the centre
+ * and 27 mm/s from a corner, against the 3–8 mm/s
+ * `paperlab-fx-fire-spec.md` §9 asks for. A sheet was 76% gone in 4.8 s, so
+ * there was no time to watch it spread and every phase was judged at the
+ * wrong size — "dying" was a strip of paper under huge flames, and "smoulder"
+ * and "cold" were the same frame.
+ *
+ * The fix is a **uniform time dilation**, not four independent retunes. This
+ * is a reaction–diffusion front, so its speed goes as `sqrt(D · k)` and the
+ * charred band behind it as `D / v`: divide every RATE by the same number and
+ * the front slows by that number while the burn keeps its exact shape. Divide
+ * them unevenly and it does not — measured, cutting `heatDiffusion` and
+ * `charRate` alone (leaving `cooling`) put the front below the threshold that
+ * sustains it and the fire went out with 1% of the sheet gone.
+ *
+ * So `heatDiffusion`, `charRate` and `cooling` are the old numbers over six,
+ * which leaves every ratio between them — and `combustion`, which is already
+ * a ratio — untouched. Measured after: **6.8 mm/s from the centre and 3.6 from
+ * a corner** (a corner spreads along the sheet's fibre as a line rather than
+ * a disc, which is slower and is the field's own doing), a hole 22 mm across
+ * at 4 s, and a fire that lives about 11 s.
+ *
+ * Water's rates (`wicking`, `drying`) are deliberately NOT dilated: nothing
+ * has ever measured a wet front against a target, and the burn is identical
+ * either way (saturation is 0 in a dry burn), so changing them here would be
+ * an unmeasured change riding along with a measured one.
+ *
+ * `consumeRate` comes back DOWN, from 20 to 6, for the same reason it went up.
+ * At 20 it was holding the charred band to 8.5 mm against a front moving six
+ * times too fast; the band is `v / consumeRate`, so once the front slowed, 20
+ * squeezed it to 2.9 mm. 6 puts it at 5.3 mm — mid-range of §5's 2–8 mm.
+ * Measured band against this number, at the new pace: 5 → 6.0 mm, 6 → 5.3,
+ * 7 → 4.7, 9 → 4.0, 20 → 2.9.
+ */
 const DEFAULTS = {
   fibre: 0,
   anisotropy: 3,
-  heatDiffusion: 0.0035,
+  heatDiffusion: 0.00058,
   wicking: 0.0045,
-  charRate: 16,
-  consumeRate: 4,
+  charRate: 2.7,
+  consumeRate: 6,
   combustion: 2.4,
-  cooling: 1.1,
+  cooling: 0.18,
   wetResistance: 2.6,
   drying: 0.015,
   grain: 0.34,
@@ -320,6 +358,13 @@ export class DamageField implements DamageSource {
   readonly data: Float32Array
   /** The same, at 8 bits, for upload. Kept in step with `data` over what changed. */
   readonly pixels: Uint8Array
+  /**
+   * How ragged the sheet DRAWS this field's edges, 0..1 — see
+   * `DamageSource.detail`. Not a simulation option, because it changes
+   * nothing the field computes: set it from `fxQualityFor(tier).detail`, and
+   * again whenever the tier moves.
+   */
+  detail = 1
   private revision = 0
 
   private readonly next: Float32Array
@@ -329,6 +374,8 @@ export class DamageField implements DamageSource {
   private readonly heat: Stencil
   private readonly water: Stencil
   private accumulator = 0
+  /** Fixed steps run since the field was made — its own clock. See {@link time}. */
+  private steps = 0
   /** Cells that might change on the next step. Everything outside is at rest. */
   private active: Box = EMPTY()
   /** Cells written since the last pack into `pixels`. */
@@ -345,6 +392,20 @@ export class DamageField implements DamageSource {
     saturation: 0,
     remaining: 1,
   }
+  /**
+   * Texels whose presence reached zero during the last `step`, in the first
+   * {@link consumedCount} slots — where ash leaves from.
+   *
+   * WHERE, not just how many. The stats were enough for the sound, which
+   * wants a level; an emitter wants a place. Fixed buffers the size of the
+   * grid and written in place: a burning sheet must not allocate a list a
+   * step, and a texel is consumed once, so a step can never fill it twice.
+   */
+  readonly consumedCells = new Int32Array(FIELD_SIZE * FIELD_SIZE)
+  /** The burn front as of the last step that ran, in the first {@link frontCount} slots — where embers and smoke leave from. */
+  readonly frontCells = new Int32Array(FIELD_SIZE * FIELD_SIZE)
+  private consumedLength = 0
+  private frontLength = 0
 
   constructor(options: DamageFieldOptions = {}) {
     this.o = { ...DEFAULTS, ...options }
@@ -382,6 +443,20 @@ export class DamageField implements DamageSource {
     return this.revision
   }
 
+  /**
+   * Simulated seconds this field has burned for — whole fixed steps, never
+   * wall time.
+   *
+   * What anything DRAWN from the field animates on: the ember line's beads
+   * flicker and crawl, flames puff, and all of it has to be the same at the
+   * same moment of the same burn, or a replay flickers differently from the
+   * original and a capture can never be taken twice. Stops while the field
+   * sleeps, which is right — a sheet at rest has nothing hot left to move.
+   */
+  get time(): number {
+    return this.steps * FIXED_DT
+  }
+
   /** Nothing is happening to this sheet, and stepping it costs nothing. */
   get asleep(): boolean {
     return this.active.x0 > this.active.x1
@@ -401,6 +476,19 @@ export class DamageField implements DamageSource {
   /** What the last `step` produced. */
   get lastStats(): FieldStats {
     return this.stats
+  }
+
+  /** How many of {@link consumedCells} the last `step` wrote. Always `lastStats.consumed`. */
+  get consumedCount(): number {
+    return this.consumedLength
+  }
+
+  /**
+   * How many of {@link frontCells} are current. `lastStats.front` times the
+   * texel count — and held, like it, across a frame too short to step.
+   */
+  get frontCount(): number {
+    return this.frontLength
   }
 
   /** Texel index for a UV, clamped to the sheet. */
@@ -513,11 +601,23 @@ export class DamageField implements DamageSource {
    */
   step(delta: number): FieldStats {
     this.visited = 0
-    if (delta <= 0) return this.stats
+    // The transient outputs belong to the step that produced them, and they
+    // are cleared BEFORE the guards below rather than after. A frame with no
+    // time in it — the first one, or one whose clock went backwards — used to
+    // hand back the LAST frame's `consumed` cells and charred count, and the
+    // emitters and the sound duly shed the same ash and played the same
+    // crackles a second time. `front` is not transient: it is the state of
+    // the burn, and it is held across a frame too short to step on purpose.
+    this.consumedLength = 0
+    if (delta <= 0) {
+      this.stats = { ...this.stats, charred: 0, consumed: 0, wetted: 0 }
+      return this.stats
+    }
     if (this.asleep) {
       // Asleep means nothing CAN change, so there is no time owed either;
       // banking it would replay a burst of steps the moment something wakes.
       this.accumulator = 0
+      this.frontLength = 0
       this.stats = { ...this.stats, front: 0, charred: 0, consumed: 0, wetted: 0 }
       return this.stats
     }
@@ -530,6 +630,7 @@ export class DamageField implements DamageSource {
     let stepped = false
     while (this.accumulator >= FIXED_DT && !this.asleep) {
       this.accumulator -= FIXED_DT
+      this.steps++
       stepped = true
       const done = this.substep()
       charred += done.charred
@@ -590,6 +691,8 @@ export class DamageField implements DamageSource {
     let consumed = 0
     let wetted = 0
     let front = 0
+    // This step's front replaces the last one's; see `frontCells`.
+    const { frontCells, consumedCells } = this
 
     // The diagonal the fibre leans toward, as index offsets. Constant per
     // field; hoisted so the inner loop is arithmetic and nothing else.
@@ -716,14 +819,17 @@ export class DamageField implements DamageSource {
         let p = presence
         if (c > 0.85) {
           p = Math.max(0, p - o.consumeRate * (c - 0.85) * dt)
-          if (p <= 0) consumed++
+          if (p <= 0) {
+            consumed++
+            consumedCells[this.consumedLength++] = i
+          }
         }
 
         h = Math.min(1, Math.max(0, h))
         g = Math.min(1, Math.max(0, g))
         c = Math.min(1, c)
         if (g > sat + 1e-6) wetted++
-        if (p > 0.15 && c > 0.08 && c < 0.92 && h > 0.1) front++
+        if (p > 0.15 && c > 0.08 && c < 0.92 && h > 0.1) frontCells[front++] = i
 
         next[b + CHAR] = c
         next[b + SATURATION] = g
@@ -751,6 +857,7 @@ export class DamageField implements DamageSource {
 
     grow(this.touched, region)
     this.active = awake
+    this.frontLength = front
     return { charred, consumed, wetted, front }
   }
 

@@ -1,10 +1,12 @@
 /**
  * `paperlab/fx` — what happens TO the paper.
  *
- * **Built, not exported.** It is in the tsup entries so the boundary test and
- * `test:consumer` cover it, and absent from `exports` so no release can
- * publish it before it has an effect in it. Export it in the commit that
- * ships fire, and not before.
+ * **Exported as of the release that ships fire**, and not before: it was
+ * built but deliberately absent from `exports` while there was nothing in it
+ * to use, because a subpath cannot be taken back once it is published. A
+ * missing changeset would not have held it back — the next release for any
+ * reason publishes whatever `exports` names — so the map was the thing that
+ * did, and `test:consumer` pinned that.
  *
  * The main entry point is paper as a thing: a sheet, its stock, its shape,
  * the way it moves. This one is the events that damage it — burning, soaking,
@@ -44,15 +46,83 @@ export {
 
 // Re-exported rather than defined here: the contract belongs to the sheet,
 // which is what draws it. See `surface/damageContract.ts`.
-export { DAMAGE_CHANNELS, type DamageSource } from './surface/damageContract'
+export {
+  DAMAGE_CHANNELS,
+  DAMAGE_LOOK_DEFAULTS,
+  type DamageLook,
+  type DamageSource,
+} from './surface/damageContract'
+
+export {
+  ParticlePool,
+  particlePresets,
+  type ParticlePreset,
+  type ParticlePresetName,
+  type ParticleTarget,
+} from './fx/particles'
+
+export {
+  FireEmitter,
+  fireEmitterDefaults,
+  type FireEmitterOptions,
+  type SurfaceLocator,
+} from './fx/fire'
+
+export { FxParticles, type FxParticlesProps } from './fx/FxParticles'
+
+export { FxPost, type FxFilm, type FxPostProps } from './fx/FxPost'
+
+/**
+ * How bright fire is, in one unit. The threshold lives here rather than in the
+ * post pass so that a consumer authoring their own emissive can read it
+ * without installing the pass's optional peers.
+ */
+export {
+  PAPER_WHITE,
+  FX_BLOOM,
+  FX_BLOOM_THRESHOLD,
+  FIRE_HEAT_SCALE,
+  FIRE_SOOT_SCALE,
+  FIRE_ZONES,
+  fireZones,
+  hexToLinear,
+  type FireZones,
+  type FireZonesInput,
+  FIRE_GLOW,
+  emit,
+  emitHex,
+  luminance,
+  srgbToLinear,
+  timesPaperWhite,
+} from './fx/emission'
+
+export { Afterglow, type AfterglowOptions } from './fx/afterglow'
+export { FxFlames, type FxFlamesProps } from './fx/FxFlames'
+export { FxWisps, type FxWispsProps } from './fx/FxWisps'
+export { FxFireFluid, type FxFireFluidProps } from './fx/FxFireFluid'
+export { FireFluid, type FluidGrid } from './fx/fluid/FireFluid'
+export {
+  fireFluidControls,
+  fireFluidDefaults,
+  solverUniforms,
+  type FireFluidParams,
+  type SolverUniforms,
+} from './fx/fluid/params'
+export { FxFireLight, type FxFireLightProps } from './fx/FxFireLight'
+export { FxMatchFlame, type FxMatchFlameProps, type MatchFlameState } from './fx/FxMatchFlame'
+export { flameAnchors, flamePuff, FLAME_HEIGHT, type FlameAnchor } from './fx/flames'
 
 export {
   FxAudio,
   createAudioContext,
   type AudioLike,
+  type BiquadFilterLike,
   type FxAudioOptions,
+  type PannerLike,
   type Voice,
 } from './fx/sfx/graph'
+
+export { FireSound, type FireSoundOptions, type SoundAt } from './fx/sfx/fire'
 
 export {
   fxQualityNames,

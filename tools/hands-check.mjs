@@ -289,6 +289,19 @@ try {
   const vertices = () => page.evaluate(() => window.__HANDS__.vertices())
   const release = () => page.evaluate((a) => window.__HANDS__.drive(null, a), ASPECT)
 
+  /**
+   * Press "fresh sheet", if there is anything to undo.
+   *
+   * By NAME rather than by class, and that is not fussiness: the panel has two
+   * ghost buttons now, and the other one strikes a match. `.hud .ghost` finds
+   * whichever comes first in the DOM, so a reset would quietly have become an
+   * ignition halfway through this file.
+   */
+  const freshSheet = async () => {
+    const button = page.getByRole('button', { name: 'fresh sheet' })
+    if (await button.count()) await button.click()
+  }
+
   /** How big the sheet is right now, along each axis, in local units. */
   const extent = () =>
     page.evaluate(() => {
@@ -658,7 +671,7 @@ try {
   await frames(25)
 
   // ── Crush. With nothing scored, a fist crumples instead. ─────────────────
-  await page.evaluate(() => document.querySelector('.hud .ghost')?.click())
+  await freshSheet()
   await frames(12)
   await settle()
   const lightFist = await hold(POSES.fistLight)
@@ -770,7 +783,7 @@ try {
   // The same pose as a grab, aimed somewhere particular. Which is the whole
   // answer to a vocabulary that ran out of hand shapes: paper is indexed by
   // where you take hold of it.
-  await page.evaluate(() => document.querySelector('.hud .ghost')?.click())
+  await freshSheet()
   await frames(12)
   const corners = await scanSurface()
   const cornerAt = corners?.corner ? { x: corners.corner.camX, y: corners.corner.camY } : null
@@ -790,7 +803,7 @@ try {
 
   // ── Throw. The same snap of the fingers, with the paper in your hand. ─────
   // Last, because it takes the sheet off the wall and leaves it there.
-  await page.evaluate(() => document.querySelector('.hud .ghost')?.click())
+  await freshSheet()
   await frames(12)
   await settle()
   const hanging = await vertices()
@@ -856,6 +869,81 @@ try {
     [POSES, ASPECT],
   )
 
+  // ── Fire. A match is a pinch held still in free air; a flick is not one. ──
+  // Last, because it burns the sheet and nothing after it would be measuring
+  // the same paper. A fresh sheet first, so the flame meets unburnt paper.
+  //
+  // On the injected clock, like the flick, and for the same reason: the dwell
+  // is a DURATION, and a page.evaluate round trip is not one. The damage field
+  // steps on that clock too, so the burn is as deterministic as the gesture.
+  await freshSheet()
+  await frames(12)
+  await settle()
+  const burnAt = ((await scanSurface()) ?? surface).mid
+
+  // The MATCH — what the gesture means — on the injected clock, where a frame
+  // is exactly 16 ms whatever the machine is doing. None of this needs the
+  // fire to advance, which is why it can run inside one evaluate.
+  const flame = await page.evaluate(
+    ([poses, a, aim]) => {
+      let now = 100_000
+      /** One frame of the injected clock. 16 ms, like a screen. */
+      const tick = () => {
+        now += 16
+        return now
+      }
+      const at = (x, y, pose, face = null) =>
+        window.__HANDS__.drive([window.__hand__(x, y, pose)], a, face, tick())
+      // Clear the tracker's own samples before taking over the clock: they
+      // were taken from wall time and would all be in the future.
+      window.__HANDS__.drive(null, a)
+
+      // A flick first, above the sheet. It must leave no flame behind — this
+      // is the case the dwell exists for, since a flick IS a pinch briefly.
+      for (let i = 0; i <= 4; i++) at(0.65 - i * 0.04, 0.17, poses.pinch)
+      const flicked = at(0.45, 0.17, poses.palm).fire.lit
+      window.__HANDS__.drive(null, a)
+
+      // Then the same pinch, held still in free air. Not a match yet after
+      // twelve frames — under 200 ms — and one after another twenty.
+      let early = false
+      for (let i = 0; i < 12; i++) early = at(0.62, 0.15, poses.pinch).fire.lit
+      for (let i = 0; i < 20; i++) at(0.62, 0.15, poses.pinch)
+      const lit = at(0.62, 0.15, poses.pinch).fire.lit
+
+      // Carried over the paper it must not drag the sheet: holding a match is
+      // not holding paper, so the pointer stays up.
+      let dragged = false
+      for (let i = 0; i < 10; i++) dragged = at(aim.camX, aim.camY, poses.pinch).pointer?.down ?? false
+
+      // Blowing puts it out, and it stays out while the hand stays shut —
+      // otherwise blowing a flame out would not mean anything.
+      let blown = true
+      for (let i = 0; i < 8; i++) blown = at(0.62, 0.15, poses.pinch, { pucker: 1 }).fire.lit
+      for (let i = 0; i < 40; i++) at(0.62, 0.15, poses.pinch)
+      const relit = at(0.62, 0.15, poses.pinch).fire.lit
+
+      window.__HANDS__.drive(null, a)
+      return { flicked, early, lit, dragged, blown, relit }
+    },
+    [POSES, ASPECT, burnAt],
+  )
+
+  // The BURN — which is the library's, not the gesture's — from the panel's
+  // button: no hand, no camera, and real frames, because the fire advances on
+  // the render clock now rather than the tracker's.
+  await settle()
+  const beforeBurn = await vertices()
+  await page.getByRole('button', { name: 'strike a match' }).click()
+  const readFire = () => page.evaluate((a) => window.__HANDS__.drive(null, a).fire, ASPECT)
+  const caught = await until(readFire, (f) => f.front > 0 && f.particles > 0)
+  const eaten = await until(readFire, (f) => f.remaining < 0.995)
+  // And the sheet MOVES as it burns: the coupling inside the library shortens
+  // the paper the field has charred and breaks what it has taken away. The
+  // sheet was asleep before the match — `settle` above — so nothing else is
+  // moving it.
+  const burnMoved = moved(beforeBurn, await vertices())
+
   const capture = problems.filter((p) => /PointerCapture|NotFoundError/i.test(p))
 
   console.log('')
@@ -900,6 +988,12 @@ try {
     `  peel a corner          ${peeling ? `${peeling.peel} · moved ${peelMoved.toFixed(4)} · pointer ${peeling.pointer?.down ? 'down' : 'up'}` : 'no corner found'}`,
   )
   console.log(`  thrown off its pins    ${thrown.thrown} · sheet moved ${flew.toFixed(4)}`)
+  console.log(
+    `  match, flick vs held   ${flame.flicked ? 'lit' : 'out'} vs ${flame.lit ? 'lit' : 'out'} · blown ${flame.blown ? 'STILL LIT' : 'out'}${flame.relit ? ' · RELIT' : ''}`,
+  )
+  console.log(
+    `  struck match burns     front ${caught.front.toFixed(4)} · ${caught.particles} in the air · paper ${(eaten.remaining * 100).toFixed(1)}% · sheet moved ${burnMoved.toFixed(4)}`,
+  )
   console.log('')
 
   let failed = 0
@@ -1018,6 +1112,28 @@ try {
   )
   check(thrown.thrown === true, 'a flick with the sheet in hand throws it off its pins', 'still pinned')
   check(flew > 0.3, 'and the sheet actually leaves', `it moved ${flew}`)
+  check(!flame.flicked, 'a flick throws paint and leaves no flame behind', 'a snap summoned a match')
+  check(!flame.early, 'a pinch is not a match until it has been held still', 'it lit straight away')
+  check(flame.lit, 'a pinch held still in free air is a match', 'it never lit')
+  check(!flame.dragged, 'carrying a lit match over the sheet does not drag it', 'the pointer went down')
+  check(!flame.blown, 'blowing puts the flame out', 'it stayed lit through a blow')
+  check(!flame.relit, 'and it stays out until the hand opens', 'it relit on its own')
+  check(
+    caught.front > 0,
+    'a match struck from the panel sets the paper burning',
+    `the front never caught (front ${caught.front})`,
+  )
+  check(
+    caught.particles > 0,
+    'and the burn throws embers and smoke into the air',
+    `${caught.particles} particles`,
+  )
+  check(eaten.remaining < 0.995, 'the fire eats the paper', `${(eaten.remaining * 100).toFixed(1)}% left`)
+  check(
+    burnMoved > 0.01,
+    'and the sheet moves as it burns — the coupling reaches the cloth',
+    `moved only ${burnMoved}`,
+  )
   check(capture.length === 0, 'pointer capture survives a synthetic pointer', capture[0] ?? '')
   const strangers = [...offsite].filter((origin) => origin !== MODEL_HOST)
   check(
@@ -1052,7 +1168,9 @@ try {
     console.log(`  ${failed} check${failed === 1 ? '' : 's'} failed.`)
     process.exitCode = 1
   } else {
-    console.log('  Gestures reach the paper: hold it, score it, paint it, tear it, crush it, blow it.')
+    console.log(
+      '  Gestures reach the paper: hold it, score it, paint it, tear it, crush it, blow it, burn it.',
+    )
   }
 } finally {
   await browser.close()

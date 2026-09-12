@@ -18,7 +18,10 @@ import { DAMAGE_CHANNELS, Paper, PaperLighting, PaperMesh, type DamageSource, ty
  *   ?damage=untouched  a texture with nothing in it
  *   ?damage=scorched   a texture with a burn in the middle — the CONTROL:
  *                      if this matched too, the check could not see anything
+ *   ?damage=glowing    the same scorch with its burning line HOT — which must
+ *                      draw exactly `scorched`: heat paints nothing on paper
  *   ?damage=hole       a hole punched through the middle — for the shadow
+ *   ?detail=0          the same damage without its per-fragment fray
  *   ?stock=…           any stock; `vellum` is the one below full opacity
  *   ?scene=shadow      the sheet over a floor that RECEIVES its shadow map,
  *                      seen from above — the one place a hole's shadow shows.
@@ -40,23 +43,33 @@ const query = new URLSearchParams(window.location.search)
 const mode = query.get('damage') ?? 'none'
 const stock = (query.get('stock') ?? 'printer') as StockName
 const scene = query.get('scene') ?? 'sheet'
+// Clamped, because it comes off a URL: `?detail=Infinity` would otherwise
+// reach the shader, where the fray is multiplied by a zero on pristine paper
+// and NaN is what lands on the sheet.
+const asked = Number(query.get('detail') ?? '1')
+const detail = Number.isFinite(asked) ? Math.min(1, Math.max(0, asked)) : 1
 
 const SIZE = 64
 
-function field(scorch: boolean, hole = false): DamageSource {
+function field(scorch: boolean, hole = false, glow = false): DamageSource {
   const pixels = new Uint8Array(SIZE * SIZE * 4)
   for (let i = 0; i < SIZE * SIZE; i++) {
     const x = i % SIZE
     const y = (i / SIZE) | 0
+    const d = Math.hypot(x - SIZE / 2, y - SIZE / 2)
     // A hole: the middle of the sheet gone. Its shadow is the question —
     // a hole that casts a solid shadow is the most obvious fake a burn has.
-    pixels[i * 4 + DAMAGE_CHANNELS.presence] = hole && Math.hypot(x - SIZE / 2, y - SIZE / 2) < 14 ? 0 : 255
-    if (scorch) {
-      const d = Math.hypot(x - SIZE / 2, y - SIZE / 2)
-      pixels[i * 4 + DAMAGE_CHANNELS.char] = Math.max(0, Math.min(255, Math.round((12 - d) * 40)))
+    pixels[i * 4 + DAMAGE_CHANNELS.presence] = hole && d < 14 ? 0 : 255
+    if (scorch) pixels[i * 4 + DAMAGE_CHANNELS.char] = Math.max(0, Math.min(255, Math.round((12 - d) * 40)))
+    // The burning line: a ring of heat at the scorch's rim, where a front is.
+    if (glow) {
+      pixels[i * 4 + DAMAGE_CHANNELS.heat] = Math.max(
+        0,
+        Math.min(255, Math.round((1 - Math.abs(d - 10.5) / 2.5) * 255)),
+      )
     }
   }
-  return { size: SIZE, pixels, version: 1 }
+  return { size: SIZE, pixels, version: 1, detail }
 }
 
 const damage =
@@ -64,9 +77,11 @@ const damage =
     ? field(false)
     : mode === 'scorched'
       ? field(true)
-      : mode === 'hole'
-        ? field(false, true)
-        : undefined
+      : mode === 'glowing'
+        ? field(true, false, true)
+        : mode === 'hole'
+          ? field(false, true)
+          : undefined
 
 /**
  * Ready after the content texture exists and a run of frames has been drawn.

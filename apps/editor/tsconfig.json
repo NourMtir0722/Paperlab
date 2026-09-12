@@ -4,7 +4,8 @@
     "noEmit": true,
     "paths": {
       "paperlab": ["../../packages/paperlab/src/index.ts"],
-      "paperlab/stage": ["../../packages/paperlab/src/stage.ts"]
+      "paperlab/stage": ["../../packages/paperlab/src/stage.ts"],
+      "paperlab/fx": ["../../packages/paperlab/src/fx.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

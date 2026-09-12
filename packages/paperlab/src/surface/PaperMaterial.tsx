@@ -1,12 +1,13 @@
 import * as THREE from 'three'
 import { useEffect, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import CustomShaderMaterial from 'three-custom-shader-material'
 import type { LightingName, SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { composeSurface } from './compose'
 import { resolveCreases, type CreaseShading } from './creases'
 import { useLightRig } from '../scene/rig'
-import type { DamageSource } from './damageContract'
+import { DAMAGE_LOOK_DEFAULTS, type DamageSource } from './damageContract'
 import { useDamageTexture } from './useDamageTexture'
 
 export interface PaperMaterialProps {
@@ -73,7 +74,17 @@ export function PaperMaterial({
   const bound = useMemo(() => composed.uniforms, [composed.structureKey])
   useEffect(() => {
     for (const [key, uniform] of Object.entries(composed.uniforms)) {
-      if (!bound[key] || key === 'uFrontMap' || key === 'uBackMap' || key === 'uDamage') continue
+      if (
+        !bound[key] ||
+        key === 'uFrontMap' ||
+        key === 'uBackMap' ||
+        key === 'uDamage' ||
+        key === 'uDamageDetail' ||
+        key === 'uDamageTime' ||
+        key.startsWith('uLook')
+      ) {
+        continue
+      }
       if (bound[key].value instanceof THREE.Color && uniform.value instanceof THREE.Color) {
         ;(bound[key].value as THREE.Color).copy(uniform.value)
       } else {
@@ -86,6 +97,54 @@ export function PaperMaterial({
     if (bound.uBackMap) bound.uBackMap.value = backTexture ?? null
     if (bound.uDamage) bound.uDamage.value = damageTexture
   }, [bound, texture, backTexture, damageTexture])
+  // The fray follows the quality tier, which can change at any moment, so it
+  // is read off the source each frame rather than baked into the program.
+  useFrame((state) => {
+    if (!bound.uDamageDetail) return
+    // The burn's clock when it has one, so a replayed burn's ember line
+    // flickers the same way twice; the frame clock otherwise. Clamped for the
+    // same reason `detail` is.
+    if (bound.uDamageTime) {
+      const time = damage?.time ?? state.clock.elapsedTime
+      bound.uDamageTime.value = Number.isFinite(time) ? time : 0
+    }
+    // How the burn is drawn, from the source's look over the defaults. Read
+    // each frame like `detail`, so a slider in a lab moves it live.
+    if (bound.uLook0) {
+      const look = { ...DAMAGE_LOOK_DEFAULTS, ...damage?.look }
+      const v = (x: number, d: number) => (Number.isFinite(x) ? x : d)
+      const d = DAMAGE_LOOK_DEFAULTS
+      ;(bound.uLook0.value as THREE.Vector4).set(
+        v(look.emberWidth, d.emberWidth),
+        v(look.emberIntensity, d.emberIntensity),
+        v(look.emberCoverage, d.emberCoverage),
+        v(look.emberFlicker, d.emberFlicker),
+      )
+      ;(bound.uLook1!.value as THREE.Vector4).set(
+        v(look.emberGlow, d.emberGlow),
+        v(look.lipWidth, d.lipWidth),
+        v(look.lipBrightness, d.lipBrightness),
+        v(look.charWarmth, d.charWarmth),
+      )
+      ;(bound.uLook2!.value as THREE.Vector4).set(
+        v(look.charCracks, d.charCracks),
+        v(look.scorchReach, d.scorchReach),
+        v(look.scorchDarkness, d.scorchDarkness),
+        v(look.fingers, d.fingers),
+      )
+      ;(bound.uLook3!.value as THREE.Vector4).set(
+        v(look.edgeWave, d.edgeWave),
+        v(look.edgeBite, d.edgeBite),
+        v(look.sparkle, d.sparkle),
+        0,
+      )
+    }
+    // Clamped rather than trusted: `detail` is a number on a public
+    // interface, and an infinite one reaching the shader is multiplied by a
+    // zero somewhere in the fray and paints NaN across the whole sheet.
+    const detail = damage?.detail ?? 1
+    bound.uDamageDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 1
+  })
 
   return (
     <>
