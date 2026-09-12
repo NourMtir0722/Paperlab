@@ -8,6 +8,7 @@ import {
   FIELD_SIZE,
   FxFireFluid,
   FxFireLight,
+  FxMatchFlame,
   FxParticles,
   FxPost,
   FxWisps,
@@ -21,11 +22,13 @@ import {
   type DamageSource,
   type FieldStats,
   type FireFluidParams,
+  type MatchFlameState,
   fireEmitterDefaults,
   fireFluidControls,
   fireFluidDefaults,
   fxQualityFor,
 } from 'paperlab/fx'
+import type { SurfaceLocator } from 'paperlab/fx'
 import {
   ALL_LAYERS,
   DURATION,
@@ -83,6 +86,7 @@ import {
  *                                honoured with ?ui=0 too, so a capture can
  *                                isolate one term of the ember line
  *   ?lighting=noir               any lighting preset
+ *   ?play=1&speed=0.25           start it running, and how fast
  *   ?ui=0                        the stage alone — what the capture script loads
  *
  * Dev only. It is in no build's input list, and the references it draws come
@@ -203,6 +207,19 @@ const START_ORIGIN: BurnOrigin = query.get('origin') === 'corner' ? 'corner' : '
 const START_T = query.has('phase')
   ? (phasesFor({ origin: START_ORIGIN }).find((p) => p.id === query.get('phase'))?.at ?? 0)
   : num('t', 0, 0, DURATION)
+
+/**
+ * `?play=1` starts the burn running.
+ *
+ * The page opens paused because almost everything it is for is a single
+ * frame compared against a still. Motion is the exception, and it is the one
+ * a contact sheet cannot show: flicker, whether a tongue tears or dissolves,
+ * whether the smoulder is a different picture from the cold. `tools/
+ * fire-film.mjs` needs a way to say "go" with the panel hidden.
+ */
+const START_PLAYING = query.get('play') === '1'
+/** `?speed=0.25` — the transport's rate, so a film can be slowed for the flicker. */
+const START_SPEED = num('speed', 1, 0.05, 4)
 
 const START_POST = query.get('post') !== '0'
 /**
@@ -483,6 +500,8 @@ function Driver({
   playing,
   speed,
   onTime,
+  match,
+  locate,
 }: {
   burn: ScriptedBurn
   view: FieldView
@@ -491,6 +510,8 @@ function Driver({
   playing: boolean
   speed: number
   onTime(t: number): void
+  match: { current: MatchFlameState }
+  locate: SurfaceLocator
 }) {
   useFrame((_, delta) => {
     if (playing) {
@@ -498,6 +519,21 @@ function Driver({
       onTime(burn.time)
     }
     view.sync(burn.glow, layers, detail)
+    // The match that lights it.
+    //
+    // The lab had none, so the scorch and then the first hole appeared with
+    // nothing on screen to have caused them — a burn that starts by itself.
+    // It is held for exactly as long as the script holds it (`HOLD`), on the
+    // BURN's clock rather than the frame's, so the same moment photographs
+    // the same flame twice: `FxMatchFlame` takes `time` and `litAt` for
+    // precisely this and throws no random sparks when it has them.
+    const origin = ORIGINS[burn.settings.origin]
+    const at = burn.time < HOLD ? locate(origin.u, origin.v) : null
+    match.current.state = at ? 'lit' : 'none'
+    match.current.position = at ? { x: at.x, y: at.y, z: at.z + 0.02 } : null
+    match.current.touching = at !== null
+    match.current.time = burn.time
+    match.current.litAt = 0
   })
   return null
 }
@@ -592,6 +628,11 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
     why: 'FxFireLight — ~1900 K at the rim, as bright as the front is long, flickering with the flames (§7)',
   },
   {
+    key: 'match',
+    name: 'the match',
+    why: 'FxMatchFlame — the flame that lights it, held for as long as the script holds it, on the burn clock so it photographs the same twice',
+  },
+  {
     key: 'wisps',
     name: 'smoulder wisp',
     why: 'FxWisps — a pale thread from a glowing bead once the flames are out, S-curving as it climbs (§8.2)',
@@ -632,8 +673,8 @@ function Lab() {
   /** Where a seek is aimed. Separate from `shown` so that playing does not re-seek. */
   const [target, setTarget] = useState(START_T)
   const [shown, setShown] = useState(START_T)
-  const [playing, setPlaying] = useState(query.get('play') === '1')
-  const [speed, setSpeed] = useState(1)
+  const [playing, setPlaying] = useState(START_PLAYING)
+  const [speed, setSpeed] = useState(START_SPEED)
   const [layers, setLayers] = useState(START_LAYERS)
   const [detail, setDetail] = useState(1)
   const [camera, setCamera] = useState<'wide' | 'close'>(query.get('view') === 'close' ? 'close' : 'wide')
@@ -712,6 +753,14 @@ function Lab() {
   }
 
   const [mode, setModeState] = useState<Mode>(START_MODE)
+  const match = useRef<MatchFlameState>({
+    position: null,
+    state: 'none',
+    blow: 0,
+    touching: false,
+    time: 0,
+    litAt: 0,
+  })
   /**
    * The side panel follows the mode. Watching means the reference beside the
    * render; tuning and debugging both mean controls, and the difference
@@ -924,6 +973,7 @@ function Lab() {
               resetKey={fluidKey}
             />
           )}
+          {layers.match && <FxMatchFlame match={match} />}
           {layers.light && <FxFireLight field={burn.field} locate={locate} gain={settings.light} />}
           {layers.wisps && settings.burn.smoke && (
             <FxWisps glow={burn.glow} field={burn.field} locate={locate} wind={burn.pool.wind} />
@@ -946,6 +996,8 @@ function Lab() {
             playing={playing}
             speed={speed}
             onTime={setShown}
+            match={match}
+            locate={locate}
           />
           <Ready
             phases={phases}

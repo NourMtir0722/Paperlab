@@ -430,6 +430,8 @@ export interface Layers {
   light: boolean
   /** `FxWisps` — the thread of smoke rising from a smouldering bead. */
   wisps: boolean
+  /** `FxMatchFlame` — the match that lights it, for as long as it is held. */
+  match: boolean
   embers: boolean
   smoke: boolean
   ash: boolean
@@ -443,6 +445,7 @@ export const ALL_LAYERS: Layers = {
   fluid: true,
   light: true,
   wisps: true,
+  match: true,
   embers: true,
   smoke: true,
   ash: true,

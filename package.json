@@ -29,7 +29,8 @@
     "test:consumer": "node tools/consumer-install.mjs",
     "test:damage": "node tools/damage-check.mjs",
     "test:fire-look": "node tools/fire-look.mjs",
-    "test:fire-budget": "node tools/fire-budget.mjs"
+    "test:fire-budget": "node tools/fire-budget.mjs",
+    "film": "node tools/fire-film.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
