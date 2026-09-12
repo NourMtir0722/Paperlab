@@ -234,6 +234,20 @@ try {
 } catch (e) {
   console.log(\`FAIL the print pass cannot load — \${e.message.split('\\n')[0]}\`)
 }
+
+// fx's post pass, by the same argument: \`FxPost\` swallows a failed import so
+// a missing peer means an unbloomed fire rather than a crash, and so would a
+// chunk that never made it into the tarball.
+try {
+  const dist = dirname(require.resolve('paperlab/fx'))
+  const chunks = readdirSync(dist).filter((f) => f.startsWith('FxPostPass') && f.endsWith('.js'))
+  if (chunks.length !== 1) throw new Error(\`expected one FxPostPass chunk in dist, found \${chunks.length}\`)
+  const mod = await import(pathToFileURL(join(dist, chunks[0])).href)
+  if (typeof mod.FxPostPass !== 'function') throw new Error('the chunk exports no FxPostPass component')
+  console.log(\`OK fire's post pass loads on demand (\${chunks[0]})\`)
+} catch (e) {
+  console.log(\`FAIL fire's post pass cannot load — \${e.message.split('\\n')[0]}\`)
+}
 `
 
 consumer('Pass 2 — optional peers installed as well', [...REQUIRED, ...OPTIONAL], gradeProbe)

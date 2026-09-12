@@ -30,7 +30,7 @@ describe('the emission unit', () => {
     expect(srgbToLinear(1)).toBeCloseTo(1, 12)
     // The linear segment below the knee, and a mid grey.
     expect(srgbToLinear(0.04)).toBeCloseTo(0.04 / 12.92, 12)
-    expect(srgbToLinear(0.5)).toBeCloseTo(0.2140, 3)
+    expect(srgbToLinear(0.5)).toBeCloseTo(0.214, 3)
   })
 
   it('emits exactly the brightness it is asked for, whatever the hue', () => {

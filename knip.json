@@ -20,7 +20,8 @@
         "src/harness/media-main.tsx",
         "src/harness/field-main.tsx",
         "src/harness/hands-main.tsx",
-        "src/harness/damage-main.tsx"
+        "src/harness/damage-main.tsx",
+        "src/harness/fx-lab-main.tsx"
       ],
       "project": "src/**"
     }

@@ -1,5 +1,8 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  // Where the fire references live (see tools/fx-refs.mjs). Pass-through, not
+  // hashed: it changes which stills a dev page shows, never what a task builds.
+  "globalPassThroughEnv": ["PAPERLAB_FX_REFS"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

@@ -108,10 +108,7 @@ export function timesPaperWhite(c: readonly [number, number, number]): number {
  * The returned triple has exactly `times * PAPER_WHITE` luminance, so it can
  * be handed straight to a shader.
  */
-export function emit(
-  srgb: readonly [number, number, number],
-  times: number,
-): [number, number, number] {
+export function emit(srgb: readonly [number, number, number], times: number): [number, number, number] {
   const linear: [number, number, number] = [
     srgbToLinear(srgb[0]),
     srgbToLinear(srgb[1]),
