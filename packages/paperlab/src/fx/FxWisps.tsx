@@ -15,6 +15,24 @@ export interface FxWispsProps {
   wind?: readonly [number, number, number]
 }
 
+/**
+ * How opaque a point of the thread is at `age` seconds: 0 unless it is alive.
+ *
+ * Its own function because the inline version drew white suns on the paper.
+ * It was `alive * ramp * (1 - age / LIFE) ** 1.6`, and for a dead point
+ * `1 - age / LIFE` is NEGATIVE — a negative number to a fractional power is
+ * NaN, and `0 * NaN` is still NaN. Dead points are collapsed onto a living
+ * one precisely so that nothing they carry is ever drawn, but NaN in a vertex
+ * attribute only needs one fragment to reach the HDR frame, and bloom then
+ * spreads it into a white disc that greys the whole stage. It showed only in
+ * the smoulder (the one time wisps are drawn), only while playing, and it was
+ * gone with the wisp layer switched off.
+ */
+export function wispAlpha(age: number): number {
+  if (!(age >= 0 && age < LIFE)) return 0
+  return Math.min(1, age / 0.25) * (1 - age / LIFE) ** 1.6 * 0.42
+}
+
 /** At most this many threads at once (spec §8.2: one or two). */
 const WISPS = 2
 /** Points along one thread. */
@@ -186,16 +204,20 @@ export function FxWisps({ glow, field, locate, wind }: FxWispsProps) {
         const a = age[i]!
         if (!(a >= 0 && a < LIFE)) {
           // Onto the nearest living point, so the ribbon has no area here.
-          // With NOTHING alive there is no such point, and the fallback used
-          // to be the world ORIGIN — the middle of the sheet — so an entire
-          // dead thread became a zero-alpha ribbon sitting in the scene
-          // rather than nowhere. Collapse it onto its own first point
-          // instead: wherever that is, every vertex shares it, so the strip
-          // has no area at all.
-          const k = anchor >= 0 ? anchor : 0
-          path[i * 3] = path[k * 3]!
-          path[i * 3 + 1] = path[k * 3 + 1]!
-          path[i * 3 + 2] = path[k * 3 + 2]!
+          // With NOTHING alive there is no such point; collapse onto the root
+          // the thread was last born at — finite, and on the sheet. (Not onto
+          // point 0's own position: for a dead thread that is a billion
+          // seconds of rise away, ~10^16 units.)
+          if (anchor >= 0) {
+            path[i * 3] = path[anchor * 3]!
+            path[i * 3 + 1] = path[anchor * 3 + 1]!
+            path[i * 3 + 2] = path[anchor * 3 + 2]!
+          } else {
+            const r = ((s.next - 1 + POINTS) % POINTS) * 3
+            path[i * 3] = s.root[r]!
+            path[i * 3 + 1] = s.root[r + 1]!
+            path[i * 3 + 2] = s.root[r + 2]!
+          }
         } else {
           anchor = i
         }
@@ -211,17 +233,25 @@ export function FxWisps({ glow, field, locate, wind }: FxWispsProps) {
           path[j * 3 + 2]! - path[h * 3 + 2]!,
         )
         toCamera.copy(camera.position).sub(p)
-        side.crossVectors(q, toCamera)
-        // A degenerate segment has no side; give it one rather than a NaN.
-        if (side.lengthSq() < 1e-20) side.set(1, 0, 0)
-        side.normalize()
+        const alive = a >= 0 && a < LIFE
+        if (alive || i === 0) {
+          side.crossVectors(q, toCamera)
+          // A degenerate segment has no side; give it one rather than a NaN.
+          if (side.lengthSq() < 1e-20) side.set(1, 0, 0)
+          side.normalize()
+        }
+        // A dead point KEEPS the side of the living point it was collapsed
+        // onto. Computing its own gave it the degenerate fallback (1, 0, 0)
+        // while its neighbour used the real direction, so the two made a
+        // small bow-tie with area — enough to rasterise whatever the dead
+        // vertices carried. Same position and same side is no area at all.
         // A thread at the bead, widening a little as it climbs and thins.
-        const half = 0.0011 + 0.0022 * Math.min(1, a / LIFE)
+        // Clamped, so a dead point's (huge) age cannot widen it past its anchor.
+        const half = 0.0011 + 0.0022 * Math.min(1, Math.max(0, a) / LIFE)
         const v = (w * POINTS + i) * 2
         positions.setXYZ(v, p.x - side.x * half, p.y - side.y * half, p.z - side.z * half)
         positions.setXYZ(v + 1, p.x + side.x * half, p.y + side.y * half, p.z + side.z * half)
-        const alive = a >= 0 && a < LIFE ? 1 : 0
-        const alpha = alive * Math.min(1, a / 0.25) * (1 - a / LIFE) ** 1.6 * 0.42
+        const alpha = wispAlpha(a)
         alphas.setX(v, alpha)
         alphas.setX(v + 1, alpha)
       }
