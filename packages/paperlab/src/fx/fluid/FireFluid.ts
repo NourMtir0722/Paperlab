@@ -82,7 +82,7 @@ function pass(fragmentShader: string, uniforms: Record<string, THREE.IUniform>):
 export class FireFluid {
   /** (fuel, heat, smoke, soot) on the fine grid — what is drawn. */
   readonly scalars: Pair
-  /** (premixed oxygen, ambient oxygen, burn rate, –) on the fine grid. */
+  /** (premixed oxygen, ambient oxygen, burn rate, flame heat) on the fine grid. */
   readonly air: Pair
   readonly velocity: Pair
   readonly pressure: Pair
@@ -177,6 +177,8 @@ export class FireFluid {
         uSootYield: { value: 0 },
         uSootHeat: { value: 1 },
         uStoich: { value: 1 },
+        uSmoulderSmoke: { value: 0 },
+        uSmoulderHeat: { value: 0 },
       }),
       forces: pass(FORCES, {
         uVelocity: { value: null },
@@ -343,6 +345,8 @@ export class FireFluid {
       r.uSootYield!.value = u.sootYield
       r.uSootHeat!.value = u.sootHeat
       r.uStoich!.value = u.stoich
+      r.uSmoulderSmoke!.value = u.smoulderSmoke
+      r.uSmoulderHeat!.value = u.smoulderHeat
       r.uVelocity!.value = this.velocity.read.texture
       r.uA!.value = this.scalars.read.texture
       r.uB!.value = this.air.read.texture

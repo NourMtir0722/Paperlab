@@ -129,11 +129,11 @@ export function emitHex(hex: string, times: number): [number, number, number] {
 }
 
 /**
- * The solver temperature that counts as the hottest gas in a flame.
+ * The FLAME HEAT that counts as the hottest gas in a flame — the heat burning
+ * made (see `REACT`), which is what a flame's colour is drawn from.
  *
- * The fluid's heat has no natural ceiling — the rim releases 22 a second and
- * burning adds three times what it consumes — so the render pass needs a
- * reference before "hot" can mean anything. Every band in `RENDER_FRAGMENT`
+ * It has no natural ceiling, so the render pass needs a reference before
+ * "hot" can mean anything. Every band in `RENDER_FRAGMENT`
  * is a fraction of this, which is what gives a flame a core, a body and a
  * tip instead of one saturated colour.
  *
@@ -141,13 +141,13 @@ export function emitHex(hex: string, times: number): [number, number, number] {
  * reference temperature, and they decide how much gas ever reaches it.
  * `pnpm test:fire-budget` is what holds the pair honest.
  *
- * 2.5 since the gas leaves the rim at its real speed through a narrow band
- * and cools faster (see `fireFluidDefaults`): it spends less time over the
- * rim piling up heat, the hottest gas now reads about 2.3 at the 99th
- * percentile, and at the old 5 every glowing pixel sat in the tip's band — a
- * flat peach flame.
+ * 0.65, measured: inside a flame (where its soot is visible) flame heat runs
+ * 0.17 / 0.27 / 0.40 / 0.48 at the 10th / 50th / 90th / 99th percentile.
+ * At 0.4 most of the flame sat past the core's threshold and was 36%
+ * near-white; at 0.8 all of it sat in the tip's band and was 93% orange.
+ * 0.65 puts the median in the body and only the top few percent in the core.
  */
-export const FIRE_HEAT_SCALE = 2.5
+export const FIRE_HEAT_SCALE = 0.65
 
 /**
  * The soot density that counts as a full flame.
@@ -268,12 +268,21 @@ export type FireZonesInput = { [Z in keyof FireZones]?: Partial<FireZones[Z]> }
  */
 export const FIRE_ZONES: FireZones = {
   root: { color: '#3b6bff', amount: 0, reach: 0.5 },
-  core: { color: '#fff7d4', glow: 4.6, from: 0.55 },
+  // glow 6 (was 4.6): once the core became the hottest few percent of a
+  // flame instead of its whole root, 4.6 no longer cleared the bloom
+  // threshold — bloom's share of the peak frame fell to 0.48%, under the
+  // budget. Brighter keeps the same small area: 1.47% bloom, near-white 0.8%.
+  // Starting it lower (from 0.45) bloomed 6.4% but put near-white back at 4.7%.
+  core: { color: '#fff7d4', glow: 6, from: 0.55 },
   // Saturated, because the tone curve takes saturation away from anything
   // above paper white: #ffdd7c at this glow came out pale yellow (s ~0.4),
   // and measured 7.5% yellow against Flame_base.png's 29%.
-  body: { color: '#ffc02a', glow: 1.3 },
-  tip: { color: '#ff9e2c', glow: 0.9, from: 0.08, to: 0.32, softness: 0.15, tearing: 0.35 },
+  body: { color: '#ffcf3a', glow: 1.3 },
+  // to: 0.4, measured against Flame_base.png with bloom off (bloom's halo
+  // counts as flame in any diff): near-white / pale / yellow / orange came out
+  // 0.7 / 21 / 34 / 44% against the reference's 0.9 / 17 / 29 / 43. At 0.32
+  // the body took half the flame and it was 51% yellow; at 0.45, 64% orange.
+  tip: { color: '#ff9e2c', glow: 0.9, from: 0.08, to: 0.4, softness: 0.15, tearing: 0.35 },
 }
 
 /** The defaults with `input` laid over them, zone by zone. */

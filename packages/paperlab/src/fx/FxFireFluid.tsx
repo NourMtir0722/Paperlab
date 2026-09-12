@@ -92,6 +92,15 @@ const MAX_STEPS = 6
  */
 const BAND = 1.2 / 210
 /**
+ * Spots of the rim that remember a flame, so they go on smoking after it.
+ * Each flame writes itself into one slot (by its seed) every step it burns;
+ * a slot not written for a while is a spot whose flame has gone out, and it
+ * releases smoke — no fuel — fading over `smokeAfter` seconds.
+ */
+const SMOULDER_SLOTS = 16
+/** Seconds a spot must have had no flame before it counts as out and starts to smoke. */
+const SMOULDER_AFTER = 1
+/**
  * How long a reset fire is run before it is shown.
  *
  * Was 0.8 s, and that is what drew the HOOKS — tongues curling over at the
@@ -155,6 +164,7 @@ export function FxFireFluid({
         fragmentShader: RENDER_FRAGMENT,
         uniforms: {
           uA: { value: null },
+          uB: { value: null },
           uTime: { value: 0 },
           uGlow: { value: 1 },
           // Thin: smoke over a clear background, not a veil across it.
@@ -213,6 +223,15 @@ export function FxFireFluid({
   const anchors = useRef<FlameAnchor[]>([])
   const sources = useMemo(() => new Float32Array(MAX_SOURCES * 4), [])
   const across = useMemo(() => new Float32Array(MAX_SOURCES * 4), [])
+  const smoulder = useMemo(
+    () =>
+      Array.from({ length: SMOULDER_SLOTS }, () => ({
+        seen: Number.NEGATIVE_INFINITY,
+        source: new Float32Array(4),
+        across: new Float32Array(4),
+      })),
+    [],
+  )
   const scratch = useMemo(() => new THREE.Vector3(), [])
 
   /** Where the domain stands: a vertical plane through the sheet, facing the camera. */
@@ -248,7 +267,8 @@ export function FxFireFluid({
    */
   const gather = (time: number): number => {
     const s = state.current
-    const n = Math.min(MAX_SOURCES, flameAnchors(field, locate, MAX_SOURCES, anchors.current, time))
+    const room = MAX_SOURCES - SMOULDER_SLOTS
+    const n = Math.min(room, flameAnchors(field, locate, room, anchors.current, time))
     const band = BAND / DOMAIN.height
     for (let i = 0; i < n; i++) {
       const a = anchors.current[i]!
@@ -285,9 +305,33 @@ export function FxFireFluid({
       // never grew enough soot to show, and the ring lost its short flames.
       const disc = Math.max(0.0025, (a.width * 0.6) / DOMAIN.height)
       const tallest = (FLAME_HEIGHT[1] * 0.47 * 0.6) / DOMAIN.height
-      sources[k + 3] = (a.height / FLAME_HEIGHT[1]) * (0.5 + 0.5 * a.heat) * Math.min(30, (disc * tallest) / area)
+      sources[k + 3] =
+        (a.height / FLAME_HEIGHT[1]) * (0.5 + 0.5 * a.heat) * Math.min(30, (disc * tallest) / area)
+      // This spot is burning: remember it, so it smokes once it stops.
+      const slot = smoulder[Math.floor(a.seed * SMOULDER_SLOTS) % SMOULDER_SLOTS]!
+      slot.seen = time
+      slot.source.set(sources.subarray(k, k + 4))
+      slot.across.set(across.subarray(k, k + 4))
     }
-    return n
+    // Spots whose flame has gone out, smoking and fading — flagged by a
+    // negative strength, which the emission pass turns into smoke alone.
+    const after = Math.max(0, merged.smokeAfter ?? 0)
+    let count = n
+    for (const slot of smoulder) {
+      const since = time - slot.seen
+      // Only once the flame has really gone. Flames hop along the rim every
+      // ~0.7 s, so a slot left unwritten for a step or two is a flame that
+      // moved, not one that went out — and smoking at once from every such
+      // slot poured a grey cloud over the sheet while it was still burning.
+      if (!(since > SMOULDER_AFTER) || after <= 0 || since > after * 3) continue
+      const k = count * 4
+      sources.set(slot.source, k)
+      across.set(slot.across, k)
+      const onset = Math.min(1, (since - SMOULDER_AFTER) / 0.6)
+      sources[k + 3] = -slot.source[3]! * onset * Math.exp(-since / after)
+      count++
+    }
+    return count
   }
 
   useFrame((_, delta) => {
@@ -299,6 +343,7 @@ export function FxFireFluid({
       s.key = resetKey
       place()
       fluid.reset(u.ambient)
+      for (const slot of smoulder) slot.seen = Number.NEGATIVE_INFINITY
       // Warm up from the rim as it stands, on the burn's own clock, so the
       // same moment of the same burn draws the same fire.
       const end = field.time
@@ -321,6 +366,7 @@ export function FxFireFluid({
       }
     }
     material.uniforms.uA!.value = fluid.scalars.read.texture
+    material.uniforms.uB!.value = fluid.air.read.texture
     material.uniforms.uTime!.value = s.time
     material.uniforms.uGlow!.value = glow
     material.uniforms.uHeatScale!.value = heatScale

@@ -56,6 +56,12 @@ export interface FireFluidParams {
   wind: number
   /** How long smoke lingers, in seconds — long enough and it hangs as a haze. Ours, not the panel's. */
   smokeFade: number
+  /**
+   * How long a spot of the rim goes on smoking once its flame is out, in
+   * seconds. Ours, not the panel's. Paper does not stop smoking when it stops
+   * burning: the char is still hot, and a thin thread goes on rising from it.
+   */
+  smokeAfter: number
 }
 
 /**
@@ -132,6 +138,7 @@ export const fireFluidDefaults: FireFluidParams = {
   // paper smoke thins out within a second or two. Swept in live play against
   // the default: 1.5 s is thin threads and a clean sheet.
   smokeFade: 1.5,
+  smokeAfter: 4,
 }
 
 /** Slider ranges for the lab, grouped the way the panel groups them. */
@@ -178,6 +185,7 @@ export const fireFluidControls: readonly {
   { group: 'Motion & turbulence', key: 'vorticity', label: 'Vorticity', min: 0, max: 8, step: 0.1 },
   { group: 'Motion & turbulence', key: 'wind', label: 'Wind', min: -3, max: 3, step: 0.05 },
   { group: 'Look', key: 'smokeFade', label: 'Smoke lingers (s)', min: 0.2, max: 10, step: 0.1 },
+  { group: 'Look', key: 'smokeAfter', label: 'Smoke after the flames (s)', min: 0, max: 12, step: 0.1 },
 ]
 
 /** What the solver's passes read, in its own units. */
@@ -209,6 +217,10 @@ export interface SolverUniforms {
   sootHeat: number
   /** Units of air a unit of fuel burns with. */
   stoich: number
+  /** Smoke a second, per unit of smouldering strength, where a flame has gone out. */
+  smoulderSmoke: number
+  /** Heat with it — enough that the smoke rises, not enough to glow. */
+  smoulderHeat: number
   turbulence: number
   turbulenceScale: number
   /** Noise units a second the turbulence changes by, on top of rising with the gas. */
@@ -260,6 +272,12 @@ export function solverUniforms(p: FireFluidParams): SolverUniforms {
     // matters here is only that it is well above one, so fuel near the rim is
     // denser than the air that can reach it and burns from the outside in.
     stoich: 4,
+    // Several times the rim's own smoke per unit strength: a smouldering spot
+    // has no flame to lift its smoke fast, so it pools and rises slowly, and
+    // at 1.5× it read 0.03 at the 99th percentile — about 3% opacity, gone —
+    // at 8× 0.07, and at 30× thin wisps you had to look for.
+    smoulderSmoke: Math.max(0, finite(p.smoke, 0)) * 0.45 * 80,
+    smoulderHeat: 1.2,
     turbulence: Math.max(0, finite(p.turbulence, 0)) * 0.35,
     // Noise frequency per WORLD unit — the pass multiplies by the domain's
     // size, which it did not before (it read UV, and the domain is two units
