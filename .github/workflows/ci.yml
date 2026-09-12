@@ -9,8 +9,24 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Five jobs, and `ci` is the one that matters.
+#
+# This was one job with a 20-minute limit, and the browser gates run one after
+# another on runners with no GPU — every WebGL frame drawn by SwiftShader on
+# the CPU. On main it already took ~18 of its 20 minutes (the dropdown gate
+# alone is ~7, stage navigation ~4.5), so the first gate to get slower, or the
+# first gate added, pushed it over and the whole check was CANCELLED rather
+# than failed — which is what PR #83 showed, on every push, with nothing wrong
+# in any test. Split by measured time, each group has its own 20 minutes and
+# they run at once.
+#
+# `ci` is the check the `protect-main` ruleset requires, so it stays, as the
+# job that stands for all the others: it waits for every one of them and fails
+# unless each one passed. A skipped required job counts as a pass on GitHub,
+# which is why it checks for skipped and cancelled as well as failed.
+
 jobs:
-  ci:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -68,6 +84,33 @@ jobs:
       - name: Consumer install gate
         run: pnpm test:consumer
 
+  # ~5.5 minutes on main: parity, stage navigation, the share loop, routing.
+  gates-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The gates serve the editor from a dev server, but they ran after these
+      # two steps for as long as they have existed, so they keep them: a gate
+      # that quietly depended on a vendored wasm or a built package should not
+      # find out here.
+      - name: Vendor the hand tracker's wasm
+        run: pnpm hands:setup
+
+      - name: Build
+        run: pnpm build
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
@@ -96,6 +139,32 @@ jobs:
       - name: Root routing gate
         run: pnpm test:route
 
+  # ~7 minutes on main, on its own.
+  gates-dropdown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vendor the hand tracker's wasm
+        run: pnpm hands:setup
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
       # The select is the app's own, so its option list is app DOM in a
       # scrolling box. It shipped dismissing itself on its own scroll, which
       # put every option below the fold out of reach of a mouse with nothing
@@ -103,6 +172,32 @@ jobs:
       # list is reachable.
       - name: Dropdown reach gate
         run: pnpm test:dropdown
+
+  # The damage seam and the fire's budgets: everything that renders a burn.
+  gates-fire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vendor the hand tracker's wasm
+        run: pnpm hands:setup
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       # `<Paper damage>` compiles a different program — another chunk, another
       # sampler, a different alpha test — and claims that on an untouched field
@@ -124,3 +219,18 @@ jobs:
       # whether the fire was bright enough to be a fire. This one does.
       - name: Fire budgets
         run: pnpm test:fire-budget
+
+  # The required check. See the note at the top.
+  ci:
+    needs: [checks, gates-stage, gates-dropdown, gates-fire]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: |
+          echo "Not every job passed: checks ${{ needs.checks.result }}, gates-stage ${{ needs.gates-stage.result }}, gates-dropdown ${{ needs.gates-dropdown.result }}, gates-fire ${{ needs.gates-fire.result }}"
+          exit 1
+
+      - run: echo "checks, gates-stage, gates-dropdown and gates-fire all passed."
