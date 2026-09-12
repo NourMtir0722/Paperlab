@@ -131,25 +131,44 @@ export function emitHex(hex: string, times: number): [number, number, number] {
 /**
  * The flame body, in multiples of paper white.
  *
- * Above paper — so a flame reads as a light in the frame rather than as a
- * painted colour — and deliberately UNDER {@link FX_BLOOM_THRESHOLD} (2.25×),
- * so the body of a flame stays a saturated orange instead of being bloomed and
- * tone-curved into pastel. The review's word for the old frame was "a pastel
- * stain with cream blobs on it", and this gap is what stops that.
+ * **Below paper white, and that is not a mistake.** It was 1.3, on the
+ * reasoning that a flame has to be brighter than the paper to read as a
+ * light — and the result was the pastel salmon the spec forbids. The
+ * arithmetic that was missed: the tone curve rolls everything approaching
+ * white toward white, hue and all, and paper white is ALREADY at the top of
+ * it. Anything brighter than paper therefore lands where the curve has no
+ * saturation left to give, so a flame body at 1.3x paper came out the same
+ * near-white as the sheet behind it, with only a pink cast to say it was
+ * there.
+ *
+ * A flame is only over-exposed in its core. Photograph a candle beside a
+ * sheet of white paper in daylight and the paper is BRIGHTER than the body of
+ * the flame; what makes the flame read as fire is not its luminance but its
+ * saturation, and saturation only survives in the mid-tones. So the body sits
+ * below paper, where the curve still has colour, and {@link FIRE_CORE} does
+ * the over-exposing — which is what the bloom threshold is for.
+ *
+ * Swept against a macro crop of the flames at 0.45, 0.7, 1.0 and 1.3: gold at
+ * the bottom of that range, pastel at the top.
  */
-export const FIRE_BODY = 1.3
+export const FIRE_BODY = 0.45
 
 /**
  * The hottest cores, in multiples of paper white — added to the body, so the
  * peak is `FIRE_BODY + FIRE_CORE`.
  *
- * 3 puts the peak at 4.3× paper white — inside §4.3's 4–8 band, at the bottom
- * of it. It was 8 first, and 9.6× paper was far too much: the bloom of that
- * much area tinted the whole black stage olive, the tone curve took every
- * flame to cream, and the gate's own check failed with "the fire light pushes
- * paper past the bloom threshold". Swept against the peak frame at 2, 4 and 8.
+ * With the body at 0.45 this puts the peak at 4.45× paper white — inside
+ * §4.3's 4–8 band, at the bottom of it. It was 8 at one point, and 9.6× paper
+ * was far too much: the bloom of that much area tinted the whole black stage
+ * olive, the tone curve took every flame to cream, and the gate's own check
+ * failed with "the fire light pushes paper past the bloom threshold".
+ *
+ * This is the ONLY term allowed to over-expose. The body stays in the
+ * mid-tones where the curve still has colour; the cores, which are a small
+ * part of a flame's area, go past white and bloom. That division is what
+ * makes fire read as fire rather than as a bright stain.
  */
-export const FIRE_CORE = 3
+export const FIRE_CORE = 4
 
 /**
  * The solver temperature that counts as the hottest gas in a flame.
@@ -189,3 +208,33 @@ export const FIRE_HEAT_SCALE = 5
  * peak frame; past about 0.4 the stage stops being black.
  */
 export const FX_BLOOM = 0.55
+
+/**
+ * How much darker a flame's mid-tones are than a linear ramp would make them.
+ *
+ * A gamma on the normalised temperature. 1 is the ramp as the solver hands it
+ * over; above 1 the body falls away from the core faster, which is the gap
+ * that reads as fire rather than as a glow.
+ */
+export const FIRE_CONTRAST = 1.15
+
+/**
+ * How hard the render pass carves the gas into filaments, 0..2.
+ *
+ * Multiplicative, and weighted toward thin gas, so it opens holes through the
+ * flame instead of dimming it evenly — a fire is optically thin and the black
+ * you see through it is half of its contrast.
+ */
+export const FIRE_DETAIL = 0.9
+
+/**
+ * How opaque the densest flame gas is, as an extinction coefficient.
+ *
+ * Fire used to be pure added light, which is why a tongue standing in front
+ * of the sheet came out salmon: orange added to cream paper is pink, the one
+ * colour §13.3 forbids. A flame is thin at the tip and nearly opaque through
+ * its bright heart, and that opacity is what lets it read as its own colour
+ * instead of as a tint on whatever is behind it. 0 restores the old purely
+ * additive fire.
+ */
+export const FIRE_OPACITY = 2.2

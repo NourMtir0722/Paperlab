@@ -66,7 +66,11 @@ export const fireFluidDefaults: FireFluidParams = {
   initialVelocity: [0, 0.5, 0],
   burnRate: 6.1,
   gasExpansion: 0.65,
-  buoyancy: 1.9,
+  // Was 1.9. With the flame body authored below paper white (see
+  // `fx/emission.ts`) a tongue stops registering sooner, so it needs to be
+  // carried further before it cools out of sight — 3 puts the tall ones back
+  // up into the text the way Hero.png does, and cooling keeps them apart.
+  buoyancy: 3,
   // Was 0.92. Gas that stays hot all the way up pools into ONE column: the
   // rim's forty-odd emission points merge a few centimetres above the paper
   // and the fire reads as a single plume with a couple of licks beside it.

@@ -1,7 +1,15 @@
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { type ReactNode, useEffect, useMemo, useRef } from 'react'
-import { FIRE_BODY, FIRE_CORE, FIRE_HEAT_SCALE, PAPER_WHITE } from './emission'
+import {
+  FIRE_BODY,
+  FIRE_CONTRAST,
+  FIRE_CORE,
+  FIRE_DETAIL,
+  FIRE_HEAT_SCALE,
+  FIRE_OPACITY,
+  PAPER_WHITE,
+} from './emission'
 import type { DamageField } from './field'
 import type { SurfaceLocator } from './fire'
 import { FLAME_HEIGHT, flameAnchors, type FlameAnchor } from './flames'
@@ -36,6 +44,12 @@ export interface FxFireFluidProps {
   core?: number
   /** The solver temperature that counts as a flame's hottest gas. */
   heatScale?: number
+  /** Gamma on the flame's temperature — above 1 darkens the body against the core. */
+  contrast?: number
+  /** How hard the render pass carves the gas into filaments, 0..2. */
+  detail?: number
+  /** How opaque the densest flame gas is; 0 is purely additive fire. */
+  opacity?: number
   /**
    * What to draw where the simulator cannot run (no half-float render
    * targets) — typically `<FxFlames>`. Drawn INSTEAD, never as well.
@@ -81,6 +95,9 @@ export function FxFireFluid({
   body = FIRE_BODY,
   core = FIRE_CORE,
   heatScale = FIRE_HEAT_SCALE,
+  contrast = FIRE_CONTRAST,
+  detail = FIRE_DETAIL,
+  opacity = FIRE_OPACITY,
   fallback,
 }: FxFireFluidProps) {
   const gl = useThree((s) => s.gl)
@@ -106,6 +123,9 @@ export function FxFireFluid({
           uBody: { value: FIRE_BODY },
           uCore: { value: FIRE_CORE },
           uHeatScale: { value: FIRE_HEAT_SCALE },
+          uContrast: { value: FIRE_CONTRAST },
+          uDetail: { value: FIRE_DETAIL },
+          uOpacity: { value: FIRE_OPACITY },
         },
         transparent: true,
         depthWrite: false,
@@ -215,6 +235,9 @@ export function FxFireFluid({
     material.uniforms.uBody!.value = body
     material.uniforms.uCore!.value = core
     material.uniforms.uHeatScale!.value = heatScale
+    material.uniforms.uContrast!.value = contrast
+    material.uniforms.uDetail!.value = detail
+    material.uniforms.uOpacity!.value = opacity
   })
 
   if (!fluid) return <>{fallback ?? null}</>

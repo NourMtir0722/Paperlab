@@ -75,17 +75,29 @@ describe('the emission unit', () => {
       expect(timesPaperWhite(cold)).toBeGreaterThan(0.3)
     })
 
-    it('a flame body is brighter than paper and dimmer than the threshold', () => {
-      // The gap that keeps a flame saturated instead of pastel. Both halves
-      // matter: under 1 it is not a light, over 2.25 it blooms and washes out.
-      expect(FIRE_BODY).toBeGreaterThan(1)
+    it('a flame body sits BELOW paper, where the tone curve still has colour', () => {
+      // This assertion used to read `FIRE_BODY > 1` — a flame has to be
+      // brighter than the paper to be a light — and that reasoning produced
+      // the salmon the spec forbids. The tone curve rolls everything
+      // approaching white toward white, hue and all, and paper white is
+      // already at the top of it: a body brighter than paper therefore lands
+      // where the curve has no saturation left, and comes out the same
+      // near-white as the sheet with a pink cast on it.
+      //
+      // A flame is only over-exposed in its CORE. Its body is what carries
+      // the colour, and colour only survives in the mid-tones.
+      expect(FIRE_BODY).toBeLessThan(1)
+      expect(FIRE_BODY).toBeGreaterThan(0.2)
       expect(FIRE_BODY * PAPER_WHITE).toBeLessThan(FX_BLOOM_THRESHOLD)
     })
 
-    it('a flame core clears the threshold and reaches the spec band', () => {
+    it('a flame core clears the threshold and lands inside the spec band', () => {
+      // The core is the only term allowed to over-expose, so it alone has to
+      // carry the whole of §4.3's 4-8x.
       const peak = FIRE_BODY + FIRE_CORE
       expect(peak * PAPER_WHITE).toBeGreaterThan(FX_BLOOM_THRESHOLD)
       expect(peak).toBeGreaterThanOrEqual(FIRE_GLOW[0])
+      expect(peak).toBeLessThanOrEqual(FIRE_GLOW[1])
     })
 
     it('smoke and ash never glow — they are lit, not emitting', () => {

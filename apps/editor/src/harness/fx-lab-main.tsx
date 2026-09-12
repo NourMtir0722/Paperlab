@@ -248,10 +248,24 @@ const THRESHOLD = query.has('threshold') ? num('threshold', 1.6, 0, 50) : undefi
  * and finding the pair that reads as fire rather than as a white blob is a
  * sweep, not a guess. Honoured with `?ui=0`, so a capture can shoot a grid.
  */
-const FIRE_OVERRIDES: { body?: number; core?: number; heatScale?: number } = (() => {
+const FIRE_OVERRIDES: {
+  body?: number
+  core?: number
+  heatScale?: number
+  contrast?: number
+  detail?: number
+  opacity?: number
+} = (() => {
   const raw = query.get('fire')
   if (!raw) return {}
-  const out: { body?: number; core?: number; heatScale?: number } = {}
+  const out: {
+    body?: number
+    core?: number
+    heatScale?: number
+    contrast?: number
+    detail?: number
+    opacity?: number
+  } = {}
   for (const pair of raw.split(',')) {
     const [key, value] = pair.split(':')
     const n = Number(value)
@@ -259,6 +273,9 @@ const FIRE_OVERRIDES: { body?: number; core?: number; heatScale?: number } = (()
     if (key === 'body') out.body = n
     if (key === 'core') out.core = n
     if (key === 'scale') out.heatScale = n
+    if (key === 'contrast') out.contrast = n
+    if (key === 'detail') out.detail = n
+    if (key === 'opacity') out.opacity = n
   }
   return out
 })()
@@ -1015,6 +1032,9 @@ function Lab() {
               body={FIRE_OVERRIDES.body}
               core={FIRE_OVERRIDES.core}
               heatScale={FIRE_OVERRIDES.heatScale}
+              contrast={FIRE_OVERRIDES.contrast}
+              detail={FIRE_OVERRIDES.detail}
+              opacity={FIRE_OVERRIDES.opacity}
               running={playing}
               // Every seek starts the fire over, warmed up from the rim as it
               // stands; paused, a slider change does too, so it shows at once.

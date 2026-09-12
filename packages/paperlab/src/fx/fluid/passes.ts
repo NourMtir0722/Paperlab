@@ -285,6 +285,9 @@ uniform float uPaperWhite;
 uniform float uBody;
 uniform float uCore;
 uniform float uHeatScale;
+uniform float uContrast;
+uniform float uDetail;
+uniform float uOpacity;
 varying vec2 vUv;
 ${NOISE}
 // Temperature to colour, the way hot gas glows: dark red, orange, yellow,
@@ -292,10 +295,16 @@ ${NOISE}
 vec3 blackbody(float t) {
   // The coolest visible gas is deep ORANGE, not red: red light added to
   // cream paper is exactly the pink the spec forbids (§0, §13.3).
-  vec3 c = mix(vec3(0.0), vec3(0.6, 0.16, 0.01), smoothstep(0.3, 0.6, t));
-  c = mix(c, vec3(1.0, 0.36, 0.02), smoothstep(0.6, 1.0, t));
-  c = mix(c, vec3(1.0, 0.68, 0.18), smoothstep(0.95, 1.7, t));
-  c = mix(c, vec3(1.0, 0.88, 0.62), smoothstep(1.7, 2.8, t));
+  vec3 c = mix(vec3(0.0), vec3(0.55, 0.11, 0.005), smoothstep(0.3, 0.62, t));
+  c = mix(c, vec3(1.0, 0.30, 0.012), smoothstep(0.62, 1.05, t));
+  c = mix(c, vec3(1.0, 0.62, 0.10), smoothstep(1.0, 1.75, t));
+  // The top stop is GOLD, not cream. It was (1.0, 0.88, 0.62), which is a
+  // colour with its blue channel more than half up — so the hottest gas was
+  // already nearly white before the tone curve got to it, and a flame whose
+  // brightest part is white reads as a lamp rather than as fire. Real flame
+  // stays saturated right up to the point where it is simply over-exposed,
+  // and letting the CORE term do that (it is small) keeps the body gold.
+  c = mix(c, vec3(1.0, 0.84, 0.38), smoothstep(1.75, 2.8, t));
   return c;
 }
 /**
@@ -378,19 +387,53 @@ void main() {
   // The noise bites only at the COOL end (smoothstep runs 0.9 to 0.25, so it
   // is zero through the core and full at the tip), which is the one place a
   // real flame comes apart.
-  vec2 nt = vUv * vec2(48.0, 34.0) + vec2(0.0, -uTime * 3.2);
-  t = max(0.0, t + (fxFbm(nt) - 0.5) * 0.34 * smoothstep(0.9, 0.25, t));
-  float body = smoothstep(0.10, 0.34, t) * uBody + flame * 0.3 * uBody * smoothstep(0.06, 0.2, t);
+  // Two octaves, carving the gas MULTIPLICATIVELY so it opens holes rather
+  // than dimming everything evenly — a real flame is optically thin and you
+  // see black through the gaps in it, which is most of what gives a fire its
+  // contrast. It bites hardest where the gas is already thin and barely at
+  // all through a core, so tongues keep their bodies and come apart at the
+  // edges.
+  vec2 n1 = vUv * vec2(34.0, 24.0) + vec2(0.0, -uTime * 2.4);
+  vec2 n2 = vUv * vec2(92.0, 64.0) + vec2(0.0, -uTime * 5.5);
+  float grain = (fxFbm(n1) - 0.5) * 0.72 + (fxNoise(n2) - 0.5) * 0.28;
+  t = max(0.0, t * (1.0 + grain * uDetail * (1.0 - smoothstep(0.15, 0.95, t))));
+  // Contrast: a flame's mid-tones are darker than a linear ramp makes them,
+  // and it is the gap between a dim body and a bright core that reads as
+  // fire rather than as a glow.
+  t = pow(t, uContrast);
+  float body = smoothstep(0.045, 0.26, t) * uBody + flame * 0.3 * uBody * smoothstep(0.03, 0.15, t);
   float core = smoothstep(0.45, 0.85, t) * uCore;
   float glow = (body + core) * uPaperWhite / BB_PEAK_LUMA;
   // The ramp's own domain is 0..2.8; t is 0..1.
   vec3 fire = blackbody((t + ft * 0.4) * 2.8) * glow * uGlow;
   // Smoke: grey-brown, lit warm by the fire under it.
-  float alpha = 1.0 - exp(-smoke * uSmokeDensity);
-  vec3 smokeColor = vec3(0.13, 0.12, 0.11) + vec3(0.35, 0.14, 0.03) * clamp(heat * 0.5, 0.0, 1.0);
+  float smokeAlpha = 1.0 - exp(-smoke * uSmokeDensity);
+  // Lit by the fire under it, keyed to the NORMALISED temperature like
+  // everything else here — it used to read the solver's raw heat, which has no
+  // ceiling, so a puff anywhere near the rim took the full warm term and came
+  // out pink against the cream sheet. Smoke is lit, not burning: half the warm
+  // term, and only where the gas under it is genuinely hot.
+  vec3 smokeColor = vec3(0.13, 0.12, 0.11) + vec3(0.32, 0.13, 0.03) * smoothstep(0.15, 0.9, t);
+  // Dense flame COVERS what is behind it.
+  //
+  // Fire was drawn as pure added light, and added light is why a flame
+  // standing in front of the sheet came out salmon: orange added to cream
+  // paper is pink, which is the one colour the spec forbids outright (§13.3,
+  // Never_this.png). It looked right only where a flame happened to be over
+  // the black hole.
+  //
+  // A luminous flame is not a transparency. It is thin at its edges — you see
+  // straight through a tongue's tip — and nearly opaque through the bright
+  // gas at its heart, and that opacity is what lets it read as its OWN colour
+  // rather than as a tint on whatever it is standing in front of. Keyed to
+  // the same normalised temperature as everything else, so the parts that
+  // cover are exactly the parts that glow.
+  float fireAlpha = 1.0 - exp(-max(t, 0.0) * uOpacity);
+  // Over one another, not added: either can hide the background alone.
+  float alpha = smokeAlpha + fireAlpha - smokeAlpha * fireAlpha;
   // No square edge: the domain fades out before its borders.
   float edge = smoothstep(0.0, 0.06, vUv.x) * smoothstep(1.0, 0.94, vUv.x) * smoothstep(0.0, 0.03, vUv.y) * smoothstep(1.0, 0.9, vUv.y);
-  gl_FragColor = vec4((fire + smokeColor * alpha) * edge, alpha * edge);
+  gl_FragColor = vec4((fire + smokeColor * smokeAlpha) * edge, alpha * edge);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
