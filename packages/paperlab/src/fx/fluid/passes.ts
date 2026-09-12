@@ -322,137 +322,70 @@ uniform float uTime;
 uniform float uGlow;
 uniform float uSmokeDensity;
 uniform float uPaperWhite;
-uniform float uBody;
-uniform float uCore;
 uniform float uHeatScale;
 uniform float uContrast;
-uniform float uDetail;
 uniform float uOpacity;
-uniform float uStreak;
-uniform float uEdge;
-uniform float uBlue;
 uniform float uThin;
-uniform float uPaleFrom;
-uniform float uShapeFrom;
+uniform vec3 uTipColor;
+uniform vec3 uBodyColor;
+uniform vec3 uCoreColor;
+uniform vec3 uRootColor;
+uniform float uTipGlow;
+uniform float uBodyGlow;
+uniform float uCoreGlow;
+uniform float uTipFrom;
+uniform float uTipTo;
+uniform float uCoreFrom;
+uniform float uSoftness;
+uniform float uTearing;
+uniform float uRootAmount;
+uniform float uRootReach;
 varying vec2 vUv;
 ${NOISE}
-// Emission as a function of how INTENSE the gas is — colour and brightness
-// together, in the order a hot body glows: dim is deep red-orange, brighter is
-// orange, bright is amber and then yellow, and only the brightest is pale.
-//
-// The version before this chose hue and brightness separately, to stop heat
-// turning a flame white. That cut the one link real fire never breaks —
-// hotter gas is brighter AND yellower — and the dim parts of every tongue
-// came out dark YELLOW, which is olive: a khaki-green fire. The blackbody ramp
-// before that had the order right; its only problem was that the temperature
-// field was saturated, so every pixel sat at the top of it. Now the intensity
-// carries the flame's structure (outline, sheets, streak), so it spans the
-// whole ramp. The stops' luminance rises monotonically: 0.13, 0.43, 0.66,
-// 0.82, 0.93.
-vec3 flameEmission(float i) {
-  // The dim end is burnt ORANGE, not deep red: deep red light on cream paper
-  // is pink, and a flame's dim parts are exactly the parts that stand in
-  // front of the sheet at the tips. Amber and yellow come earlier than they
-  // did (0.32 and 0.62): the flame measured 9% yellow against the
-  // reference's 29%, and raising the gain only pushed yellow into the tone
-  // curve's roll-off, where it turns pale — more yellow has to come from
-  // spending more of the intensity range on it, not from more light.
-  vec3 c = mix(vec3(0.0), vec3(0.40, 0.09, 0.008), smoothstep(0.0, 0.1, i));
-  c = mix(c, vec3(1.0, 0.34, 0.025), smoothstep(0.08, 0.34, i));
-  c = mix(c, vec3(1.0, 0.62, 0.10), smoothstep(0.25, 0.52, i));
-  c = mix(c, vec3(1.0, 0.82, 0.30), smoothstep(0.45, 0.78, i));
-  return mix(c, vec3(1.0, 0.93, 0.66), smoothstep(0.9, 1.4, i));
-}
-
 void main() {
-  // Detail finer than the grid, and none of it touching the solve: a domain
+  // Detail finer than the grid, none of it touching the solve: a small domain
   // warp so a tongue's outline is never the grid's, and a finer shimmer.
   vec2 w = vUv * vec2(26.0, 18.0) + vec2(0.0, -uTime * 1.6);
   vec2 warp = vec2(fxFbm(w), fxFbm(w + 31.7)) - 0.5;
   vec2 q = vUv * vec2(70.0, 50.0) + vec2(0.0, -uTime * 7.0);
   vec2 jitter = (vec2(fxNoise(q), fxNoise(q + 17.3)) - 0.5) * 0.0035;
-  // A third of what it was. At 0.014 the warp was large enough to fold the
-  // gas's own gradients into marbled whorls — a procedural texture inside the
-  // flame, which reads as a shaded object rather than as fire.
   vec4 a = texture2D(uA, vUv + jitter + warp * 0.005);
   float fuel = a.r;
   float heat = a.g;
   float smoke = a.b;
-  // Temperature against the hottest gas a flame has (see FIRE_HEAT_SCALE),
-  // with what burnt a moment ago still counting for a little.
+  // Temperature against the hottest gas a flame has (FIRE_HEAT_SCALE), with
+  // what burnt a moment ago still counting for a little.
   float t = max(heat, a.a * 0.6) / max(uHeatScale, 1e-3);
-  // Carved multiplicatively, hardest where the gas is thin, so it opens
-  // holes rather than dimming evenly — the black between tongues.
+  // The tip's tearing: carved multiplicatively, hardest where the gas is
+  // thin, so tongues come apart at their edges and keep their bodies.
   vec2 n1 = vUv * vec2(34.0, 24.0) + vec2(0.0, -uTime * 2.4);
   vec2 n2 = vUv * vec2(92.0, 64.0) + vec2(0.0, -uTime * 5.5);
   float grain = (fxFbm(n1) - 0.5) * 0.72 + (fxNoise(n2) - 0.5) * 0.28;
-  t = max(0.0, t * (1.0 + grain * uDetail * (1.0 - smoothstep(0.15, 0.95, t))));
+  t = max(0.0, t * (1.0 + grain * uTearing * (1.0 - smoothstep(0.15, 0.95, t))));
   t = pow(t, uContrast);
 
-  // SHEETS of light, stretched along the flow. A flame's light does not
-  // come from a volume the way a lamp's does; it comes from the thin sheet
-  // where the burning is, folded by the flow, and seen edge-on it reads as
-  // streaks running up the tongue with darker gas between them. Drawing the
-  // temperature field straight was drawing a gradient — a smooth hot centre
-  // falling off to a cool rim — which is a blob by construction. Ridged
-  // noise, eight times finer across than along, scrolling up.
-  vec2 sp = vec2(vUv.x * 64.0 + warp.x * 6.0, vUv.y * 8.0 - uTime * 2.6);
-  // Spread before it is folded. Fractal noise clusters around 0.5, so a ridge
-  // made straight from it sits near 1 almost everywhere — there were almost
-  // never any dark lanes, and turning FIRE_STREAK from 0.3 to 0.8 changed
-  // nothing measurable. Measured, the flame's brightness was 80% in a single
-  // band against a reference spread across all five: a flat fill.
-  float sn = clamp((fxFbm(sp) - 0.5) * 2.8 + 0.5, 0.0, 1.0);
-  float ridge = 1.0 - abs(2.0 * sn - 1.0);
-
-  // Where the flame IS: an outline, not a fade. Real tongues have a fairly
-  // defined edge (Flame_base.png); a gaussian fall-off is what makes a flame
-  // read as a glow.
-  // It starts at FIRE_SHAPE_FROM of the hottest gas, not at the edge of
-  // any warmth at all. Gas just above that line is warm but barely glowing,
-  // and drawn over cream paper it is a long peach veil trailing above each
-  // tongue — 8.4% of the flame's pixels, 97% of them over the paper. The
-  // tongues in Hero.png end in defined tips with nothing above them.
-  float shape = smoothstep(uShapeFrom, uShapeFrom + uEdge, t);
-  // How bright, in multiples of paper white: the body, dimmer at the cool
-  // edges and tips, and shaded by the sheets. Never climbing to white.
-  float intensity = shape * mix(0.15, 1.0, smoothstep(0.05, 0.8, t)) * mix(1.0 - uStreak, 1.0, ridge);
-  // The pale part: only the hottest gas, and only ON a sheet — a streak up
-  // the lower middle of a tongue, never a filled interior. It pushes the
-  // intensity past the yellow into the pale end of the ramp, and it is the one
-  // term allowed to over-expose, so the one that blooms.
-  // Smooth, and small: the hottest root of a tongue, the soft pale core in
-  // Flame_base.png. Each tongue there is smooth INSIDE — pale core, yellow,
-  // orange edges — and all of its character is in its outline. Painting
-  // sheets and streaks inside it (FIRE_STREAK above zero) made the flame read
-  // as an object with a shader on it. The streak survives only as an option.
-  float pale = smoothstep(uPaleFrom, uPaleFrom + 0.35, t) * mix(1.0, pow(ridge, 4.0), uStreak);
-  intensity += pale * 0.5;
-  float gain = (uBody + pale * uCore) * uPaperWhite;
-  vec3 hue = flameEmission(intensity);
-  // Blue at the root, where fresh gas leaves the paper and burns clean
-  // before it has heated through — the thin blue line under every tongue in
-  // Flame_base.png. Fuel rich, heat low, inside the outline.
-  // Keyed to fuel alone: the first version keyed it to fuel / heat, and at
-  // four times the strength it drew not one blue pixel.
-  float root = shape * uBlue * smoothstep(0.02, 0.25, fuel) * (1.0 - smoothstep(0.25, 0.6, t));
-  // Added as light, not mixed in: mixing blue into orange does not make a
-  // blue base, it makes GREY — the lavender cast at the edges of every tongue.
-  hue += vec3(0.05, 0.12, 0.45) * clamp(root, 0.0, 0.6);
-  // Dense flame covers what is behind it, inside its outline only — so a
-  // tongue in front of the sheet reads as its own colour, not a tint on it.
+  // THE FOUR ZONES (FireZones, fx/emission.ts), as bands of temperature.
+  // Where the flame is at all: its outline starts at the tip's own edge.
+  float shape = smoothstep(uTipFrom, uTipFrom + uSoftness, t);
+  // Tip gives way to body, body to core. Colour and brightness blend across
+  // the same bands but are chosen separately per zone.
+  float toBody = smoothstep(uTipTo - 0.12, uTipTo + 0.12, t);
+  float toCore = smoothstep(uCoreFrom, uCoreFrom + 0.35, t);
+  vec3 color = mix(mix(uTipColor, uBodyColor, toBody), uCoreColor, toCore);
+  float glow = mix(mix(uTipGlow, uBodyGlow, toBody), uCoreGlow, toCore);
+  // Dense flame covers what is behind it; thin gas glows only as much as it
+  // covers (soot emits and absorbs together) — or a transparent tip adds
+  // red light to cream paper and turns salmon.
   float fireAlpha = shape * (1.0 - exp(-t * uOpacity));
-  // …and THIN gas glows in proportion to how much of the background it
-  // covers. Soot emits and absorbs together; a tip that barely hides the
-  // paper also barely glows. Without this a tip was nearly transparent yet
-  // emitting at full strength for its colour, so the frame came out as cream
-  // paper plus red light — the salmon tips over the sheet.
-  vec3 fire = hue * gain * uGlow * smoothstep(0.0, uThin, fireAlpha);
+  vec3 fire = color * glow * shape * uPaperWhite * uGlow * smoothstep(0.0, uThin, fireAlpha);
+  // The root: added as LIGHT, where fresh fuel is still near the paper and the
+  // gas has not heated through. Mixed in instead of added, blue makes grey.
+  float rootMask = shape * smoothstep(mix(0.4, 0.02, uRootReach), mix(0.6, 0.12, uRootReach), fuel) * (1.0 - smoothstep(0.25, 0.6, t));
+  fire += uRootColor * rootMask * uRootAmount * uPaperWhite * uGlow * 0.6;
 
-  // Smoke: grey-brown, lit warm by the fire under it — keyed to the same
-  // normalised temperature, so a puff near the rim is not pink on cream.
+  // Smoke: warm grey-brown (a cool grey over cream reads lavender), lit by
+  // the fire under it.
   float smokeAlpha = 1.0 - exp(-smoke * uSmokeDensity);
-  // Warm grey-brown: a cool neutral grey over cream paper reads LAVENDER.
   vec3 smokeColor = vec3(0.16, 0.13, 0.10) + vec3(0.22, 0.09, 0.02) * smoothstep(0.15, 0.9, t);
   float alpha = smokeAlpha + fireAlpha - smokeAlpha * fireAlpha;
   // No square edge: the domain fades out before its borders.

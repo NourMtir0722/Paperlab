@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  FIRE_BODY,
-  FIRE_CORE,
   FIRE_GLOW,
+  FIRE_ZONES,
   FX_BLOOM_THRESHOLD,
   PAPER_WHITE,
   emit,
   emitHex,
+  hexToLinear,
   luminance,
   srgbToLinear,
   timesPaperWhite,
@@ -75,29 +75,44 @@ describe('the emission unit', () => {
       expect(timesPaperWhite(cold)).toBeGreaterThan(0.3)
     })
 
-    it('a flame body sits BELOW paper, where the tone curve still has colour', () => {
-      // This assertion used to read `FIRE_BODY > 1` — a flame has to be
-      // brighter than the paper to be a light — and that reasoning produced
-      // the salmon the spec forbids. The tone curve rolls everything
-      // approaching white toward white, hue and all, and paper white is
-      // already at the top of it: a body brighter than paper therefore lands
-      // where the curve has no saturation left, and comes out the same
-      // near-white as the sheet with a pink cast on it.
-      //
-      // A flame is only over-exposed in its CORE. Its body is what carries
-      // the colour, and colour only survives in the mid-tones.
-      expect(FIRE_BODY).toBeLessThan(1)
-      expect(FIRE_BODY).toBeGreaterThan(0.2)
-      expect(FIRE_BODY * PAPER_WHITE).toBeLessThan(FX_BLOOM_THRESHOLD)
+    it('each zone of a flame is brighter AND yellower than the one outside it', () => {
+      // The order a hot body glows in: tip, body, core. Breaking it is how the
+      // dim parts of a flame came out dark yellow — olive — when hue was once
+      // chosen apart from brightness. Colour may be tuned freely in the lab;
+      // the defaults keep this order.
+      const z = FIRE_ZONES
+      const lum = (hex: string) => luminance(hexToLinear(hex))
+      expect(lum(z.tip.color)).toBeLessThan(lum(z.body.color))
+      expect(lum(z.body.color)).toBeLessThan(lum(z.core.color))
+      expect(lum(z.tip.color) * z.tip.glow).toBeLessThan(lum(z.body.color) * z.body.glow)
+      expect(lum(z.body.color) * z.body.glow).toBeLessThan(lum(z.core.color) * z.core.glow)
     })
 
-    it('a flame core clears the threshold and lands inside the spec band', () => {
-      // The core is the only term allowed to over-expose, so it alone has to
-      // carry the whole of §4.3's 4-8x.
-      const peak = FIRE_BODY + FIRE_CORE
-      expect(peak * PAPER_WHITE).toBeGreaterThan(FX_BLOOM_THRESHOLD)
-      expect(peak).toBeGreaterThanOrEqual(FIRE_GLOW[0])
-      expect(peak).toBeLessThanOrEqual(FIRE_GLOW[1])
+    it('a flame body sits BELOW paper white, where the tone curve still has colour', () => {
+      // `> 1` was once asserted here, and produced the pastel salmon the spec
+      // forbids: paper white is already at the top of the tone curve, so a body
+      // brighter than paper lands where there is no saturation left. A flame
+      // is over-exposed only in its core.
+      expect(FIRE_ZONES.body.glow).toBeLessThan(1)
+      expect(FIRE_ZONES.body.glow).toBeGreaterThan(0.2)
+      expect(FIRE_ZONES.tip.glow).toBeLessThan(FIRE_ZONES.body.glow)
+    })
+
+    it('only the core clears the bloom threshold, and it lands inside the spec band', () => {
+      const z = FIRE_ZONES
+      const lum = (hex: string) => luminance(hexToLinear(hex))
+      expect(lum(z.core.color) * z.core.glow * PAPER_WHITE).toBeGreaterThan(FX_BLOOM_THRESHOLD)
+      expect(lum(z.body.color) * z.body.glow * PAPER_WHITE).toBeLessThan(FX_BLOOM_THRESHOLD)
+      expect(z.core.glow).toBeGreaterThanOrEqual(FIRE_GLOW[0])
+      expect(z.core.glow).toBeLessThanOrEqual(FIRE_GLOW[1])
+    })
+
+    it('the zones come in order up the flame, and the blue root starts off', () => {
+      const z = FIRE_ZONES
+      expect(z.tip.from).toBeLessThan(z.tip.to)
+      expect(z.tip.to).toBeLessThan(z.core.from)
+      // Blue light over cream paper reads lavender; it is there to be dialled in.
+      expect(z.root.amount).toBe(0)
     })
 
     it('smoke and ash never glow — they are lit, not emitting', () => {

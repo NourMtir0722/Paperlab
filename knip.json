@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["ffmpeg"],
+  "ignoreBinaries": ["ffmpeg", "ffprobe"],
   "workspaces": {
     ".": {},
     "packages/paperlab": {

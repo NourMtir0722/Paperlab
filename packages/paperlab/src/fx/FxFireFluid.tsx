@@ -2,19 +2,14 @@ import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import {
-  FIRE_BODY,
   FIRE_CONTRAST,
-  FIRE_CORE,
-  FIRE_DETAIL,
   FIRE_HEAT_SCALE,
-  FIRE_BLUE,
-  FIRE_EDGE,
   FIRE_OPACITY,
-  FIRE_PALE_FROM,
-  FIRE_SHAPE_FROM,
-  FIRE_STREAK,
   FIRE_THIN,
+  type FireZonesInput,
   PAPER_WHITE,
+  fireZones,
+  hexToLinear,
 } from './emission'
 import type { DamageField } from './field'
 import type { SurfaceLocator } from './fire'
@@ -41,33 +36,19 @@ export interface FxFireFluidProps {
   /** How bright the fire glows, against paper white. */
   glow?: number
   /**
-   * The flame body, in multiples of paper white — see `emission.ts`. Above 1
-   * it reads as a light; keep it under the bloom threshold's 2.25 or the body
-   * of every flame blooms and the tone curve takes it to pastel.
+   * The flame's four zones — root, core, body and tip — each part laid over
+   * `FIRE_ZONES`. See `FireZones` for what each zone is and why it looks the
+   * way it does.
    */
-  body?: number
-  /** The hottest cores, in multiples of paper white, added to {@link body}. */
-  core?: number
+  zones?: FireZonesInput
   /** The solver temperature that counts as a flame's hottest gas. */
   heatScale?: number
   /** Gamma on the flame's temperature — above 1 darkens the body against the core. */
   contrast?: number
-  /** How hard the render pass carves the gas into filaments, 0..2. */
-  detail?: number
   /** How opaque the densest flame gas is; 0 is purely additive fire. */
   opacity?: number
-  /** How much darker the gas is between a flame's sheets of light, 0..1. */
-  streak?: number
-  /** How soft a flame's outline is; smaller is crisper. */
-  edge?: number
-  /** Blue at the root of each tongue; 0 removes it. */
-  blue?: number
   /** How opaque gas must be to glow fully; see `FIRE_THIN`. */
   thin?: number
-  /** Where the pale, over-exposed core begins; see `FIRE_PALE_FROM`. */
-  paleFrom?: number
-  /** Where the flame's outline begins; see `FIRE_SHAPE_FROM`. */
-  shapeFrom?: number
   /**
    * Seconds of fire run, unseen, whenever it starts over (see `resetKey`).
    * A plume started from still air rolls its leading edge into a mushroom cap
@@ -134,18 +115,11 @@ export function FxFireFluid({
   running = true,
   resetKey,
   glow = 1,
-  body = FIRE_BODY,
-  core = FIRE_CORE,
+  zones,
   heatScale = FIRE_HEAT_SCALE,
   contrast = FIRE_CONTRAST,
-  detail = FIRE_DETAIL,
   opacity = FIRE_OPACITY,
-  streak = FIRE_STREAK,
-  edge = FIRE_EDGE,
-  blue = FIRE_BLUE,
   thin = FIRE_THIN,
-  paleFrom = FIRE_PALE_FROM,
-  shapeFrom = FIRE_SHAPE_FROM,
   warm = WARM,
   sharp,
   fallback,
@@ -170,18 +144,26 @@ export function FxFireFluid({
           uSmokeDensity: { value: 0.9 },
           // How bright the fire is, in the one unit `emission.ts` defines.
           uPaperWhite: { value: PAPER_WHITE },
-          uBody: { value: FIRE_BODY },
-          uCore: { value: FIRE_CORE },
           uHeatScale: { value: FIRE_HEAT_SCALE },
           uContrast: { value: FIRE_CONTRAST },
-          uDetail: { value: FIRE_DETAIL },
           uOpacity: { value: FIRE_OPACITY },
-          uStreak: { value: FIRE_STREAK },
-          uEdge: { value: FIRE_EDGE },
-          uBlue: { value: FIRE_BLUE },
           uThin: { value: FIRE_THIN },
-          uPaleFrom: { value: FIRE_PALE_FROM },
-          uShapeFrom: { value: FIRE_SHAPE_FROM },
+          // The four zones (FireZones). Colours linear, glows in multiples of
+          // paper white, boundaries in fractions of the hottest gas.
+          uTipColor: { value: new THREE.Vector3() },
+          uBodyColor: { value: new THREE.Vector3() },
+          uCoreColor: { value: new THREE.Vector3() },
+          uRootColor: { value: new THREE.Vector3() },
+          uTipGlow: { value: 0 },
+          uBodyGlow: { value: 0 },
+          uCoreGlow: { value: 0 },
+          uTipFrom: { value: 0 },
+          uTipTo: { value: 0 },
+          uCoreFrom: { value: 0 },
+          uSoftness: { value: 0 },
+          uTearing: { value: 0 },
+          uRootAmount: { value: 0 },
+          uRootReach: { value: 0 },
         },
         transparent: true,
         depthWrite: false,
@@ -289,18 +271,27 @@ export function FxFireFluid({
     material.uniforms.uA!.value = fluid.scalars.read.texture
     material.uniforms.uTime!.value = s.time
     material.uniforms.uGlow!.value = glow
-    material.uniforms.uBody!.value = body
-    material.uniforms.uCore!.value = core
     material.uniforms.uHeatScale!.value = heatScale
     material.uniforms.uContrast!.value = contrast
-    material.uniforms.uDetail!.value = detail
     material.uniforms.uOpacity!.value = opacity
-    material.uniforms.uStreak!.value = streak
-    material.uniforms.uEdge!.value = edge
-    material.uniforms.uBlue!.value = blue
     material.uniforms.uThin!.value = thin
-    material.uniforms.uPaleFrom!.value = paleFrom
-    material.uniforms.uShapeFrom!.value = shapeFrom
+    // Read every frame, so a zone tuned in the lab shows at once, paused or not.
+    const z = fireZones(zones)
+    const mu = material.uniforms
+    ;(mu.uTipColor!.value as THREE.Vector3).fromArray(hexToLinear(z.tip.color))
+    ;(mu.uBodyColor!.value as THREE.Vector3).fromArray(hexToLinear(z.body.color))
+    ;(mu.uCoreColor!.value as THREE.Vector3).fromArray(hexToLinear(z.core.color))
+    ;(mu.uRootColor!.value as THREE.Vector3).fromArray(hexToLinear(z.root.color))
+    mu.uTipGlow!.value = z.tip.glow
+    mu.uBodyGlow!.value = z.body.glow
+    mu.uCoreGlow!.value = z.core.glow
+    mu.uTipFrom!.value = z.tip.from
+    mu.uTipTo!.value = z.tip.to
+    mu.uCoreFrom!.value = z.core.from
+    mu.uSoftness!.value = z.tip.softness
+    mu.uTearing!.value = z.tip.tearing
+    mu.uRootAmount!.value = z.root.amount
+    mu.uRootReach!.value = z.root.reach
   })
 
   if (!fluid) return <>{fallback ?? null}</>

@@ -18,6 +18,10 @@ import {
   DAMAGE_LOOK_DEFAULTS,
   FX_BLOOM,
   FX_BLOOM_THRESHOLD,
+  FIRE_ZONES,
+  fireZones,
+  type FireZones,
+  type FireZonesInput,
   type DamageLook,
   type DamageSource,
   type FieldStats,
@@ -79,8 +83,10 @@ import {
  *   ?post=0                      no post at all: the renderer's own tone curve
  *   ?bloom=0 | ?bloom=0.4        bloom off, or at that strength
  *   ?threshold=1.6               the bloom threshold, in scene luminance
- *   ?fire=body:1.1,core:5        the fluid's emission, in multiples of paper
- *                                white — see fx/emission.ts
+ *   ?fire=tip:0.4,pale:0.55      the flame's zones (FireZones) and render terms:
+ *                                tip, from, to, edge, detail · body · core, pale
+ *                                · blue, reach · scale, contrast, opacity, thin,
+ *                                warm, sharp
  *   ?fluid=vorticity:2.5         the solver's own controls, over the defaults
  *   ?look=emberGlow:0,sparkle:0  how the burn is drawn, over the defaults —
  *                                honoured with ?ui=0 too, so a capture can
@@ -150,6 +156,8 @@ interface LabSettings {
   look: Required<DamageLook>
   /** The fire simulator's panel. */
   fluid: FireFluidParams
+  /** The flame's four zones — root, core, body, tip (`FireZones`). */
+  zones: FireZones
   /** The fire light's gain (`FxFireLight`). */
   light: number
   /** Bloom strength, and the scene luminance it starts at. */
@@ -190,6 +198,51 @@ const SLIDERS: {
   { group: 'Scorch', key: 'fingers', label: 'Fingers', min: 0, max: 2.5, step: 0.05 },
   { group: 'Edge shape', key: 'edgeWave', label: 'Waves', min: 0, max: 15, step: 0.5, unit: 'mm' },
   { group: 'Edge shape', key: 'edgeBite', label: 'Bites', min: 0, max: 6, step: 0.1, unit: 'mm' },
+]
+
+/**
+ * The flame's zones, as the Tune panel shows them — base to tip, the order a
+ * flame over a sheet is built in (see `FireZones` in `paperlab/fx`). Every
+ * zone also has a colour picker; brightness is in multiples of paper white,
+ * and boundaries are fractions of the hottest gas.
+ */
+const FLAME_ZONE_NAMES: { zone: keyof FireZones; title: string; note: string }[] = [
+  {
+    zone: 'root',
+    title: 'Root',
+    note: 'The blue edge where fresh gas meets the air at the paper. Off by default: blue light over cream reads lavender.',
+  },
+  {
+    zone: 'core',
+    title: 'Core',
+    note: 'The hottest gas, where soot is densest. The only part that over-exposes, so the part that blooms.',
+  },
+  { zone: 'body', title: 'Body', note: 'The luminous bulk: soot glowing yellow-orange as it rises.' },
+  {
+    zone: 'tip',
+    title: 'Tip',
+    note: 'Where soot cools and burns off — dimmer, redder, tearing into tongues.',
+  },
+]
+const FLAME_CONTROLS: {
+  zone: keyof FireZones
+  key: string
+  label: string
+  min: number
+  max: number
+  step: number
+  unit?: string
+}[] = [
+  { zone: 'root', key: 'amount', label: 'Blue', min: 0, max: 1, step: 0.01 },
+  { zone: 'root', key: 'reach', label: 'How far up it reaches', min: 0, max: 1, step: 0.01 },
+  { zone: 'core', key: 'glow', label: 'Brightness', min: 0, max: 10, step: 0.05, unit: '× paper' },
+  { zone: 'core', key: 'from', label: 'Starts at', min: 0.2, max: 1, step: 0.01 },
+  { zone: 'body', key: 'glow', label: 'Brightness', min: 0, max: 2, step: 0.01, unit: '× paper' },
+  { zone: 'tip', key: 'glow', label: 'Brightness', min: 0, max: 2, step: 0.01, unit: '× paper' },
+  { zone: 'tip', key: 'from', label: 'Where the flame begins', min: 0, max: 0.5, step: 0.01 },
+  { zone: 'tip', key: 'to', label: 'Where the tip becomes body', min: 0.1, max: 0.8, step: 0.01 },
+  { zone: 'tip', key: 'softness', label: 'Softness of the outline', min: 0.02, max: 0.5, step: 0.01 },
+  { zone: 'tip', key: 'tearing', label: 'Tearing', min: 0, max: 1.5, step: 0.01 },
 ]
 
 const query = new URLSearchParams(window.location.search)
@@ -249,57 +302,49 @@ const THRESHOLD = query.has('threshold') ? num('threshold', 1.6, 0, 50) : undefi
  * sweep, not a guess. Honoured with `?ui=0`, so a capture can shoot a grid.
  */
 const FIRE_OVERRIDES: {
-  body?: number
-  core?: number
+  zones: FireZonesInput
   heatScale?: number
   contrast?: number
-  detail?: number
   opacity?: number
   sharp?: number
-  streak?: number
-  edge?: number
-  blue?: number
   thin?: number
   warm?: number
-  pale?: number
-  from?: number
 } = (() => {
-  const raw = query.get('fire')
-  if (!raw) return {}
   const out: {
-    body?: number
-    core?: number
+    zones: FireZonesInput
     heatScale?: number
     contrast?: number
-    detail?: number
     opacity?: number
     sharp?: number
-    streak?: number
-    edge?: number
-    blue?: number
     thin?: number
     warm?: number
-    pale?: number
-    from?: number
-  } = {}
+  } = { zones: {} }
+  const raw = query.get('fire')
+  if (!raw) return out
+  const z = out.zones
   for (const pair of raw.split(',')) {
     const [key, value] = pair.split(':')
     const n = Number(value)
     if (!Number.isFinite(n)) continue
-    if (key === 'body') out.body = n
-    if (key === 'core') out.core = n
+    // The zones. The older names still work so every sweep in the fire
+    // history can be re-run: `body`, `core`, `pale`, `from`, `edge`, `detail`
+    // and `blue` are the knobs these zones replaced.
+    if (key === 'tip') z.tip = { ...z.tip, glow: n }
+    if (key === 'from') z.tip = { ...z.tip, from: n }
+    if (key === 'to') z.tip = { ...z.tip, to: n }
+    if (key === 'edge') z.tip = { ...z.tip, softness: n }
+    if (key === 'detail') z.tip = { ...z.tip, tearing: n }
+    if (key === 'body') z.body = { ...z.body, glow: n }
+    if (key === 'core') z.core = { ...z.core, glow: n }
+    if (key === 'pale') z.core = { ...z.core, from: n }
+    if (key === 'blue') z.root = { ...z.root, amount: n }
+    if (key === 'reach') z.root = { ...z.root, reach: n }
     if (key === 'scale') out.heatScale = n
     if (key === 'contrast') out.contrast = n
-    if (key === 'detail') out.detail = n
     if (key === 'opacity') out.opacity = n
     if (key === 'sharp') out.sharp = n
-    if (key === 'streak') out.streak = n
-    if (key === 'edge') out.edge = n
-    if (key === 'blue') out.blue = n
-    if (key === 'warm') out.warm = n
-    if (key === 'pale') out.pale = n
-    if (key === 'from') out.from = n
     if (key === 'thin') out.thin = n
+    if (key === 'warm') out.warm = n
   }
   return out
 })()
@@ -337,6 +382,7 @@ const LOOK_OVERRIDES: Partial<typeof DAMAGE_LOOK_DEFAULTS> = (() => {
 const DEFAULT_SETTINGS: LabSettings = {
   look: { ...DAMAGE_LOOK_DEFAULTS, ...LOOK_OVERRIDES },
   fluid: fireFluidDefaults,
+  zones: fireZones(),
   // FxFireLight's own gain, FxPost's own bloom, the tier's haze — the
   // values tuned here on 2026-09-12, which are the library's defaults too.
   light: 42,
@@ -409,6 +455,7 @@ function loadSettings(): LabSettings {
       ...saved,
       look: { ...DEFAULT_SETTINGS.look, ...saved.look, ...LOOK_OVERRIDES },
       fluid: { ...DEFAULT_SETTINGS.fluid, ...saved.fluid },
+      zones: fireZones(saved.zones),
       rates: { ...DEFAULT_SETTINGS.rates, ...saved.rates },
       burn: {
         ...DEFAULT_SETTINGS.burn,
@@ -820,6 +867,18 @@ function Lab() {
     const base = { ...fluid, ...FLUID_OVERRIDES }
     return settings.burn.smoke ? base : { ...base, smoke: 0, smokeProduction: 0 }
   }, [fluid, settings.burn.smoke])
+  // The Tune panel's zones, with any `?fire=` zone keys laid over them. Render
+  // terms only — they update the shader every frame and never restart the fire.
+  const flameZones = useMemo(() => {
+    const o = FIRE_OVERRIDES.zones
+    const z = settings.zones
+    return {
+      root: { ...z.root, ...o.root },
+      core: { ...z.core, ...o.core },
+      body: { ...z.body, ...o.body },
+      tip: { ...z.tip, ...o.tip },
+    }
+  }, [settings.zones])
   const fluidKey = `${generation}:${playing ? 'live' : JSON.stringify(fluidParams)}`
 
   // Measured off this burn, for the settings in hand — see `phasesFor`.
@@ -1070,18 +1129,11 @@ function Lab() {
               locate={locate}
               quality={TIER}
               params={fluidParams}
-              body={FIRE_OVERRIDES.body}
-              core={FIRE_OVERRIDES.core}
+              zones={flameZones}
               heatScale={FIRE_OVERRIDES.heatScale}
               contrast={FIRE_OVERRIDES.contrast}
-              detail={FIRE_OVERRIDES.detail}
               opacity={FIRE_OVERRIDES.opacity}
-              streak={FIRE_OVERRIDES.streak}
-              edge={FIRE_OVERRIDES.edge}
-              blue={FIRE_OVERRIDES.blue}
               warm={FIRE_OVERRIDES.warm}
-              paleFrom={FIRE_OVERRIDES.pale}
-              shapeFrom={FIRE_OVERRIDES.from}
               thin={FIRE_OVERRIDES.thin}
               sharp={FIRE_OVERRIDES.sharp === undefined ? undefined : FIRE_OVERRIDES.sharp !== 0}
               running={playing}
@@ -1255,6 +1307,11 @@ function Tune({
   const setLook = (key: keyof Required<DamageLook>, value: number) =>
     onChange({ ...settings, look: { ...settings.look, [key]: value } })
   const setFluid = (fluid: FireFluidParams) => onChange({ ...settings, fluid })
+  const setZone = (zone: keyof FireZones, patch: Record<string, number | string>) =>
+    onChange({
+      ...settings,
+      zones: { ...settings.zones, [zone]: { ...settings.zones[zone], ...patch } } as FireZones,
+    })
   const fluid = settings.fluid
   const groups = [...new Set(SLIDERS.map((s) => s.group))]
   const burn = settings.burn
@@ -1403,6 +1460,40 @@ function Tune({
           screen. It found the look and it is the wrong surface for using one,
           so it lives in debug rather than being deleted — the next time the
           fire's motion is wrong, this is what fixes it. */}
+      {/* The flame, in the four zones it actually has (FireZones) — the same
+          pattern as the sheet's zones above, so a flame is art-directed the
+          way a burnt edge is. */}
+      {FLAME_ZONE_NAMES.map(({ zone, title, note }) => (
+        <details open key={zone}>
+          <summary>Flame · {title}</summary>
+          <p className="caption">{note}</p>
+          <label className="layer" style={{ display: 'block' }}>
+            <span className="row">
+              <span className="grow">Colour</span>
+              <input
+                type="color"
+                value={settings.zones[zone].color}
+                onChange={(e) => setZone(zone, { color: e.target.value })}
+              />
+            </span>
+          </label>
+          {FLAME_CONTROLS.filter((c) => c.zone === zone).map((c) => (
+            <Slider
+              key={c.key}
+              label={c.label}
+              value={(settings.zones[zone] as unknown as Record<string, number>)[c.key] ?? 0}
+              min={c.min}
+              max={c.max}
+              step={c.step}
+              {...(c.unit ? { unit: c.unit } : {})}
+              onInput={(v) => setZone(zone, { [c.key]: v })}
+            />
+          ))}
+          <button type="button" onClick={() => setZone(zone, { ...FIRE_ZONES[zone] })}>
+            reset {title.toLowerCase()}
+          </button>
+        </details>
+      ))}
       {advanced && (
         <details open>
           <summary>Fire simulator</summary>

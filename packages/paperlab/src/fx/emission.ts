@@ -129,38 +129,6 @@ export function emitHex(hex: string, times: number): [number, number, number] {
 }
 
 /**
- * The flame body's gain, in multiples of paper white — how much light the
- * emission ramp (`flameEmission` in the render pass) is scaled by.
- *
- * Its history is worth keeping, because each value was a real mistake. At
- * 1.3 the whole flame sat in the tone curve's roll-off and came out pastel.
- * At 0.45, with hue chosen apart from brightness, the dim parts of every
- * tongue were dark YELLOW, which is olive. Colour follows intensity now, the
- * way a hot body's does, and the gain decides how far up that ramp a flame
- * reaches. Measured against Flame_base.png: 0.5 -> 13% yellow, 0.8 -> 9%,
- * 1.2 -> 2% (bright yellow is taken to pale by the curve), so it stays well
- * under paper white and the cores, via {@link FIRE_CORE}, do the over-exposing.
- */
-export const FIRE_BODY = 0.6
-
-/**
- * The hottest cores, in multiples of paper white — added to the body, so the
- * peak is `FIRE_BODY + FIRE_CORE`.
- *
- * With the body at 0.45 this puts the peak at 4.45× paper white — inside
- * §4.3's 4–8 band, at the bottom of it. It was 8 at one point, and 9.6× paper
- * was far too much: the bloom of that much area tinted the whole black stage
- * olive, the tone curve took every flame to cream, and the gate's own check
- * failed with "the fire light pushes paper past the bloom threshold".
- *
- * This is the ONLY term allowed to over-expose. The body stays in the
- * mid-tones where the curve still has colour; the cores, which are a small
- * part of a flame's area, go past white and bloom. That division is what
- * makes fire read as fire rather than as a bright stain.
- */
-export const FIRE_CORE = 4
-
-/**
  * The solver temperature that counts as the hottest gas in a flame.
  *
  * The fluid's heat has no natural ceiling — the rim releases 22 a second and
@@ -211,15 +179,6 @@ export const FX_BLOOM = 0.55
 export const FIRE_CONTRAST = 0.9
 
 /**
- * How hard the render pass carves the gas into filaments, 0..2.
- *
- * Multiplicative, and weighted toward thin gas, so it opens holes through the
- * flame instead of dimming it evenly — a fire is optically thin and the black
- * you see through it is half of its contrast.
- */
-export const FIRE_DETAIL = 0.35
-
-/**
  * How opaque the densest flame gas is, as an extinction coefficient.
  *
  * Fire used to be pure added light, which is why a tongue standing in front
@@ -239,27 +198,6 @@ export const FIRE_DETAIL = 0.35
 export const FIRE_OPACITY = 5
 
 /**
- * How much darker the gas is BETWEEN a flame's sheets of light than on them,
- * 0..1. A flame's light comes from the thin sheet where the burning is, seen
- * as streaks running up the tongue; 0 is a smooth, gradient-lit flame — the
- * blob this replaced.
- */
-export const FIRE_STREAK = 0
-
-/**
- * How soft a flame's outline is, as a width in normalised temperature.
- * Smaller is a crisper silhouette; a wide fall-off reads as a glow, not a
- * tongue.
- */
-export const FIRE_EDGE = 0.1
-
-/**
- * How much blue at the root of each tongue, where fresh gas leaves the paper
- * and burns before it has heated through (Flame_base.png). 0 removes it.
- */
-export const FIRE_BLUE = 0
-
-/**
  * How opaque flame gas must be before it glows at full strength, 0..1.
  *
  * Soot emits and absorbs together, so thin gas should glow in proportion to
@@ -270,31 +208,71 @@ export const FIRE_BLUE = 0
 export const FIRE_THIN = 0.55
 
 /**
- * Where a flame's pale, over-exposed core begins, as a fraction of the
- * hottest gas (FIRE_HEAT_SCALE). The core is the one part of a flame that is
- * brighter than white — the reason it blooms — so if this sits above what the
- * gas actually reaches, nothing over-exposes and nothing blooms, which is
- * what `test:fire-budget` catches.
+ * A flame, in four zones — drawn the way the sheet's burn is (ember line, ash
+ * lip, char, scorch): each part named for what it is, with its own controls.
+ * Base to tip, as a flame spreading over a sheet actually is:
+ *
+ *   root  the blue leading edge where fresh gas meets the air at the paper.
+ *         Its light comes from excited molecules, not soot, so it is faint
+ *         and blue — and it starts OFF, because blue light added over cream
+ *         paper reads lavender.
+ *   core  the hottest gas, where soot forms densest and glows pale. The only
+ *         zone allowed to over-expose past the bloom threshold, and so the
+ *         one that blooms.
+ *   body  the luminous bulk: soot glowing yellow-orange as it rises.
+ *   tip   where soot cools and burns off at the outer edge — orange-red,
+ *         dimmer, tearing into tongues. What survives escapes as smoke.
+ *
+ * Colour and brightness are separate in every zone, the way professional
+ * fire shading keeps an intensity ramp apart from a colour ramp. The DEFAULTS
+ * keep the order a hot body glows in — each zone brighter and yellower than
+ * the one outside it — because breaking it is how dim yellow turns olive;
+ * `emission.test.ts` holds them to that.
+ *
+ * The zones are bands of the normalised temperature (see FIRE_HEAT_SCALE):
+ * the flame begins at `tip.from`, the tip gives way to the body around
+ * `tip.to`, and the core begins at `core.from`. Brightness is in multiples of
+ * paper white; colours are sRGB, the way a colour picker gives them.
  */
-// Swept against the budget's own measurement (bloom on vs off, share of the
-// frame that changes) AND the flame's near-white share, because the two pull
-// against each other: blooming needs an over-exposed core and over-exposure is
-// white, the thing Noor first asked to be rid of. Reference near-white: 0.9%.
-//   0.5  core 4    bloom 3.2%  near-white 6.3%
-//   0.55 core 4    bloom 1.6%  near-white 4.2%   <- this
-//   0.55 core 3    bloom 0.7%  near-white 3.3%
-//   0.75 core 4    bloom 0.01% (never clears the threshold)
-// How MUCH gas reaches the core decides it, not how bright the core is made.
-export const FIRE_PALE_FROM = 0.55
+export interface FireZones {
+  root: { color: string; amount: number; reach: number }
+  core: { color: string; glow: number; from: number }
+  body: { color: string; glow: number }
+  tip: { color: string; glow: number; from: number; to: number; softness: number; tearing: number }
+}
+
+/** Any part of any zone, over the defaults. */
+export type FireZonesInput = { [Z in keyof FireZones]?: Partial<FireZones[Z]> }
 
 /**
- * Where a flame's outline begins, as a fraction of the hottest gas. Below it
- * the gas is warm but barely glowing, and over cream paper it draws as a peach
- * veil above each tongue rather than as flame.
- *
- * Swept on the peak frame, measuring the peach share of the flame's pixels
- * against how much flame is left: 0.05 -> 8.2% peach, 0.10 -> 5.1% (6% less
- * flame), 0.15 -> 3.8% (11% less flame, and drifting yellow). The tongues keep
- * their height at 0.10; only the veil above them shortens.
+ * The defaults reproduce the look arrived at by measurement against
+ * Flame_base.png (yellow ~30%, orange ~40%, pale ~18% of a flame's pixels),
+ * now expressed zone by zone. Each colour is the linear emission the previous
+ * ramp used in that band, written as the sRGB a picker would show.
  */
-export const FIRE_SHAPE_FROM = 0.1
+export const FIRE_ZONES: FireZones = {
+  root: { color: '#3b6bff', amount: 0, reach: 0.5 },
+  core: { color: '#fff7d4', glow: 4.6, from: 0.55 },
+  body: { color: '#ffdd7c', glow: 0.6 },
+  tip: { color: '#ff9e2c', glow: 0.42, from: 0.1, to: 0.32, softness: 0.1, tearing: 0.35 },
+}
+
+/** The defaults with `input` laid over them, zone by zone. */
+export function fireZones(input?: FireZonesInput): FireZones {
+  return {
+    root: { ...FIRE_ZONES.root, ...input?.root },
+    core: { ...FIRE_ZONES.core, ...input?.core },
+    body: { ...FIRE_ZONES.body, ...input?.body },
+    tip: { ...FIRE_ZONES.tip, ...input?.tip },
+  }
+}
+
+/** A `#rrggbb` colour as linear RGB — what a shader multiplies light by. */
+export function hexToLinear(hex: string): [number, number, number] {
+  const n = Number.parseInt(hex.replace('#', ''), 16)
+  return [
+    srgbToLinear(((n >> 16) & 255) / 255),
+    srgbToLinear(((n >> 8) & 255) / 255),
+    srgbToLinear((n & 255) / 255),
+  ]
+}
