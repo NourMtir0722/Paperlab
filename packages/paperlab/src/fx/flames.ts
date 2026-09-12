@@ -33,6 +33,14 @@ export interface FlameAnchor {
   heat: number
   /** -1 on the lower rim of a hole, +1 on the upper. */
   upper: number
+  /**
+   * Which way the paper lies from the root, as a world-space unit vector —
+   * across the rim, into the sheet. Zero where it could not be found. The
+   * simulator lays its gas along the rim with this, rather than in a disc.
+   */
+  nx: number
+  ny: number
+  nz: number
 }
 
 /** 10 and 40 mm, in world units: a default sheet is one unit (210 mm) across. */
@@ -187,12 +195,15 @@ export function flameAnchors(
     const rz = at.z
     const toward = locate(u + gx / gl / last, v + gy / gl / last)
     let upper = 0
+    scratchA.x = 0
+    scratchA.y = 0
+    scratchA.z = 0
     if (toward) {
-      scratchA.x = toward.x - rx
-      scratchA.y = toward.y - ry
-      scratchA.z = toward.z - rz
-      const l = Math.hypot(scratchA.x, scratchA.y, scratchA.z) || 1
-      upper = scratchA.y / l
+      const l = Math.hypot(toward.x - rx, toward.y - ry, toward.z - rz) || 1
+      scratchA.x = (toward.x - rx) / l
+      scratchA.y = (toward.y - ry) / l
+      scratchA.z = (toward.z - rz) / l
+      upper = scratchA.y
     }
     const heat = data[cell * 4 + HEAT]!
     // Square root: the edge of a hole is rarely at full heat.
@@ -205,9 +216,12 @@ export function flameAnchors(
     const height = base * (0.2 + 1.3 * pick.cluster ** 1.4) * (0.6 + 0.8 * pick.seed) * pick.life * pick.scale
     let anchor = out[n]
     if (!anchor) {
-      anchor = { x: 0, y: 0, z: 0, height: 0, width: 0, seed: 0, heat: 0, upper: 0 }
+      anchor = { x: 0, y: 0, z: 0, height: 0, width: 0, seed: 0, heat: 0, upper: 0, nx: 0, ny: 0, nz: 0 }
       out[n] = anchor
     }
+    anchor.nx = scratchA.x
+    anchor.ny = scratchA.y
+    anchor.nz = scratchA.z
     anchor.x = rx
     anchor.y = ry
     anchor.z = rz

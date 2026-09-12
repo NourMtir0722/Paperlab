@@ -82,6 +82,7 @@ export {
   FX_BLOOM,
   FX_BLOOM_THRESHOLD,
   FIRE_HEAT_SCALE,
+  FIRE_SOOT_SCALE,
   FIRE_ZONES,
   fireZones,
   hexToLinear,

@@ -88,13 +88,13 @@ describe('the emission unit', () => {
       expect(lum(z.body.color) * z.body.glow).toBeLessThan(lum(z.core.color) * z.core.glow)
     })
 
-    it('a flame body sits BELOW paper white, where the tone curve still has colour', () => {
-      // `> 1` was once asserted here, and produced the pastel salmon the spec
-      // forbids: paper white is already at the top of the tone curve, so a body
-      // brighter than paper lands where there is no saturation left. A flame
-      // is over-exposed only in its core.
-      expect(FIRE_ZONES.body.glow).toBeLessThan(1)
-      expect(FIRE_ZONES.body.glow).toBeGreaterThan(0.2)
+    it('a flame body is brighter than the paper it stands in front of', () => {
+      // It was held BELOW paper white for a while, and asserted here, because
+      // under a bright preset paper already sits at the top of the tone curve
+      // and a brighter body turned pastel. The price was worse: a flame dimmer
+      // than the sheet behind it, drawn opaque, read as a yellow decal. The
+      // answer to a bright room is the lighting, not a dim flame.
+      expect(FIRE_ZONES.body.glow).toBeGreaterThan(1)
       expect(FIRE_ZONES.tip.glow).toBeLessThan(FIRE_ZONES.body.glow)
     })
 
@@ -109,8 +109,10 @@ describe('the emission unit', () => {
 
     it('the zones come in order up the flame, and the blue root starts off', () => {
       const z = FIRE_ZONES
-      expect(z.tip.from).toBeLessThan(z.tip.to)
+      // Colour bands, on temperature. (Where the flame starts, tip.from, is on
+      // the soot's own axis and has no order against these.)
       expect(z.tip.to).toBeLessThan(z.core.from)
+      expect(z.tip.from).toBeGreaterThan(0)
       // Blue light over cream paper reads lavender; it is there to be dialled in.
       expect(z.root.amount).toBe(0)
     })

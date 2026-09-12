@@ -17,10 +17,14 @@
  *   ambient oxygen    oxygen in the surrounding air, which fuel burns with as
  *                     it mixes in. At 0 only the premixed share ever burns,
  *                     so flames stay close to the rim.
- *   heat              temperature released with the gas; hot gas glows and
- *                     rises.
- *   flame persistence how long a parcel that has just burnt keeps looking
- *                     like flame.
+ *   heat              temperature released with the gas — paper's gas leaves
+ *                     it hot, and that heat is what lets its soot form and
+ *                     glow before it has burnt (swept to 1, most of the flame
+ *                     went out).
+ *   flame persistence how long glowing soot lasts in open air before it
+ *                     burns away — the soot a flame's light comes from.
+ *   air mixing        how fast air works into the fuel, and so how far up a
+ *                     tongue's fuel core survives.
  */
 export interface FireFluidParams {
   // Emission
@@ -39,6 +43,12 @@ export interface FireFluidParams {
   // Fuel & air
   ambientOxygen: number
   flamePersistence: number
+  /**
+   * How fast air works its way into the fuel, 0..1. Ours, not the panel's.
+   * Low and the fuel core survives a long way up — tall tongues with long
+   * tips; high and the fuel burns out close to the paper — short licks.
+   */
+  airMixing: number
   // Motion & turbulence
   turbulence: number
   turbulenceScale: number
@@ -63,7 +73,11 @@ export const fireFluidDefaults: FireFluidParams = {
   // into mushroom caps: the grey spirals over the text that the review called
   // the most synthetic thing in the frame. A flame leaves paper going UP.
   radialImpulse: 0.8,
-  initialVelocity: [0, 0.5, 0],
+  // In world units a second now (see `solverUniforms`): 1.4 is ~0.3 m/s, the
+  // speed gas leaves burning paper with. It was 0.5 at a quarter scale —
+  // 26 mm/s — and gas held that slow pooled into a bulb at the rim before
+  // buoyancy stretched it into a neck: every flame was a droplet.
+  initialVelocity: [0, 1.4, 0],
   burnRate: 6.1,
   // Was 0.65. Expansion is divergence where the gas burns, and it pushes the
   // gas SIDEWAYS as much as up: at 0.65 each tongue swelled into a puff and
@@ -71,19 +85,24 @@ export const fireFluidDefaults: FireFluidParams = {
   // tongues, and swept at 0.2 / 0.65 / 1.3 the low end is the one that looks
   // like it.
   gasExpansion: 0.3,
-  // Was 1.9. With the flame body authored below paper white (see
-  // `fx/emission.ts`) a tongue stops registering sooner, so it needs to be
-  // carried further before it cools out of sight — 3 puts the tall ones back
-  // up into the text the way Hero.png does, and cooling keeps them apart.
-  buoyancy: 3,
+  // Was 3, when the flame body was authored below paper white and a tongue
+  // needed carrying further to register. Now the gas leaves the rim at its
+  // real speed and glows above paper white, and 3 threw tongues past the
+  // text; 2 holds them lower. (1.5 was no shorter — height is set by how
+  // soon the gas cools, below — only broader and slower.)
+  buoyancy: 2,
   // Was 0.92. Gas that stays hot all the way up pools into ONE column: the
   // rim's forty-odd emission points merge a few centimetres above the paper
   // and the fire reads as a single plume with a couple of licks beside it.
   // Hero.png is many separate tongues around the whole rim — tall above,
   // short below — and cooling them faster is what keeps them apart, because
-  // each one runs out of glow before it can merge with its neighbour. 1.7
-  // stunted them; 1.15 keeps the tall ones and still holds them apart.
-  cooling: 1.15,
+  // each one runs out of glow before it can merge with its neighbour.
+  //
+  // 1.8 since a flame's light comes from soot that only lives in hot gas:
+  // cooling is now what sets a tongue's HEIGHT. Swept in live play: 1.15
+  // reached the text (~150 mm), 1.6 ~100 mm, 2.1 short licks (~60 mm);
+  // Hero.png's tallest is ~70 mm.
+  cooling: 1.8,
   // Was 1.4, which made a thick grey column, then 0.5. Noor's direction is
   // light smoke, and with MacCormack advection keeping the smoke's fine
   // structure it needs less of it to read: at 0.5 it veiled the upper sheet.
@@ -93,6 +112,7 @@ export const fireFluidDefaults: FireFluidParams = {
   // flame channel decayed with a 5 ms time constant, so it was an
   // instantaneous quantity with no history and therefore no shape.
   flamePersistence: 0.06,
+  airMixing: 0.5,
   // Was 0, also switched off, with all the motion coming from vorticity and
   // the radial impulse — a few big eddies instead of many small ones, which
   // is the difference between a fire that tears and one that curls. Swept
@@ -142,6 +162,7 @@ export const fireFluidControls: readonly {
     max: 1,
     step: 0.005,
   },
+  { group: 'Fuel & air', key: 'airMixing', label: 'Air mixing', min: 0, max: 1, step: 0.01 },
   // 0–10 while the default was 0. Now that turbulence is what breaks the
   // flames into tongues, the tuned value has to sit somewhere a slider can
   // move in BOTH directions — see the test.
@@ -176,8 +197,22 @@ export interface SolverUniforms {
   smokeFade: number
   ambient: number
   persistence: number
+  /** Share of the neighbours' oxygen mixed in per step, in the plane. */
+  mixing: number
+  /** Per second: air drawn in from in front of and behind the slice. */
+  entrain: number
+  /** Fuel density at which entrainment is down to 1/e — dense fuel keeps air out. */
+  fuelBlock: number
+  /** Soot formed per unit of hot fuel a second. */
+  sootYield: number
+  /** The temperature soot needs to form and glow at. */
+  sootHeat: number
+  /** Units of air a unit of fuel burns with. */
+  stoich: number
   turbulence: number
   turbulenceScale: number
+  /** Noise units a second the turbulence changes by, on top of rising with the gas. */
+  turbulenceEvolve: number
   vorticity: number
   wind: number
 }
@@ -200,7 +235,8 @@ export function solverUniforms(p: FireFluidParams): SolverUniforms {
     smoke: Math.max(0, finite(p.smoke, 0)) * 0.45,
     // World units a second: A4 flames climb a few tens of centimetres a second.
     radial: Math.max(0, finite(p.radialImpulse, 0)) * 0.2,
-    initialVelocity: [finite(p.initialVelocity[0], 0) * 0.25, finite(p.initialVelocity[1], 0) * 0.25],
+    // World units a second, one to one — a unit is 210 mm.
+    initialVelocity: [finite(p.initialVelocity[0], 0), finite(p.initialVelocity[1], 0)],
     // Per second.
     burnRate: Math.max(0, finite(p.burnRate, 0)) * 2,
     // Temperature a unit of burnt fuel adds.
@@ -215,9 +251,21 @@ export function solverUniforms(p: FireFluidParams): SolverUniforms {
     smokeFade: Math.max(0.05, finite(p.smokeFade, 2.5)),
     ambient: Math.min(1, Math.max(0, finite(p.ambientOxygen, 0))),
     persistence: Math.max(0.005, finite(p.flamePersistence, 0.085)),
+    mixing: Math.min(1, Math.max(0, finite(p.airMixing, 0.5))) * 0.5,
+    entrain: Math.min(1, Math.max(0, finite(p.airMixing, 0.5))) * 40,
+    fuelBlock: 0.05,
+    sootYield: 30,
+    sootHeat: 2,
+    // Paper's gas takes several times its own mass of air to burn; what
+    // matters here is only that it is well above one, so fuel near the rim is
+    // denser than the air that can reach it and burns from the outside in.
+    stoich: 4,
     turbulence: Math.max(0, finite(p.turbulence, 0)) * 0.35,
-    // Noise frequency per world unit: 4.6 → ~36 mm eddies.
-    turbulenceScale: Math.max(0.1, finite(p.turbulenceScale, 4.6)) * 6,
+    // Noise frequency per WORLD unit — the pass multiplies by the domain's
+    // size, which it did not before (it read UV, and the domain is two units
+    // tall, so every eddy was half the size this said). 12 → ~14 mm eddies.
+    turbulenceScale: Math.max(0.1, finite(p.turbulenceScale, 4.6)) * 1.25,
+    turbulenceEvolve: 3,
     vorticity: Math.max(0, finite(p.vorticity, 0)),
     wind: finite(p.wind, 0) * 0.3,
   }

@@ -4,6 +4,7 @@ import {
   ADVECT,
   CURL,
   DIVERGENCE,
+  EMIT,
   FILL,
   FORCES,
   GRADIENT,
@@ -79,12 +80,14 @@ function pass(fragmentShader: string, uniforms: Record<string, THREE.IUniform>):
  * from the GPU.
  */
 export class FireFluid {
-  /** (fuel, heat, smoke, flame) on the fine grid — what is drawn. */
+  /** (fuel, heat, smoke, soot) on the fine grid — what is drawn. */
   readonly scalars: Pair
   /** (premixed oxygen, ambient oxygen, burn rate, –) on the fine grid. */
   readonly air: Pair
   readonly velocity: Pair
   readonly pressure: Pair
+  /** The rim's emission this step, on the fine grid — see EMIT. */
+  private readonly emit: THREE.WebGLRenderTarget
   private readonly divergence: THREE.WebGLRenderTarget
   private readonly curl: THREE.WebGLRenderTarget
   /** The two intermediate advections the MacCormack step compares. */
@@ -101,6 +104,7 @@ export class FireFluid {
   private readonly mesh: THREE.Mesh
   private readonly m: Record<string, THREE.ShaderMaterial>
   private readonly sources: THREE.Vector4[] = Array.from({ length: MAX_SOURCES }, () => new THREE.Vector4())
+  private readonly across: THREE.Vector4[] = Array.from({ length: MAX_SOURCES }, () => new THREE.Vector4())
 
   /** Whether this renderer can draw into half-float targets at all. */
   static supported(renderer: THREE.WebGLRenderer): boolean {
@@ -123,6 +127,7 @@ export class FireFluid {
     this.air = new Pair(dw, dh)
     this.velocity = new Pair(vw, vh)
     this.pressure = new Pair(vw, vh)
+    this.emit = target(dw, dh)
     this.divergence = target(vw, vh)
     this.curl = target(vw, vh)
     this.forward = target(dw, dh)
@@ -130,9 +135,15 @@ export class FireFluid {
 
     const aspect = domain.width / domain.height
     const vTexel = new THREE.Vector2(1 / vw, 1 / vh)
+    const dTexel = new THREE.Vector2(1 / dw, 1 / dh)
     const cell = domain.width / vw
-    const shared = { uSources: { value: this.sources }, uCount: { value: 0 }, uAspect: { value: aspect } }
     this.m = {
+      emit: pass(EMIT, {
+        uSources: { value: this.sources },
+        uAcross: { value: this.across },
+        uCount: { value: 0 },
+        uAspect: { value: aspect },
+      }),
       advect: pass(ADVECT, {
         uVelocity: { value: null },
         uSource: { value: null },
@@ -141,9 +152,12 @@ export class FireFluid {
         uKeep: { value: new THREE.Vector4(1, 1, 1, 1) },
       }),
       react: pass(REACT, {
-        ...shared,
         uA: { value: null },
         uB: { value: null },
+        uEmit: { value: this.emit.texture },
+        uVelocity: { value: null },
+        uDomain: { value: new THREE.Vector2(domain.width, domain.height) },
+        uTexel: { value: dTexel },
         uOut: { value: 0 },
         uDt: { value: 0 },
         uFuel: { value: 0 },
@@ -157,18 +171,26 @@ export class FireFluid {
         uSmokeProduction: { value: 0 },
         uSmokeFade: { value: 1 },
         uPersistence: { value: 0.1 },
+        uMixing: { value: 0 },
+        uEntrain: { value: 0 },
+        uFuelBlock: { value: 1 },
+        uSootYield: { value: 0 },
+        uSootHeat: { value: 1 },
+        uStoich: { value: 1 },
       }),
       forces: pass(FORCES, {
-        ...shared,
         uVelocity: { value: null },
         uA: { value: null },
+        uEmit: { value: this.emit.texture },
         uTexel: { value: vTexel },
+        uDomain: { value: new THREE.Vector2(domain.width, domain.height) },
         uDt: { value: 0 },
         uTime: { value: 0 },
         uBuoyancy: { value: 0 },
         uWind: { value: 0 },
         uTurbulence: { value: 0 },
         uTurbScale: { value: 1 },
+        uTurbEvolve: { value: 0 },
         uRadial: { value: 0 },
         uInitVel: { value: new THREE.Vector2() },
       }),
@@ -233,6 +255,7 @@ export class FireFluid {
       }
       this.run(fill, this.divergence)
       this.run(fill, this.curl)
+      this.run(fill, this.emit)
       value.set(0, ambient, 0, 0)
       this.run(fill, this.air.read)
       this.run(fill, this.air.write)
@@ -240,16 +263,30 @@ export class FireFluid {
   }
 
   /**
-   * One step of `dt` seconds. `sources` is (u, v, radius, strength) per
-   * point, `count` of them; `time` drives the turbulence.
+   * One step of `dt` seconds. `sources` is (u, v, half-length, strength) per
+   * rim segment and `across` is (toward-paper x, y, half-width, offset onto
+   * the paper) — see EMIT — `count` of each; `time` drives the turbulence.
    */
-  step(dt: number, u: SolverUniforms, sources: Float32Array, count: number, time: number): void {
+  step(
+    dt: number,
+    u: SolverUniforms,
+    sources: Float32Array,
+    across: Float32Array,
+    count: number,
+    time: number,
+  ): void {
     const n = Math.min(MAX_SOURCES, count)
-    for (let i = 0; i < n; i++) this.sources[i]!.fromArray(sources, i * 4)
+    for (let i = 0; i < n; i++) {
+      this.sources[i]!.fromArray(sources, i * 4)
+      this.across[i]!.fromArray(across, i * 4)
+    }
     const m = this.m
-    for (const name of ['react', 'forces'] as const) m[name]!.uniforms.uCount!.value = n
+    m.emit!.uniforms.uCount!.value = n
 
     this.withRenderer(() => {
+      // 0. Where the rim releases gas this step, once, for every pass after.
+      this.run(m.emit!, this.emit)
+
       // 1. Carry everything along the flow.
       const advect = m.advect!
       advect.uniforms.uDt!.value = dt
@@ -300,6 +337,13 @@ export class FireFluid {
       r.uSmokeProduction!.value = u.smokeProduction
       r.uSmokeFade!.value = u.smokeFade
       r.uPersistence!.value = u.persistence
+      r.uMixing!.value = u.mixing
+      r.uEntrain!.value = u.entrain
+      r.uFuelBlock!.value = u.fuelBlock
+      r.uSootYield!.value = u.sootYield
+      r.uSootHeat!.value = u.sootHeat
+      r.uStoich!.value = u.stoich
+      r.uVelocity!.value = this.velocity.read.texture
       r.uA!.value = this.scalars.read.texture
       r.uB!.value = this.air.read.texture
       r.uOut!.value = 0
@@ -320,6 +364,7 @@ export class FireFluid {
       f.uWind!.value = u.wind
       f.uTurbulence!.value = u.turbulence
       f.uTurbScale!.value = u.turbulenceScale
+      f.uTurbEvolve!.value = u.turbulenceEvolve
       f.uRadial!.value = u.radial
       ;(f.uInitVel!.value as THREE.Vector2).set(u.initialVelocity[0], u.initialVelocity[1])
       this.run(forces, this.velocity.write)
@@ -359,6 +404,7 @@ export class FireFluid {
 
   dispose(): void {
     for (const p of [this.scalars, this.air, this.velocity, this.pressure]) p.dispose()
+    this.emit.dispose()
     this.divergence.dispose()
     this.curl.dispose()
     this.forward.dispose()

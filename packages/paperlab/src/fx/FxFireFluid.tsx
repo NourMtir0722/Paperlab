@@ -5,6 +5,7 @@ import {
   FIRE_CONTRAST,
   FIRE_HEAT_SCALE,
   FIRE_OPACITY,
+  FIRE_SOOT_SCALE,
   FIRE_THIN,
   type FireZonesInput,
   PAPER_WHITE,
@@ -43,6 +44,8 @@ export interface FxFireFluidProps {
   zones?: FireZonesInput
   /** The solver temperature that counts as a flame's hottest gas. */
   heatScale?: number
+  /** The soot density that counts as a full flame — see `FIRE_SOOT_SCALE`. */
+  sootScale?: number
   /** Gamma on the flame's temperature — above 1 darkens the body against the core. */
   contrast?: number
   /** How opaque the densest flame gas is; 0 is purely additive fire. */
@@ -73,8 +76,21 @@ export interface FxFireFluidProps {
 const DOMAIN = { width: 1.5, height: 2 } as const
 /** Below the sheet's middle, where the domain starts. */
 const BELOW = 0.8
-/** Fixed solver step. */
-const STEP = 1 / 60
+/**
+ * Fixed solver step. 1/120: gas leaving the rim at ~0.3 m/s crosses about a
+ * velocity cell a step at this rate, which is what semi-Lagrangian advection
+ * is accurate for; at 1/60 it crossed two, and smeared.
+ */
+const STEP = 1 / 120
+/** The unseen warm-up after a reset runs at the old rate — it is shed before it is shown. */
+const WARM_STEP = 1 / 60
+/** Steps a frame may take before the fire falls behind rather than stalling the page. */
+const MAX_STEPS = 6
+/**
+ * Half-width of the band gas comes off, across the rim: ~1.2 mm of A4. The
+ * char right behind the ember line, which is where paper gives off its gas.
+ */
+const BAND = 1.2 / 210
 /**
  * How long a reset fire is run before it is shown.
  *
@@ -117,6 +133,7 @@ export function FxFireFluid({
   glow = 1,
   zones,
   heatScale = FIRE_HEAT_SCALE,
+  sootScale = FIRE_SOOT_SCALE,
   contrast = FIRE_CONTRAST,
   opacity = FIRE_OPACITY,
   thin = FIRE_THIN,
@@ -145,6 +162,7 @@ export function FxFireFluid({
           // How bright the fire is, in the one unit `emission.ts` defines.
           uPaperWhite: { value: PAPER_WHITE },
           uHeatScale: { value: FIRE_HEAT_SCALE },
+          uSootScale: { value: FIRE_SOOT_SCALE },
           uContrast: { value: FIRE_CONTRAST },
           uOpacity: { value: FIRE_OPACITY },
           uThin: { value: FIRE_THIN },
@@ -194,6 +212,7 @@ export function FxFireFluid({
   })
   const anchors = useRef<FlameAnchor[]>([])
   const sources = useMemo(() => new Float32Array(MAX_SOURCES * 4), [])
+  const across = useMemo(() => new Float32Array(MAX_SOURCES * 4), [])
   const scratch = useMemo(() => new THREE.Vector3(), [])
 
   /** Where the domain stands: a vertical plane through the sheet, facing the camera. */
@@ -221,19 +240,52 @@ export function FxFireFluid({
     }
   }
 
-  /** The rim, as emission points in the domain's UV. */
+  /**
+   * The rim, as short lines of emission in the domain's UV: one per flame,
+   * as long as its tongue is wide, a band ~1.2 mm across, laid just onto the
+   * paper side of the edge. Lengths are in the pass's aspect-corrected space,
+   * where a world length is `length / DOMAIN.height`.
+   */
   const gather = (time: number): number => {
     const s = state.current
     const n = Math.min(MAX_SOURCES, flameAnchors(field, locate, MAX_SOURCES, anchors.current, time))
+    const band = BAND / DOMAIN.height
     for (let i = 0; i < n; i++) {
       const a = anchors.current[i]!
       scratch.set(a.x, a.y, a.z).sub(s.origin)
-      sources[i * 4] = scratch.dot(s.right) / DOMAIN.width
-      sources[i * 4 + 1] = scratch.dot(up) / DOMAIN.height
-      // Radius in the domain's v units: about half a tongue's width.
-      sources[i * 4 + 2] = Math.max(0.0025, (a.width * 0.6) / DOMAIN.height)
-      // Tall clusters release more gas than short licks.
-      sources[i * 4 + 3] = (a.height / FLAME_HEIGHT[1]) * (0.5 + 0.5 * a.heat)
+      const k = i * 4
+      sources[k] = scratch.dot(s.right) / DOMAIN.width
+      sources[k + 1] = scratch.dot(up) / DOMAIN.height
+      // Which way the paper lies, in the plane the fire is drawn in.
+      const nu = a.nx * s.right.x + a.ny * s.right.y + a.nz * s.right.z
+      const nv = a.ny
+      const nl = Math.hypot(nu, nv)
+      let area: number
+      if (nl > 0.25) {
+        const half = Math.max(1.5 / 210, a.width * 0.5) / DOMAIN.height
+        sources[k + 2] = half
+        across[k] = nu / nl
+        across[k + 1] = nv / nl
+        across[k + 2] = band
+        across[k + 3] = band
+        area = half * band
+      } else {
+        // A rim seen end-on has no direction in this plane: a small disc.
+        sources[k + 2] = band * 2
+        across[k] = 0
+        across[k + 1] = 1
+        across[k + 2] = band * 2
+        across[k + 3] = 0
+        area = band * band * 4
+      }
+      // Tall clusters release more gas than short licks: per length of rim,
+      // in proportion to the height. It was in proportion to height × width²
+      // — the disc's area — and since width follows height that is height³:
+      // a lower-rim lick at a third of the height got a thirtieth of the gas,
+      // never grew enough soot to show, and the ring lost its short flames.
+      const disc = Math.max(0.0025, (a.width * 0.6) / DOMAIN.height)
+      const tallest = (FLAME_HEIGHT[1] * 0.47 * 0.6) / DOMAIN.height
+      sources[k + 3] = (a.height / FLAME_HEIGHT[1]) * (0.5 + 0.5 * a.heat) * Math.min(30, (disc * tallest) / area)
     }
     return n
   }
@@ -250,10 +302,10 @@ export function FxFireFluid({
       // Warm up from the rim as it stands, on the burn's own clock, so the
       // same moment of the same burn draws the same fire.
       const end = field.time
-      const steps = Math.round(warm / STEP)
+      const steps = Math.round(warm / WARM_STEP)
       for (let k = 0; k < steps; k++) {
-        const t = end - warm + k * STEP
-        fluid.step(STEP, u, sources, gather(t), t)
+        const t = end - warm + k * WARM_STEP
+        fluid.step(WARM_STEP, u, sources, across, gather(t), t)
       }
       s.time = end
       s.owed = 0
@@ -261,10 +313,10 @@ export function FxFireFluid({
     if (running) {
       s.owed += Math.min(0.1, Math.max(0, delta))
       let taken = 0
-      while (s.owed >= STEP && taken < 3) {
+      while (s.owed >= STEP && taken < MAX_STEPS) {
         s.owed -= STEP
         s.time += STEP
-        fluid.step(STEP, u, sources, gather(field.time), s.time)
+        fluid.step(STEP, u, sources, across, gather(field.time), s.time)
         taken++
       }
     }
@@ -272,6 +324,7 @@ export function FxFireFluid({
     material.uniforms.uTime!.value = s.time
     material.uniforms.uGlow!.value = glow
     material.uniforms.uHeatScale!.value = heatScale
+    material.uniforms.uSootScale!.value = sootScale
     material.uniforms.uContrast!.value = contrast
     material.uniforms.uOpacity!.value = opacity
     material.uniforms.uThin!.value = thin

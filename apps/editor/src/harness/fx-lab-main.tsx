@@ -85,7 +85,7 @@ import {
  *   ?threshold=1.6               the bloom threshold, in scene luminance
  *   ?fire=tip:0.4,pale:0.55      the flame's zones (FireZones) and render terms:
  *                                tip, from, to, edge, detail · body · core, pale
- *                                · blue, reach · scale, contrast, opacity, thin,
+ *                                · blue, reach · scale, soot, contrast, opacity, thin,
  *                                warm, sharp
  *   ?fluid=vorticity:2.5         the solver's own controls, over the defaults
  *   ?look=emberGlow:0,sparkle:0  how the burn is drawn, over the defaults —
@@ -239,7 +239,7 @@ const FLAME_CONTROLS: {
   { zone: 'core', key: 'from', label: 'Starts at', min: 0.2, max: 1, step: 0.01 },
   { zone: 'body', key: 'glow', label: 'Brightness', min: 0, max: 2, step: 0.01, unit: '× paper' },
   { zone: 'tip', key: 'glow', label: 'Brightness', min: 0, max: 2, step: 0.01, unit: '× paper' },
-  { zone: 'tip', key: 'from', label: 'Where the flame begins', min: 0, max: 0.5, step: 0.01 },
+  { zone: 'tip', key: 'from', label: 'Where the flame begins (how dense its soot)', min: 0, max: 0.5, step: 0.01 },
   { zone: 'tip', key: 'to', label: 'Where the tip becomes body', min: 0.1, max: 0.8, step: 0.01 },
   { zone: 'tip', key: 'softness', label: 'Softness of the outline', min: 0.02, max: 0.5, step: 0.01 },
   { zone: 'tip', key: 'tearing', label: 'Tearing', min: 0, max: 1.5, step: 0.01 },
@@ -304,6 +304,7 @@ const THRESHOLD = query.has('threshold') ? num('threshold', 1.6, 0, 50) : undefi
 const FIRE_OVERRIDES: {
   zones: FireZonesInput
   heatScale?: number
+  sootScale?: number
   contrast?: number
   opacity?: number
   sharp?: number
@@ -313,6 +314,7 @@ const FIRE_OVERRIDES: {
   const out: {
     zones: FireZonesInput
     heatScale?: number
+    sootScale?: number
     contrast?: number
     opacity?: number
     sharp?: number
@@ -340,6 +342,7 @@ const FIRE_OVERRIDES: {
     if (key === 'blue') z.root = { ...z.root, amount: n }
     if (key === 'reach') z.root = { ...z.root, reach: n }
     if (key === 'scale') out.heatScale = n
+    if (key === 'soot') out.sootScale = n
     if (key === 'contrast') out.contrast = n
     if (key === 'opacity') out.opacity = n
     if (key === 'sharp') out.sharp = n
@@ -492,7 +495,18 @@ const START_MODE: Mode = (MODES as readonly string[]).includes(query.get('mode')
     ? 'debug'
     : 'watch'
 
-const LIGHTING = query.get('lighting') ?? undefined
+/**
+ * `noir` unless asked otherwise: a sheet under one hard key in a dark room,
+ * which is how every fire reference was shot.
+ *
+ * Under `studio` — `<Paper>`'s own default — clean paper photographs at a
+ * luminance of 0.93, at the very top of the tone curve, so NOTHING can be
+ * brighter than the paper and still have a colour; the flames were authored
+ * dimmer than paper white to keep their orange and read as painted decals on
+ * the sheet. Hero.png's paper is 0.70; `noir`'s is 0.62. A flame is the
+ * brightest thing in the frame only where the frame leaves it room.
+ */
+const LIGHTING = query.get('lighting') ?? 'noir'
 
 const START_LAYERS: Layers = (() => {
   const off = new Set((query.get('off') ?? '').split(',').filter(Boolean))
@@ -1131,6 +1145,7 @@ function Lab() {
               params={fluidParams}
               zones={flameZones}
               heatScale={FIRE_OVERRIDES.heatScale}
+              sootScale={FIRE_OVERRIDES.sootScale}
               contrast={FIRE_OVERRIDES.contrast}
               opacity={FIRE_OVERRIDES.opacity}
               warm={FIRE_OVERRIDES.warm}

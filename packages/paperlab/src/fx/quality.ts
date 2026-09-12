@@ -88,9 +88,17 @@ export interface FxQualitySettings {
    */
   haze: number
   /**
-   * The fire simulator's grids (`FxFireFluid`): a coarse velocity grid, a
-   * fine one for what is drawn, and the pressure solve's iterations. Every
-   * tier simulates a real fire; a phone solves a coarser one.
+   * The fire simulator's grids (`FxFireFluid`): a velocity grid, a finer one
+   * for what is drawn, and the pressure solve's iterations. Every tier
+   * simulates a real fire; a phone solves a coarser one.
+   *
+   * The velocity grid is half the dye's resolution, not a quarter as it was.
+   * At a quarter its cells were 4.4 mm and a tongue was one to five cells
+   * wide, so everything that makes a flame flicker happened inside a cell and
+   * the solve never saw it — sharper advection of the dye could only draw the
+   * edges of a motion that was itself butter. The pressure solve is the cheap
+   * part (a quarter of the dye grid's texels); the iterations rise with it
+   * because Jacobi needs more of them to converge over more cells.
    */
   fluid: { velocity: readonly [number, number]; dye: readonly [number, number]; iterations: number }
 }
@@ -105,7 +113,7 @@ export const fxQualityTiers: Record<FxQualityTier, FxQualitySettings> = {
     flames: 64,
     caps: { ember: 200, smoke: 200, ash: 120 },
     haze: 2,
-    fluid: { velocity: [96, 128], dye: [384, 512], iterations: 24 },
+    fluid: { velocity: [192, 256], dye: [384, 512], iterations: 36 },
   },
   /** The default worth aiming at: a recent phone, or an integrated laptop GPU. */
   medium: {
@@ -116,7 +124,7 @@ export const fxQualityTiers: Record<FxQualityTier, FxQualitySettings> = {
     flames: 36,
     caps: { ember: 80, smoke: 80, ash: 60 },
     haze: 0,
-    fluid: { velocity: [72, 96], dye: [288, 384], iterations: 18 },
+    fluid: { velocity: [144, 192], dye: [288, 384], iterations: 30 },
   },
   /**
    * A throttled phone with the camera and the tracker already running, which
@@ -132,7 +140,7 @@ export const fxQualityTiers: Record<FxQualityTier, FxQualitySettings> = {
     flames: 16,
     caps: { ember: 30, smoke: 30, ash: 20 },
     haze: 0,
-    fluid: { velocity: [48, 64], dye: [192, 256], iterations: 12 },
+    fluid: { velocity: [96, 128], dye: [192, 256], iterations: 20 },
   },
 }
 

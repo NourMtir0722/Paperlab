@@ -30,7 +30,13 @@ rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
 
 const { base, stop } = await startApp('editor', PORT)
-const browser = await chromium.launch()
+// On the GPU. Headless Chromium on a Mac otherwise draws with SwiftShader,
+// on the CPU, at about 5 frames a second — and the lab's burn clock and the
+// fire's solver both advance by frame, so the film was of a fire running at a
+// fraction of its speed, one step at a time. Stills never showed it.
+const browser = await chromium.launch({
+  args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [],
+})
 
 /** The burn is 24 simulated seconds; at 0.25× that is 96 of wall clock. */
 const SECONDS = Math.ceil(24 / speed) + 2

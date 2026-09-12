@@ -4,12 +4,20 @@
  * Jacobi pressure solve that keeps the air from compressing, buoyancy from
  * temperature, curl-noise turbulence and vorticity confinement for the small
  * eddies that make fire restless — and a combustion step that burns fuel
- * only where there is oxygen for it, turning it into heat and smoke.
+ * only where AIR HAS REACHED IT, turning it into heat, soot and smoke.
+ *
+ * That last clause is the whole difference between a flame and a plume of hot
+ * smoke, and the first version of this file got it wrong: it refilled every
+ * cell toward ambient oxygen, inside the flame as much as outside it, so fuel
+ * burnt within a twelfth of a second of leaving the paper wherever it was. A
+ * flame is the surface where fuel meets air. The fuel inside it cannot burn
+ * until air has worked its way in from the sides, so the fuel core is eaten
+ * from the outside and closes to a point — the TIP — at the height where the
+ * last of it meets air. Nothing else gives a tongue that shape.
  *
  * Every pass is a full-screen triangle over one field. Velocity and pressure
- * live on a coarse grid (they are smooth); fuel, heat, smoke, flame and air
- * on a finer one, sampling the velocity bilinearly — which is where the
- * fire's detail comes from, at a fraction of the cost of a fine solve.
+ * live on a coarser grid; fuel, heat, smoke, soot and air on a finer one,
+ * sampling the velocity bilinearly.
  */
 
 /** Maximum emission points the passes loop over. */
@@ -41,11 +49,42 @@ float fxFbm(vec2 p) {
   }
   return v;
 }
+float fxHash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
+float fxNoise3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(fxHash3(i), fxHash3(i + vec3(1.0, 0.0, 0.0)), u.x), mix(fxHash3(i + vec3(0.0, 1.0, 0.0)), fxHash3(i + vec3(1.0, 1.0, 0.0)), u.x), u.y);
+  float b = mix(mix(fxHash3(i + vec3(0.0, 0.0, 1.0)), fxHash3(i + vec3(1.0, 0.0, 1.0)), u.x), mix(fxHash3(i + vec3(0.0, 1.0, 1.0)), fxHash3(i + vec3(1.0, 1.0, 1.0)), u.x), u.y);
+  return mix(a, b, u.z);
+}
+float fxFbm3(vec3 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 3; i++) {
+    v += a * fxNoise3(p);
+    p = p * 2.07 + 13.0;
+    a *= 0.5;
+  }
+  return v;
+}
 `
 
-/** Sources: (u, v, radius in v units, strength). */
+/**
+ * Sources are short LINES along the rim, not discs.
+ *
+ * `uSources`: (u, v, half-length along the rim, strength).
+ * `uAcross`:  (toward the paper — a unit vector in aspect-corrected domain
+ *             space —, half-width across the rim, how far onto the paper).
+ *
+ * A disc was the old shape: up to 15 mm in radius, releasing gas into the
+ * hole and over the paper alike, and it was what drew every flame as a
+ * droplet. Gas comes off the char just behind the ember line, along it, in a
+ * band a couple of millimetres wide; that band is what this draws.
+ */
 const SOURCES = /* glsl */ `
 uniform vec4 uSources[${MAX_SOURCES}];
+uniform vec4 uAcross[${MAX_SOURCES}];
 uniform int uCount;
 uniform float uAspect;
 float fxEmission(vec2 uv, out vec2 outward) {
@@ -54,13 +93,34 @@ float fxEmission(vec2 uv, out vec2 outward) {
   for (int i = 0; i < ${MAX_SOURCES}; i++) {
     if (i >= uCount) break;
     vec4 s = uSources[i];
+    vec4 k = uAcross[i];
     vec2 d = (uv - s.xy) * vec2(uAspect, 1.0);
-    float g = s.w * exp(-dot(d, d) / (s.z * s.z));
+    vec2 n = k.xy;
+    float across = dot(d, n) - k.w;
+    float along = dot(d, vec2(-n.y, n.x));
+    float g = s.w * exp(-along * along / (s.z * s.z) - across * across / (k.z * k.z));
     e += g;
-    float l = length(d);
-    if (l > 1e-5) outward += g * d / l;
+    // Off the edge, away from the paper it came from.
+    outward -= g * n;
   }
   return e;
+}
+`
+
+/**
+ * The rim's emission, once per step: (strength, outward.x, outward.y, –).
+ *
+ * The combustion pass used to loop over every source for every texel, TWICE
+ * (it runs once per output target), and the forces pass a third time. Written
+ * once here and read back as a texture, it costs one loop a step.
+ */
+export const EMIT = /* glsl */ `
+varying vec2 vUv;
+${SOURCES}
+void main() {
+  vec2 outward;
+  float e = fxEmission(vUv, outward);
+  gl_FragColor = vec4(e, outward, 0.0);
 }
 `
 
@@ -84,9 +144,7 @@ void main() {
  *
  * One semi-Lagrangian back-trace loses about half a cell of detail a step,
  * because every read is a bilinear average of four cells; at sixty steps a
- * second, anything the solver resolves is butter within a few frames. That
- * is the dominant reason the flames were soft, and no finer grid fixes it —
- * the loss is per step, not per cell.
+ * second, anything the solver resolves is butter within a few frames.
  *
  * MacCormack measures its own error and gives it back: advect forward
  * (uForward), advect THAT back again (uBackward), and the difference between
@@ -121,12 +179,32 @@ void main() {
 
 /**
  * Emission and combustion, for the fine grid. Run twice with `uOut` 0 and 1:
- * once to write (fuel, heat, smoke, flame), once for (premixed, oxygen,
- * burn rate, –). The same arithmetic both times, so the two agree.
+ * once to write (fuel, heat, smoke, soot), once for (premixed, oxygen, burn
+ * rate, –). The same arithmetic both times, so the two agree.
+ *
+ * Oxygen reaches fuel two ways, and neither is "everywhere at once":
+ *
+ *   mixing       from the air beside it, in the plane — a diffusion step
+ *                over the four neighbours.
+ *   entrainment  from in front and behind: a slice through a fire has no
+ *                third dimension for air to come from, so it is put back
+ *                here — but dense fuel BLOCKS it, because the air drawn into
+ *                a real tongue meets the fuel's outside first. That is what
+ *                keeps a fuel core fuel-rich and burning only at its skin.
+ *
+ * Soot is what a flame's light comes from, and the only thing drawn as flame
+ * (the render pass reads it, not the heat). It forms from fuel that is hot,
+ * burns away where there is oxygen, and goes out when the gas cools — so a
+ * tongue glows from the paper to the height where its fuel runs out, and no
+ * further. `persistence` is how long soot lasts in open air.
  */
 export const REACT = /* glsl */ `
 uniform sampler2D uA;
 uniform sampler2D uB;
+uniform sampler2D uEmit;
+uniform sampler2D uVelocity;
+uniform vec2 uDomain;
+uniform vec2 uTexel;
 uniform int uOut;
 uniform float uDt;
 uniform float uFuel;
@@ -140,35 +218,62 @@ uniform float uCooling;
 uniform float uSmokeProduction;
 uniform float uSmokeFade;
 uniform float uPersistence;
+uniform float uMixing;
+uniform float uEntrain;
+uniform float uFuelBlock;
+uniform float uSootYield;
+uniform float uSootHeat;
+uniform float uStoich;
 varying vec2 vUv;
-${SOURCES}
 void main() {
   vec4 a = texture2D(uA, vUv);
   vec4 b = texture2D(uB, vUv);
-  vec2 outward;
-  float e = fxEmission(vUv, outward);
+  // What a parcel picked up crossing the rim during the step — sampled back
+  // along its path, not at the one point it ended at. The band gas comes off
+  // is ~2 mm across and the gas crosses it at ~5 mm a step at 60 Hz, so a
+  // point sample drew one line of fuel per step: horizontal stripes up every
+  // tongue.
+  vec2 path = texture2D(uVelocity, vUv).xy * uDt / uDomain;
+  float e = 0.25 * (texture2D(uEmit, vUv).r + texture2D(uEmit, vUv - path * 0.25).r +
+    texture2D(uEmit, vUv - path * 0.5).r + texture2D(uEmit, vUv - path * 0.75).r);
   // What the rim releases this step.
   float fuel = a.r + e * uFuel * uDt;
   float heat = a.g + e * uHeat * uDt;
   float smoke = a.b + e * uSmoke * uDt;
   float premixed = b.r + e * uFuel * uPremixed * uDt;
-  // The air mixes back toward its ambient oxygen.
-  float oxygen = b.g + (uAmbient - b.g) * (1.0 - exp(-uDt * 1.5));
-  // Fuel burns only as far as there is oxygen for it — premixed first.
-  float burn = min(fuel, premixed + oxygen) * (1.0 - exp(-uBurnRate * uDt));
+  // Air, mixed in from beside and entrained from in front and behind.
+  float around = 0.25 * (
+    texture2D(uB, vUv + vec2(uTexel.x, 0.0)).g + texture2D(uB, vUv - vec2(uTexel.x, 0.0)).g +
+    texture2D(uB, vUv + vec2(0.0, uTexel.y)).g + texture2D(uB, vUv - vec2(0.0, uTexel.y)).g);
+  float oxygen = mix(b.g, around, uMixing);
+  float reach = exp(-fuel / max(uFuelBlock, 1e-4));
+  oxygen += (uAmbient - oxygen) * (1.0 - exp(-uEntrain * reach * uDt));
+  // Fuel burns only as far as there is oxygen for it — premixed first — and a
+  // unit of fuel takes uStoich of air. At one to one (as it once was) fuel was
+  // never denser than the air around it, so nothing ever ran out of air and
+  // every scrap of fuel burnt where it stood: no core, no tip.
+  float burn = min(fuel, premixed + oxygen / uStoich) * (1.0 - exp(-uBurnRate * uDt));
   fuel = max(0.0, fuel - burn) * exp(-uDt * 0.6);
   float fromPremixed = min(premixed, burn);
   premixed = max(0.0, premixed - fromPremixed) * exp(-uDt * 0.6);
-  oxygen = max(0.0, oxygen - (burn - fromPremixed));
+  oxygen = max(0.0, oxygen - (burn - fromPremixed) * uStoich);
   heat = (heat + burn * uHeatRelease) * exp(-uCooling * uDt);
   smoke = (smoke + burn * uSmokeProduction) * exp(-uDt / uSmokeFade);
   float rate = burn / max(uDt, 1e-4);
-  // Flame: what burnt a moment ago still looks like flame, for as long as
-  // persistence says.
-  float flame = max(a.a * exp(-uDt / uPersistence), rate * 0.25);
+  // Soot: forms from hot fuel, burns where there is air, and is gone once the
+  // gas is too cool to glow.
+  float hot = heat / max(uSootHeat, 1e-3);
+  float soot = a.a + uSootYield * (fuel + burn) * smoothstep(0.3, 0.8, hot) * uDt;
+  float air = oxygen / max(uAmbient, 0.05);
+  // Soot that cools stops glowing within a few frames — it is smoke now, and
+  // the smoke channel already carries that. Held to glowing only below a
+  // twentieth of uSootHeat, it outlived the flame by a hand's breadth and
+  // drew ribbons and hooks of flame colour high over the sheet.
+  float cold = 1.0 - smoothstep(0.2, 0.6, hot);
+  soot *= exp(-uDt * (air / max(uPersistence, 1e-3) + cold * 25.0));
   // An open top: whatever reaches it leaves.
   float open = 1.0 - smoothstep(0.9, 1.0, vUv.y);
-  if (uOut == 0) gl_FragColor = vec4(fuel, heat, smoke * open, flame) * vec4(open, open, 1.0, open);
+  if (uOut == 0) gl_FragColor = vec4(fuel, heat, smoke * open, soot) * vec4(open, open, 1.0, open);
   else gl_FragColor = vec4(premixed * open, oxygen, rate, 0.0);
 }
 `
@@ -177,36 +282,40 @@ void main() {
 export const FORCES = /* glsl */ `
 uniform sampler2D uVelocity;
 uniform sampler2D uA;
+uniform sampler2D uEmit;
 uniform vec2 uTexel;
+uniform vec2 uDomain;
 uniform float uDt;
 uniform float uTime;
 uniform float uBuoyancy;
 uniform float uWind;
 uniform float uTurbulence;
 uniform float uTurbScale;
+uniform float uTurbEvolve;
 uniform float uRadial;
 uniform vec2 uInitVel;
 varying vec2 vUv;
 ${NOISE}
-${SOURCES}
 void main() {
   vec2 v = texture2D(uVelocity, vUv).xy;
   vec4 a = texture2D(uA, vUv);
   // Hot gas rises.
   v.y += uBuoyancy * a.g * uDt;
   v.x += uWind * uDt;
-  // Curl noise: divergence-free eddies that drift upward at a speed that
-  // itself wanders, so the motion never settles into a loop.
+  // Curl noise: divergence-free eddies, in world units, carried up with the
+  // gas AND changing as they go. The third coordinate is time: a 2D pattern
+  // that only scrolled was a wave travelling up a still flame, never a flame
+  // that flickers.
   float drift = uTime * 0.8 + 1.7 * fxNoise(vec2(uTime * 0.23, 3.1));
-  vec2 p = vec2(vUv.x * uAspect, vUv.y) * uTurbScale + vec2(0.37 * fxNoise(vec2(uTime * 0.17, 9.0)), -drift);
+  vec3 p = vec3(vUv * uDomain * uTurbScale + vec2(0.37 * fxNoise(vec2(uTime * 0.17, 9.0)), -drift), uTime * uTurbEvolve);
   float h = 0.04;
-  float n = fxFbm(p);
-  vec2 curl = vec2(fxFbm(p + vec2(0.0, h)) - n, -(fxFbm(p + vec2(h, 0.0)) - n)) / h;
+  float n = fxFbm3(p);
+  vec2 curl = vec2(fxFbm3(p + vec3(0.0, h, 0.0)) - n, -(fxFbm3(p + vec3(h, 0.0, 0.0)) - n)) / h;
   v += curl * uTurbulence * uDt * (0.2 + clamp(a.g, 0.0, 2.0));
-  // The gas leaves the paper at its own speed, pushed outward if asked.
-  vec2 outward;
-  float e = fxEmission(vUv, outward);
-  vec2 launch = uInitVel + uRadial * outward / max(e, 1e-4);
+  // The gas leaves the paper at its own speed, pushed off the edge if asked.
+  vec4 em = texture2D(uEmit, vUv);
+  float e = em.r;
+  vec2 launch = uInitVel + uRadial * em.gb / max(e, 1e-4);
   v = mix(v, launch, clamp(e * uDt * 6.0, 0.0, 1.0));
   // Walls on three sides; the top is open.
   if (vUv.x < uTexel.x || vUv.x > 1.0 - uTexel.x || vUv.y < uTexel.y) v = vec2(0.0);
@@ -307,7 +416,7 @@ void main() {
 }
 `
 
-/** How the fine grid is drawn: blackbody fire, and smoke lit warm from below. */
+/** How the fine grid is drawn: soot glowing at its temperature, and smoke lit warm from below. */
 export const RENDER_VERTEX = /* glsl */ `
 varying vec2 vUv;
 void main() {
@@ -316,6 +425,16 @@ void main() {
 }
 `
 
+/**
+ * Two fields, two jobs. The first version drew everything — outline, colour,
+ * opacity, brightness — from temperature alone, and the contours of one
+ * smooth scalar are nested smooth rings: an airbrushed blob with a white spot
+ * in it, however the bands were tuned.
+ *
+ *   soot         WHERE the flame is and how dense: its outline, its opacity,
+ *                how much light it can give. It ends where the fuel runs out.
+ *   temperature  WHAT COLOUR that soot glows: the zones, tip to core.
+ */
 export const RENDER_FRAGMENT = /* glsl */ `
 uniform sampler2D uA;
 uniform float uTime;
@@ -323,6 +442,7 @@ uniform float uGlow;
 uniform float uSmokeDensity;
 uniform float uPaperWhite;
 uniform float uHeatScale;
+uniform float uSootScale;
 uniform float uContrast;
 uniform float uOpacity;
 uniform float uThin;
@@ -344,43 +464,39 @@ varying vec2 vUv;
 ${NOISE}
 void main() {
   // Detail finer than the grid, none of it touching the solve: a small domain
-  // warp so a tongue's outline is never the grid's, and a finer shimmer.
+  // warp so a tongue's outline is never the grid's.
   vec2 w = vUv * vec2(26.0, 18.0) + vec2(0.0, -uTime * 1.6);
   vec2 warp = vec2(fxFbm(w), fxFbm(w + 31.7)) - 0.5;
-  vec2 q = vUv * vec2(70.0, 50.0) + vec2(0.0, -uTime * 7.0);
-  vec2 jitter = (vec2(fxNoise(q), fxNoise(q + 17.3)) - 0.5) * 0.0035;
-  vec4 a = texture2D(uA, vUv + jitter + warp * 0.005);
+  vec4 a = texture2D(uA, vUv + warp * 0.004);
   float fuel = a.r;
   float heat = a.g;
   float smoke = a.b;
-  // Temperature against the hottest gas a flame has (FIRE_HEAT_SCALE), with
-  // what burnt a moment ago still counting for a little.
-  float t = max(heat, a.a * 0.6) / max(uHeatScale, 1e-3);
-  // The tip's tearing: carved multiplicatively, hardest where the gas is
-  // thin, so tongues come apart at their edges and keep their bodies.
+  // How dense the glowing soot is, against a full flame's (FIRE_SOOT_SCALE).
+  float rho = a.a / max(uSootScale, 1e-4);
+  // The tip's tearing: carved into the soot where it is thin, so tongues come
+  // apart at their edges and keep their bodies.
   vec2 n1 = vUv * vec2(34.0, 24.0) + vec2(0.0, -uTime * 2.4);
   vec2 n2 = vUv * vec2(92.0, 64.0) + vec2(0.0, -uTime * 5.5);
   float grain = (fxFbm(n1) - 0.5) * 0.72 + (fxNoise(n2) - 0.5) * 0.28;
-  t = max(0.0, t * (1.0 + grain * uTearing * (1.0 - smoothstep(0.15, 0.95, t))));
-  t = pow(t, uContrast);
+  rho = max(0.0, rho * (1.0 + grain * uTearing * (1.0 - smoothstep(0.1, 0.8, rho))));
+  // Temperature against the hottest gas a flame has (FIRE_HEAT_SCALE).
+  float t = pow(clamp(heat / max(uHeatScale, 1e-3), 0.0, 2.0), uContrast);
 
-  // THE FOUR ZONES (FireZones, fx/emission.ts), as bands of temperature.
-  // Where the flame is at all: its outline starts at the tip's own edge.
-  float shape = smoothstep(uTipFrom, uTipFrom + uSoftness, t);
-  // Tip gives way to body, body to core. Colour and brightness blend across
-  // the same bands but are chosen separately per zone.
+  // WHERE: the outline, from the soot.
+  float shape = smoothstep(uTipFrom, uTipFrom + uSoftness, rho);
+  // WHAT COLOUR: the zones, as bands of temperature.
   float toBody = smoothstep(uTipTo - 0.12, uTipTo + 0.12, t);
   float toCore = smoothstep(uCoreFrom, uCoreFrom + 0.35, t);
   vec3 color = mix(mix(uTipColor, uBodyColor, toBody), uCoreColor, toCore);
   float glow = mix(mix(uTipGlow, uBodyGlow, toBody), uCoreGlow, toCore);
-  // Dense flame covers what is behind it; thin gas glows only as much as it
-  // covers (soot emits and absorbs together) — or a transparent tip adds
-  // red light to cream paper and turns salmon.
-  float fireAlpha = shape * (1.0 - exp(-t * uOpacity));
-  vec3 fire = color * glow * shape * uPaperWhite * uGlow * smoothstep(0.0, uThin, fireAlpha);
+  // Soot emits and absorbs together: thin soot glows as much as it covers, and
+  // a dense flame covers what is behind it only as far as uOpacity says.
+  float cover = 1.0 - exp(-rho * 3.0);
+  float fireAlpha = shape * cover * clamp(uOpacity / 5.0, 0.0, 1.0);
+  vec3 fire = color * glow * shape * uPaperWhite * uGlow * smoothstep(0.0, uThin, cover);
   // The root: added as LIGHT, where fresh fuel is still near the paper and the
   // gas has not heated through. Mixed in instead of added, blue makes grey.
-  float rootMask = shape * smoothstep(mix(0.4, 0.02, uRootReach), mix(0.6, 0.12, uRootReach), fuel) * (1.0 - smoothstep(0.25, 0.6, t));
+  float rootMask = smoothstep(mix(0.4, 0.02, uRootReach), mix(0.6, 0.12, uRootReach), fuel) * (1.0 - smoothstep(0.25, 0.6, t));
   fire += uRootColor * rootMask * uRootAmount * uPaperWhite * uGlow * 0.6;
 
   // Smoke: warm grey-brown (a cool grey over cream reads lavender), lit by

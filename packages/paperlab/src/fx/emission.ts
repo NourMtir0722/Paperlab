@@ -137,22 +137,29 @@ export function emitHex(hex: string, times: number): [number, number, number] {
  * is a fraction of this, which is what gives a flame a core, a body and a
  * tip instead of one saturated colour.
  *
- * Tuned by sweeping it against the peak frame at 2, 4, 8 and 16: at 2 the
- * whole flame is cream again, at 16 the fire goes grey and thin because
- * nothing reaches the core band.
+ * It is NOT independent of the solver's `cooling` and heat terms: this is a
+ * reference temperature, and they decide how much gas ever reaches it.
+ * `pnpm test:fire-budget` is what holds the pair honest.
  *
- * It is NOT independent of the solver's `cooling`, and that is worth stating
- * because the two were tuned apart and fought. This is a reference
- * temperature; cooling decides how much gas ever reaches it. At cooling 0.92
- * a scale of 5 put 77% of the frame past the bloom threshold — the blown-out
- * frame — so the scale went to 8; then cooling went to 1.15 to stop the
- * tongues merging, and at 8 almost nothing reached the core band any more and
- * bloom touched 0.01% of the frame. Measured together (bloom's share of the
- * frame): scale 5 gives 77% / 11% / 4% at cooling 0.92 / 1.15 / 1.4, and
- * scale 8 gives 1.2% / 0.6% / 0.2%. `pnpm test:fire-budget` is what holds the
- * pair honest now.
+ * 2.5 since the gas leaves the rim at its real speed through a narrow band
+ * and cools faster (see `fireFluidDefaults`): it spends less time over the
+ * rim piling up heat, the hottest gas now reads about 2.3 at the 99th
+ * percentile, and at the old 5 every glowing pixel sat in the tip's band — a
+ * flat peach flame.
  */
-export const FIRE_HEAT_SCALE = 5
+export const FIRE_HEAT_SCALE = 2.5
+
+/**
+ * The soot density that counts as a full flame.
+ *
+ * Soot is what the render pass draws a flame FROM — its outline, its opacity,
+ * how much light it can give — while temperature only picks the colour (see
+ * `RENDER_FRAGMENT`). Like the heat, the solver's soot has no natural unit,
+ * so this is the reference: `tip.from` is a fraction of it. At 1 the soot's
+ * 90th percentile (~1.4) was already past it, so every tongue was solid to
+ * its edge with a hard outline; 3 leaves the thin parts room to fade.
+ */
+export const FIRE_SOOT_SCALE = 3
 
 /**
  * How strongly light past {@link FX_BLOOM_THRESHOLD} spreads.
@@ -229,10 +236,19 @@ export const FIRE_THIN = 0.55
  * the one outside it — because breaking it is how dim yellow turns olive;
  * `emission.test.ts` holds them to that.
  *
- * The zones are bands of the normalised temperature (see FIRE_HEAT_SCALE):
- * the flame begins at `tip.from`, the tip gives way to the body around
- * `tip.to`, and the core begins at `core.from`. Brightness is in multiples of
- * paper white; colours are sRGB, the way a colour picker gives them.
+ * WHERE the flame is comes from its soot: it begins at `tip.from`, a fraction
+ * of FIRE_SOOT_SCALE, over `tip.softness`. WHAT COLOUR it is comes from its
+ * temperature (a fraction of FIRE_HEAT_SCALE): the tip gives way to the body
+ * around `tip.to`, and the core begins at `core.from`. Brightness is in
+ * multiples of paper white; colours are sRGB, the way a colour picker gives
+ * them.
+ *
+ * The body is ABOVE paper white. It was once held below it, because under a
+ * bright preset paper sits at the top of the tone curve and anything brighter
+ * loses its colour — and a flame dimmer than the paper behind it, drawn
+ * opaque, is a yellow decal on the sheet, not light. Fire photographed in a
+ * bright room DOES wash out; that is the lighting's to answer (the lab shoots
+ * under `noir`, as the references were), not the flame's.
  */
 export interface FireZones {
   root: { color: string; amount: number; reach: number }
@@ -253,8 +269,11 @@ export type FireZonesInput = { [Z in keyof FireZones]?: Partial<FireZones[Z]> }
 export const FIRE_ZONES: FireZones = {
   root: { color: '#3b6bff', amount: 0, reach: 0.5 },
   core: { color: '#fff7d4', glow: 4.6, from: 0.55 },
-  body: { color: '#ffdd7c', glow: 0.6 },
-  tip: { color: '#ff9e2c', glow: 0.42, from: 0.1, to: 0.32, softness: 0.1, tearing: 0.35 },
+  // Saturated, because the tone curve takes saturation away from anything
+  // above paper white: #ffdd7c at this glow came out pale yellow (s ~0.4),
+  // and measured 7.5% yellow against Flame_base.png's 29%.
+  body: { color: '#ffc02a', glow: 1.3 },
+  tip: { color: '#ff9e2c', glow: 0.9, from: 0.08, to: 0.32, softness: 0.15, tearing: 0.35 },
 }
 
 /** The defaults with `input` laid over them, zone by zone. */
