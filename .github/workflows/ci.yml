@@ -9,7 +9,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Five jobs, and `ci` is the one that matters.
+# Six jobs, and `ci` is the one that matters.
 #
 # This was one job with a 20-minute limit, and the browser gates run one after
 # another on runners with no GPU — every WebGL frame drawn by SwiftShader on
@@ -173,8 +173,8 @@ jobs:
       - name: Dropdown reach gate
         run: pnpm test:dropdown
 
-  # The damage seam and the fire's budgets: everything that renders a burn.
-  gates-fire:
+  # The damage seam gate on its own: >5 minutes on its own on PR #83.
+  gates-damage:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -208,6 +208,34 @@ jobs:
       - name: Damage seam gate
         run: pnpm test:damage
 
+  # The fire's budgets on their own: every shot seeks a burn and warms the
+  # fire simulator up from still air, on the CPU. With the damage seam gate in
+  # the same job it ran past 16 minutes of its 20.
+  gates-fire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vendor the hand tracker's wasm
+        run: pnpm hands:setup
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
       # What the fire must MEASURE, as opposed to what it must not break.
       # `test:fire-look` is the gate that photographs the burn beside the
       # stills it is meant to look like, and it can never run here: those
@@ -222,7 +250,7 @@ jobs:
 
   # The required check. See the note at the top.
   ci:
-    needs: [checks, gates-stage, gates-dropdown, gates-fire]
+    needs: [checks, gates-stage, gates-dropdown, gates-damage, gates-fire]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -230,7 +258,7 @@ jobs:
       - name: Every job passed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
         run: |
-          echo "Not every job passed: checks ${{ needs.checks.result }}, gates-stage ${{ needs.gates-stage.result }}, gates-dropdown ${{ needs.gates-dropdown.result }}, gates-fire ${{ needs.gates-fire.result }}"
+          echo "Not every job passed: checks ${{ needs.checks.result }}, gates-stage ${{ needs.gates-stage.result }}, gates-dropdown ${{ needs.gates-dropdown.result }}, gates-damage ${{ needs.gates-damage.result }}, gates-fire ${{ needs.gates-fire.result }}"
           exit 1
 
-      - run: echo "checks, gates-stage, gates-dropdown and gates-fire all passed."
+      - run: echo "checks, gates-stage, gates-dropdown, gates-damage and gates-fire all passed."
