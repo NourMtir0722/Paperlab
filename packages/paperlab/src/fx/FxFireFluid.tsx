@@ -7,7 +7,12 @@ import {
   FIRE_CORE,
   FIRE_DETAIL,
   FIRE_HEAT_SCALE,
+  FIRE_BLUE,
+  FIRE_EDGE,
   FIRE_OPACITY,
+  FIRE_PALE_FROM,
+  FIRE_STREAK,
+  FIRE_THIN,
   PAPER_WHITE,
 } from './emission'
 import type { DamageField } from './field'
@@ -50,6 +55,23 @@ export interface FxFireFluidProps {
   detail?: number
   /** How opaque the densest flame gas is; 0 is purely additive fire. */
   opacity?: number
+  /** How much darker the gas is between a flame's sheets of light, 0..1. */
+  streak?: number
+  /** How soft a flame's outline is; smaller is crisper. */
+  edge?: number
+  /** Blue at the root of each tongue; 0 removes it. */
+  blue?: number
+  /** How opaque gas must be to glow fully; see `FIRE_THIN`. */
+  thin?: number
+  /** Where the pale, over-exposed core begins; see `FIRE_PALE_FROM`. */
+  paleFrom?: number
+  /**
+   * Seconds of fire run, unseen, whenever it starts over (see `resetKey`).
+   * A plume started from still air rolls its leading edge into a mushroom cap
+   * — the starting vortex — and a fire that has burned for seconds has long
+   * since shed it. Too short and a seeked-to frame shows that cap.
+   */
+  warm?: number
   /**
    * Error-compensated (MacCormack) advection for what is drawn. Defaults to
    * on everywhere but the `low` tier, where the two extra passes a step are
@@ -69,8 +91,19 @@ const DOMAIN = { width: 1.5, height: 2 } as const
 const BELOW = 0.8
 /** Fixed solver step. */
 const STEP = 1 / 60
-/** How long a reset fire is run before it is shown. */
-const WARM = 0.8
+/**
+ * How long a reset fire is run before it is shown.
+ *
+ * Was 0.8 s, and that is what drew the HOOKS — tongues curling over at the
+ * top like ribbons. A plume started from still air rolls its leading edge
+ * into a mushroom cap, the starting vortex, and 0.8 s is not long enough for
+ * it to have risen out of frame; a fire that has actually burned for a few
+ * seconds shed it long ago. Swept on the peak frame: at 0.8 s two hooks, at
+ * 2 s nearly none, at 4 s straight vertical tongues. Turbulence and vorticity
+ * were tried first and changed nothing — the hooks were never the flow's, they
+ * were the seek's. Only a reset pays this (a seek, or `resetKey` changing).
+ */
+const WARM = 3
 
 const up = new THREE.Vector3(0, 1, 0)
 
@@ -104,6 +137,12 @@ export function FxFireFluid({
   contrast = FIRE_CONTRAST,
   detail = FIRE_DETAIL,
   opacity = FIRE_OPACITY,
+  streak = FIRE_STREAK,
+  edge = FIRE_EDGE,
+  blue = FIRE_BLUE,
+  thin = FIRE_THIN,
+  paleFrom = FIRE_PALE_FROM,
+  warm = WARM,
   sharp,
   fallback,
 }: FxFireFluidProps) {
@@ -124,7 +163,7 @@ export function FxFireFluid({
           uTime: { value: 0 },
           uGlow: { value: 1 },
           // Thin: smoke over a clear background, not a veil across it.
-          uSmokeDensity: { value: 1.4 },
+          uSmokeDensity: { value: 0.9 },
           // How bright the fire is, in the one unit `emission.ts` defines.
           uPaperWhite: { value: PAPER_WHITE },
           uBody: { value: FIRE_BODY },
@@ -133,6 +172,11 @@ export function FxFireFluid({
           uContrast: { value: FIRE_CONTRAST },
           uDetail: { value: FIRE_DETAIL },
           uOpacity: { value: FIRE_OPACITY },
+          uStreak: { value: FIRE_STREAK },
+          uEdge: { value: FIRE_EDGE },
+          uBlue: { value: FIRE_BLUE },
+          uThin: { value: FIRE_THIN },
+          uPaleFrom: { value: FIRE_PALE_FROM },
         },
         transparent: true,
         depthWrite: false,
@@ -219,9 +263,9 @@ export function FxFireFluid({
       // Warm up from the rim as it stands, on the burn's own clock, so the
       // same moment of the same burn draws the same fire.
       const end = field.time
-      const steps = Math.round(WARM / STEP)
+      const steps = Math.round(warm / STEP)
       for (let k = 0; k < steps; k++) {
-        const t = end - WARM + k * STEP
+        const t = end - warm + k * STEP
         fluid.step(STEP, u, sources, gather(t), t)
       }
       s.time = end
@@ -246,6 +290,11 @@ export function FxFireFluid({
     material.uniforms.uContrast!.value = contrast
     material.uniforms.uDetail!.value = detail
     material.uniforms.uOpacity!.value = opacity
+    material.uniforms.uStreak!.value = streak
+    material.uniforms.uEdge!.value = edge
+    material.uniforms.uBlue!.value = blue
+    material.uniforms.uThin!.value = thin
+    material.uniforms.uPaleFrom!.value = paleFrom
   })
 
   if (!fluid) return <>{fallback ?? null}</>

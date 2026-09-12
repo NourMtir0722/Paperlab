@@ -256,6 +256,12 @@ const FIRE_OVERRIDES: {
   detail?: number
   opacity?: number
   sharp?: number
+  streak?: number
+  edge?: number
+  blue?: number
+  thin?: number
+  warm?: number
+  pale?: number
 } = (() => {
   const raw = query.get('fire')
   if (!raw) return {}
@@ -267,6 +273,12 @@ const FIRE_OVERRIDES: {
     detail?: number
     opacity?: number
     sharp?: number
+    streak?: number
+    edge?: number
+    blue?: number
+    thin?: number
+    warm?: number
+    pale?: number
   } = {}
   for (const pair of raw.split(',')) {
     const [key, value] = pair.split(':')
@@ -279,6 +291,12 @@ const FIRE_OVERRIDES: {
     if (key === 'detail') out.detail = n
     if (key === 'opacity') out.opacity = n
     if (key === 'sharp') out.sharp = n
+    if (key === 'streak') out.streak = n
+    if (key === 'edge') out.edge = n
+    if (key === 'blue') out.blue = n
+    if (key === 'warm') out.warm = n
+    if (key === 'pale') out.pale = n
+    if (key === 'thin') out.thin = n
   }
   return out
 })()
@@ -1038,6 +1056,12 @@ function Lab() {
               contrast={FIRE_OVERRIDES.contrast}
               detail={FIRE_OVERRIDES.detail}
               opacity={FIRE_OVERRIDES.opacity}
+              streak={FIRE_OVERRIDES.streak}
+              edge={FIRE_OVERRIDES.edge}
+              blue={FIRE_OVERRIDES.blue}
+              warm={FIRE_OVERRIDES.warm}
+              paleFrom={FIRE_OVERRIDES.pale}
+              thin={FIRE_OVERRIDES.thin}
               sharp={FIRE_OVERRIDES.sharp === undefined ? undefined : FIRE_OVERRIDES.sharp !== 0}
               running={playing}
               // Every seek starts the fire over, warmed up from the rim as it

@@ -129,29 +129,19 @@ export function emitHex(hex: string, times: number): [number, number, number] {
 }
 
 /**
- * The flame body, in multiples of paper white.
+ * The flame body's gain, in multiples of paper white — how much light the
+ * emission ramp (`flameEmission` in the render pass) is scaled by.
  *
- * **Below paper white, and that is not a mistake.** It was 1.3, on the
- * reasoning that a flame has to be brighter than the paper to read as a
- * light — and the result was the pastel salmon the spec forbids. The
- * arithmetic that was missed: the tone curve rolls everything approaching
- * white toward white, hue and all, and paper white is ALREADY at the top of
- * it. Anything brighter than paper therefore lands where the curve has no
- * saturation left to give, so a flame body at 1.3x paper came out the same
- * near-white as the sheet behind it, with only a pink cast to say it was
- * there.
- *
- * A flame is only over-exposed in its core. Photograph a candle beside a
- * sheet of white paper in daylight and the paper is BRIGHTER than the body of
- * the flame; what makes the flame read as fire is not its luminance but its
- * saturation, and saturation only survives in the mid-tones. So the body sits
- * below paper, where the curve still has colour, and {@link FIRE_CORE} does
- * the over-exposing — which is what the bloom threshold is for.
- *
- * Swept against a macro crop of the flames at 0.45, 0.7, 1.0 and 1.3: gold at
- * the bottom of that range, pastel at the top.
+ * Its history is worth keeping, because each value was a real mistake. At
+ * 1.3 the whole flame sat in the tone curve's roll-off and came out pastel.
+ * At 0.45, with hue chosen apart from brightness, the dim parts of every
+ * tongue were dark YELLOW, which is olive. Colour follows intensity now, the
+ * way a hot body's does, and the gain decides how far up that ramp a flame
+ * reaches. Measured against Flame_base.png: 0.5 -> 13% yellow, 0.8 -> 9%,
+ * 1.2 -> 2% (bright yellow is taken to pale by the curve), so it stays well
+ * under paper white and the cores, via {@link FIRE_CORE}, do the over-exposing.
  */
-export const FIRE_BODY = 0.45
+export const FIRE_BODY = 0.6
 
 /**
  * The hottest cores, in multiples of paper white — added to the body, so the
@@ -213,10 +203,12 @@ export const FX_BLOOM = 0.55
  * How much darker a flame's mid-tones are than a linear ramp would make them.
  *
  * A gamma on the normalised temperature. 1 is the ramp as the solver hands it
- * over; above 1 the body falls away from the core faster, which is the gap
- * that reads as fire rather than as a glow.
+ * over; above 1 the body falls away from the core faster, below 1 mid
+ * temperatures are lifted up the emission ramp. It was 1.15 while the gradient
+ * of temperature WAS the look; now that the sheets and the outline carry the
+ * contrast, 0.9 gives fuller tongues and a little more amber and yellow.
  */
-export const FIRE_CONTRAST = 1.15
+export const FIRE_CONTRAST = 0.9
 
 /**
  * How hard the render pass carves the gas into filaments, 0..2.
@@ -225,7 +217,7 @@ export const FIRE_CONTRAST = 1.15
  * flame instead of dimming it evenly — a fire is optically thin and the black
  * you see through it is half of its contrast.
  */
-export const FIRE_DETAIL = 0.9
+export const FIRE_DETAIL = 0.35
 
 /**
  * How opaque the densest flame gas is, as an extinction coefficient.
@@ -236,5 +228,56 @@ export const FIRE_DETAIL = 0.9
  * its bright heart, and that opacity is what lets it read as its own colour
  * instead of as a tint on whatever is behind it. 0 restores the old purely
  * additive fire.
+ *
+ * 2.2 left the body of a flame about half see-through at mid temperature
+ * (1 - e^-(0.3 x 2.2) ~ 0.5), so half of every tongue in front of the sheet
+ * was cream paper — which is what turned orange into PEACH. Measured on the
+ * flame's own pixels, 35-44% of them were pale against the reference's 17%.
+ * At 5 the body covers what is behind it and only the thin edges and tips
+ * stay translucent.
  */
-export const FIRE_OPACITY = 2.2
+export const FIRE_OPACITY = 5
+
+/**
+ * How much darker the gas is BETWEEN a flame's sheets of light than on them,
+ * 0..1. A flame's light comes from the thin sheet where the burning is, seen
+ * as streaks running up the tongue; 0 is a smooth, gradient-lit flame — the
+ * blob this replaced.
+ */
+export const FIRE_STREAK = 0
+
+/**
+ * How soft a flame's outline is, as a width in normalised temperature.
+ * Smaller is a crisper silhouette; a wide fall-off reads as a glow, not a
+ * tongue.
+ */
+export const FIRE_EDGE = 0.1
+
+/**
+ * How much blue at the root of each tongue, where fresh gas leaves the paper
+ * and burns before it has heated through (Flame_base.png). 0 removes it.
+ */
+export const FIRE_BLUE = 0
+
+/**
+ * How opaque flame gas must be before it glows at full strength, 0..1.
+ *
+ * Soot emits and absorbs together, so thin gas should glow in proportion to
+ * how much of the background it covers; at a low value a nearly transparent
+ * tip still emits fully and turns cream paper salmon, at a high value every
+ * dim edge fades out before it can show its deep orange.
+ */
+export const FIRE_THIN = 0.55
+
+/**
+ * Where a flame's pale, over-exposed core begins, as a fraction of the
+ * hottest gas (FIRE_HEAT_SCALE). The core is the one part of a flame that is
+ * brighter than white — the reason it blooms — so if this sits above what the
+ * gas actually reaches, nothing over-exposes and nothing blooms, which is
+ * what `test:fire-budget` catches.
+ */
+// Swept against the budget's own measurement (bloom on vs off, share of the
+// frame that changes): 0.75 -> 0.01%, 0.6 -> 0.6%, 0.6 with a core of 6 ->
+// 1.5%, 0.5 -> 3.2%. How MUCH gas reaches the core decides it, not how bright
+// the core is made.
+export const FIRE_PALE_FROM = 0.5

@@ -84,8 +84,10 @@ export const fireFluidDefaults: FireFluidParams = {
   // each one runs out of glow before it can merge with its neighbour. 1.7
   // stunted them; 1.15 keeps the tall ones and still holds them apart.
   cooling: 1.15,
-  // Was 1.4, which made a thick grey column. Noor's direction is light smoke.
-  smokeProduction: 0.5,
+  // Was 1.4, which made a thick grey column, then 0.5. Noor's direction is
+  // light smoke, and with MacCormack advection keeping the smoke's fine
+  // structure it needs less of it to read: at 0.5 it veiled the upper sheet.
+  smokeProduction: 0.25,
   ambientOxygen: 0.47,
   // Was 0.005 — the slider's own floor, which is to say switched off. The
   // flame channel decayed with a 5 ms time constant, so it was an
@@ -104,7 +106,12 @@ export const fireFluidDefaults: FireFluidParams = {
   // away; at 6 it was manufacturing swirls the flow never had.
   vorticity: 3,
   wind: 0.8,
-  smokeFade: 4.2,
+  // Was 4.2 s. Smoke that lingers that long is stretched by the flow into
+  // long grey veins, and sharper advection keeps every one of them — so the
+  // whole upper sheet and the black stage behind it came out MARBLED. Real
+  // paper smoke thins out within a second or two. Swept in live play against
+  // the default: 1.5 s is thin threads and a clean sheet.
+  smokeFade: 1.5,
 }
 
 /** Slider ranges for the lab, grouped the way the panel groups them. */
