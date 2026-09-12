@@ -286,3 +286,15 @@ export const FIRE_THIN = 0.55
 //   0.75 core 4    bloom 0.01% (never clears the threshold)
 // How MUCH gas reaches the core decides it, not how bright the core is made.
 export const FIRE_PALE_FROM = 0.55
+
+/**
+ * Where a flame's outline begins, as a fraction of the hottest gas. Below it
+ * the gas is warm but barely glowing, and over cream paper it draws as a peach
+ * veil above each tongue rather than as flame.
+ *
+ * Swept on the peak frame, measuring the peach share of the flame's pixels
+ * against how much flame is left: 0.05 -> 8.2% peach, 0.10 -> 5.1% (6% less
+ * flame), 0.15 -> 3.8% (11% less flame, and drifting yellow). The tongues keep
+ * their height at 0.10; only the veil above them shortens.
+ */
+export const FIRE_SHAPE_FROM = 0.1

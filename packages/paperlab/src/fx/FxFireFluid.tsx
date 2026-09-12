@@ -11,6 +11,7 @@ import {
   FIRE_EDGE,
   FIRE_OPACITY,
   FIRE_PALE_FROM,
+  FIRE_SHAPE_FROM,
   FIRE_STREAK,
   FIRE_THIN,
   PAPER_WHITE,
@@ -65,6 +66,8 @@ export interface FxFireFluidProps {
   thin?: number
   /** Where the pale, over-exposed core begins; see `FIRE_PALE_FROM`. */
   paleFrom?: number
+  /** Where the flame's outline begins; see `FIRE_SHAPE_FROM`. */
+  shapeFrom?: number
   /**
    * Seconds of fire run, unseen, whenever it starts over (see `resetKey`).
    * A plume started from still air rolls its leading edge into a mushroom cap
@@ -142,6 +145,7 @@ export function FxFireFluid({
   blue = FIRE_BLUE,
   thin = FIRE_THIN,
   paleFrom = FIRE_PALE_FROM,
+  shapeFrom = FIRE_SHAPE_FROM,
   warm = WARM,
   sharp,
   fallback,
@@ -177,6 +181,7 @@ export function FxFireFluid({
           uBlue: { value: FIRE_BLUE },
           uThin: { value: FIRE_THIN },
           uPaleFrom: { value: FIRE_PALE_FROM },
+          uShapeFrom: { value: FIRE_SHAPE_FROM },
         },
         transparent: true,
         depthWrite: false,
@@ -295,6 +300,7 @@ export function FxFireFluid({
     material.uniforms.uBlue!.value = blue
     material.uniforms.uThin!.value = thin
     material.uniforms.uPaleFrom!.value = paleFrom
+    material.uniforms.uShapeFrom!.value = shapeFrom
   })
 
   if (!fluid) return <>{fallback ?? null}</>

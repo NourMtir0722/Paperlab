@@ -262,6 +262,7 @@ const FIRE_OVERRIDES: {
   thin?: number
   warm?: number
   pale?: number
+  from?: number
 } = (() => {
   const raw = query.get('fire')
   if (!raw) return {}
@@ -279,6 +280,7 @@ const FIRE_OVERRIDES: {
     thin?: number
     warm?: number
     pale?: number
+    from?: number
   } = {}
   for (const pair of raw.split(',')) {
     const [key, value] = pair.split(':')
@@ -296,6 +298,7 @@ const FIRE_OVERRIDES: {
     if (key === 'blue') out.blue = n
     if (key === 'warm') out.warm = n
     if (key === 'pale') out.pale = n
+    if (key === 'from') out.from = n
     if (key === 'thin') out.thin = n
   }
   return out
@@ -633,6 +636,7 @@ function Ready({
   playing,
   phases,
   look,
+  onReady,
 }: {
   burn: ScriptedBurn
   armed: boolean
@@ -640,6 +644,8 @@ function Ready({
   playing: boolean
   phases: readonly Phase[]
   look: Required<DamageLook>
+  /** Called each time the frame settles — what `?play=1` starts the burn from. */
+  onReady?: () => void
 }) {
   const frames = useRef(0)
   const fonts = useRef(false)
@@ -674,7 +680,10 @@ function Ready({
   useFrame(() => {
     // `armed`: not before the first seek has actually run on a located sheet.
     if (!armed || playing || !fonts.current || frames.current > SETTLE_FRAMES) return
-    if (++frames.current > SETTLE_FRAMES) publish(true)
+    if (++frames.current > SETTLE_FRAMES) {
+      publish(true)
+      onReady?.()
+    }
   })
   return null
 }
@@ -752,7 +761,18 @@ function Lab() {
   /** Where a seek is aimed. Separate from `shown` so that playing does not re-seek. */
   const [target, setTarget] = useState(START_T)
   const [shown, setShown] = useState(START_T)
-  const [playing, setPlaying] = useState(START_PLAYING)
+  const [playing, setPlaying] = useState(false)
+  // `?play=1` waits for the first settled frame. Started at mount, the burn
+  // played itself out during the shader compile — and since `Ready` only
+  // publishes while the burn is NOT playing, the page could only report
+  // ready once the fire was over. Every film `tools/fire-film.mjs` made was
+  // of the cold aftermath, with the burn itself spent before it started.
+  const autoplay = useRef(START_PLAYING)
+  const startWhenReady = useCallback(() => {
+    if (!autoplay.current) return
+    autoplay.current = false
+    setPlaying(true)
+  }, [])
   const [speed, setSpeed] = useState(START_SPEED)
   const [layers, setLayers] = useState(START_LAYERS)
   const [detail, setDetail] = useState(1)
@@ -1061,6 +1081,7 @@ function Lab() {
               blue={FIRE_OVERRIDES.blue}
               warm={FIRE_OVERRIDES.warm}
               paleFrom={FIRE_OVERRIDES.pale}
+              shapeFrom={FIRE_OVERRIDES.from}
               thin={FIRE_OVERRIDES.thin}
               sharp={FIRE_OVERRIDES.sharp === undefined ? undefined : FIRE_OVERRIDES.sharp !== 0}
               running={playing}
@@ -1102,6 +1123,7 @@ function Lab() {
             armed={generation > 0}
             playing={playing}
             nonce={`${fluidKey}:${camera}:${at.u},${at.v}:${detail}:${post}:${bloom}`}
+            onReady={startWhenReady}
           />
         </Paper>
       </div>

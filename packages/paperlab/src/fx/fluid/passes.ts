@@ -333,6 +333,7 @@ uniform float uEdge;
 uniform float uBlue;
 uniform float uThin;
 uniform float uPaleFrom;
+uniform float uShapeFrom;
 varying vec2 vUv;
 ${NOISE}
 // Emission as a function of how INTENSE the gas is — colour and brightness
@@ -407,7 +408,12 @@ void main() {
   // Where the flame IS: an outline, not a fade. Real tongues have a fairly
   // defined edge (Flame_base.png); a gaussian fall-off is what makes a flame
   // read as a glow.
-  float shape = smoothstep(0.05, 0.05 + uEdge, t);
+  // It starts at FIRE_SHAPE_FROM of the hottest gas, not at the edge of
+  // any warmth at all. Gas just above that line is warm but barely glowing,
+  // and drawn over cream paper it is a long peach veil trailing above each
+  // tongue — 8.4% of the flame's pixels, 97% of them over the paper. The
+  // tongues in Hero.png end in defined tips with nothing above them.
+  float shape = smoothstep(uShapeFrom, uShapeFrom + uEdge, t);
   // How bright, in multiples of paper white: the body, dimmer at the cool
   // edges and tips, and shaded by the sheets. Never climbing to white.
   float intensity = shape * mix(0.15, 1.0, smoothstep(0.05, 0.8, t)) * mix(1.0 - uStreak, 1.0, ridge);
