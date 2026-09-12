@@ -114,9 +114,28 @@ export function FxWisps({ glow, field, locate, wind }: FxWispsProps) {
 
     for (let w = 0; w < WISPS; w++) {
       const s = state.current[w]!
-      // Keep a bead while it glows; take a new one when it goes out.
-      if (!beads.includes(s.cell))
-        s.cell = beads.find((c) => !state.current.some((o) => o !== s && o.cell === c)) ?? -1
+      // Keep a bead while it glows; take a new one when it goes out — and
+      // START THE THREAD OVER when it does.
+      //
+      // The ring buffer holds where each point was BORN, and those roots
+      // belong to the bead it was rising from. Left in place when the wisp
+      // moved to another bead, the thread's newest points sat over the new
+      // one while its older points were still alive over the old one, and the
+      // ribbon joining them is a straight line across the sheet at full
+      // alpha. During the smoulder the beads go out one by one, so the wisp
+      // re-targets again and again and lays down one line per move: the
+      // "random lines" that appear late in a burn, fanning across the burnt
+      // area from bead to bead. They only showed while PLAYING, because a
+      // seek rebuilds the page and never changes bead twice.
+      if (!beads.includes(s.cell)) {
+        const taken = beads.find((c) => !state.current.some((o) => o !== s && o.cell === c)) ?? -1
+        if (taken !== s.cell) {
+          s.born.fill(-1e9)
+          s.next = 0
+          s.owed = 0
+        }
+        s.cell = taken
+      }
       if (s.cell >= 0 && dt > 0) {
         s.owed += dt
         const every = LIFE / POINTS
@@ -166,10 +185,17 @@ export function FxWisps({ glow, field, locate, wind }: FxWispsProps) {
       for (let i = 0; i < POINTS; i++) {
         const a = age[i]!
         if (!(a >= 0 && a < LIFE)) {
+          // Onto the nearest living point, so the ribbon has no area here.
+          // With NOTHING alive there is no such point, and the fallback used
+          // to be the world ORIGIN — the middle of the sheet — so an entire
+          // dead thread became a zero-alpha ribbon sitting in the scene
+          // rather than nowhere. Collapse it onto its own first point
+          // instead: wherever that is, every vertex shares it, so the strip
+          // has no area at all.
           const k = anchor >= 0 ? anchor : 0
-          path[i * 3] = anchor >= 0 ? path[k * 3]! : 0
-          path[i * 3 + 1] = anchor >= 0 ? path[k * 3 + 1]! : 0
-          path[i * 3 + 2] = anchor >= 0 ? path[k * 3 + 2]! : 0
+          path[i * 3] = path[k * 3]!
+          path[i * 3 + 1] = path[k * 3 + 1]!
+          path[i * 3 + 2] = path[k * 3 + 2]!
         } else {
           anchor = i
         }

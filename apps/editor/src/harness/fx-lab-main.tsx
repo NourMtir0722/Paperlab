@@ -317,11 +317,52 @@ const DEFAULT_SETTINGS: LabSettings = {
 }
 
 /** A saved combination, over the defaults — or the defaults, if there is none or it will not parse. */
+/**
+ * A fingerprint of the shipped defaults.
+ *
+ * Saved settings are merged over the defaults, which means a tune saved in
+ * this browser silently wins over every default the library ships afterwards
+ * — for every key it happens to contain, including ones the person tuning
+ * never touched. That is how a lab comes to show a fire the product does not
+ * have: a look saved before the fire was retuned kept its own ash lip, char
+ * warmth, fingers, fire-light gain AND the whole solver, so what was on
+ * screen was an old look wearing a new renderer, and neither of us had ever
+ * chosen it.
+ *
+ * Deriving the stamp FROM the defaults is the point: nobody has to remember
+ * to bump a version, because changing a default changes the stamp, and a save
+ * made against different defaults is set aside rather than applied.
+ */
+function fingerprint(value: unknown): string {
+  const text = JSON.stringify(value)
+  let h = 2166136261
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0).toString(36)
+}
+
+const DEFAULTS_STAMP = fingerprint(DEFAULT_SETTINGS)
+
+/** Whether the settings on screen came from a save, and whether one was set aside. */
+export type SavedState = 'defaults' | 'restored' | 'stale'
+let savedState: SavedState = 'defaults'
+
 function loadSettings(): LabSettings {
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY)
     if (!raw) return DEFAULT_SETTINGS
-    const saved = JSON.parse(raw) as Partial<LabSettings>
+    const saved = JSON.parse(raw) as Partial<LabSettings> & { stamp?: string }
+    if (saved.stamp !== DEFAULTS_STAMP) {
+      // Kept, not deleted — it is somebody's tuning session. It is simply not
+      // applied over defaults it was never tuned against, and the panel says
+      // so rather than leaving them wondering why nothing looks like the
+      // screenshots.
+      savedState = 'stale'
+      return DEFAULT_SETTINGS
+    }
+    savedState = 'restored'
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
@@ -782,6 +823,13 @@ function Lab() {
         <div className="panel">
           <h1>fx lab · fire</h1>
           <p className="sub">A scripted burn, the same every time, beside the stills it has to look like.</p>
+          {savedState !== 'defaults' && (
+            <p className="gap">
+              {savedState === 'stale'
+                ? 'A tune saved in this browser was set aside — the defaults have changed since it was saved. This is what the library ships.'
+                : 'Showing a tune saved in this browser, not the shipped defaults. “reset all”, under tune, goes back to them.'}
+            </p>
+          )}
           <div className="row modes">
             {MODES.map((m) => (
               <button type="button" key={m} onClick={() => setMode(m)} aria-pressed={mode === m}>
@@ -1162,7 +1210,7 @@ function Tune({
   }
   const save = () => {
     try {
-      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, stamp: DEFAULTS_STAMP }))
       setNote('Saved in this browser — it loads next time you open the lab.')
     } catch {
       setNote('This browser would not save it; copy it instead.')
