@@ -150,10 +150,18 @@ describe('the damage field', () => {
       // The clamp is a safety net for extreme options. The first version
       // needed it on every tier at 60 fps, which is what made the fire's speed
       // a function of the frame rate in the first place.
+      //
+      // The first number is the field's own `heatDiffusion` default and the
+      // second its `wicking`. Heat's was 0.0035 until the clock was dilated;
+      // the old value is kept below as a HEADROOM case, because a test that
+      // only ever tried the current default would stop saying anything the
+      // moment the default moved further from the bound.
       for (let degrees = 0; degrees < 180; degrees += 15) {
         const fibre = (degrees * Math.PI) / 180
-        expect(stencil(0.0035, 3, fibre).clamped).toBe(false)
+        expect(stencil(0.00058, 3, fibre).clamped).toBe(false)
         expect(stencil(0.0045, 3, fibre).clamped).toBe(false)
+        // Six times heat's default, and still clear of the bound.
+        expect(stencil(0.0035, 3, fibre).clamped).toBe(false)
       }
     })
 
@@ -257,7 +265,12 @@ describe('the damage field', () => {
     it('goes back to sleep once a fire has burnt itself out', () => {
       const field = new DamageField({ seed: 8 })
       field.ignite(0.5, 0.5, 0.06, 1)
-      run(field, 20)
+      // 20 s while the field's clock ran six times faster. Measured at the
+      // pace it runs now: still awake at 24 s, asleep at 26. The lag from the
+      // last flame to sleep is about a second either way — heat leaves with
+      // the paper it was sitting on — so what grew is how long the fire takes,
+      // not how long the field lingers after it.
+      run(field, 28)
       expect(field.asleep).toBe(true)
       field.step(1 / 60)
       expect(field.cellsVisited).toBe(0)
@@ -344,7 +357,10 @@ describe('the damage field', () => {
       gap.cut(0, 0.5, 1, 0.5, 0.05)
       for (const f of [gap, solid]) {
         f.ignite(0.5, 0.2, 0.05, 1)
-        run(f, 5)
+        // The front has to cross 0.42 of the sheet (about 88 mm) to reach the
+        // band this counts. At 6.8 mm/s that is 13 s, not 5 — measured, the
+        // solid sheet first chars past 0.62 between 18 and 22 s.
+        run(f, 24)
       }
       expect(beyond(solid)).toBeGreaterThan(0)
       expect(beyond(gap)).toBeLessThan(beyond(solid) * 0.5)
@@ -358,7 +374,11 @@ describe('the damage field', () => {
     field.ignite(0.5, 0.5, 0.06, 1)
     let peak = 0
     let atPeak = 0
-    const frames = 60 * 8
+    // 8 s caught this fire still growing at the pace the field runs now — the
+    // front peaked on the very last frame, so "and then falls away" had
+    // nothing to stand on. Measured: the peak is at 10.2 s and the front is
+    // back to zero by 26.
+    const frames = 60 * 26
     for (let i = 0; i < frames; i++) {
       const stats = field.step(1 / 60)
       if (stats.front > peak) {

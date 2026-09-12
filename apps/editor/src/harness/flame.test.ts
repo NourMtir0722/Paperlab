@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DamageField } from 'paperlab/fx'
-import { FLAME_RADIUS, flameHeat } from './flame'
+import { DamageField, FIXED_DT } from 'paperlab/fx'
+import { BLOW_COOL_FROM, FLAME_RADIUS, coolFromBlow, flameHeat } from './flame'
 
 /**
  * Is the match hot enough to light paper, and cool enough not to light it by
@@ -56,5 +56,50 @@ describe('the match’s flame', () => {
     const { peakFront, remaining } = hold(0.1)
     expect(peakFront).toBe(0)
     expect(remaining).toBe(1)
+  })
+})
+
+describe('blowing a burn out', () => {
+  const burning = () => {
+    const field = new DamageField()
+    for (let t = 0; t < 1.8; t += FIXED_DT) {
+      if (t < 1.6) field.ignite(0.5, 0.32, FLAME_RADIUS, flameHeat(t + FIXED_DT, FIXED_DT))
+      field.step(FIXED_DT)
+    }
+    return field
+  }
+
+  it('does nothing to a fire below the breath that only leans flames', () => {
+    const a = burning()
+    const b = burning()
+    coolFromBlow(b, BLOW_COOL_FROM * 0.9, 0.5)
+    expect(Array.from(b.data)).toEqual(Array.from(a.data))
+  })
+
+  it('puts a burning sheet out with a sustained blow, and it stays out', () => {
+    const blown = burning()
+    const left = burning()
+    for (let t = 0; t < 0.8; t += FIXED_DT) {
+      coolFromBlow(blown, 1, FIXED_DT)
+      blown.step(FIXED_DT)
+      left.step(FIXED_DT)
+    }
+    // What each had left the moment the blowing stopped. Measured against
+    // THIS rather than against a fixed margin: the old test asked the two to
+    // differ by 0.2 of the sheet after four more seconds, which was a
+    // statement about how fast the field burns — it failed the moment the
+    // field's clock was dilated (`fx/field.ts`), while testing nothing about
+    // blowing. What blowing means is that one fire stopped eating paper and
+    // the other did not.
+    const blownThen = blown.lastStats.remaining
+    const leftThen = left.lastStats.remaining
+    for (let t = 0; t < 10; t += FIXED_DT) {
+      blown.step(FIXED_DT)
+      left.step(FIXED_DT)
+    }
+    // The blown one ate essentially nothing more; the one left alone went on.
+    expect(blownThen - blown.lastStats.remaining).toBeLessThan(0.02)
+    expect(leftThen - left.lastStats.remaining).toBeGreaterThan(0.15)
+    expect(blown.lastStats.front).toBe(0)
   })
 })

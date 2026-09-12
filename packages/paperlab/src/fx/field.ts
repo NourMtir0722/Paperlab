@@ -171,15 +171,53 @@ export interface DamageFieldOptions {
   seed?: number
 }
 
+/**
+ * **Fire's four rates were all six times too fast, and they were wrong
+ * together.**
+ *
+ * Measured on the scripted burn: the front spread at 39 mm/s from the centre
+ * and 27 mm/s from a corner, against the 3–8 mm/s
+ * `paperlab-fx-fire-spec.md` §9 asks for. A sheet was 76% gone in 4.8 s, so
+ * there was no time to watch it spread and every phase was judged at the
+ * wrong size — "dying" was a strip of paper under huge flames, and "smoulder"
+ * and "cold" were the same frame.
+ *
+ * The fix is a **uniform time dilation**, not four independent retunes. This
+ * is a reaction–diffusion front, so its speed goes as `sqrt(D · k)` and the
+ * charred band behind it as `D / v`: divide every RATE by the same number and
+ * the front slows by that number while the burn keeps its exact shape. Divide
+ * them unevenly and it does not — measured, cutting `heatDiffusion` and
+ * `charRate` alone (leaving `cooling`) put the front below the threshold that
+ * sustains it and the fire went out with 1% of the sheet gone.
+ *
+ * So `heatDiffusion`, `charRate` and `cooling` are the old numbers over six,
+ * which leaves every ratio between them — and `combustion`, which is already
+ * a ratio — untouched. Measured after: **6.8 mm/s from the centre and 3.6 from
+ * a corner** (a corner spreads along the sheet's fibre as a line rather than
+ * a disc, which is slower and is the field's own doing), a hole 22 mm across
+ * at 4 s, and a fire that lives about 11 s.
+ *
+ * Water's rates (`wicking`, `drying`) are deliberately NOT dilated: nothing
+ * has ever measured a wet front against a target, and the burn is identical
+ * either way (saturation is 0 in a dry burn), so changing them here would be
+ * an unmeasured change riding along with a measured one.
+ *
+ * `consumeRate` comes back DOWN, from 20 to 6, for the same reason it went up.
+ * At 20 it was holding the charred band to 8.5 mm against a front moving six
+ * times too fast; the band is `v / consumeRate`, so once the front slowed, 20
+ * squeezed it to 2.9 mm. 6 puts it at 5.3 mm — mid-range of §5's 2–8 mm.
+ * Measured band against this number, at the new pace: 5 → 6.0 mm, 6 → 5.3,
+ * 7 → 4.7, 9 → 4.0, 20 → 2.9.
+ */
 const DEFAULTS = {
   fibre: 0,
   anisotropy: 3,
-  heatDiffusion: 0.0035,
+  heatDiffusion: 0.00058,
   wicking: 0.0045,
-  charRate: 16,
-  consumeRate: 4,
+  charRate: 2.7,
+  consumeRate: 6,
   combustion: 2.4,
-  cooling: 1.1,
+  cooling: 0.18,
   wetResistance: 2.6,
   drying: 0.015,
   grain: 0.34,
@@ -336,6 +374,8 @@ export class DamageField implements DamageSource {
   private readonly heat: Stencil
   private readonly water: Stencil
   private accumulator = 0
+  /** Fixed steps run since the field was made — its own clock. See {@link time}. */
+  private steps = 0
   /** Cells that might change on the next step. Everything outside is at rest. */
   private active: Box = EMPTY()
   /** Cells written since the last pack into `pixels`. */
@@ -401,6 +441,20 @@ export class DamageField implements DamageSource {
   /** Bumped whenever `pixels` changes. */
   get version(): number {
     return this.revision
+  }
+
+  /**
+   * Simulated seconds this field has burned for — whole fixed steps, never
+   * wall time.
+   *
+   * What anything DRAWN from the field animates on: the ember line's beads
+   * flicker and crawl, flames puff, and all of it has to be the same at the
+   * same moment of the same burn, or a replay flickers differently from the
+   * original and a capture can never be taken twice. Stops while the field
+   * sleeps, which is right — a sheet at rest has nothing hot left to move.
+   */
+  get time(): number {
+    return this.steps * FIXED_DT
   }
 
   /** Nothing is happening to this sheet, and stepping it costs nothing. */
@@ -576,6 +630,7 @@ export class DamageField implements DamageSource {
     let stepped = false
     while (this.accumulator >= FIXED_DT && !this.asleep) {
       this.accumulator -= FIXED_DT
+      this.steps++
       stepped = true
       const done = this.substep()
       charred += done.charred

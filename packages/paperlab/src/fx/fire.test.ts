@@ -76,9 +76,37 @@ describe('the fire emitter', () => {
 
     // Embers and smoke come off paper that is burning, not paper that is
     // already gone. Char only ever rises, so the same argument applies.
-    const front = pool.spawns.filter((s) => s.name !== 'ash')
-    expect(front.length).toBeGreaterThan(0)
-    for (const s of front) expect(field.sample(s.u, s.v)[CHAR]).toBeGreaterThan(0.08)
+    //
+    // The two are checked differently, because they are SPAWNED differently.
+    // Smoke leaves the front cell itself, so the field under a puff must be
+    // charred. An ember is deliberately lifted up to 0.09 UV — about 19 mm —
+    // up a flame tongue and thrown a few millimetres to one side (see
+    // `FireEmitter.emit`), so the field at an ember's own position is paper
+    // ABOVE the front, and there is no reason for it to be charred.
+    //
+    // This used to assert char at the spawn for both, and passed only because
+    // a fire spreading six times too fast had charred a wide enough band that
+    // 19 mm up was still inside it. With the band at 5 mm (§5 wants 2–8) the
+    // lift clears it, and the assertion was measuring the fire's SIZE while
+    // claiming to measure where embers come from.
+    const smoke = pool.spawns.filter((s) => s.name === 'smoke')
+    expect(smoke.length).toBeGreaterThan(0)
+    for (const s of smoke) expect(field.sample(s.u, s.v)[CHAR]).toBeGreaterThan(0.08)
+
+    // An ember's source is under it: somewhere within the lift, straight down,
+    // the paper was burning.
+    const embers = pool.spawns.filter((s) => s.name === 'ember')
+    expect(embers.length).toBeGreaterThan(0)
+    for (const s of embers) {
+      let charredBelow = false
+      for (let drop = 0; drop <= 0.095; drop += 0.005) {
+        if (field.sample(s.u, Math.max(0, s.v - drop))[CHAR]! > 0.08) {
+          charredBelow = true
+          break
+        }
+      }
+      expect(charredBelow).toBe(true)
+    }
   })
 
   it('throws embers and smoke off the burn front', () => {
