@@ -277,7 +277,12 @@ export const FIRE_THIN = 0.55
  * what `test:fire-budget` catches.
  */
 // Swept against the budget's own measurement (bloom on vs off, share of the
-// frame that changes): 0.75 -> 0.01%, 0.6 -> 0.6%, 0.6 with a core of 6 ->
-// 1.5%, 0.5 -> 3.2%. How MUCH gas reaches the core decides it, not how bright
-// the core is made.
-export const FIRE_PALE_FROM = 0.5
+// frame that changes) AND the flame's near-white share, because the two pull
+// against each other: blooming needs an over-exposed core and over-exposure is
+// white, the thing Noor first asked to be rid of. Reference near-white: 0.9%.
+//   0.5  core 4    bloom 3.2%  near-white 6.3%
+//   0.55 core 4    bloom 1.6%  near-white 4.2%   <- this
+//   0.55 core 3    bloom 0.7%  near-white 3.3%
+//   0.75 core 4    bloom 0.01% (never clears the threshold)
+// How MUCH gas reaches the core decides it, not how bright the core is made.
+export const FIRE_PALE_FROM = 0.55

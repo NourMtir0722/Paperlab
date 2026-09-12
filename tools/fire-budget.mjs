@@ -136,9 +136,17 @@ const bloomShare = await pixels([peak.png, noBloom.png], (frames) => {
   }
   return moved / (a.data.length / 4)
 })
+// 0.5%, not the 2% this was written with. That bar was set while bloom
+// touched 17.6% of the frame — when the whole inside of every flame was
+// over-exposed, the look that was then rejected as "too much white inside".
+// A real flame over-exposes only at its hottest root (Flame_base.png: 0.9% of
+// its pixels near-white), and a bar that demands a large bloomed area demands
+// that white back. What this check exists to catch is the original failure:
+// flames that never clear the threshold at all, which measured 0.01-0.07%.
+// 0.5% sits seven times above that.
 check(
-  bloomShare >= 0.02,
-  `the fire is bright enough to bloom — it changes ${(bloomShare * 100).toFixed(2)}% of the frame (want ≥ 2%)`,
+  bloomShare >= 0.005,
+  `the fire is bright enough to bloom — it changes ${(bloomShare * 100).toFixed(2)}% of the frame (want ≥ 0.5%)`,
   'bloom barely touches the fire, so the flames are not clearing the threshold. Raise what they EMIT, never the threshold',
 )
 
