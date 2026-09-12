@@ -381,7 +381,7 @@ void main() {
   vec2 nt = vUv * vec2(48.0, 34.0) + vec2(0.0, -uTime * 3.2);
   t = max(0.0, t + (fxFbm(nt) - 0.5) * 0.34 * smoothstep(0.9, 0.25, t));
   float body = smoothstep(0.10, 0.34, t) * uBody + flame * 0.3 * uBody * smoothstep(0.06, 0.2, t);
-  float core = smoothstep(0.72, 1.0, t) * uCore;
+  float core = smoothstep(0.45, 0.85, t) * uCore;
   float glow = (body + core) * uPaperWhite / BB_PEAK_LUMA;
   // The ramp's own domain is 0..2.8; t is 0..1.
   vec3 fire = blackbody((t + ft * 0.4) * 2.8) * glow * uGlow;

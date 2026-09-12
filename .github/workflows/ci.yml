@@ -112,3 +112,15 @@ jobs:
       # scorched field as the control that proves it can see a difference.
       - name: Damage seam gate
         run: pnpm test:damage
+
+      # What the fire must MEASURE, as opposed to what it must not break.
+      # `test:fire-look` is the gate that photographs the burn beside the
+      # stills it is meant to look like, and it can never run here: those
+      # references are 20 MB kept deliberately out of this repo. Every check in
+      # this one compares the frame to itself with one thing switched off, so
+      # it needs nothing but the app. It exists because all twelve of
+      # fire-look's checks passed while a review scored the result 3.5/10 —
+      # they all ask "did nothing change that should not have", and none asked
+      # whether the fire was bright enough to be a fire. This one does.
+      - name: Fire budgets
+        run: pnpm test:fire-budget

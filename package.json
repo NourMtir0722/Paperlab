@@ -28,7 +28,8 @@
     "sheet": "node tools/contact-sheet.mjs",
     "test:consumer": "node tools/consumer-install.mjs",
     "test:damage": "node tools/damage-check.mjs",
-    "test:fire-look": "node tools/fire-look.mjs"
+    "test:fire-look": "node tools/fire-look.mjs",
+    "test:fire-budget": "node tools/fire-budget.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",

@@ -162,10 +162,20 @@ export const FIRE_CORE = 3
  *
  * Tuned by sweeping it against the peak frame at 2, 4, 8 and 16: at 2 the
  * whole flame is cream again, at 16 the fire goes grey and thin because
- * nothing reaches the core band. 8 is where a flame has a pale core, a
- * saturated orange body and a darker tip — which is `Flame_base.png`.
+ * nothing reaches the core band.
+ *
+ * It is NOT independent of the solver's `cooling`, and that is worth stating
+ * because the two were tuned apart and fought. This is a reference
+ * temperature; cooling decides how much gas ever reaches it. At cooling 0.92
+ * a scale of 5 put 77% of the frame past the bloom threshold — the blown-out
+ * frame — so the scale went to 8; then cooling went to 1.15 to stop the
+ * tongues merging, and at 8 almost nothing reached the core band any more and
+ * bloom touched 0.01% of the frame. Measured together (bloom's share of the
+ * frame): scale 5 gives 77% / 11% / 4% at cooling 0.92 / 1.15 / 1.4, and
+ * scale 8 gives 1.2% / 0.6% / 0.2%. `pnpm test:fire-budget` is what holds the
+ * pair honest now.
  */
-export const FIRE_HEAT_SCALE = 8
+export const FIRE_HEAT_SCALE = 5
 
 /**
  * How strongly light past {@link FX_BLOOM_THRESHOLD} spreads.
@@ -178,4 +188,4 @@ export const FIRE_HEAT_SCALE = 8
  * tinted the entire black stage olive. Swept at 0.25, 0.6 and 1.2 against the
  * peak frame; past about 0.4 the stage stops being black.
  */
-export const FX_BLOOM = 0.3
+export const FX_BLOOM = 0.55

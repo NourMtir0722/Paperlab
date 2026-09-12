@@ -72,8 +72,9 @@ export const fireFluidDefaults: FireFluidParams = {
   // and the fire reads as a single plume with a couple of licks beside it.
   // Hero.png is many separate tongues around the whole rim — tall above,
   // short below — and cooling them faster is what keeps them apart, because
-  // each one runs out of glow before it can merge with its neighbour.
-  cooling: 1.7,
+  // each one runs out of glow before it can merge with its neighbour. 1.7
+  // stunted them; 1.15 keeps the tall ones and still holds them apart.
+  cooling: 1.15,
   // Was 1.4, which made a thick grey column. Noor's direction is light smoke.
   smokeProduction: 0.5,
   ambientOxygen: 0.47,
