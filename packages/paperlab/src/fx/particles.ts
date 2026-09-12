@@ -92,7 +92,10 @@ export const particlePresets = {
     drag: 0.8,
     jitter: 1.5,
     windCatch: 0.8,
-    size: [0.005, 0.0018],
+    // 0.3-1 mm of core (§5). A sheet is one world unit across, 210 mm, so
+    // 0.0035 is 0.7 mm. It was 0.005 — a full millimetre wide before the
+    // streak stretched it, which is where "wide bars" started.
+    size: [0.0035, 0.0012],
     color: [
       // 6× paper white: inside §4.3's 4–8 band, so it blooms.
       emitHex('#FFC271', 6),
@@ -139,14 +142,21 @@ export const particlePresets = {
    */
   ash: {
     life: [2.5, 5],
-    speed: [0.02, 0.1],
+    // Thrown UP by the heat it came off, before it is heavier than the air.
+    // It used to leave at almost nothing (0.02–0.1) with a lift of −0.35, so
+    // every flake began falling the moment it was born — straight through the
+    // hole it came from, onto the black stage, dark on dark.
+    speed: [0.14, 0.3],
     direction: [0, 1, 0],
-    spread: 1,
-    lift: -0.35,
+    spread: 0.55,
+    lift: -0.22,
     drag: 1.6,
     jitter: 1.2,
     windCatch: 1,
-    size: [0.018, 0.014],
+    // 5–10 mm across (§8.3). A sheet is 210 mm, so 0.03 is 6.3 mm. They were
+    // 3.8 mm and there were far too many of them: a shower of specks rather
+    // than a few flakes you would notice.
+    size: [0.03, 0.026],
     color: [
       [0.07, 0.065, 0.06],
       [0.12, 0.115, 0.11],

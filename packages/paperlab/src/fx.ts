@@ -61,7 +61,12 @@ export {
   type ParticleTarget,
 } from './fx/particles'
 
-export { FireEmitter, type FireEmitterOptions, type SurfaceLocator } from './fx/fire'
+export {
+  FireEmitter,
+  fireEmitterDefaults,
+  type FireEmitterOptions,
+  type SurfaceLocator,
+} from './fx/fire'
 
 export { FxParticles, type FxParticlesProps } from './fx/FxParticles'
 

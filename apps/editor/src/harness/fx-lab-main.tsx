@@ -21,6 +21,7 @@ import {
   type DamageSource,
   type FieldStats,
   type FireFluidParams,
+  fireEmitterDefaults,
   fireFluidControls,
   fireFluidDefaults,
   fxQualityFor,
@@ -287,8 +288,14 @@ const DEFAULT_SETTINGS: LabSettings = {
   bloom: FX_BLOOM,
   threshold: FX_BLOOM_THRESHOLD,
   haze: fxQualityFor(TIER).haze,
-  // FireEmitter's own rates.
-  rates: { embers: 0.59, smoke: 0.19, ash: 0.86 },
+  // FireEmitter's own, read from it rather than copied: these were stale the
+  // moment the library's changed, and a lab showing a fire the product does
+  // not have is worse than no lab.
+  rates: {
+    embers: fireEmitterDefaults.embers,
+    smoke: fireEmitterDefaults.smoke,
+    ash: fireEmitterDefaults.ash,
+  },
   burn: { ...BURN_DEFAULTS, origin: START_ORIGIN },
 }
 

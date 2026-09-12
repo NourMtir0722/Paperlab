@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CHAR, DamageField, PRESENCE } from './field'
-import { FireEmitter, type SurfaceLocator } from './fire'
+import { FireEmitter, type FireEmitterOptions, type SurfaceLocator } from './fire'
 import { ParticlePool, type ParticlePresetName } from './particles'
 
 /**
@@ -33,11 +33,17 @@ const flat: SurfaceLocator = (u, v) => ({ x: u, y: v, z: 0 })
 
 function burning(
   seconds: number,
-  options: { field?: DamageField; locate?: SurfaceLocator; pool?: ParticlePool } = {},
+  options: {
+    field?: DamageField
+    locate?: SurfaceLocator
+    pool?: ParticlePool
+    /** Rates, for the tests that need a kind the defaults no longer throw. */
+    emit?: FireEmitterOptions
+  } = {},
 ) {
   const field = options.field ?? new DamageField({ seed: 3 })
   const pool = options.pool ?? new ParticlePool(2000, 9)
-  const emitter = new FireEmitter(field, pool, options.locate ?? flat)
+  const emitter = new FireEmitter(field, pool, options.locate ?? flat, options.emit)
   field.ignite(0.5, 0.5, 0.08, 1)
   let consumed = 0
   for (let i = 0; i < Math.round(seconds * 60); i++) {
@@ -63,7 +69,10 @@ describe('the fire emitter', () => {
 
   it('sheds ash from the texels that burnt through, and embers from paper still burning', () => {
     const pool = new Recording(2000, 9)
-    const { field, consumed } = burning(4, { pool })
+    // Smoke explicitly: this test is about WHERE each kind is born, and the
+    // emitter's default smoke rate is 0 now (the simulator makes a burning
+    // sheet's smoke). Without asking, there would be no puff to place.
+    const { field, consumed } = burning(4, { pool, emit: { smoke: 0.2 } })
     expect(consumed).toBeGreaterThan(0)
 
     const ash = pool.spawns.filter((s) => s.name === 'ash')
@@ -109,10 +118,15 @@ describe('the fire emitter', () => {
     }
   })
 
-  it('throws embers and smoke off the burn front', () => {
-    const { pool } = burning(2)
-    expect(pool.countOf('ember')).toBeGreaterThan(0)
-    expect(pool.countOf('smoke')).toBeGreaterThan(0)
+  it('throws embers off the burn front, and smoke when it is asked for', () => {
+    // Smoke has to be asked for now. `FireEmitter`'s default rate is 0,
+    // because a burning sheet's smoke is the fire simulator's — the same
+    // fluid the flames are made of — and three smoke systems at once was one
+    // of the review's findings. The emitter can still make it, and that is
+    // what this checks.
+    expect(burning(2).pool.countOf('ember')).toBeGreaterThan(0)
+    expect(burning(2).pool.countOf('smoke')).toBe(0)
+    expect(burning(2, { emit: { smoke: 0.2 } }).pool.countOf('smoke')).toBeGreaterThan(0)
   })
 
   it('throws more the longer the front gets', () => {

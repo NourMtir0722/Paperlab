@@ -114,16 +114,27 @@ export interface DamageLook {
  * tuned in the lab's sidebar on 2026-09-12, which is the look this ships.
  */
 export const DAMAGE_LOOK_DEFAULTS: Required<DamageLook> = {
-  emberWidth: 1.8,
+  // §5 asks for 0.3–1 mm. 1.8 was outside it, and outside the slider's range
+  // it was tuned in — a control at its limit is a report that something
+  // underneath is wrong, which in this case was a fire nothing could see.
+  emberWidth: 0.9,
   emberIntensity: 1.45,
   emberCoverage: 0.6,
   emberFlicker: 1.65,
   emberGlow: 1.25,
   sparkle: 0.5,
-  lipWidth: 1.55,
-  lipBrightness: 1.5,
-  charWarmth: 1,
-  charCracks: 1,
+  lipWidth: 1.2,
+  // Was 1.5, its slider's ceiling, which made the ash lip brighter than the
+  // paper it sits on. Ash is pale GREY; the reference's lip is dimmer than
+  // the sheet, not a highlight drawn on it.
+  lipBrightness: 0.85,
+  // Was 1, also a ceiling. At full warmth the char is milk chocolate —
+  // closer to cardboard than to charcoal (§5). Burnt paper keeps a little
+  // warmth in the plates and reads near black in a frame with a fire in it.
+  charWarmth: 0.3,
+  // Was 1, also a ceiling. The cracks are drawn as thin polygon outlines, so
+  // at full strength the char reads as a mosaic rather than as broken plates.
+  charCracks: 0.55,
   scorchReach: 30,
   scorchDarkness: 1.17,
   fingers: 1.25,

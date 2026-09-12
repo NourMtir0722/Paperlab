@@ -310,10 +310,23 @@ vec3 blackbody(float t) {
 const float BB_PEAK_LUMA = 0.887;
 
 void main() {
-  // A shimmer finer than the grid, so the flames flicker at their own scale.
+  // Detail finer than the grid, and none of it touching the solve.
+  //
+  // The dye grid resolves about a millimetre, which is finer than a tongue —
+  // but a single bilinear semi-Lagrangian advection loses roughly half a cell
+  // of detail per step, so at 60 steps a second whatever structure the solver
+  // makes is butter within a few frames. Both of these are per-PIXEL and cost
+  // one fbm each, which is the cheap half of the fix (the other half is a
+  // better advection, and belongs in the solver).
+  //
+  // A domain warp first: the read wanders at a scale below a cell, scrolling
+  // up with the gas, so a tongue's outline is never the grid's.
+  vec2 w = vUv * vec2(26.0, 18.0) + vec2(0.0, -uTime * 1.6);
+  vec2 warp = vec2(fxFbm(w), fxFbm(w + 31.7)) - 0.5;
+  // …and a shimmer finer again, so the flames flicker at their own scale.
   vec2 q = vUv * vec2(70.0, 50.0) + vec2(0.0, -uTime * 7.0);
   vec2 jitter = (vec2(fxNoise(q), fxNoise(q + 17.3)) - 0.5) * 0.0035;
-  vec4 a = texture2D(uA, vUv + jitter);
+  vec4 a = texture2D(uA, vUv + jitter + warp * 0.014);
   float heat = a.g;
   float flame = a.a;
   float smoke = a.b;
@@ -356,6 +369,17 @@ void main() {
   // something for one set of solver settings.
   float t = heat / max(uHeatScale, 1e-3);
   float ft = flame / max(uHeatScale, 1e-3);
+  // Tear the tips.
+  //
+  // Combustion is a thin sheet, and where it runs out it breaks into
+  // filaments — a flame ends in split tongues, not in a soft edge. Every ramp
+  // in this pass is smooth, so without this the top of a tongue dissolves
+  // evenly like a gaussian, which is most of why the flames read as blobs.
+  // The noise bites only at the COOL end (smoothstep runs 0.9 to 0.25, so it
+  // is zero through the core and full at the tip), which is the one place a
+  // real flame comes apart.
+  vec2 nt = vUv * vec2(48.0, 34.0) + vec2(0.0, -uTime * 3.2);
+  t = max(0.0, t + (fxFbm(nt) - 0.5) * 0.34 * smoothstep(0.9, 0.25, t));
   float body = smoothstep(0.10, 0.34, t) * uBody + flame * 0.3 * uBody * smoothstep(0.06, 0.2, t);
   float core = smoothstep(0.72, 1.0, t) * uCore;
   float glow = (body + core) * uPaperWhite / BB_PEAK_LUMA;

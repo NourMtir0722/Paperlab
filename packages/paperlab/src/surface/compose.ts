@@ -863,19 +863,39 @@ void plDamage(inout vec4 color, inout float roughness) {
   // ── Ash lip ─────────────────────────────────────────────────────────────
   // Inside the spec's zones (§5): the lip 0.5–1.5 mm, then the ember line
   // 0.3–1 mm — 2.5 mm from the cut at most, which the gate holds it to.
+  // Along the rim. Both the lip and the ember line below are laid out on this,
+  // and unlike the scorch fingers above it is safe to sample noise in: it is
+  // used ONLY within a couple of millimetres of the cut, where the presence
+  // gradient is the actual edge and points somewhere real. The fingers'
+  // mistake was carrying the same idea out into flat char, where the gradient
+  // is rounding error and a noise sampled in its frame draws the contours.
+  vec2 tangentP = length(gradP) > 1e-4 ? normalize(vec2(-gradP.y, gradP.x)) : vec2(1.0, 0.0);
+
   float lipWidth = mix(0.4, max(uLook1.y, 0.41), plFbm(p / (2.5 * PL_MM)));
-  float lip = (1.0 - smoothstep(lipWidth - aa, lipWidth + aa, mm)) * step(d.a, 0.999) * cutNear;
+  // Broken, not a hem. Ash flakes off a cooling edge in pieces, so the lip
+  // comes and goes along the rim and wanders in width where it is there. It
+  // used to be a continuous band of even width with a highlight down the
+  // middle of it, which read as a neon tube round the hole — the single most
+  // synthetic thing at wide view.
+  float lipAlong = dot(p, tangentP) / (3.2 * PL_MM);
+  float lipBreak = smoothstep(0.34, 0.56, plFbm(vec2(lipAlong, 0.9)));
+  float lip = (1.0 - smoothstep(lipWidth - aa, lipWidth + aa, mm)) * step(d.a, 0.999) * cutNear * lipBreak;
   vec3 ash = plLinear(mix(vec3(0.525, 0.498, 0.490), vec3(0.741, 0.725, 0.725), plNoise(p * 520.0) * 0.6 + plNoise(p * 90.0) * 0.4)) * uLook1.z;
   color.rgb = mix(color.rgb, ash, lip);
-  roughness = mix(roughness, 0.95, lip);
-  plHeight += lip * (1.0 - mm / max(lipWidth, 0.1)) * 0.0007;
+  roughness = mix(roughness, 0.99, lip);
+  // Barely raised. THIS is where the highlight came from: a 0.7 mm ridge
+  // running round the hole is a cylinder, and a cylinder under a key light
+  // has a specular line down it however rough the surface is. Ash is a
+  // fragile crust a fraction of a millimetre proud of the paper, not a bead
+  // of solder — and the shape of it belongs to the broken edge above, not to
+  // a smooth ramp.
+  plHeight += lip * (1.0 - mm / max(lipWidth, 0.1)) * 0.00018;
 
   // ── The ember line ──────────────────────────────────────────────────────
   // Beads along the cut: position along the edge, crawling on the burn's
   // clock, with a flicker of their own. Only where it is hot — and as the
   // heat goes the threshold rises, so the line breaks into fewer, dimmer
   // beads and they go out one by one.
-  vec2 tangentP = length(gradP) > 1e-4 ? normalize(vec2(-gradP.y, gradP.x)) : vec2(1.0, 0.0);
   float s1 = dot(p, tangentP) / (2.4 * PL_MM) - uDamageTime * 0.55 * uLook0.w;
   float bead = plNoise(vec2(s1, 0.37)) * 0.7 + plNoise(vec2(s1 * 2.3, 5.1)) * 0.3;
   float flicker = 0.62 + 0.38 * plNoise(vec2(floor(s1) * 7.13, uDamageTime * 9.0 * uLook0.w));

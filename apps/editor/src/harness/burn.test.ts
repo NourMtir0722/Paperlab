@@ -195,13 +195,25 @@ describe('the scripted burn', () => {
     expect(ORIGINS.corner.v).toBeLessThan(0.1)
   })
 
-  it('with smoke off, throws no smoke at all', () => {
-    const burn = new ScriptedBurn(flatSheet, { smoke: false })
-    burn.seek(phase('dying').at)
-    expect(burn.pool.countOf('smoke')).toBe(0)
-    const smoky = new ScriptedBurn(flatSheet)
-    smoky.seek(phase('dying').at)
-    expect(smoky.pool.countOf('smoke')).toBeGreaterThan(0)
+  it('with smoke off, throws no smoke at all — whatever rate is asked for', () => {
+    // A burning sheet's smoke is the fire simulator's now, so `FireEmitter`'s
+    // own rate is 0 and the pool throws no puffs by default. The setting still
+    // has to hold when something DOES ask for them, which is what a lab
+    // sidebar can do — so this asks, and checks the toggle still wins.
+    const off = new ScriptedBurn(flatSheet, { smoke: false })
+    off.setEmit({ embers: true, smoke: true, ash: true }, { smoke: 0.2 })
+    off.seek(phase('dying').at)
+    expect(off.pool.countOf('smoke')).toBe(0)
+
+    const on = new ScriptedBurn(flatSheet)
+    on.setEmit({ embers: true, smoke: true, ash: true }, { smoke: 0.2 })
+    on.seek(phase('dying').at)
+    expect(on.pool.countOf('smoke')).toBeGreaterThan(0)
+
+    // And with nobody asking, the default really is none.
+    const quiet = new ScriptedBurn(flatSheet)
+    quiet.seek(phase('dying').at)
+    expect(quiet.pool.countOf('smoke')).toBe(0)
   })
 
   it('sheds ash off the cooling edge as it dies', () => {

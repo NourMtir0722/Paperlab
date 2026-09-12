@@ -67,7 +67,13 @@ export const fireFluidDefaults: FireFluidParams = {
   burnRate: 6.1,
   gasExpansion: 0.65,
   buoyancy: 1.9,
-  cooling: 0.92,
+  // Was 0.92. Gas that stays hot all the way up pools into ONE column: the
+  // rim's forty-odd emission points merge a few centimetres above the paper
+  // and the fire reads as a single plume with a couple of licks beside it.
+  // Hero.png is many separate tongues around the whole rim — tall above,
+  // short below — and cooling them faster is what keeps them apart, because
+  // each one runs out of glow before it can merge with its neighbour.
+  cooling: 1.7,
   // Was 1.4, which made a thick grey column. Noor's direction is light smoke.
   smokeProduction: 0.5,
   ambientOxygen: 0.47,

@@ -113,11 +113,19 @@ const EMBER_FRAGMENT = /* glsl */ `
 varying vec4 vColor;
 varying vec2 vQuad;
 void main() {
-  // A hot, round head and a tail that fades behind it.
-  float across = 1.0 - smoothstep(0.35, 1.0, abs(vQuad.x));
-  float tail = 1.0 - smoothstep(0.0, 1.0, vQuad.y);
-  float m = across * across * mix(0.25, 1.0, tail * tail);
-  if (m <= 0.0) discard;
+  // A thin hot core with a soft edge, fading to NOTHING behind the head.
+  //
+  // It used to be flat-topped across (smoothstep from 0.35, so the middle
+  // seventy per cent of the width was all at full brightness) and to keep a
+  // quarter of that brightness all the way to the end of the quad. Both
+  // together drew a wide bar with a squared-off end, which is what the review
+  // saw up close. A spark is a point of light smeared by its own motion: it
+  // is brightest on its centre line and it runs out.
+  float across = abs(vQuad.x);
+  float body = exp(-across * across * 7.0);
+  float tail = clamp(1.0 - vQuad.y, 0.0, 1.0);
+  float m = body * tail * tail;
+  if (m <= 0.003) discard;
   gl_FragColor = vec4(vColor.rgb * vColor.a * m, 1.0);
 ${OUTPUT}
 }
@@ -229,8 +237,16 @@ void main() {
   float patches = smoothstep(0.45, 0.75, flNoise(vec2(a * 2.2 + vSeed * 17.0, vSeed * 13.0)));
   float grain = flNoise(vQuad * 3.0 + vSeed * 23.0);
   vec3 charC = vec3(0.05, 0.043, 0.038) * (0.7 + 0.6 * grain);
-  vec3 ashC = vec3(0.3, 0.285, 0.275);
-  vec3 c = mix(charC, ashC, rim * patches * 0.8) * vLight;
+  // #A49E9D, the spec's own sample of ash (§8.3), in linear.
+  vec3 ashC = vec3(0.372, 0.344, 0.340);
+  // Pale ash with char under it, not char with a pale rim.
+  //
+  // It was the other way round, and the flakes came out near black: at 0.07
+  // linear they fell through the hole onto a black stage and read as dust in
+  // the void. Burnt paper ash is a LIGHT grey — what makes a flake flash dark
+  // and light as it tumbles is vLight, the face it is showing, not its own
+  // colour being nearly black to begin with.
+  vec3 c = mix(ashC, charC, (1.0 - rim * patches) * 0.45) * vLight;
   // A few carry a hot edge that fades over their first second or so, on ONE
   // arc of it — the side that was burning when it tore off. All the way round
   // drew it as an orange ring.
