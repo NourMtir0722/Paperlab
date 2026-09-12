@@ -323,6 +323,29 @@ function loadSettings(): LabSettings {
 }
 
 /** Any preset by name; unknown names fall back inside `<Paper>` like any config. */
+/**
+ * Which of the lab's three jobs is on screen.
+ *
+ * It was doing all three at once: about sixty controls, thirteen rows of a
+ * table of spec numbers nothing read, and a paragraph of argument under every
+ * checkbox. That is what finding the look needed, and it is not what looking
+ * at one needs.
+ *
+ *   watch  the stage, big. Play, scrub, the phases, the camera, the reference.
+ *   tune   the controls named for what a person SEES, grouped the same way.
+ *   debug  layers, the solver's own panel, the field's numbers, the constants.
+ *
+ * `?mode=` so a capture can ask for one, and so the default is the one you
+ * want when you open the page to look at a fire.
+ */
+const MODES = ['watch', 'tune', 'debug'] as const
+type Mode = (typeof MODES)[number]
+const START_MODE: Mode = (MODES as readonly string[]).includes(query.get('mode') ?? '')
+  ? (query.get('mode') as Mode)
+  : query.get('debug') === '1'
+    ? 'debug'
+    : 'watch'
+
 const LIGHTING = query.get('lighting') ?? undefined
 
 const START_LAYERS: Layers = (() => {
@@ -595,32 +618,6 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   },
 ]
 
-/** What the spec asks for that no code answers yet, against the step that owes it. */
-const TODO: { name: string; step: number; why: string }[] = [
-  {
-    name: 'a real mid-range phone, and Safari',
-    step: 10,
-    why: '§14.5 — the capture harness is Chromium on this laptop; neither can be claimed from here',
-  },
-]
-
-/** The numbers §5–§8 name. Sliders arrive with the thing each one controls. */
-const PARAMS: { name: string; spec: string; step: number }[] = [
-  { name: 'ash lip width', spec: '0.5–1.5 mm', step: 3 },
-  { name: 'scorch width', spec: '5–20 mm, growing', step: 3 },
-  { name: 'char width', spec: '2–8 mm', step: 3 },
-  { name: 'ember line width', spec: '0.3–1 mm', step: 4 },
-  { name: 'bead length · lit fraction', spec: '1–4 mm · 40–60% of the front', step: 4 },
-  { name: 'bead flicker', spec: '6–12 Hz', step: 4 },
-  { name: 'cool-to-off', spec: '~1.5 s', step: 4 },
-  { name: 'fire light', spec: '~1900 K, follows front length', step: 5 },
-  { name: 'flame height', spec: '10–40 mm, taller on the upper rim', step: 6 },
-  { name: 'flame flicker', spec: '10–15 Hz, never in sync', step: 6 },
-  { name: 'ember core · life', spec: '0.3–1 mm · 0.5–2.5 s', step: 7 },
-  { name: 'ash flake size', spec: '2–10 mm', step: 7 },
-  { name: 'heat haze', spec: '1–3 px at 1080p', step: 10 },
-]
-
 function Lab() {
   const paperRef = useRef<PaperHandle | null>(null)
   const world = useRef(new THREE.Vector3())
@@ -650,7 +647,8 @@ function Lab() {
    */
   const [settings, setSettings] = useState<LabSettings>(() => (bare ? DEFAULT_SETTINGS : loadSettings()))
   const fluid = settings.fluid
-  const [side, setSide] = useState<'tune' | 'refs'>('tune')
+  // Follows the mode from the start, not only when one is clicked.
+  const [side, setSide] = useState<'tune' | 'refs'>(START_MODE === 'watch' ? 'refs' : 'tune')
   const [bloom, setBloom] = useState(START_BLOOM)
   const [refName, setRefName] = useState<string | null>(null)
   /** Bumped whenever the burn is rebuilt: the pool is a new object and the tree has to see it. */
@@ -713,6 +711,17 @@ function Lab() {
     setTarget(burn.time)
   }
 
+  const [mode, setModeState] = useState<Mode>(START_MODE)
+  /**
+   * The side panel follows the mode. Watching means the reference beside the
+   * render; tuning and debugging both mean controls, and the difference
+   * between those two is which controls (see `Tune`'s `advanced`).
+   */
+  const setMode = (m: Mode) => {
+    setModeState(m)
+    setSide(m === 'watch' ? 'refs' : 'tune')
+  }
+
   const setLayer = (key: keyof Layers, on: boolean) => {
     hold()
     setLayers((l) => ({ ...l, [key]: on }))
@@ -723,10 +732,14 @@ function Lab() {
       {!bare && (
         <div className="panel">
           <h1>fx lab · fire</h1>
-          <p className="sub">
-            A scripted burn, the same every time, beside the stills it has to look like. Everything built is
-            on below; what is not built yet is listed with the step that owes it.
-          </p>
+          <p className="sub">A scripted burn, the same every time, beside the stills it has to look like.</p>
+          <div className="row modes">
+            {MODES.map((m) => (
+              <button type="button" key={m} onClick={() => setMode(m)} aria-pressed={mode === m}>
+                {m}
+              </button>
+            ))}
+          </div>
 
           <h2>transport</h2>
           <div className="row">
@@ -803,105 +816,82 @@ function Lab() {
             ))}
           </div>
 
-          <h2>
-            layers <span className="note">built</span>
-          </h2>
-          {BUILT.map((row) => (
-            <label className="layer" key={row.key}>
+          {mode === 'debug' && (
+            <>
+              <h2>
+                layers <span className="note">built</span>
+              </h2>
+              {BUILT.map((row) => (
+                <label className="layer" key={row.key}>
+                  <input
+                    type="checkbox"
+                    checked={layers[row.key]}
+                    onChange={(e) => setLayer(row.key, e.target.checked)}
+                  />
+                  <span>
+                    {row.name}
+                    <span className="why">{row.why}</span>
+                  </span>
+                </label>
+              ))}
+              <div className="layer">
+                <span className="grow">edge fray (detail) · {detail.toFixed(2)}</span>
+              </div>
               <input
-                type="checkbox"
-                checked={layers[row.key]}
-                onChange={(e) => setLayer(row.key, e.target.checked)}
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={detail}
+                onChange={(e) => setDetail(Number(e.target.value))}
               />
-              <span>
-                {row.name}
-                <span className="why">{row.why}</span>
-              </span>
-            </label>
-          ))}
-          <div className="layer">
-            <span className="grow">edge fray (detail) · {detail.toFixed(2)}</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={detail}
-            onChange={(e) => setDetail(Number(e.target.value))}
-          />
 
-          <h2>
-            light &amp; post <span className="note">§7</span>
-          </h2>
-          <label className="layer">
-            <input type="checkbox" checked={post} onChange={(e) => setPost(e.target.checked)} />
-            <span>
-              HDR + the tone curve
-              <span className="why">
-                a half-float frame, the rig's own film applied last. Off is the renderer's curve — the two
-                must look the same on an unburnt sheet
-              </span>
-            </span>
-          </label>
-          <label className="layer">
-            <input
-              type="checkbox"
-              checked={bloom}
-              disabled={!post}
-              onChange={(e) => setBloom(e.target.checked)}
-            />
-            <span>
-              bloom
-              <span className="why">
-                threshold above paper white — paper never blooms; embers (past 1.0) do
-              </span>
-            </span>
-          </label>
+              <h2>
+                light &amp; post <span className="note">§7</span>
+              </h2>
+              <label className="layer">
+                <input type="checkbox" checked={post} onChange={(e) => setPost(e.target.checked)} />
+                <span>
+                  HDR + the tone curve
+                  <span className="why">
+                    a half-float frame, the rig's own film applied last. Off is the renderer's curve — the two
+                    must look the same on an unburnt sheet
+                  </span>
+                </span>
+              </label>
+              <label className="layer">
+                <input
+                  type="checkbox"
+                  checked={bloom}
+                  disabled={!post}
+                  onChange={(e) => setBloom(e.target.checked)}
+                />
+                <span>
+                  bloom
+                  <span className="why">
+                    threshold above paper white — paper never blooms; embers (past 1.0) do
+                  </span>
+                </span>
+              </label>
 
-          <h2>
-            layers <span className="note">not built — the spec asks for these</span>
-          </h2>
-          {TODO.map((row) => (
-            <label className="layer todo" key={row.name}>
-              <input type="checkbox" disabled />
-              <span>
-                {row.name}
-                <span className="why">{row.why}</span>
-              </span>
-              <span className="step">step {row.step}</span>
-            </label>
-          ))}
-
-          <h2>
-            parameters <span className="note">§5–§8, each with its step</span>
-          </h2>
-          {PARAMS.map((row) => (
-            <div className="layer todo" key={row.name}>
-              <span>
-                {row.name}
-                <span className="why">{row.spec}</span>
-              </span>
-              <span className="step">step {row.step}</span>
-            </div>
-          ))}
-
-          <h2>the burn</h2>
-          <dl className="stats">
-            <dt>ignition</dt>
-            <dd>
-              {settings.burn.origin} · u {ORIGINS[settings.burn.origin].u}, v{' '}
-              {ORIGINS[settings.burn.origin].v} · held {HOLD.toFixed(2)}s
-            </dd>
-            <dt>front</dt>
-            <dd>{(stats.front * 100).toFixed(2)}%</dd>
-            <dt>remaining</dt>
-            <dd>{(stats.remaining * 100).toFixed(1)}%</dd>
-            <dt>charred</dt>
-            <dd>{stats.charred} cells this step</dd>
-            <dt>tier</dt>
-            <dd>{TIER}</dd>
-          </dl>
+              <h2>the burn</h2>
+              <dl className="stats">
+                <dt>ignition</dt>
+                <dd>
+                  {settings.burn.origin} · u {ORIGINS[settings.burn.origin].u}, v{' '}
+                  {ORIGINS[settings.burn.origin].v} · held {HOLD.toFixed(2)}s
+                </dd>
+                <dt>front</dt>
+                <dd>{(stats.front * 100).toFixed(2)}%</dd>
+                <dt>remaining</dt>
+                <dd>{(stats.remaining * 100).toFixed(1)}%</dd>
+                <dt>charred</dt>
+                <dd>{stats.charred} cells this step</dd>
+                <dt>tier</dt>
+                <dd>{TIER}</dd>
+              </dl>
+            </>
+          )}
         </div>
       )}
 
@@ -983,7 +973,7 @@ function Lab() {
             </button>
           </div>
           {side === 'tune' ? (
-            <Tune settings={settings} onChange={setSettings} />
+            <Tune settings={settings} onChange={setSettings} advanced={mode === 'debug'} />
           ) : (
             <>
               <div className="row" style={{ marginTop: 10 }}>
@@ -1081,7 +1071,15 @@ function Slider({
  * reset — and the whole combination copied, saved or put back, so the one
  * that looks right can become the default.
  */
-function Tune({ settings, onChange }: { settings: LabSettings; onChange(next: LabSettings): void }) {
+function Tune({
+  settings,
+  onChange,
+  advanced,
+}: {
+  settings: LabSettings
+  onChange(next: LabSettings): void
+  advanced: boolean
+}) {
   const [note, setNote] = useState('')
   const [json, setJson] = useState<string | null>(null)
   const setLook = (key: keyof Required<DamageLook>, value: number) =>
@@ -1230,47 +1228,54 @@ function Tune({ settings, onChange }: { settings: LabSettings; onChange(next: La
         </details>
       ))}
 
-      <details open>
-        <summary>Fire simulator</summary>
-        {[...new Set(fireFluidControls.map((c) => c.group))].map((group) => (
-          <div key={group}>
-            <div className="layer" style={{ color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>
-              {group}
-            </div>
-            {fireFluidControls
-              .filter((c) => c.group === group)
-              .map((c) => (
+      {/* The solver's own panel, in the vocabulary of the tool it was borrowed
+          from: seventeen sliders where at least five move the same thing on
+          screen. It found the look and it is the wrong surface for using one,
+          so it lives in debug rather than being deleted — the next time the
+          fire's motion is wrong, this is what fixes it. */}
+      {advanced && (
+        <details open>
+          <summary>Fire simulator</summary>
+          {[...new Set(fireFluidControls.map((c) => c.group))].map((group) => (
+            <div key={group}>
+              <div className="layer" style={{ color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>
+                {group}
+              </div>
+              {fireFluidControls
+                .filter((c) => c.group === group)
+                .map((c) => (
+                  <Slider
+                    key={c.key}
+                    label={c.label}
+                    value={fluid[c.key]}
+                    min={c.min}
+                    max={c.max}
+                    step={c.step}
+                    onInput={(v) => setFluid({ ...fluid, [c.key]: v })}
+                  />
+                ))}
+              {group === 'Emission' && (
                 <Slider
-                  key={c.key}
-                  label={c.label}
-                  value={fluid[c.key]}
-                  min={c.min}
-                  max={c.max}
-                  step={c.step}
-                  onInput={(v) => setFluid({ ...fluid, [c.key]: v })}
+                  label="Initial velocity Y"
+                  value={fluid.initialVelocity[1]}
+                  min={0}
+                  max={5}
+                  step={0.05}
+                  onInput={(v) =>
+                    setFluid({
+                      ...fluid,
+                      initialVelocity: [fluid.initialVelocity[0], v, fluid.initialVelocity[2]],
+                    })
+                  }
                 />
-              ))}
-            {group === 'Emission' && (
-              <Slider
-                label="Initial velocity Y"
-                value={fluid.initialVelocity[1]}
-                min={0}
-                max={5}
-                step={0.05}
-                onInput={(v) =>
-                  setFluid({
-                    ...fluid,
-                    initialVelocity: [fluid.initialVelocity[0], v, fluid.initialVelocity[2]],
-                  })
-                }
-              />
-            )}
-          </div>
-        ))}
-        <button type="button" onClick={() => setFluid(fireFluidDefaults)}>
-          reset fire simulator
-        </button>
-      </details>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => setFluid(fireFluidDefaults)}>
+            reset fire simulator
+          </button>
+        </details>
+      )}
 
       <details open>
         <summary>Fire light</summary>
@@ -1294,23 +1299,34 @@ function Tune({ settings, onChange }: { settings: LabSettings; onChange(next: La
           step={0.05}
           onInput={(v) => onChange({ ...settings, bloom: v })}
         />
-        <Slider
-          label="Bloom starts at (below ~1.6 paper blooms)"
-          value={settings.threshold}
-          min={1}
-          max={4}
-          step={0.05}
-          onInput={(v) => onChange({ ...settings, threshold: v })}
-        />
-        <Slider
-          label="Heat haze"
-          value={settings.haze}
-          min={0}
-          max={6}
-          step={0.1}
-          unit="px"
-          onInput={(v) => onChange({ ...settings, haze: v })}
-        />
+        {/* A correctness constant, not a look: below it paper blooms, which is
+            the painted-glow failure the whole pass exists to prevent. It is
+            not something to tune a fire with, so it is only here to be ruled
+            out when something is wrong. */}
+        {advanced && (
+          <Slider
+            label="Bloom starts at (a correctness constant — below ~1.6 paper blooms)"
+            value={settings.threshold}
+            min={1}
+            max={6}
+            step={0.05}
+            onInput={(v) => onChange({ ...settings, threshold: v })}
+          />
+        )}
+        {/* Last polish item, not a look — see `fxQualityTiers.haze`. It is off
+            on this lab's tier, and it is still placed from where the sprite
+            flames stand rather than from where the fluid burns. */}
+        {advanced && (
+          <Slider
+            label="Heat haze (off on this tier)"
+            value={settings.haze}
+            min={0}
+            max={6}
+            step={0.1}
+            unit="px"
+            onInput={(v) => onChange({ ...settings, haze: v })}
+          />
+        )}
       </details>
 
       <details open>

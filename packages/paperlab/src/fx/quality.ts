@@ -75,7 +75,17 @@ export interface FxQualitySettings {
    * `particles` budget. Read by `FireEmitter` through its `caps` option.
    */
   caps: { ember: number; smoke: number; ash: number }
-  /** Heat haze strength in pixels at 1080p; 0 turns it off (the low tier). Read by `FxPost`. */
+  /**
+   * Heat haze strength in pixels at 1080p; 0 turns it off. Read by `FxPost`.
+   *
+   * High tier only, and half what it was. It was 3.8 px on two tiers against
+   * §10's 1–3, and invisible in every capture at either — a few pixels of
+   * wobble reads as nothing while the fluid beside it is moving. It is also
+   * still driven from `flameAnchors`, which is where the SPRITE flames stand,
+   * not where the fluid actually burns; until it reads the fluid's own heat
+   * texture it is the last polish item rather than a look, so it is off
+   * everywhere it cannot be afforded to be good.
+   */
   haze: number
   /**
    * The fire simulator's grids (`FxFireFluid`): a coarse velocity grid, a
@@ -94,7 +104,7 @@ export const fxQualityTiers: Record<FxQualityTier, FxQualitySettings> = {
     bloomScale: 1,
     flames: 64,
     caps: { ember: 200, smoke: 200, ash: 120 },
-    haze: 3.8,
+    haze: 2,
     fluid: { velocity: [96, 128], dye: [384, 512], iterations: 24 },
   },
   /** The default worth aiming at: a recent phone, or an integrated laptop GPU. */
@@ -105,7 +115,7 @@ export const fxQualityTiers: Record<FxQualityTier, FxQualitySettings> = {
     bloomScale: 1,
     flames: 36,
     caps: { ember: 80, smoke: 80, ash: 60 },
-    haze: 3.8,
+    haze: 0,
     fluid: { velocity: [72, 96], dye: [288, 384], iterations: 18 },
   },
   /**
