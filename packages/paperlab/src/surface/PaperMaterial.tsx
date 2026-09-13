@@ -54,7 +54,7 @@ export function PaperMaterial({
   damage,
 }: PaperMaterialProps) {
   const rig = useLightRig(lighting)
-  const damageTexture = useDamageTexture(damage)
+  const damageTextures = useDamageTexture(damage, sheet)
   const composed = composeSurface(
     surface,
     stock,
@@ -62,7 +62,7 @@ export function PaperMaterial({
     {
       hasFrontMap: Boolean(texture),
       hasBackMap: Boolean(backTexture),
-      hasDamage: Boolean(damageTexture),
+      hasDamage: Boolean(damageTextures),
     },
     sheet,
     rig,
@@ -79,6 +79,7 @@ export function PaperMaterial({
         key === 'uFrontMap' ||
         key === 'uBackMap' ||
         key === 'uDamage' ||
+        key === 'uDamageEdge' ||
         key === 'uDamageDetail' ||
         key === 'uDamageTime' ||
         key.startsWith('uLook')
@@ -95,8 +96,9 @@ export function PaperMaterial({
   useEffect(() => {
     if (bound.uFrontMap) bound.uFrontMap.value = texture
     if (bound.uBackMap) bound.uBackMap.value = backTexture ?? null
-    if (bound.uDamage) bound.uDamage.value = damageTexture
-  }, [bound, texture, backTexture, damageTexture])
+    if (bound.uDamage) bound.uDamage.value = damageTextures?.damage ?? null
+    if (bound.uDamageEdge) bound.uDamageEdge.value = damageTextures?.edge ?? null
+  }, [bound, texture, backTexture, damageTextures])
   // The fray follows the quality tier, which can change at any moment, so it
   // is read off the source each frame rather than baked into the program.
   useFrame((state) => {
@@ -136,7 +138,7 @@ export function PaperMaterial({
         v(look.edgeWave, d.edgeWave),
         v(look.edgeBite, d.edgeBite),
         v(look.sparkle, d.sparkle),
-        0,
+        v(look.charWidth, d.charWidth),
       )
     }
     // Clamped rather than trusted: `detail` is a number on a public

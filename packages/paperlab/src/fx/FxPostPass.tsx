@@ -1,4 +1,4 @@
-import { Bloom, EffectComposer, ToneMapping } from '@react-three/postprocessing'
+import { Bloom, DepthOfField, EffectComposer, ToneMapping } from '@react-three/postprocessing'
 import { useFrame } from '@react-three/fiber'
 import { ToneMappingMode } from 'postprocessing'
 import { useMemo, useRef } from 'react'
@@ -58,11 +58,14 @@ export function FxPostPass({
   field,
   locate,
   haze: hazeOverride,
+  focus = 0,
 }: FxPostProps) {
   const { bloomScale, haze: tierHaze } = fxQualityFor(quality)
   const hazePx = hazeOverride ?? tierHaze
   const haze = useMemo(() => new HazeGradeEffect(), [])
   const anchors = useRef<FlameAnchor[]>([])
+  /** Where the fire is, for the focus to sit on it. */
+  const focusTarget = useRef(new THREE.Vector3())
 
   // The flames, in screen space, for the haze; the front, for the grade.
   useFrame(({ camera }) => {
@@ -78,6 +81,18 @@ export function FxPostPass({
       root.set(a.x, a.y, a.z).project(camera)
       top.set(a.x, a.y + a.height, a.z).project(camera)
       sources[i]!.set(root.x * 0.5 + 0.5, root.y * 0.5 + 0.5, Math.max(0, (top.y - root.y) * 0.5), a.heat)
+    }
+    // Focus on the fire itself, as a point in the room rather than a
+    // fraction of the far plane: the far plane is a thousand times the size
+    // of a sheet, and a focus expressed against it lands the plane a metre
+    // away and blurs everything, the rim included.
+    if (focus > 0 && n > 0) {
+      focusTarget.current.set(0, 0, 0)
+      for (let i = 0; i < n; i++) {
+        const a = anchors.current[i]!
+        focusTarget.current.add(root.set(a.x, a.y, a.z))
+      }
+      focusTarget.current.multiplyScalar(1 / n)
     }
     haze.count = n
     haze.time = field.time
@@ -101,6 +116,16 @@ export function FxPostPass({
         />
       ) : null}
       <primitive object={haze} />
+      {focus > 0 ? (
+        <DepthOfField
+          target={focusTarget.current}
+          // A hand's width of sheet in focus at the gentlest, a few
+          // centimetres at the strongest — the macro look of the reference
+          // crops, without losing the rim the shot is about.
+          focalLength={0.06 - 0.045 * focus}
+          bokehScale={1 + 3 * focus}
+        />
+      ) : null}
       <ToneMapping mode={modes[film]} />
     </EffectComposer>
   )

@@ -6,6 +6,8 @@ import { Paper, type PaperHandle } from 'paperlab'
 import {
   CHAR,
   FIELD_SIZE,
+  FireSound,
+  FxAudio,
   FxFireFluid,
   FxFireLight,
   FxMatchFlame,
@@ -18,6 +20,7 @@ import {
   DAMAGE_LOOK_DEFAULTS,
   FX_BLOOM,
   FX_BLOOM_THRESHOLD,
+  FIRE_LIGHT_GAIN,
   FIRE_ZONES,
   fireZones,
   type FireZones,
@@ -31,6 +34,7 @@ import {
   fireFluidControls,
   fireFluidDefaults,
   fxQualityFor,
+  createAudioContext,
 } from 'paperlab/fx'
 import type { SurfaceLocator } from 'paperlab/fx'
 import {
@@ -40,6 +44,7 @@ import {
   LONGEST,
   ORIGINS,
   planBurn,
+  roomYield,
   type BurnOrigin,
   type BurnPlan,
   type BurnSettings,
@@ -96,12 +101,20 @@ import {
  *   ?play=1&speed=0.25           start it running, and how fast
  *   ?ui=0                        the stage alone — what the capture script loads
  *   ?amount=0.5                  how much of the sheet burns, 0..1 — 1 is all of it
+ *   ?camera=static               no push-in and no drift: the still camera every
+ *                                capture and budget is measured with
+ *   ?floor=1                     a floor under the sheet, and the shot framed
+ *                                to include it
+ *   ?focus=0.8                   shallow focus on the burn, 0..1 — the macro
+ *                                look of the reference crops
  *   ?physics=flat                the sheet held flat and still, as it was before it
  *                                hung: nothing curls, nothing falls
  *
- * Dev only. It is in no build's input list, and the references it draws come
- * from outside the repo through a dev-server middleware — see
- * `tools/fx-refs.mjs`.
+ * It ships, as the site's `/fx-lab` route — its own build pass, the way
+ * `/hands` is. What does not ship is the reference stills it can put beside
+ * the render: they come from outside the repo through a dev-server
+ * middleware, so on the deployed page the reference pane says where they
+ * live instead of showing them — see `tools/fx-refs.mjs`.
  */
 
 declare global {
@@ -125,6 +138,8 @@ declare global {
       burnt: number
       /** When it cut a piece of the sheet loose, which then falls — or null. */
       severedAt: number | null
+      /** Where on the screen the field says char, hole, paper and scorch are — null until ready. */
+      masks: FieldMasks | null
     }
   }
 }
@@ -170,11 +185,22 @@ interface LabSettings {
   zones: FireZones
   /** The fire light's gain (`FxFireLight`). */
   light: number
+  /**
+   * How much of the room's light a fire at its height takes over, 0..1
+   * (`DamageFirelight`); null is the lighting preset's own — see `roomYield`.
+   */
+  firelight: number | null
+  /** One fire light casts shadows (`FxFireLight`'s `shadows`) — a shadow pass a frame, so off on this tier. */
+  fireShadows: boolean
+  /** A floor under the sheet: what the fire's light pools on, and what a cut-loose piece lands on. */
+  floor: boolean
   /** Bloom strength, and the scene luminance it starts at. */
   bloom: number
   threshold: number
   /** Heat haze, pixels at 1080p. */
   haze: number
+  /** Shallow focus on the burn, 0..1 — the macro look of the reference crops (K4). */
+  focus: number
   /** How much of each particle the burn throws — the emitter's rates. */
   rates: { embers: number; smoke: number; ash: number }
   /** Where the burn starts and how it ends — see `BurnSettings`. */
@@ -199,15 +225,18 @@ const SLIDERS: {
   { group: 'Ember line', key: 'emberFlicker', label: 'Flicker speed', min: 0, max: 3, step: 0.05 },
   { group: 'Ember line', key: 'emberGlow', label: 'Crimson glow in the char', min: 0, max: 2, step: 0.05 },
   { group: 'Ember line', key: 'sparkle', label: 'Glowing fibre specks', min: 0, max: 2, step: 0.05 },
-  { group: 'Ash lip', key: 'lipWidth', label: 'Width', min: 0.2, max: 3, step: 0.05, unit: 'mm' },
+  { group: 'Ash lip', key: 'lipWidth', label: 'Width', min: 0.2, max: 8, step: 0.05, unit: 'mm' },
   { group: 'Ash lip', key: 'lipBrightness', label: 'Paleness', min: 0.3, max: 1.5, step: 0.01 },
+  { group: 'Char', key: 'charWidth', label: 'Width', min: 0.5, max: 10, step: 0.05, unit: 'mm' },
   { group: 'Char', key: 'charWarmth', label: 'Warmth (grey → dark orange)', min: 0, max: 1, step: 0.01 },
   { group: 'Char', key: 'charCracks', label: 'Cracks', min: 0, max: 1, step: 0.01 },
   { group: 'Scorch', key: 'scorchReach', label: 'Reach upward', min: 0, max: 30, step: 0.5, unit: 'mm' },
   { group: 'Scorch', key: 'scorchDarkness', label: 'Darkness', min: 0.3, max: 1.8, step: 0.01 },
   { group: 'Scorch', key: 'fingers', label: 'Fingers', min: 0, max: 2.5, step: 0.05 },
   { group: 'Edge shape', key: 'edgeWave', label: 'Waves', min: 0, max: 15, step: 0.5, unit: 'mm' },
-  { group: 'Edge shape', key: 'edgeBite', label: 'Bites', min: 0, max: 6, step: 0.1, unit: 'mm' },
+  // To 10: the default (6) was this slider's old ceiling, and a default needs
+  // room to move both ways.
+  { group: 'Edge shape', key: 'edgeBite', label: 'Bites', min: 0, max: 10, step: 0.1, unit: 'mm' },
 ]
 
 /**
@@ -258,7 +287,8 @@ const FLAME_CONTROLS: {
     step: 0.01,
   },
   { zone: 'tip', key: 'to', label: 'Where the tip becomes body', min: 0.1, max: 0.8, step: 0.01 },
-  { zone: 'tip', key: 'softness', label: 'Softness of the outline', min: 0.02, max: 0.5, step: 0.01 },
+  // From 0: the default (0.02) was this slider's old floor.
+  { zone: 'tip', key: 'softness', label: 'Softness of the outline', min: 0, max: 0.5, step: 0.01 },
   { zone: 'tip', key: 'tearing', label: 'Tearing', min: 0, max: 1.5, step: 0.01 },
 ]
 
@@ -305,6 +335,14 @@ const PHYSICS: ComponentProps<typeof Paper>['physics'] =
  * at 11.2 s; from 42% burnt on, it is still eating when it gets there, and
  * the paper under the hole is joined to nothing.
  */
+/**
+ * Where the floor lies when it is on — `<Paper>`'s own contact-shadow height.
+ * The cloth stops here too: one height, so a falling piece cannot land
+ * through the thing its shadow is on. With the floor off the cloth keeps its
+ * old floor, well below the frame.
+ */
+const FLOOR_Y = -1.05
+
 const CUT_IN_TWO = 0.42
 
 /** "How much burns", in the words a person would use. The slider is the spectrum between. */
@@ -337,6 +375,16 @@ function burnNote(plan: BurnPlan, origin: BurnOrigin): string {
  * fire-film.mjs` needs a way to say "go" with the panel hidden.
  */
 const START_PLAYING = query.get('play') === '1'
+
+/**
+ * A still camera, for anything that measures the frame.
+ *
+ * The lab's camera pushes in as the fire grows and drifts a little, because
+ * a fire filmed from a tripod bolted to the floor reads as a render. Every
+ * capture, budget and reference crop needs the opposite: the same camera in
+ * the same place every time, or two loads of one moment are two pictures.
+ */
+const CAMERA_STATIC = query.get('camera') === 'static'
 /** `?speed=0.25` — the transport's rate, so a film can be slowed for the flicker. */
 const START_SPEED = num('speed', 1, 0.05, 4)
 
@@ -447,20 +495,32 @@ const LOOK_OVERRIDES: Partial<typeof DAMAGE_LOOK_DEFAULTS> = (() => {
   }
   return out
 })()
+
 /** What every knob starts at: the product's own values (and any `?look=`). */
 const DEFAULT_SETTINGS: LabSettings = {
   look: { ...DAMAGE_LOOK_DEFAULTS, ...LOOK_OVERRIDES },
   fluid: fireFluidDefaults,
   zones: fireZones(),
   // FxFireLight's own gain, FxPost's own bloom, the tier's haze — the
-  // values tuned here on 2026-09-12, which are the library's defaults too.
-  light: 42,
+  // library's defaults, read from it and never copied, so the lab cannot
+  // show a fire the product does not have.
+  light: FIRE_LIGHT_GAIN,
+  // The preset's own until someone moves the slider — so switching presets
+  // in the URL does not make a saved tune look stale.
+  firelight: null,
+  fireShadows: false,
+  // `?floor=1` so a capture can ask for the ground without a saved tune.
+  floor: query.get('floor') === '1',
   // The library's own, not copies of them: these three used to be literals
   // here and in `fx/emission.ts` both, which is exactly how a lab comes to
   // show a fire the product does not have.
   bloom: FX_BLOOM,
   threshold: FX_BLOOM_THRESHOLD,
   haze: fxQualityFor(TIER).haze,
+  // Sharp: a shallow focus is a look to reach for, not the lab's default,
+  // and every capture is judged on a sharp frame. `?focus=0.8` for a macro
+  // shot of the rim without a saved tune.
+  focus: num('focus', 0, 0, 1),
   // FireEmitter's own, read from it rather than copied: these were stale the
   // moment the library's changed, and a lab showing a fire the product does
   // not have is worse than no lab.
@@ -607,6 +667,8 @@ class FieldView implements DamageSource {
   time = 0
   /** How the burn is drawn — the Tune sidebar's, read by the sheet every frame. */
   look: DamageLook = {}
+  /** How much of the room's light is left, as the fire takes over — set by `Driver` every frame. */
+  firelight = { room: 1 }
   private from = -1
   private mask = ''
 
@@ -654,24 +716,82 @@ function CameraRig({
   view,
   at,
   locate,
+  burn,
+  pushFrom,
+  pushTo,
+  floor,
 }: {
   view: 'wide' | 'close'
+  /** With a floor in the scene the shot includes it, so the fall lands in frame (K3). */
+  floor: boolean
   at: { u: number; v: number }
   locate: (u: number, v: number) => { x: number; y: number; z: number } | null
+  /** The burn, for its own clock: the push-in follows the fire, not the page. */
+  burn: ScriptedBurn
+  /** The seconds the push-in runs between — catch to peak. */
+  pushFrom: number
+  pushTo: number
 }) {
   const camera = useThree((s) => s.camera)
   useFrame(() => {
-    look.set(0, WIDE.y, 0)
+    // With a floor, the shot sits lower and looks down a little, so the
+    // ground — and anything that lands on it — is in frame.
+    look.set(0, floor ? FLOOR_FRAMING.look : WIDE.y, 0)
     if (view === 'close') {
       const point = locate(at.u, at.v)
       if (point) look.set(point.x, point.y, point.z)
     }
-    camera.position.set(look.x, look.y, look.z + (view === 'close' ? CLOSE_Z : WIDE.z))
+    // A slow push-in from the catch to the peak, and it stays in: a few
+    // percent of the frame, on the BURN's clock, so the same moment is
+    // always shot from the same place (K1). Held still for the macro view,
+    // which is a crop of the rim and has nothing to push toward.
+    const moving = !CAMERA_STATIC && view === 'wide'
+    const k = moving ? clamp01((burn.time - pushFrom) / Math.max(0.1, pushTo - pushFrom)) : 0
+    const push = 1 - PUSH_IN * (k * k * (3 - 2 * k))
+    // And a breath of handheld life: well under a degree, on smooth noise,
+    // never a shake (K2). Off with the push-in, so a capture is a capture.
+    const drift = moving ? DRIFT : 0
+    const wobbleX = (drift * (driftNoise(burn.time * 0.21) - 0.5)) as number
+    const wobbleY = (drift * (driftNoise(burn.time * 0.17 + 9.3) - 0.5)) as number
+    camera.position.set(
+      look.x + wobbleX,
+      look.y + wobbleY + (floor && view === 'wide' ? FLOOR_FRAMING.lift : 0),
+      look.z + (view === 'close' ? CLOSE_Z : WIDE.z * push * (floor ? FLOOR_FRAMING.back : 1)),
+    )
     camera.lookAt(look)
     // After `lookAt`, which resolves roll against world up and would undo it.
     camera.rotation.z = ROLL
   })
   return null
+}
+
+/**
+ * How the wide shot changes when there is a floor: it aims lower and stands a
+ * little higher, so the ground is in frame and the camera looks down on it
+ * rather than along it (K3, F4).
+ */
+const FLOOR_FRAMING = { look: -0.32, lift: 0.34, back: 1.34 }
+
+/** How much closer the wide camera stands at the peak than at the first contact. */
+const PUSH_IN = 0.07
+
+/** How far the handheld drift wanders, world units: about a third of a degree at this distance. */
+const DRIFT = 0.012
+
+function clamp01(x: number): number {
+  return x < 0 ? 0 : x > 1 ? 1 : x
+}
+
+/** Smooth value noise, 0..1 — a drift that wanders rather than swinging on a sine. */
+function driftNoise(x: number): number {
+  const i = Math.floor(x)
+  const f = x - i
+  const smooth = f * f * (3 - 2 * f)
+  const hash = (n: number) => {
+    const v = Math.sin(n * 127.1) * 43758.5453
+    return v - Math.floor(v)
+  }
+  return hash(i) + (hash(i + 1) - hash(i)) * smooth
 }
 
 /**
@@ -713,9 +833,20 @@ function Driver({
   match,
   locate,
   until,
+  yields,
+  burstAt,
+  sound,
+  soundOn,
 }: {
   burn: ScriptedBurn
   view: FieldView
+  /** The burn's voice, once someone has asked for it — see `FireSound`. */
+  sound: { current: FireSound | null }
+  soundOn: boolean
+  /** How much of the room's light a fire at its height takes over, 0..1. */
+  yields: number
+  /** When this burn cuts a piece loose, for the burst of sparks it throws — or null. */
+  burstAt: number | null
   layers: Layers
   detail: number
   playing: boolean
@@ -726,12 +857,47 @@ function Driver({
   /** Where playing stops: the end of this burn, which is not the same for every burn. */
   until: number
 }) {
+  /** The burn's clock last frame, for the moments a sound belongs to. */
+  const was = useRef(0)
   useFrame((_, delta) => {
+    burn.burstAt = burstAt
+    const before = was.current
     if (playing) {
       burn.play(delta, speed, until)
       onTime(burn.time)
     }
+    was.current = burn.time
+
+    // Sound (§10). Only while it is actually playing, and only at a speed a
+    // crackle still means something at: paused or scrubbing, the room is
+    // silent rather than stuttering, and a seek resumes from the new moment
+    // with no burst of caught-up crackles — `FireSound` reads this step's
+    // stats and nothing older.
+    const voice = sound.current
+    if (voice) {
+      if (soundOn && playing && speed >= 0.5) {
+        // The match, at the moment it touches the paper.
+        if (before < 0.02 && burn.time >= 0.02) voice.strike()
+        // The cut: a soft breath as the piece lets go.
+        if (burstAt !== null && before < burstAt && burn.time >= burstAt) voice.puff()
+        // Where the fire is, not where the sheet is: the crackle comes from
+        // the burn (S8), which on a corner burn is nowhere near the middle.
+        const origin = ORIGINS[burn.settings.origin]
+        voice.update(delta * speed, burn.stats, locate(origin.u, origin.v) ?? locate(0.5, 0.5))
+        // The smoulder: a bead popping now and then, once the flames are out.
+        const out = burn.wentOut
+        if (out !== null && burn.stats.front === 0 && burn.time < out + burn.settings.smoulder) {
+          if (Math.random() < delta * 1.5) voice.pop()
+        }
+      } else {
+        voice.stop()
+      }
+    }
     view.sync(burn.glow, layers, detail)
+    // The fire is the key light while it burns, and the room yields to it —
+    // but only while its light is on: with the light layer off, nothing on
+    // screen is lighting the sheet in the room's place.
+    view.firelight.room = layers.light ? 1 - yields * burn.fireLevel : 1
     // The match that lights it.
     //
     // The lab had none, so the scorch and then the first hole appeared with
@@ -762,6 +928,8 @@ function Driver({
  */
 function Ready({
   burn,
+  view,
+  locate,
   armed,
   nonce,
   playing,
@@ -770,6 +938,9 @@ function Ready({
   onReady,
 }: {
   burn: ScriptedBurn
+  /** The field as the sheet draws it — what the masks are read from. */
+  view: FieldView
+  locate: SurfaceLocator
   armed: boolean
   nonce: string
   playing: boolean
@@ -781,6 +952,8 @@ function Ready({
 }) {
   const frames = useRef(0)
   const fonts = useRef(false)
+  const camera = useThree((s) => s.camera)
+  const canvas = useThree((s) => s.gl.domElement)
 
   useEffect(() => {
     document.fonts.ready.then(() => {
@@ -801,9 +974,10 @@ function Ready({
         duration: plan.duration,
         burnt: plan.burnt,
         severedAt: plan.severedAt,
+        masks: ready ? fieldMasks(view, locate, camera, canvas) : null,
       }
     },
-    [burn, plan, look],
+    [burn, plan, look, view, locate, camera, canvas],
   )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` and `playing` are the TRIGGER — anything that changes the picture starts the count again
@@ -821,6 +995,140 @@ function Ready({
     }
   })
   return null
+}
+
+/**
+ * Where on the screen the burn says each thing is.
+ *
+ * So a budget can measure the colour of char where the burn says char is,
+ * instead of finding the char by its colour — which is the thing being
+ * measured, and a mask drawn from it could only ever agree with it.
+ *
+ * The char and the scorch are found by DISTANCE from the drawn edge, never by
+ * the field's char. The field carries char in about one texel beside the cut,
+ * and the shader builds the whole band and its halo out of that; a mask keyed
+ * on char levels found nothing at all on a cold sheet. So from every texel on
+ * the rim a ray goes out into the paper, and points are taken along it at set
+ * distances in millimetres.
+ */
+interface FieldMasks {
+  /** On the char band, past the lip and the beads: {@link CHAR_AT} from the edge. */
+  char: [number, number][]
+  /** The middle of the hole, two texels or more from any paper. */
+  hole: [number, number][]
+  /** Clean paper, well beyond the scorch's reach. */
+  paper: [number, number][]
+  /** Out through the scorch, with the distance from the edge in mm. */
+  scorch: [number, number, number][]
+}
+
+/**
+ * Where along each ray the char is sampled, mm: past the default lip (3.5)
+ * and widest bead (1.25), inside the default char band (3.5 more).
+ */
+const CHAR_AT = [6, 7.5]
+/** And the scorch, out to past its reach. */
+const SCORCH_AT = [6, 8, 10, 14, 18, 24, 30, 40]
+/** A millimetre of A4 in world units: a default sheet is one unit, 210 mm, across. */
+const WORLD_MM = 1 / 210
+
+const projected = new THREE.Vector3()
+
+function fieldMasks(
+  view: FieldView,
+  locate: SurfaceLocator,
+  camera: THREE.Camera,
+  canvas: HTMLCanvasElement,
+): FieldMasks {
+  const { size, pixels } = view
+  const last = size - 1
+  const w = canvas.clientWidth
+  const h = canvas.clientHeight
+  const presence = (x: number, y: number) => pixels[(y * size + x) * 4 + PRESENCE]!
+  const near = (x: number, y: number, r: number, test: (x: number, y: number) => boolean) => {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = x + dx
+        const ny = y + dy
+        if (nx >= 0 && ny >= 0 && nx <= last && ny <= last && test(nx, ny)) return true
+      }
+    }
+    return false
+  }
+  const paper = (x: number, y: number) => presence(x, y) >= 128
+  const cut = (x: number, y: number) => presence(x, y) < 128
+  const drawn = (u: number, v: number) => {
+    const x = Math.round(u * last)
+    const y = Math.round(v * last)
+    return x >= 0 && y >= 0 && x <= last && y <= last && paper(x, y)
+  }
+  const screen = (u: number, v: number): [number, number] | null => {
+    const at = locate(u, v)
+    if (!at) return null
+    projected.set(at.x, at.y, at.z).project(camera)
+    const sx = Math.round((projected.x * 0.5 + 0.5) * w * 10) / 10
+    const sy = Math.round((0.5 - projected.y * 0.5) * h * 10) / 10
+    return sx < 1 || sy < 1 || sx > w - 2 || sy > h - 2 ? null : [sx, sy]
+  }
+  const masks: FieldMasks = { char: [], hole: [], paper: [], scorch: [] }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (cut(x, y)) {
+        const at = near(x, y, 2, paper) ? null : screen(x / last, y / last)
+        if (at) masks.hole.push(at)
+        continue
+      }
+      // Clean paper: twelve texels, about 40 mm, from any cut — past the
+      // farthest the scorch's halo reaches up.
+      if (!near(x, y, 12, cut)) {
+        const at = screen(x / last, y / last)
+        if (at) masks.paper.push(at)
+        continue
+      }
+      // A texel on the rim: paper, with the cut beside it. Out, away from it.
+      let nx = 0
+      let ny = 0
+      if (x > 0 && cut(x - 1, y)) nx++
+      if (x < last && cut(x + 1, y)) nx--
+      if (y > 0 && cut(x, y - 1)) ny++
+      if (y < last && cut(x, y + 1)) ny--
+      const length = Math.hypot(nx, ny)
+      if (length === 0) continue
+      nx /= length
+      ny /= length
+      // The drawn edge is half a texel back toward the cut: presence is cut
+      // at one half, between this texel and the gone one.
+      const eu = (x - nx * 0.5) / last
+      const ev = (y - ny * 0.5) / last
+      // Copied out before the second call: the locator writes every answer
+      // into one reused vector, so `edge` would otherwise BECOME `next`.
+      const edge = locate(eu, ev)
+      if (!edge) continue
+      const ex = edge.x
+      const ey = edge.y
+      const ez = edge.z
+      const next = locate(eu + nx / last, ev + ny / last)
+      if (!next) continue
+      // A texel is not the same number of millimetres both ways on a sheet
+      // that is not square, so measure this one.
+      const texelMm = Math.hypot(next.x - ex, next.y - ey, next.z - ez) / WORLD_MM
+      if (!(texelMm > 0)) continue
+      const along = (mm: number) => {
+        const u = eu + (nx * mm) / texelMm / last
+        const v = ev + (ny * mm) / texelMm / last
+        return drawn(u, v) ? screen(u, v) : null
+      }
+      for (const mm of CHAR_AT) {
+        const at = along(mm)
+        if (at) masks.char.push(at)
+      }
+      for (const mm of SCORCH_AT) {
+        const at = along(mm)
+        if (at) masks.scorch.push([at[0], at[1], mm])
+      }
+    }
+  }
+  return masks
 }
 
 /** What is wired today, and what it actually draws. */
@@ -897,6 +1205,40 @@ function Lab() {
   const [target, setTarget] = useState(START_T)
   const [shown, setShown] = useState(START_T)
   const [playing, setPlaying] = useState(false)
+
+  /**
+   * The burn's voice. Muted until someone asks for it (Noor, 13 Sep): a
+   * browser will not start audio without a gesture anyway, so the button IS
+   * the gesture, and a lab that spoke on load would be a lab nobody could
+   * leave open.
+   */
+  const [soundOn, setSoundOn] = useState(false)
+  const audioRef = useRef<FxAudio | null>(null)
+  const soundRef = useRef<FireSound | null>(null)
+  const toggleSound = useCallback(async () => {
+    if (soundRef.current && soundOn) {
+      soundRef.current.stop()
+      setSoundOn(false)
+      return
+    }
+    try {
+      audioRef.current ??= new FxAudio({ context: createAudioContext(), quality: TIER })
+      await audioRef.current.unlock()
+      soundRef.current ??= new FireSound(audioRef.current)
+      setSoundOn(true)
+    } catch {
+      // No Web Audio here: everything but the sound still works.
+    }
+  }, [soundOn])
+  useEffect(
+    () => () => {
+      soundRef.current?.stop()
+      void audioRef.current?.dispose()
+      soundRef.current = null
+      audioRef.current = null
+    },
+    [],
+  )
   // `?play=1` waits for the first settled frame. Started at mount, the burn
   // played itself out during the shader compile — and since `Ready` only
   // publishes while the burn is NOT playing, the page could only report
@@ -1140,6 +1482,19 @@ function Lab() {
               </button>
             </div>
           )}
+          <div className="row">
+            <button type="button" aria-pressed={soundOn} onClick={() => void toggleSound()}>
+              {soundOn ? 'sound on' : 'sound off'}
+            </button>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.floor}
+                onChange={(e) => setSettings({ ...settings, floor: e.currentTarget.checked })}
+              />{' '}
+              floor
+            </label>
+          </div>
 
           <h2>
             phases <span className="note">§9, at the times this burn reaches them</span>
@@ -1274,12 +1629,27 @@ function Lab() {
           // the burn being judged.
           reducedMotion={PHYSICS === undefined}
           content={CONTENT}
-          physics={PHYSICS}
+          physics={
+            typeof PHYSICS === 'object' ? { ...PHYSICS, floor: settings.floor ? FLOOR_Y : -1.4 } : PHYSICS
+          }
           damage={view}
-          scene={LIGHTING ? ({ lighting: LIGHTING } as ComponentProps<typeof Paper>['scene']) : undefined}
+          scene={
+            {
+              lighting: LIGHTING,
+              floor: { enabled: settings.floor, y: FLOOR_Y },
+            } as ComponentProps<typeof Paper>['scene']
+          }
         >
           <SheetReady locate={locate} onReady={() => setSheet(true)} />
-          <CameraRig view={camera} at={at} locate={locate} />
+          <CameraRig
+            view={camera}
+            at={at}
+            locate={locate}
+            burn={burn}
+            floor={settings.floor}
+            pushFrom={plan.phases.find((p) => p.id === 'catch')?.at ?? 0}
+            pushTo={plan.phases.find((p) => p.id === 'peak')?.at ?? plan.duration}
+          />
           <FxParticles pool={burn.pool} />
           {layers.fluid && (
             <FxFireFluid
@@ -1302,7 +1672,14 @@ function Lab() {
             />
           )}
           {layers.match && <FxMatchFlame match={match} />}
-          {layers.light && <FxFireLight field={burn.field} locate={locate} gain={settings.light} />}
+          {layers.light && (
+            <FxFireLight
+              field={burn.field}
+              locate={locate}
+              gain={settings.light}
+              shadows={settings.fireShadows}
+            />
+          )}
           {layers.wisps && settings.burn.smoke && (
             <FxWisps glow={burn.glow} field={burn.field} locate={locate} wind={burn.pool.wind} />
           )}
@@ -1312,6 +1689,7 @@ function Lab() {
               bloom={bloom ? (BLOOM_STRENGTH ?? settings.bloom) : 0}
               threshold={THRESHOLD ?? settings.threshold}
               haze={settings.haze}
+              focus={settings.focus}
               field={burn.field}
               locate={locate}
             />
@@ -1327,11 +1705,17 @@ function Lab() {
             match={match}
             locate={locate}
             until={plan.duration}
+            yields={settings.firelight ?? roomYield(LIGHTING)}
+            burstAt={plan.severedAt}
+            sound={soundRef}
+            soundOn={soundOn}
           />
           <Ready
             plan={plan}
             look={settings.look}
             burn={burn}
+            view={view}
+            locate={locate}
             armed={generation > 0}
             playing={playing}
             nonce={`${fluidKey}:${camera}:${at.u},${at.v}:${detail}:${post}:${bloom}`}
@@ -1703,6 +2087,22 @@ function Tune({
           step={1}
           onInput={(v) => onChange({ ...settings, light: v })}
         />
+        <Slider
+          label="How much the room yields at the fire's height"
+          value={settings.firelight ?? roomYield(LIGHTING)}
+          min={0}
+          max={1}
+          step={0.01}
+          onInput={(v) => onChange({ ...settings, firelight: v })}
+        />
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.fireShadows}
+            onChange={(e) => onChange({ ...settings, fireShadows: e.currentTarget.checked })}
+          />{' '}
+          casts shadows (one extra shadow pass a frame)
+        </label>
       </details>
 
       <details open>
@@ -1732,6 +2132,14 @@ function Tune({
         {/* Last polish item, not a look — see `fxQualityTiers.haze`. It is off
             on this lab's tier, and it is still placed from where the sprite
             flames stand rather than from where the fluid burns. */}
+        <Slider
+          label="Shallow focus on the burn"
+          value={settings.focus}
+          min={0}
+          max={1}
+          step={0.01}
+          onInput={(v) => onChange({ ...settings, focus: v })}
+        />
         {advanced && (
           <Slider
             label="Heat haze (off on this tier)"

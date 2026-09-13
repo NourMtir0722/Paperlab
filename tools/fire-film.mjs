@@ -15,6 +15,11 @@
  *
  *   pnpm film
  *   pnpm film --speed=0.25    slower, for the flicker
+ * The camera moves here, and only here: the push-in and the drift are part of
+ * what a film is for. Everything that MEASURES a frame loads `?camera=static`.
+ *
+ *   pnpm film --floor         with the ground under it, so a piece it drops
+ *                             lands in shot
  *   pnpm film --amount=0.42   how much of the sheet burns — from the centre,
  *                             enough to cut it in two and watch the piece fall
  */
@@ -28,6 +33,9 @@ const PORT = 5199
 const argv = process.argv.slice(2)
 const speed = Number((argv.find((a) => a.startsWith('--speed=')) ?? '--speed=1').slice(8)) || 1
 const amount = argv.find((a) => a.startsWith('--amount='))?.slice(9)
+// The ground, for a burn that drops a piece: without it the piece falls out
+// of frame and the fall is over before it can be judged.
+const floor = argv.includes('--floor')
 const out = join(shotsDir(), 'fire-film')
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
@@ -50,7 +58,7 @@ for (const origin of ['center', 'corner']) {
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  const asked = amount === undefined ? '' : `&amount=${amount}`
+  const asked = (amount === undefined ? '' : `&amount=${amount}`) + (floor ? '&floor=1' : '')
   await page.goto(`${base}/fx-lab/?ui=0&play=1&t=0&origin=${origin}&speed=${speed}${asked}`, {
     waitUntil: 'networkidle',
   })

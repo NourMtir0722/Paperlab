@@ -579,7 +579,7 @@ pnpm lint           # biome
 pnpm knip           # dead code and unused exports
 ```
 
-**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor`. All of them are dev-only — `pnpm build` emits `index.html` and nothing else — with one exception: `hands/index.html` also ships, as the site's `/hands` route, built in a second pass (`PAPERLAB_HANDS=1`) so the default build stays lean.
+**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor`. All of them are dev-only — `pnpm build` emits `index.html` and nothing else — with two exceptions, each built in a pass of its own so the default build stays lean: `hands/index.html` ships as the site's `/hands` route (`PAPERLAB_HANDS=1`, into `dist-hands/`), and `fx-lab/index.html` as `/fx-lab` (`PAPERLAB_FXLAB=1`, into `dist-fxlab/`) — the fire lab is a feature of the site now, not only a harness. Its reference stills do not ship; they live outside the repo and the page says so where they would have been.
 
 | | | |
 |---|---|---|
@@ -587,7 +587,7 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:drive` | the editor | the stage really walks when you drag, wheel or arrow it. **CI gate** |
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
-| `pnpm test:hands` | `/hands` | scripted gestures really reach the paper — grab, score, paint, tear, crush, blow, pointer capture, and that the page talks to nobody. Runs `pnpm hands:setup` for you. **Own workflow**, not the `ci` gate — see below |
+| `pnpm test:hands` | `/hands` | the three ways to light the paper really light it — a held match, a flame in the camera's frame (and never a steady lamp), the panel's button — plus the blow that puts it out, and that the page talks to nobody. Runs `pnpm hands:setup` for you. **Own workflow**, not the `ci` gate — see below |
 | `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground, and its nav names every route `pages.yml` deploys. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
 | `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
@@ -603,9 +603,9 @@ go, not somewhere you are sent.
 
 **It has CI, and deliberately not the required kind.** `.github/workflows/hands.yml`
 runs `pnpm test:hands` on the paths that can break it — the harness, the page,
-the vite wiring, and `packages/paperlab/src/**`, because every gesture lands on
-a library feature and a change to the cloth sim is exactly what breaks one
-silently — plus weekly, to catch a MediaPipe or model revision that no commit
+the vite wiring, and `packages/paperlab/src/**`, because the burn is the
+library's and a change to the field or the cloth coupling is exactly what
+breaks it silently — plus weekly, to catch a MediaPipe or model revision that no commit
 here caused. It is NOT in `protect-main`'s required checks: the harness fetches
 its weights from Google, and a required gate would let someone else's CDN block
 every unrelated PR in the repo. A failure is a red X somebody reads, not a veto.
@@ -659,158 +659,150 @@ button. **And stopping is not optional:** the detection loop calls the same
 gesture between one scripted frame and the next. Thirteen unrelated checks
 failed and none of them was broken.
 
-**`/hands` — handling the paper with a camera.** Ten files, none of which
-`packages/paperlab` knows about: `landmarks.ts` is the hand as geometry (every
-measurement normalised by the palm, so leaning toward the camera is not a
-gesture), `gestures.ts` names the pose, `roles.ts` decides which of two hands
-is holding and which is acting, `marks.ts` turns a drag across the sheet into a
-crease, `flick.ts` turns a snap of the fingers into a watercolour, `dial.ts`
-turns a wrist into a stock selector, `breath.ts` turns a puckered mouth into
-wind, `span.ts` turns the gap between two hands into a size, `handPointer.ts` turns a gesture into a synthetic `PointerEvent` at the
-canvas — which R3F raycasts exactly as it does a mouse, so it reaches the cloth
-grab the paper already had — and `hands-main.tsx` is the page. Press *start the
-camera* to use it; `pnpm test:hands` drives the same paths with scripted hands
-and no camera, because the tracking is not the part that can break and the rest
-is.
+**`/hands` — setting the paper alight with a camera.** It used to be twelve
+gestures over ten files: grab, score, paint, fold, crush, tear, rip, resize,
+peel, throw, dial, blow. It is ONE feature now, on purpose — the fire — and
+the other eleven were deleted rather than left to rot beside it. A page that
+does one thing properly is worth more than a page that demonstrates eleven,
+and the fire is the thing the library spent a month building.
 
-Twelve effects, each mapped onto something the library could already do:
+Seven files, none of which `packages/paperlab` knows about: `landmarks.ts` is
+the hand as geometry (every measurement normalised by the palm, so leaning
+toward the camera is not a gesture), `gestures.ts` names the pose, `match.ts`
+turns a pinch held still into a lit match, `breath.ts` turns a puckered mouth
+into wind, `lighter.ts` finds a real flame in the camera's pixels, `flame.ts`
+is how a held flame heats the sheet and a breath cools it, and
+`hands-main.tsx` is the page. Press *start the camera* to use it;
+`pnpm test:hands` drives the same paths with scripted hands and painted
+frames, because the tracking is not the part that can break and the rest is.
+
+Three ways to light the sheet, and they all end in the same place — one UV on
+the sheet that `DamageField.ignite` is called at:
 
 | | | |
 |---|---|---|
-| pinch | take hold and pull | the cloth sim's own grab |
-| point | score a line | `memory.creases` — the sheet keeps it |
-| flick | throw a watercolour at it | `content.wash` |
-| turn an open palm | change the stock under your hand | `stock`, swapped live |
-| blow at it | the wind rises | `cloth.wind`, driven continuously |
-| fist | fold along the line you scored | the `fold` deformer, over the sim |
-| fist | crush, with nothing scored | the `crumple` behavior, over the sim |
-| open palm | let go of the fold or the crush | — |
-| pull an edge | tear it ragged | `surface.deckle` |
-| pull apart, two hands | rip along the dotted line | `surface.perforation` |
-| two open palms, spread | resize the sheet | `sheet.width/height` |
-| pinch a CORNER and lift | it peels and curls back | the `peel` behavior, over the sim |
-| flick with the sheet in hand | it comes off its pins and flies | `pins`, and the sim's own throw |
+| hold a real flame up to the camera | the paper catches where the flame is | `lighter.ts` → `field.ignite` |
+| pinch and hold still, over the paper or beside it | you are holding a match, and the sheet catches where it touches | `match.ts` → `field.ignite` |
+| *strike a match* on the panel | for a machine with no camera | `field.ignite` low on the sheet, for a few seconds |
+| blow at it | the flame goes out, the edge smoulders | `coolFromBlow`, and `cloth.wind` |
 
-**The rule that decides how all of it feels: surface and memory changes are
-free, structural changes reset the sheet.** `surface.*`, `memory.creases`,
-`stock` and the live cloth parameters (`wind`, `stiffness`, `gravity`, `floor`)
-all update in place. That is the single most useful thing to know before
-designing a new gesture — and since cloth started hosting a shape, and
-`ClothSim.adopt` started carrying the particles across a rebuild, there is no
-gesture here left on the wrong side of it.
+**The flame detector is arithmetic, not a model.** `lighter.ts` counts pixels
+that are bright, warm in the order red-green-blue, and almost blue-free, then
+asks two more questions of the count: is it a plausible SIZE for a lighter at
+arm's length (between 0.03% and 12% of the frame — below is noise, above is a
+lit wall or a hand over the lens), and does it MOVE? The flicker is the part
+that earns its keep. Bright warm pixels alone call a desk lamp, a
+candle-coloured bulb or sunlight on a wall a flame; a real flame's pixel count
+wanders by a few percent frame to frame and a lamp's does not move at all. It
+costs about a quarter of a second before the paper catches and it buys a page
+that does not set itself on fire under a desk lamp — which `pnpm test:hands`
+asserts, with a painted steady patch and a painted flickering one.
 
-**Two things used to be on the wrong side of that line and are not any more.**
-A fist swapped the simulation out for a behavior and snapped the sheet flat;
-cloth hosts a shape now, so it folds or crushes what is hanging there.
-`sheet.width/height` still rebuild the mesh, but `ClothSim.adopt` carries the
-drape across, so a hanging sheet can be resized while it hangs. As a SHAPE it
-was always free — a deformer is a pure function of its options, so the sheet
-simply redraws at the new size with the fold or the crush where it was.
+It runs on a 320×240 crop of the camera, every other frame, in a 2D canvas
+that is never in the document. A flame is an enormous feature at that size,
+and the detector is pure arithmetic over a `Uint8Array`, so it runs in node
+under vitest as well as in the browser.
 
-Five more things are worth knowing before extending it.
+**The fire itself is the library's, at the library's defaults.** `paperlab/fx`
+is the whole of it — `DamageField`, `FireEmitter`, `ParticlePool`,
+`FxFireFluid`, `FxFireLight`, `FxParticles`, `FxPost`, `FxWisps`,
+`FxMatchFlame`, `Afterglow` — and the look comes from
+`DAMAGE_LOOK_DEFAULTS`, which IS the tune made in `/fx-lab`. `/hands` sets no
+look of its own and should not: if the burn wants changing, it changes in the
+library and both pages move together. The one thing the page owns is where
+the fire starts.
+
+**A flame that leaves the frame must stop lighting paper.** What has caught
+goes on burning — that is what a fire does — but `flameRef` is an ignition
+point, and one left behind goes on igniting fresh texels forever from wherever
+the lighter used to be. `sees()` clears it on a frame with no flame in it;
+the gate checks that too.
+
+**A flame that is SEEN lights the sheet for good.** The first sighting — a
+lighter in the frame, or a lit match touching the paper — commits a flame to
+that spot for the lab's `HOLD` (1.6 s of the burn's clock), whatever the
+camera sees next, and the fire then runs until the whole sheet has burnt. It
+used to ignite only while the flame was being seen, and a flame flickering in
+and out of the detector restarted `flameHeat`'s ramp from zero every time it
+dropped out — it scorched the paper and never properly caught. Only a sheet
+that is not already alight is committed, so the burn starts where the flame
+first touched, not wherever it was last.
+
+**The detector must never report a steady light, not even briefly.** It used
+to ask the flicker question only once its eight-frame history was full, which
+reported a steady warm lamp as a flame for the first third of a second it was
+in view. Harmless while a sighting only aimed a flame; a sheet set alight
+once a sighting committed one. Every sighting is asked now.
+
+**What the camera sees is drawn over the page** (`overlay.ts`): the hand's
+bones, a box round it, and a label with the tracker's confidence and what the
+hand is doing (`hold still…`, `match lit`); a box and a `fire 87%` label round
+a flame once one is found; and a banner while it is seen. A hand driving
+something it cannot feel has to be shown that it is being read. The tracker's
+confidence thresholds are 0.35 rather than MediaPipe's 0.5, which drops a hand
+the moment it turns side-on to pinch.
+
+**The room yields to the fire here too.** The sheet draws a `Firelit` view of
+the `Afterglow` that carries `DamageSource.firelight`, eased on the burn's
+clock with the lab's own `FIRE_FULL_FRONT`, `FIRE_LEVEL_EASE` and
+`roomYield` — imported from `burn.ts`, never copied. And the page is silent:
+no `FxAudio`, no `FireSound` (Noor, 2026-09-13).
+
+**The breath is half of the fire.** The same puckered mouth that raises
+`cloth.wind` also cools the field (`coolFromBlow`) and blows a held match out,
+and a match blown out stays out until the hand opens — otherwise blowing one
+out would mean nothing, since the pinch that lit it is still a pinch. The wind
+reaches the cloth as a PROP, so it is quantised: `breath.ts` publishes steps
+of 0.05 with a deadband, and thirty renders a second becomes one or two.
+
+**A stale breath is measured by DISTANCE, not difference.** `drive()` lets a
+caller own the clock so a timed gesture can be tested without a wall clock —
+and a test that hands the page an injected time and then goes back to
+`performance.now()` moves the clock BACKWARDS, at which point a plain
+subtraction is negative, the reading never goes stale, and the last breath
+anyone blew goes on blowing forever. The sheet never came to rest and the
+harness timed out 150 seconds later with no idea why. `Math.abs`.
 
 **A fist is not a pinch, and the aperture cannot tell you which.** A closed
 fist puts the thumb against the index just as tightly as a pinch does, so
-anything thresholding thumb-to-index alone grabs the paper every time you try
-to crush it. The discriminator is the curl of the three fingers a pinch does
-not use; `gestures.test.ts` pins it.
+anything thresholding thumb-to-index alone lights the paper every time you
+close your hand. The discriminator is the curl of the three fingers a pinch
+does not use; `gestures.test.ts` pins it.
 
-**A closed hand folds what you scored, or crushes what you did not.** This
-used to be a MODE swap and the seam in the whole harness: a fist replaced
-cloth with `crumple`, threw away the drape, and crushed a flat sheet. Cloth
-hosts a shape now, so a fist runs `fold` or `crumple` over the sheet that is
-actually hanging there and the sheet stays grabbable throughout. The fold is
-aimed at a line the sheet is already carrying — `creaseFromDrag` produced that
-`{ angle, offset }` when a fingertip scored it, and `fold` takes the identical
-pair, which is the tidiest join in this harness.
-
-**`fold` moves everything BEYOND its hinge**, so which half of the sheet
-swings is decided by which way `angle` points — and `creaseFromDrag` wraps into
-a canonical half-turn that is blind to that. A line scored below the centre
-comes back with a negative offset and folds the whole sheet about a line near
-its bottom edge, which reads as the paper swinging off its pins. `marks.foldAlong`
-picks the equivalent naming with a non-negative offset, so the flap is the side
-a person would actually lift.
-
-**A debounced gesture keeps firing after the hand has left it.** The reader
-holds a pose for a few frames so a dropped fingertip does not drop the paper,
-which means `point` is still being reported while the hand is already moving
-away — and the score followed it there, collapsing the line you drew to
-wherever you relaxed. `marks.continuesScore` rejects the jump. Anything else
-that accumulates while a gesture is held needs the same guard.
-
-**The second hand is not a second grab.** `ClothSim.grabbedIndex` is one
-`int`, so two hands pulling the sheet is not something the library can be asked
-for. What two hands unlock is the posture every physical thing you do to paper
-actually uses — one hand steadies it while the other acts — and that works
-today precisely because holding is the one grab and acting (scoring, flicking,
-turning a dial) never touches the vertices. The acting hand gets its own
-raycast through `hitUV`, which needs no pointer event at all.
-
-**The vocabulary ran out of POSES long before it ran out of things to do, and
-the way out was to stop looking for new ones.** A hand has about five shapes a
-tracker can tell apart reliably, and there are twelve effects here. What makes
-that work is that a pose is not a verb on its own:
-
-- **Where it lands.** A pinch on a CORNER peels; on an EDGE it tears; anywhere
-  else it takes hold. Same pose, three meanings, and nothing to learn — that is
-  how paper works.
-- **What the sheet already is.** A fist on a scored sheet folds along the
-  score; on an unmarked one it crushes.
-- **What is in your hand.** A fast release throws whatever you are holding —
-  the sheet if you had hold of it, paint if you did not.
-- **How many hands.** Two pinches rip along a perforation; two open palms
-  resize. That second one outranks both the stock dial and the single open palm
-  that means "put the paper back", or a resize would change the material and
-  drop you out of a crush on its way.
-
-`marks.ts` is where most of this lives, because most of it is a question about
-a point on the sheet rather than about a hand.
-
-**A pinch decides what it is when it LANDS, and never again.** A grab that
-turned into a peel because the drag pulled a corner under the hand would let go
-of the paper half way through the pull — which is what tearing an edge is, so
-it took the tear with it. `wasPinchingRef` makes the peel a rising-edge
-decision; `pnpm test:hands` catches the regression because the tear stops
-working.
-
-**The harness can drive its own clock, and a tracker has to survive that.**
-`__HANDS__.drive(hands, aspect, face, now)` takes a timestamp, because a flick
-is DEFINED by how fast it is and a test measured against wall time passes on a
-laptop and fails on a loaded CI box. The cost is that the clock can jump
-backwards between a wall-time run and a scripted one — and trimming a sample
-window by age cannot see that, because the differences come out negative and
-nothing is dropped. `FlickTracker` starts again when it sees time go backwards.
+**A match is a pinch that HOLDS STILL.** A pinch is briefly part of every
+gesture a hand makes, so the dwell is what separates "I meant this" from "my
+hand passed through it": about a third of a second, motionless, anywhere.
+`match.ts` arms on the pinch, lights on the dwell, and gives up if the hand
+travels. It used to refuse to light over the paper — a pinch there was a
+GRAB, latched until the hand opened, so a tear pulling off the sheet's edge
+could not turn into a match half way. The grab went with the other gestures
+and the latch stayed behind, making the sheet the one place a match would not
+light. Noor met that first ("the sensitivity is bad"); it is gone. The harness drives that on an injected clock for the reason above.
 
 **The pinch is measured in three dimensions and the curls are not.** The
 tracker reports a `z` per landmark and nothing read it. That is a live bug in
 exactly one place: a span pointing at the camera projects SHORT, so a hand
-turned side-on puts the thumb behind the finger, the aperture collapses, and
-the sheet is grabbed by a hand that never closed. `spatialDistance` fixes it
-for the aperture, where depth is also safe — a 3D distance is never shorter
-than its own projection, so a noisy `z` can only make a pinch harder to
-register, never invent one. The curls have the same geometry and the opposite
-risk: they drive continuous values through a ratchet (the crush only climbs),
-so inflation is the harm and they stay in the image plane. A finger pointed
-straight at the camera still reads as curled.
+turned side-on puts the thumb behind the finger, the aperture collapses, and a
+match lights in a hand that never closed. `spatialDistance` fixes it for the
+aperture, where depth is also safe — a 3D distance is never shorter than its
+own projection, so a noisy `z` can only make a pinch harder to register, never
+invent one. The curls have the same geometry and the opposite risk, so they
+stay in the image plane.
 
-**A prop written every frame re-renders the tree that owns the canvas.** The
-wind a blow drives is continuous, so `breath.ts` quantises it to steps of 0.05
-with a deadband and publishes only a step change — thirty renders a second
-becomes one or two. The same reason the crush drives `ref.set('progress')`
-imperatively rather than through a prop.
-
-**A page turn was declined, not missed.** It is the fourth behavior the plan
-listed for this batch and the one that does not survive contact with a single
-hanging sheet: a page turns ONTO something, and with nothing behind it a `flip`
-reads as a peel that went too far. It wants the field, not the hero path.
+**The fire runs on the RENDER clock, not the camera's.** The camera delivers
+about thirty frames a second and none at all when it is off, so a burn driven
+from the camera loop ran at the camera's rate, stalled whenever a hand left
+the frame, and could not be lit on a machine without a camera. A fire that
+only burns while someone is watching it is an animation of one. The `<Fire>`
+component inside the canvas owns `field.step`, and the camera loop only says
+where the flame is.
 
 Still out of reach: punch and cut. The sheet is a fixed-topology grid and
 deformers are pure vertex maps, so a hole in the middle or a split into two
 sheets needs real work in the library. A torn EDGE is reachable only because
-it is alpha on the existing mesh rather than a change to it. Burning is a
-third: `aging` is yellowing and foxing, not char, and there is no burn effect
-to drive.
+it is alpha on the existing mesh rather than a change to it. Burning was the
+third until `paperlab/fx` shipped a damage field: it is a texture and a
+coupling, not a topology change, which is exactly why it could be built.
 
 ### The editor, structurally
 
@@ -822,7 +814,7 @@ to drive.
 | `controls/` | the schema→UI machinery. `controlModel.ts` is a **pure** function from a zod schema to a `Control[]` — no React, no DOM, and unit-tested as such; `controls.tsx` renders that tree; `Select.tsx` and `ui.tsx` are the shared primitives |
 | `panels/` | the inspectors that assemble a `Control[]` for one mode and hand it to `<Panel>` |
 | `chrome/` | everything around the canvas that is not an inspector — the view cluster, transport, coach mark, crash and small-screen screens |
-| `harness/` | the entry points `tools/` drives. Dev-only and out of `pnpm build`'s output, except `hands/`, which ships as the site's `/hands` route |
+| `harness/` | the entry points `tools/` drives. Dev-only and out of `pnpm build`'s output, except `hands/` and `fx-lab/`, which ship as the site's `/hands` and `/fx-lab` routes |
 
 Two things about the control layer are load-bearing and easy to undo by accident:
 

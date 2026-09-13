@@ -49,6 +49,7 @@ export function App() {
           <a href="../">Playground</a>
           <a href="../editor/">Editor</a>
           <a href="../hands/">Hands</a>
+          <a href="../fx-lab/">Fire lab</a>
           <a href="https://github.com/NourMtir0722/Paperlab">GitHub</a>
         </div>
       </nav>
@@ -146,10 +147,10 @@ export function Hero() {
       </p>
 
       <p className="note">
-        Want to feel it rather than read it? <a href="../hands/">Handle the paper with your hands</a> — a
-        webcam drives a gesture vocabulary onto this same public API: pinch to take hold, point to score a
-        line, a fist to fold along it, blow at the sheet to raise the wind. It needs a camera and it asks
-        first; the video never leaves your machine.
+        Want to feel it rather than read it? <a href="../hands/">Set fire to the paper with your hands</a> —
+        hold a lighter up to the webcam and the sheet catches where the flame is, or pinch and hold still to
+        strike a match, then blow it out. It needs a camera and it asks first; the video never leaves your
+        machine. Every knob behind the burn is in <a href="../fx-lab/">the fire lab</a>.
       </p>
     </section>
   )

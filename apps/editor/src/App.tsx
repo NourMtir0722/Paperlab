@@ -267,9 +267,23 @@ export function App() {
           href={`${SITE}hands/`}
           target="_blank"
           rel="noopener"
-          title="Handle the paper with your webcam — pinch to take hold, point to score a line, blow at it to raise the wind"
+          title="Set fire to the paper with your webcam — hold a lighter up to it, or pinch and hold still to strike a match"
         >
           Use your hands{' '}
+          <span className="hands-arrow" aria-hidden="true">
+            ↗
+          </span>
+        </a>
+        {/* The fire lab, beside it and for the same reason: a feature nobody
+            can find is not one. Every knob behind the burn, on one page. */}
+        <a
+          className="hands-link"
+          href={`${SITE}fx-lab/`}
+          target="_blank"
+          rel="noopener"
+          title="Every knob behind the burn — tune the fire and copy it out as JSON"
+        >
+          Fire lab{' '}
           <span className="hands-arrow" aria-hidden="true">
             ↗
           </span>

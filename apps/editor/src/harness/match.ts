@@ -57,11 +57,6 @@ export type MatchState = 'none' | 'arming' | 'lit'
 export interface MatchInput {
   /** Is the acting hand pinching? */
   pinching: boolean
-  /**
-   * Is this pinch on the paper, or holding it? That is a grab, and it stays a
-   * grab for as long as the hand stays closed — see the latch in {@link Match}.
-   */
-  onPaper: boolean
   /** Where the pinch is, in the camera's own coordinates. */
   at: { x: number; y: number } | null
   /** The hand's own ruler — drift is measured in palms, like everything here. */
@@ -76,22 +71,17 @@ export class Match {
   private state: MatchState = 'none'
   private origin: { x: number; y: number } | null = null
   private since = 0
-  /** Blown out, and not to be relit until the hand lets go. */
-  private blownOut = false
   /**
-   * This pinch took hold of the paper, so it is a grab until the hand opens —
-   * even once it has dragged the sheet off its own edge.
+   * Blown out, and not to be relit until the hand lets go.
    *
-   * A latch and not a per-frame test, and that distinction cost a CI run.
-   * Tearing an edge is a pinch that starts on the paper and pulls AWAY from
-   * it: a few frames in, the hand is over empty space, and it is holding
-   * still by any measure a held match would use. On a slow machine those
-   * frames span more than the dwell, so the match lit in the middle of the
-   * pull, the flame took the pointer away from the grab, and the tear could
-   * never finish. Reproduced at 100 ms a frame: lit at step 12 of 26, nothing
-   * torn. The frame rate decided whether a gesture worked.
+   * There used to be a second latch beside this one: a pinch that touched the
+   * paper was a GRAB until the hand opened, so a tear that pulled off the
+   * sheet's edge could not turn into a match half way. The grab went with the
+   * rest of the gestures, and the latch stayed behind doing harm — it made
+   * the sheet, the one place anyone aims a match, the one place a match would
+   * not light (Noor, 2026-09-13: "the sensitivity is bad").
    */
-  private grabbed = false
+  private blownOut = false
   /** What the breath read when this match lit — see {@link BLOW_RISE}. */
   private blowWhenLit = 0
 
@@ -100,7 +90,7 @@ export class Match {
   }
 
   push(input: MatchInput): MatchState {
-    const { pinching, onPaper, at, palm, blow, now, aspect } = input
+    const { pinching, at, palm, blow, now, aspect } = input
 
     // Let go of the pinch and you have let go of the match. A new pinch may
     // light another one.
@@ -108,13 +98,11 @@ export class Match {
       this.state = 'none'
       this.origin = null
       this.blownOut = false
-      this.grabbed = false
       return this.state
     }
 
-    // A lit match survives being moved — and being moved OVER THE PAPER is
-    // the entire point of holding one, so the grab test below cannot apply
-    // to it.
+    // A lit match survives being moved — being moved over the paper is the
+    // entire point of holding one.
     if (this.state === 'lit') {
       if (blow >= BLOW_OUT && blow >= this.blowWhenLit + BLOW_RISE) {
         this.state = 'none'
@@ -127,16 +115,14 @@ export class Match {
       return this.state
     }
 
-    // A pinch that has touched the paper is a grab for the rest of its life,
-    // and one already blown out stays out.
-    if (onPaper) this.grabbed = true
-    if (this.blownOut || this.grabbed) {
+    // One already blown out stays out.
+    if (this.blownOut) {
       this.state = 'none'
       this.origin = null
       return this.state
     }
 
-    // Arming: still, in free air, for long enough. Any real drift starts the
+    // Arming: still, anywhere — over the paper or beside it — for long enough. Any real drift starts the
     // clock again rather than failing outright — a hand that settles after
     // wandering is a hand holding still.
     const drift = this.origin && palm ? palmsApart(at, this.origin, palm, aspect) : 0
@@ -160,6 +146,5 @@ export class Match {
     this.origin = null
     this.since = 0
     this.blownOut = false
-    this.grabbed = false
   }
 }

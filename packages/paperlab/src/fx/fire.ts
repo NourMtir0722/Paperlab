@@ -32,24 +32,18 @@ export interface FireEmitterOptions {
 // Smoke kept light: a clean fire makes little, and a frame full of it hides
 // the burn — more only where burning struggles (see `struggle` below).
 /**
- * How much each kind leaves the front, per texel per second.
+ * How much each kind leaves the front, per texel per second — Noor's tune in
+ * the lab on 2026-09-13, which the lab starts from and `/hands` inherits.
  *
- * `smoke` is 0 on purpose. There were three smoke systems running at once —
- * the fire simulator's own, these sprite puffs at 8% alpha, and the smoulder
- * wisp — and the review's note was that only one of them should exist. The
- * simulator's is the one that belongs to a burning sheet: it is the same
- * fluid the flames are made of, so it rises with them instead of beside them.
- * `FxWisps` still carries the thread after the flames are out, which is the
- * one moment the simulator has nothing left to make. The preset stays: it is
- * a parameter set, and anything may still ask the pool for smoke.
- *
- * Embers and ash are both down. Ash at 0.86 a texel was a flake for nearly
- * every one that burnt through — a dust shower. Fewer and larger is the note.
+ * The simulator's smoke is the main smoke of a burning sheet, since it is the
+ * same fluid the flames are made of; these sprite puffs, once switched off
+ * for doubling it, are back as a light thread beside it. Ash at 0.86 a texel
+ * was a dust shower; 0.36 is a light fall of it.
  */
 export const fireEmitterDefaults: Required<FireEmitterOptions> = {
-  embers: 0.35,
-  smoke: 0,
-  ash: 0.12,
+  embers: 0.39,
+  smoke: 0.135,
+  ash: 0.36,
   seed: 7,
   caps: {},
 }
@@ -64,6 +58,13 @@ export const fireEmitterDefaults: Required<FireEmitterOptions> = {
  * holds `capacity` of them. An infinite delta never left the loop at all.
  */
 const PER_UPDATE = 24
+
+/**
+ * Sparks per texel that chars, on top of the front's steady rate: a crackle
+ * throws a spark, so they come in ones and twos with the sound of it rather
+ * than as an even drizzle.
+ */
+const CRACKLE_SPARKS = 0.06
 
 /**
  * What a burn throws into the air, read off the field that is burning.
@@ -130,7 +131,10 @@ export class FireEmitter {
       const oxygen = 1 + air * 1.5
       // Capped rather than trusted — see `PER_UPDATE`. A NaN delta falls
       // through both loops on its own, which is the right answer for it.
-      this.emberDebt = Math.min(this.emberDebt + front * o.embers * oxygen * dt, PER_UPDATE)
+      this.emberDebt = Math.min(
+        this.emberDebt + front * o.embers * oxygen * dt + field.lastStats.charred * o.embers * CRACKLE_SPARKS,
+        PER_UPDATE,
+      )
       this.smokeDebt = Math.min(this.smokeDebt + front * o.smoke * struggle * dt, PER_UPDATE)
       while (this.emberDebt >= 1) {
         this.emberDebt -= 1

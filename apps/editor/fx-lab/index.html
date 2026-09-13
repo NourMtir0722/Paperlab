@@ -5,14 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Paperlab — fx lab · fire</title>
     <!--
-      The visual gate, §14.1 of paperlab-fx-fire-spec.md.
+      The fire, and every knob behind it.
 
       A directory with an index rather than `fx-lab.html`, so the URL is
       `/fx-lab` — the spec calls it that, and it reads as a page rather than as
-      a file somebody left in the root. Unlike `/hands` it is in NO build's
-      input list: it is a dev page, and the references it puts beside the
-      render are 20 MB that live outside this repo entirely (see
-      `tools/fx-refs.mjs`).
+      a file somebody left in the root.
+
+      It SHIPS, like `/hands`: its own pass with its own base
+      (`PAPERLAB_FXLAB=1`), assembled into the site by pages.yml. It began as
+      the visual gate for the fire spec (§14.1) and it is a feature now — the
+      library's fire defaults are a tune made on this page, every one of them
+      is an option a consumer can set, and this is where you try them and copy
+      the result.
+
+      What does NOT ship is the reference stills it can put beside the render:
+      20 MB that live outside this repo (see `tools/fx-refs.mjs`), served by a
+      dev-only middleware. The page says so where they would have been.
     -->
     <style>
       :root { color-scheme: dark; }

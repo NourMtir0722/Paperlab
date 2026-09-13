@@ -68,7 +68,7 @@ async function photograph(query, file) {
     // On the flat sheet, for the reason `fire-budget.mjs` gives: a hanging
     // cloth settles on wall-clock frames, so two loads are not the same
     // picture, and these checks compare loads pixel for pixel.
-    await page.goto(`${base}/fx-lab/?ui=0&physics=flat&${query}`, { waitUntil: 'networkidle' })
+    await page.goto(`${base}/fx-lab/?ui=0&physics=flat&camera=static&${query}`, { waitUntil: 'networkidle' })
     // Frame-driven, never timed: CI renders about five times slower than the
     // laptop, and a wall-clock wait there photographs an unfinished frame.
     await page.waitForFunction(() => window.__FXLAB__?.ready === true, null, { timeout: 180_000 })

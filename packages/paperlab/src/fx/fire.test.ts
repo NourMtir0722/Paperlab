@@ -118,15 +118,13 @@ describe('the fire emitter', () => {
     }
   })
 
-  it('throws embers off the burn front, and smoke when it is asked for', () => {
-    // Smoke has to be asked for now. `FireEmitter`'s default rate is 0,
-    // because a burning sheet's smoke is the fire simulator's — the same
-    // fluid the flames are made of — and three smoke systems at once was one
-    // of the review's findings. The emitter can still make it, and that is
-    // what this checks.
+  it('throws embers off the burn front, a light thread of smoke, and none when told none', () => {
+    // The default rates are Noor's tune (2026-09-13): the simulator's smoke
+    // is the main smoke, and these puffs a light thread beside it. A rate of
+    // 0 still has to mean none — the switch a sheet with clean air needs.
     expect(burning(2).pool.countOf('ember')).toBeGreaterThan(0)
-    expect(burning(2).pool.countOf('smoke')).toBe(0)
-    expect(burning(2, { emit: { smoke: 0.2 } }).pool.countOf('smoke')).toBeGreaterThan(0)
+    expect(burning(2).pool.countOf('smoke')).toBeGreaterThan(0)
+    expect(burning(2, { emit: { smoke: 0 } }).pool.countOf('smoke')).toBe(0)
   })
 
   it('throws more the longer the front gets', () => {

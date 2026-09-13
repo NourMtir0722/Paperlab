@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { BLOW_OUT, MATCH_DWELL_MS, MATCH_STILL, Match } from './match'
 
 /**
- * A match is a pinch, and so is a grab, and so is the start of a flick. Every
- * test here is about telling those three apart — which is the only hard part
- * of adding a gesture to a vocabulary that ran out of poses.
+ * A match is a pinch — held still. A pinch is also briefly part of every hand
+ * that moves, so every test here is about telling a held one from a passing
+ * one, and about blowing it out.
  */
 
 const ASPECT = 4 / 3
@@ -12,7 +12,6 @@ const PALM = 0.2
 
 const held = (over: Partial<Parameters<Match['push']>[0]> = {}) => ({
   pinching: true,
-  onPaper: false,
   at: { x: 0.6, y: 0.2 },
   palm: PALM,
   blow: 0,
@@ -74,36 +73,19 @@ describe('the match', () => {
     expect(state).toBe('lit')
   })
 
-  it('never lights on the paper — that pinch is a grab', () => {
-    const match = new Match()
-    expect(dwell(match, 1000, { onPaper: true })).toBe('none')
-  })
-
-  it('never lights on a pinch that has ALREADY held the paper, however long it is held after', () => {
-    // The regression, and it failed on CI rather than here. Tearing an edge is
-    // a pinch that starts on the paper and pulls away from it: within a few
-    // frames the hand is over empty space and holding as still as any match.
-    // On a slow machine those frames outlast the dwell, so the match lit in
-    // the middle of the pull and the flame took the pointer away from the
-    // grab — the tear could not finish, and the frame rate decided whether a
-    // gesture worked at all.
-    const match = new Match()
-    for (let now = 0; now < 60; now += 16) match.push(held({ onPaper: true, now }))
-    // Now off the sheet, dragging slowly — a whole second of it.
-    let state: string = 'none'
-    for (let now = 64; now < 1200; now += 100) {
-      state = match.push(held({ onPaper: false, at: { x: 0.6 - now / 20_000, y: 0.2 }, now }))
-    }
-    expect(state).toBe('none')
-    // Only opening the hand ends the grab, and then a match is available again.
-    match.push(held({ pinching: false, now: 1300 }))
-    expect(dwell(match, MATCH_DWELL_MS + 32)).toBe('lit')
+  it('lights over the paper as well as in free air — there is nothing to grab now', () => {
+    // It used to refuse: a pinch on the paper was a grab, and one that had
+    // touched the paper stayed a grab until the hand opened. The grab went
+    // with the rest of the gestures, and that latch left the one place people
+    // aim a match — at the sheet — as the one place it would not light.
+    expect(dwell(new Match(), MATCH_DWELL_MS + 32, { at: { x: 0.5, y: 0.5 } })).toBe('lit')
   })
 
   it('stays lit when it is carried over the paper, which is what lighting it is for', () => {
     const match = new Match()
     expect(dwell(match, MATCH_DWELL_MS + 32)).toBe('lit')
-    for (let now = 400; now < 900; now += 16) match.push(held({ onPaper: true, now }))
+    for (let now = 400; now < 900; now += 16)
+      match.push(held({ at: { x: 0.5 - (now - 400) / 5000, y: 0.5 }, now }))
     expect(match.lit).toBe(true)
   })
 

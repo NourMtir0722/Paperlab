@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-hands/
+dist-fxlab/
 .turbo/
 *.log
 .DS_Store

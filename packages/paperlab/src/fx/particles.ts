@@ -115,7 +115,13 @@ export const particlePresets = {
    * simulation, on purpose; see the fx plan.
    */
   smoke: {
-    life: [1.8, 3.5],
+    // Shorter, and smaller below: these are the thread beside the
+    // simulator's smoke, and the simulator's is gone within a second or two
+    // of the last flame. Left to live three and a half seconds and grow to
+    // seven centimetres, the last few of them overlapped into a flat wash
+    // over the hole with nothing left to move them — the one moment of a
+    // burn Noor found the smoke wrong (2026-09-13).
+    life: [1.4, 2.6],
     speed: [0.05, 0.15],
     direction: [0, 1, 0],
     spread: 0.3,
@@ -123,13 +129,13 @@ export const particlePresets = {
     drag: 0.9,
     jitter: 0.3,
     windCatch: 1,
-    size: [0.05, 0.35],
+    size: [0.05, 0.18],
     // #6B6560 grey-brown, linear, and thin — the background stays clear.
     color: [
       [0.147, 0.13, 0.117],
       [0.2, 0.19, 0.18],
     ],
-    alpha: [0.08, 0],
+    alpha: [0.07, 0],
     spin: 0.4,
     blend: 'normal',
     shape: 'soft',
@@ -141,7 +147,9 @@ export const particlePresets = {
    * burn that proves paper was there.
    */
   ash: {
-    life: [2.5, 5],
+    // A second or two: ash that hung in the air for five read as grey
+    // confetti over the hole, dust or stars rather than something falling.
+    life: [1.2, 2.6],
     // Thrown UP by the heat it came off, before it is heavier than the air.
     // It used to leave at almost nothing (0.02–0.1) with a lift of −0.35, so
     // every flake began falling the moment it was born — straight through the
@@ -149,7 +157,9 @@ export const particlePresets = {
     speed: [0.14, 0.3],
     direction: [0, 1, 0],
     spread: 0.55,
-    lift: -0.22,
+    // Heavier than the air once the throw is spent: most flakes tumble down,
+    // only the lightest ride the heat up a little first.
+    lift: -0.42,
     drag: 1.6,
     jitter: 1.2,
     windCatch: 1,
@@ -157,9 +167,11 @@ export const particlePresets = {
     // 3.8 mm and there were far too many of them: a shower of specks rather
     // than a few flakes you would notice.
     size: [0.03, 0.026],
+    // Charred paper, near black: under a bright key the old value read as
+    // pale grey against the black stage, which is the confetti.
     color: [
-      [0.07, 0.065, 0.06],
-      [0.12, 0.115, 0.11],
+      [0.04, 0.037, 0.034],
+      [0.07, 0.066, 0.062],
     ],
     alpha: [0.95, 0],
     spin: 4,

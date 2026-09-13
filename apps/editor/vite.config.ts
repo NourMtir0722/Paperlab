@@ -17,6 +17,21 @@ import { fireRefsDir } from '../../tools/fx-refs.mjs'
  */
 const HANDS_BUILD = process.env.PAPERLAB_HANDS === '1'
 
+/**
+ * Whether this is the /fx-lab pass.
+ *
+ * The lab was a dev page in no build's input list, on the grounds that it is a
+ * tuning harness. It is a FEATURE now: the fire's defaults are Noor's tune
+ * from this lab, every knob behind them is an option the library exposes, and
+ * the page that turns them is the honest place to try them. So it ships, in
+ * its own pass with its own base for the same reason `/hands` does.
+ *
+ * The references it can put beside the render do NOT ship — they are 20 MB
+ * that live outside this repo, the middleware that serves them is dev-only,
+ * and the page already says so where they would have been.
+ */
+const FXLAB_BUILD = process.env.PAPERLAB_FXLAB === '1'
+
 /** Where `pnpm hands:setup` puts the tracker's wasm. */
 const HANDS_ASSETS = fileURLToPath(new URL('./.hands', import.meta.url))
 
@@ -100,16 +115,19 @@ export default defineConfig({
   base: process.env.PAPERLAB_BASE ?? '/',
   plugins: [react(), handsAssets(), fxRefs()],
   build: {
-    outDir: HANDS_BUILD ? 'dist-hands' : 'dist',
+    outDir: HANDS_BUILD ? 'dist-hands' : FXLAB_BUILD ? 'dist-fxlab' : 'dist',
     rollupOptions: {
       // A DIRECTORY with an index, not `hands.html`: `/hands` is a route and
       // `/hands.html` is a file someone left lying around. It also makes the
       // dev URL and the deployed one the same, which is what lets the page
       // resolve its wasm against `document.baseURI` and be right both times.
-      // Every other harness stays dev-only and is listed in neither.
+      // `/fx-lab` is the same shape. Every other harness stays dev-only and is
+      // listed in none of them.
       input: HANDS_BUILD
         ? { hands: fileURLToPath(new URL('./hands/index.html', import.meta.url)) }
-        : { index: fileURLToPath(new URL('./index.html', import.meta.url)) },
+        : FXLAB_BUILD
+          ? { 'fx-lab': fileURLToPath(new URL('./fx-lab/index.html', import.meta.url)) }
+          : { index: fileURLToPath(new URL('./index.html', import.meta.url)) },
     },
   },
   resolve: {

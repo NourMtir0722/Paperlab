@@ -1,4 +1,5 @@
 import { DAMAGE_LOOK_DEFAULTS } from './damageContract'
+import { CUT_REACH_MM } from './cutDistance'
 import * as THREE from 'three'
 import {
   paperEdges as paperEdgesOrder,
@@ -423,7 +424,7 @@ void plPerforation(inout vec4 color) {
 const DAMAGE_CHUNK = /* glsl */ `
 uniform sampler2D uDamage;
 uniform float uDamageDetail;
-// (edgeWave mm, edgeBite mm, sparkle, –) — see DamageLook.
+// (edgeWave mm, edgeBite mm, sparkle, charWidth mm) — see DamageLook.
 uniform vec4 uLook3;
 
 // The damage grid's texels sit ON the sheet — texel x at u = x / (N - 1), its
@@ -591,6 +592,8 @@ void plDamageCut(inout vec4 color, vec4 d) {
  */
 const DAMAGE_SHADE_CHUNK = /* glsl */ `
 uniform float uDamageTime;
+// How far each texel is from the cut, as a fraction of PL_CUT_REACH — see cutDistance.
+uniform sampler2D uDamageEdge;
 // The look, packed — see DamageLook for what each number means.
 uniform vec4 uLook0; // emberWidth mm, emberIntensity, emberCoverage, emberFlicker
 uniform vec4 uLook1; // emberGlow, lipWidth mm, lipBrightness, charWarmth
@@ -600,6 +603,10 @@ vec3 plDamageLight;
 
 // World units per millimetre: a default sheet is one unit across, and A4 is 210 mm.
 const float PL_MM = 1.0 / 210.0;
+// How far out a burnt edge's zones can be measured from the cut, mm: past
+// the widest lip, ember line, char and scorch the look allows by default.
+// The same number cutDistance encodes with, so the two cannot drift.
+const float PL_CUT_REACH = ${CUT_REACH_MM.toFixed(1)};
 
 vec3 plLinear(vec3 srgb) {
   return pow(srgb, vec3(2.2));
@@ -656,7 +663,12 @@ vec3 plScorchTint(float t) {
   vec3 c3 = plLinear(vec3(0.541, 0.310, 0.141)); // #8A4F24
   vec3 c4 = plLinear(vec3(0.471, 0.275, 0.149)); // #784626
   vec3 c5 = plLinear(vec3(0.380, 0.216, 0.133)); // #613722
-  vec3 c6 = plLinear(vec3(0.310, 0.200, 0.137)); // #4F3323
+  // The dark end hands over to the char's black: a nearly neutral umber, not
+  // the saturated brown (#4F3323) it used to stop at. Beside black char that
+  // brown showed through wherever the band thinned, and turned the black
+  // brown — measured, the cold char's saturation went from 0.43 to 0.11 with
+  // the scorch's darkening switched off.
+  vec3 c6 = plLinear(vec3(0.169, 0.133, 0.110)); // #2B221C
   float s = clamp(t, 0.0, 1.0) * 6.0;
   // Each stop is blended with a SMOOTH step, not a linear one.
   //
@@ -707,32 +719,6 @@ void plDamage(inout vec4 color, inout float roughness) {
   vec2 perWorld = (vec2(textureSize(uDamage, 0)) - 1.0) / uSheetSize;
   vec2 gradP = vec2(e.a - w.a, n.a - s.a) * 0.5 * perWorld;
   vec2 gradC = vec2(e.r - w.r, n.r - s.r) * 0.5 * perWorld;
-  // Millimetres from the cut, on the paper side — measured against the field
-  // the cut is DRAWN from (softened, frayed, warped), through its own screen
-  // derivatives. It used to divide by the slope of the raw texels, and since
-  // paper burns through within a texel that slope is a cliff while the drawn
-  // edge is spread over millimetres: a point well into the char computed as a
-  // hair from the cut, and the ember line drew there — found by the gate.
-  // The slope, though, is the SMOOTH presence's. The fray's fibre noise
-  // changes pixel to pixel, and its slope is a cliff everywhere it touches:
-  // divided by that, a point deep in the char came out a hair from the cut
-  // and the ember glow drew there — the gate's stray pixels. The fray still
-  // moves where the edge is; it just cannot fake how steep it is.
-  float smoothA = plDamageSmooth;
-  vec2 cutSlope = vec2(dFdx(smoothA), dFdy(smoothA));
-  float pxFromCut = (d.a - 0.5) / max(length(cutSlope), 1e-4);
-  // Millimetres per pixel ALONG the way to the cut, not across the screen's
-  // x: a sheet leaning away is foreshortened vertically, so above and below a
-  // hole a pixel covers more paper than beside it, and a scale taken from x
-  // alone drew the ember zone too many pixels deep on the top and bottom rims.
-  vec2 toCutPx = cutSlope / max(length(cutSlope), 1e-6);
-  float mmPerPx = length(dFdx(-vViewPosition) * toCutPx.x + dFdy(-vViewPosition) * toCutPx.y) / PL_MM;
-  float mm = pxFromCut * mmPerPx;
-  // About a pixel of antialiasing, never more: where the warp makes the
-  // estimate jump between neighbours, fwidth(mm) is millimetres wide, and the
-  // ember's soft tail — faint, but multiplied by its light — drew stray glow
-  // well out into the char.
-  float aa = min(fwidth(mm), 1.5 * mmPerPx);
   // Scorch reaches ahead of the char, and further UP than anywhere else:
   // the char a centimetre below this point, and the char a few millimetres
   // around it, each lent to the scorch at a discount (§4.2, §4.5).
@@ -746,37 +732,60 @@ void plDamage(inout vec4 color, inout float roughness) {
     charWide += texture2D(uDamage, uv + vec2(cos(a), sin(a)) * 7.0 * mmUv).r;
   }
   charWide /= 8.0;
-  // Only paper that has a CUT beside it has an edge: a half-eaten cell out
-  // in the middle of the sheet reads as "half a presence" too, and without
-  // this the ember line and the ash lip drew on it — islands of glow on
-  // paper, the painted glow by another route.
-  // Eased in, not switched: a hard threshold on the neighbouring texels drew
-  // the grid back into the ember glow as small squares.
-  float cutNear = 1.0 - smoothstep(0.3, 0.62, min(min(e.a, w.a), min(n.a, s.a)));
-  // And the cut has to really be there. \`mm\` extrapolates this pixel's
-  // slope to half presence, and the uneven edge's warp bends the field inside
-  // those few millimetres — measured: with the warp off the stray ember light
-  // the gate finds all but vanishes. So step across the PAPER toward where the
-  // cut should be, half a millimetre past it but never beyond the ember
-  // zone's own outer edge (the lip and the widest bead — 2.5 mm at the
-  // spec's numbers, §5) plus that half, and read what the cut is drawn from.
-  // Still paper: this is not an edge, however close the slope said it was.
-  vec2 toCutPaper = -(dFdx(vPaperUv) * toCutPx.x + dFdy(vPaperUv) * toCutPx.y);
-  float reachPx = min(max(mm, 0.0) + 0.5, uLook1.y + uLook0.x + 0.5) / max(mmPerPx, 1e-6);
-  float pastA = plDrawnPresenceAt(vPaperUv + toCutPaper * reachPx);
-  // And a hole, not a pinhole: the fray opens specks of void finer than a
-  // pixel in part-burnt paper, which the check above would take for the
-  // edge. The void has to go on for another half millimetre.
-  float beyondA = plDrawnPresenceAt(vPaperUv + toCutPaper * (reachPx + 0.5 / max(mmPerPx, 1e-6)));
-  cutNear *= (1.0 - smoothstep(0.42, 0.55, pastA)) * (1.0 - smoothstep(0.42, 0.55, beyondA));
+  // ── The cut, measured ───────────────────────────────────────────────────
+  // How far this point is from the cut, in millimetres, out to PL_CUT_REACH —
+  // the one measure every zone of a burnt edge is laid out on: the ash lip,
+  // the ember line, the char and the scorch (Ember_line annotated). Worked
+  // out on the CPU once per change of the field (cutDistance), where a speck
+  // of burnt-through paper can be told from a cut: measured here per pixel,
+  // every speck near the rim grew its own lip, char and scorch, and the bands
+  // came apart into blotches.
+  //
+  // Burnt AWAY, not charred: the black and the lip belong to paper beside a
+  // cut, so a burn toasts before it blackens.
+  //
+  // Read through the same warp as the cut, so the zones follow the edge that
+  // is drawn. Bilinear between a gone texel and the paper beside it, the
+  // drawn edge reads half a texel, which comes back off.
+  vec2 edgeTexel = 1.0 / vec2(textureSize(uDamageEdge, 0));
+  vec2 edgeWorld = uSheetSize / (vec2(textureSize(uDamageEdge, 0)) - 1.0);
+  float edgeRaw = texture2D(uDamageEdge, uv).r;
+  float edgeHalf = 0.5 * min(edgeWorld.x, edgeWorld.y) / PL_MM;
+  float xCut = max(edgeRaw * PL_CUT_REACH - edgeHalf, 0.0);
+  // A pixel or so of antialiasing, measured on the same measure.
+  float aa = clamp(fwidth(xCut), 0.05, 1.0);
+  // Which way the cut lies, from how the distance falls — and along the edge,
+  // across that. In the sheet's own space, so noise laid along it follows the
+  // rim wherever the rim goes.
+  vec2 toward = -vec2(
+    (texture2D(uDamageEdge, uv + vec2(edgeTexel.x, 0.0)).r - texture2D(uDamageEdge, uv - vec2(edgeTexel.x, 0.0)).r) / edgeWorld.x,
+    (texture2D(uDamageEdge, uv + vec2(0.0, edgeTexel.y)).r - texture2D(uDamageEdge, uv - vec2(0.0, edgeTexel.y)).r) / edgeWorld.y
+  );
+  vec2 tangentR = length(toward) > 1e-4 ? normalize(vec2(-toward.y, toward.x)) : vec2(1.0, 0.0);
+  // Paper with a cut within reach, eased out toward the reach.
+  float cutZone = 1.0 - smoothstep(PL_CUT_REACH - 2.0, PL_CUT_REACH - 0.5, xCut);
 
   // An untouched texel is left exactly as it was — the identity the whole
   // seam is built on. Nothing here has happened to this paper.
-  if (d.r <= 0.0 && d.g <= 0.0 && d.a >= 1.0 && charBelow <= 0.0 && charWide <= 0.0 && e.a >= 1.0 && w.a >= 1.0 && n.a >= 1.0 && s.a >= 1.0) {
+  if (d.r <= 0.0 && d.g <= 0.0 && d.a >= 1.0 && charBelow <= 0.0 && charWide <= 0.0 && edgeRaw >= 1.0 && e.a >= 1.0 && w.a >= 1.0 && n.a >= 1.0 && s.a >= 1.0) {
     return;
   }
 
   vec2 p = plLocal();
+
+  // The zones, out from the cut: the ash lip, the ember line on its outer
+  // edge, the char, then the scorch — each as wide as the look says, and
+  // uneven along the rim so none of them is a ribbon. The lip's unevenness
+  // stays inside the zone the ember gate allows it (lip plus bead).
+  float lipEdge = uLook1.y * mix(0.7, 1.1, plFbm(vec2(dot(p, tangentR) / (5.0 * PL_MM), 1.7)));
+  float charEnd = lipEdge + uLook0.x + uLook3.w * mix(0.8, 1.2, plFbm(vec2(dot(p, tangentR) / (7.0 * PL_MM), 4.3)));
+  // Further above the burn than below it — hot gas rises and cooks the paper
+  // over it (§4.5) — out to the scorch's full reach straight up, and about
+  // half of it below and beside.
+  vec2 upMm = normalize(upUv * uSheetSize);
+  float above = length(toward) > 1e-3 ? max(0.0, dot(-normalize(toward), upMm)) : 0.0;
+  float scorchEnd = charEnd + uLook2.y * mix(0.45, 1.0, above)
+    + (plFbm(vec2(dot(p, tangentR) / (4.0 * PL_MM), 3.1)) - 0.5) * uLook2.w * 2.5;
 
   // Wet paper is darker and smoother: water fills the gaps between fibres
   // that scatter light, which is both effects from one cause.
@@ -829,27 +838,64 @@ void plDamage(inout vec4 color, inout float roughness) {
   // being finer than a level it can only ever move a value into the
   // neighbouring one.
   c = clamp(c + (plNoise(p * 900.0) - 0.5) * (1.5 / 255.0), 0.0, 1.0);
+  // The colour INSIDE the scorch reads a smoothed c: the same char and the
+  // same reaches, without the fingers. The fingers belong to the front's
+  // silhouette (lead, below); carried into the ramp as well, a strong fingers
+  // setting swung the scorch between tan and near-black umber a few
+  // millimetres apart — a leopard print, not a toast.
+  float cSmooth = 1.0 - (1.0 - clamp(mix(d.r, soft, 0.65), 0.0, 1.0)) * (1.0 - clamp(0.62 * charBelow * 0.75, 0.0, 1.0)) * (1.0 - clamp(0.4 * charWide * 0.75, 0.0, 1.0));
+  cSmooth = clamp(cSmooth + ((plNoise(p * 300.0) - 0.5) * 0.05 + (plNoise(p * 90.0) - 0.5) * 0.04) * smoothstep(0.0, 0.1, cSmooth), 0.0, 1.0);
   // A steep leading edge — paper to straw in a sliver — then the long ramp.
-  float lead = smoothstep(0.02, 0.05, c);
-  float ramp = smoothstep(0.05, 0.7, c);
-  color.rgb *= mix(vec3(1.0), pow(plScorchTint(ramp), vec3(uLook2.z)), lead);
+  // The front's teeth from the noisy c; filled in behind them from the smooth
+  // one, so a dip in the noise cannot open a patch of clean paper inside it.
+  float lead = max(smoothstep(0.02, 0.05, c), smoothstep(0.1, 0.2, cSmooth));
+  // The browns are done by 0.45, where the char's umber hand-over takes them:
+  // the ramp used to run on to 0.7, over the char, and most of what read as
+  // "char" was this ramp's darkest brown.
+  float ramp = smoothstep(0.05, 0.45, cSmooth);
+  // That toast is for paper with no cut near it — the first stage of a burn,
+  // before anything has gone through.
+  color.rgb *= mix(vec3(1.0), pow(plScorchTint(ramp), vec3(uLook2.z)), lead * (1.0 - cutZone));
+  // Round a cut, the scorch is a band of its own: dark, only a little lighter
+  // than the char it leads from, a shade warmer toward its outer edge, then a
+  // steep leading edge into clean paper (Ember_line annotated, zone 5: "steep
+  // leading edge · albedo only"). A black band beside a pale tan one was the
+  // contrast that read as wrong.
+  float scorchT = smoothstep(charEnd, scorchEnd, xCut);
+  vec3 scorchTint = mix(plLinear(vec3(0.24, 0.17, 0.12)), plLinear(vec3(0.42, 0.28, 0.17)), scorchT) / plLinear(vec3(0.90, 0.885, 0.855));
+  float scorchZone = (1.0 - smoothstep(scorchEnd - 0.35, scorchEnd + 0.35, xCut)) * cutZone;
+  color.rgb *= mix(vec3(1.0), pow(min(scorchTint, vec3(1.0)), vec3(uLook2.z)), scorchZone);
 
   // ── Char ────────────────────────────────────────────────────────────────
   // A wide, smooth hand-over from scorch to char — the gradient is the point.
-  float charZone = smoothstep(0.5, 0.9, c);
+  // From 0.3: the field carries char in about one texel beside the cut, so
+  // past a couple of millimetres c is mostly the scorch borrowed from below,
+  // and a zone that began at 0.5 was hardly ever char at all.
+  // Away from a cut, c only makes char where it is really high: at 0.3–0.6
+  // the finger noise pushed it across the line all through the scorch, and
+  // every crossing was a black island in the orange — a leopard print.
+  // Round a cut, the band from the lip out to charEnd; away from one, only
+  // where the toast has gone all the way to char.
+  float charBand = (1.0 - smoothstep(charEnd - 0.5, charEnd + 0.5, xCut)) * cutZone;
+  float charZone = max(smoothstep(0.6, 0.85, cSmooth) * (1.0 - cutZone), charBand);
   vec2 cells = plVoronoi(p / (3.6 * PL_MM));
   // Sparse: a real crack network is broken, not a tiled floor — most cell
   // borders never split.
   float crack = (1.0 - smoothstep(0.008, 0.03, cells.y - cells.x)) * smoothstep(0.45, 0.65, plNoise(p / (7.0 * PL_MM)));
   float plate = plHash(floor(p / (3.6 * PL_MM)) + 3.7);
-  // Dark orange where the char meets the scorch, deep brown toward the cut —
-  // warm all the way, and fading smoothly into the scorch's lighter browns
-  // rather than stopping at a grey band.
-  // Warm (dark orange → deep brown) or, turned down, the sampled greys.
-  vec3 body = mix(plLinear(vec3(0.255, 0.239, 0.227)), plLinear(vec3(0.165, 0.086, 0.043)), uLook1.w);
-  vec3 under = mix(plLinear(vec3(0.275, 0.169, 0.090)), plLinear(vec3(0.42, 0.18, 0.06)), uLook1.w);
+  // Black. Real char is a near-neutral black — (22, 20, 18) on the cold
+  // macro references, about 11% of the paper's value. The warm brown this
+  // used to be was Hero.png's char LIT BY ITS FLAMES, painted into the paper,
+  // which is why ours stayed orange on a frame with no fire in it. Warmth on
+  // char comes from the fire's light now, and goes when the fire does.
+  // charWarmth adds only a trace of brown to the black, and a warmer umber
+  // where the char hands over to the scorch.
+  vec3 body = mix(plLinear(vec3(0.086, 0.078, 0.071)), plLinear(vec3(0.11, 0.08, 0.06)), uLook1.w);
+  vec3 under = mix(plLinear(vec3(0.20, 0.15, 0.11)), plLinear(vec3(0.28, 0.16, 0.08)), uLook1.w);
   vec3 cracks = plLinear(vec3(0.039, 0.024, 0.016));    // #0A0604
-  vec3 charColor = mix(under, body, smoothstep(0.66, 1.0, c));
+  // Black through the band; the umber only in its outer millimetre.
+  float toUnder = mix(1.0 - smoothstep(0.45, 0.8, cSmooth), smoothstep(charEnd - 1.2, charEnd + 0.3, xCut), cutZone);
+  vec3 charColor = mix(body, under, toUnder);
   // Mottled at the plate scale and finer, and darker than the sampled body
   // under a bright key — the reference's char reads near black in the frame.
   charColor *= (0.75 + 0.35 * plate) * (0.8 + 0.4 * plNoise(p * 260.0));
@@ -861,42 +907,42 @@ void plDamage(inout vec4 color, inout float roughness) {
   plHeight += charZone * ((plNoise(p * 380.0) - 0.5) * 0.00008 + (plate - 0.5) * 0.00018 - crack * 0.00016);
 
   // ── Ash lip ─────────────────────────────────────────────────────────────
-  // Inside the spec's zones (§5): the lip 0.5–1.5 mm, then the ember line
-  // 0.3–1 mm — 2.5 mm from the cut at most, which the gate holds it to.
-  // Along the rim. Both the lip and the ember line below are laid out on this,
-  // and unlike the scorch fingers above it is safe to sample noise in: it is
-  // used ONLY within a couple of millimetres of the cut, where the presence
-  // gradient is the actual edge and points somewhere real. The fingers'
-  // mistake was carrying the same idea out into flat char, where the gradient
-  // is rounding error and a noise sampled in its frame draws the contours.
-  vec2 tangentP = length(gradP) > 1e-4 ? normalize(vec2(-gradP.y, gradP.x)) : vec2(1.0, 0.0);
-
-  float lipWidth = mix(0.4, max(uLook1.y, 0.41), plFbm(p / (2.5 * PL_MM)));
-  // Broken, not a hem. Ash flakes off a cooling edge in pieces, so the lip
-  // comes and goes along the rim and wanders in width where it is there. It
-  // used to be a continuous band of even width with a highlight down the
-  // middle of it, which read as a neon tube round the hole — the single most
-  // synthetic thing at wide view.
-  float lipAlong = dot(p, tangentP) / (3.2 * PL_MM);
-  float lipBreak = smoothstep(0.34, 0.56, plFbm(vec2(lipAlong, 0.9)));
-  float lip = (1.0 - smoothstep(lipWidth - aa, lipWidth + aa, mm)) * step(d.a, 0.999) * cutNear * lipBreak;
-  vec3 ash = plLinear(mix(vec3(0.525, 0.498, 0.490), vec3(0.741, 0.725, 0.725), plNoise(p * 520.0) * 0.6 + plNoise(p * 90.0) * 0.4)) * uLook1.z;
+  // A crust as wide as the char band, from the cut to lipEdge — the pale
+  // thing that makes a hole read as a hole on a black stage (Ember_line
+  // annotated, zone 2). It used to be held to about a millimetre, which at a
+  // reading distance is a hairline tracing the edge, not ash.
+  //
+  // Broken, not a hem: ash flakes off a cooling edge in pieces, so the lip
+  // comes and goes along the rim and wanders in width. Mostly there, though —
+  // it has to be seen.
+  float lipAlong = dot(p, tangentR) / (3.2 * PL_MM);
+  float lipBreak = smoothstep(0.1, 0.3, plFbm(vec2(lipAlong, 0.9)));
+  float lip = (1.0 - smoothstep(lipEdge - aa, lipEdge + aa, xCut)) * cutZone * lipBreak;
+  // Pale: the reference's #A49E9D up to a near-white grey, so it reads white
+  // beside the char. Still matte and still dimmer than the paper.
+  vec3 ash = plLinear(mix(vec3(0.643, 0.620, 0.616), vec3(0.84, 0.82, 0.81), plNoise(p * 520.0) * 0.6 + plNoise(p * 90.0) * 0.4)) * uLook1.z;
   color.rgb = mix(color.rgb, ash, lip);
   roughness = mix(roughness, 0.99, lip);
-  // Barely raised. THIS is where the highlight came from: a 0.7 mm ridge
-  // running round the hole is a cylinder, and a cylinder under a key light
-  // has a specular line down it however rough the surface is. Ash is a
-  // fragile crust a fraction of a millimetre proud of the paper, not a bead
-  // of solder — and the shape of it belongs to the broken edge above, not to
-  // a smooth ramp.
-  plHeight += lip * (1.0 - mm / max(lipWidth, 0.1)) * 0.00018;
+  // And the crust the ragged edge is made of. The cut is frayed at fibre
+  // scale, and the fray opened specks of void all through the first few
+  // millimetres — exactly where the lip lies — so at a reading distance the
+  // lip was grey specks in black. Paper inside the fray's band is kept, as
+  // ash, instead of cut away: the lip overhangs the hole a little, broken
+  // where the lip is broken, the way the reference's crust does.
+  float crust = lipBreak * cutZone * smoothstep(0.18, 0.3, d.a) * (1.0 - step(0.5, d.a));
+  color.rgb = mix(color.rgb, ash, crust);
+  roughness = mix(roughness, 0.99, crust);
+  // Raised, and crumbly rather than rounded: a smooth ridge round the hole is
+  // a cylinder, and a cylinder under a key light has a specular line down it
+  // however rough it is — the neon tube this once was.
+  plHeight += lip * (0.55 + 0.45 * plNoise(p * 700.0)) * 0.00016;
 
   // ── The ember line ──────────────────────────────────────────────────────
   // Beads along the cut: position along the edge, crawling on the burn's
   // clock, with a flicker of their own. Only where it is hot — and as the
   // heat goes the threshold rises, so the line breaks into fewer, dimmer
   // beads and they go out one by one.
-  float s1 = dot(p, tangentP) / (2.4 * PL_MM) - uDamageTime * 0.55 * uLook0.w;
+  float s1 = dot(p, tangentR) / (2.4 * PL_MM) - uDamageTime * 0.55 * uLook0.w;
   float bead = plNoise(vec2(s1, 0.37)) * 0.7 + plNoise(vec2(s1 * 2.3, 5.1)) * 0.3;
   float flicker = 0.62 + 0.38 * plNoise(vec2(floor(s1) * 7.13, uDamageTime * 9.0 * uLook0.w));
   // Down to a smoulder's last flicker: a spent edge keeps a little heat in
@@ -911,7 +957,8 @@ void plDamage(inout vec4 color, inout float roughness) {
   float lit = smoothstep(mix(0.82, 0.45, hot) - shift, mix(0.9, 0.58, hot) - shift, bead);
   // Each bead tapers at its ends — a bead, not a dash cut from a strip.
   float width = max(mix(0.4, max(uLook0.x, 0.41), plNoise(vec2(s1 * 0.7, 9.0))) * (0.35 + 0.65 * lit), 1.4 * aa);
-  float band = smoothstep(lipWidth - aa, lipWidth + aa, mm) * (1.0 - smoothstep(lipWidth + width - aa, lipWidth + width + aa, mm)) * cutNear;
+  // On the lip's outer edge, between the ash and the char.
+  float band = smoothstep(lipEdge - aa, lipEdge + aa, xCut) * (1.0 - smoothstep(lipEdge + width - aa, lipEdge + width + aa, xCut)) * cutZone;
   // Mostly orange: a bead is red at its ends and yellow-white only at its
   // hottest core, which is what Ember_line.png shows. Mapped low and pushed
   // high by a power, so white is the exception rather than the line.
@@ -931,13 +978,15 @@ void plDamage(inout vec4 color, inout float roughness) {
   // edge is hot, and inside the zone the beads are held to — the lip plus
   // the widest bead, measured from the cut — so the glow never reaches out
   // over paper the gate says heat must not light.
-  float zoneEnd = uLook1.y + uLook0.x;
-  float seam = smoothstep(lipWidth - aa, lipWidth + aa, mm) * (1.0 - smoothstep(zoneEnd - 0.6, zoneEnd, mm)) * cutNear;
+  float zoneEnd = lipEdge + uLook0.x;
+  float seam = smoothstep(lipEdge - aa, lipEdge + aa, xCut) * (1.0 - smoothstep(zoneEnd - 0.6, zoneEnd, xCut)) * cutZone;
   float patch_ = smoothstep(0.35, 0.72, plFbm(p / (4.0 * PL_MM) + vec2(uDamageTime * 0.15 * uLook0.w, 0.0)));
   plDamageLight += vec3(0.55, 0.06, 0.01) * seam * patch_ * hot * uLook1.x;
   float speck = step(0.985, plHash(floor(p / (0.35 * PL_MM)) + floor(uDamageTime * 8.0 * uLook0.w)));
   plDamageLight += plEmberRamp(0.9) * 1.6 * speck * seam * hot * uLook3.z;
 
+  // The crust stays, however the fray cut it.
+  d.a = mix(d.a, max(d.a, 0.5), step(0.5, crust));
   plDamageCut(color, d);
 }
 `
@@ -1089,6 +1138,8 @@ export function composeSurface(
     calls.push('plDamage(csm_DiffuseColor, csm_Roughness);')
     // Bound by `PaperMaterial` to the uploaded texture; null only until then.
     uniforms.uDamage = { value: null }
+    // The distance from the cut beside it, bound by `PaperMaterial` with it.
+    uniforms.uDamageEdge = { value: null }
     // Set by `PaperMaterial` from the source's `detail` every frame.
     uniforms.uDamageDetail = { value: 1 }
     // The burn's clock, which the ember line's beads move on — see `DamageSource.time`.
@@ -1104,7 +1155,7 @@ export function composeSurface(
     uniforms.uLook2 = {
       value: new THREE.Vector4(look.charCracks, look.scorchReach, look.scorchDarkness, look.fingers),
     }
-    uniforms.uLook3 = { value: new THREE.Vector4(look.edgeWave, look.edgeBite, look.sparkle, 0) }
+    uniforms.uLook3 = { value: new THREE.Vector4(look.edgeWave, look.edgeBite, look.sparkle, look.charWidth) }
   }
 
   /**

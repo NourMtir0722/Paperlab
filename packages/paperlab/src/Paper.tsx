@@ -42,10 +42,25 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
             // preset whose scene said "studio, but dimmer" rendered as plain
             // studio here while the editor showed the dimmer one.
             light={config.scene.light}
-            floor={-1.05}
+            // One floor height, shared: the ground the shadow falls on is the
+            // ground a sheet lands on.
+            floor={config.scene.floor.enabled ? config.scene.floor.y : -1.05}
             scale={8}
             reducedMotion={meshProps.reducedMotion}
+            // A burn bright enough to light the room says so on its source.
+            damage={meshProps.damage}
           />
+          {config.scene.floor.enabled && (
+            // Dark, matte and large enough to leave no edge in frame: what the
+            // fire's light pools on, and what the paper it cuts loose lands on.
+            <mesh rotation-x={-Math.PI / 2} position={[0, config.scene.floor.y, 0]} receiveShadow>
+              <planeGeometry args={[40, 40]} />
+              <meshStandardMaterial
+                color={config.scene.floor.color}
+                roughness={config.scene.floor.roughness}
+              />
+            </mesh>
+          )}
           <PaperMesh ref={ref} {...meshProps} />
           {children}
           <ReleaseContextOnUnmount />

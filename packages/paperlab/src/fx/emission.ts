@@ -166,13 +166,13 @@ export const FIRE_SOOT_SCALE = 3
  *
  * It lives beside the threshold because the two are one setting: bloom is a
  * multiplier on whatever clears the threshold, so its right value depends
- * entirely on how much fire is authored above it. 1.55 was tuned when the
- * flames were UNDER the threshold and bloom had almost nothing to work on —
- * measured, 0.07% of the frame. Once the flames cleared it, that same 1.55
- * tinted the entire black stage olive. Swept at 0.25, 0.6 and 1.2 against the
- * peak frame; past about 0.4 the stage stops being black.
+ * entirely on how much fire is authored above it. With a core authored to
+ * over-expose, 0.55 was the most the black stage could take; the flame of
+ * {@link FIRE_ZONES} (Noor, 2026-09-13) authors none of it past the
+ * threshold, and 1.25 is her tune for it. `pnpm test:fire-budget` holds the
+ * stage black and the paper unbloomed whatever this is set to.
  */
-export const FX_BLOOM = 0.55
+export const FX_BLOOM = 1.25
 
 /**
  * How much darker a flame's mid-tones are than a linear ramp would make them.
@@ -221,11 +221,10 @@ export const FIRE_THIN = 0.55
  *
  *   root  the blue leading edge where fresh gas meets the air at the paper.
  *         Its light comes from excited molecules, not soot, so it is faint
- *         and blue — and it starts OFF, because blue light added over cream
- *         paper reads lavender.
- *   core  the hottest gas, where soot forms densest and glows pale. The only
- *         zone allowed to over-expose past the bloom threshold, and so the
- *         one that blooms.
+ *         and blue — and only ever a trace, because blue light added over
+ *         cream paper reads lavender.
+ *   core  the hottest gas, where soot forms densest and glows pale — the
+ *         brightest zone, and the one the bloom finds first.
  *   body  the luminous bulk: soot glowing yellow-orange as it rises.
  *   tip   where soot cools and burns off at the outer edge — orange-red,
  *         dimmer, tearing into tongues. What survives escapes as smoke.
@@ -243,12 +242,11 @@ export const FIRE_THIN = 0.55
  * multiples of paper white; colours are sRGB, the way a colour picker gives
  * them.
  *
- * The body is ABOVE paper white. It was once held below it, because under a
- * bright preset paper sits at the top of the tone curve and anything brighter
- * loses its colour — and a flame dimmer than the paper behind it, drawn
- * opaque, is a yellow decal on the sheet, not light. Fire photographed in a
- * bright room DOES wash out; that is the lighting's to answer (the lab shoots
- * under `noir`, as the references were), not the flame's.
+ * How bright the body is against paper white is a judgement, and it has gone
+ * both ways. Above it, a flame keeps its light in a bright room but loses its
+ * colour to the tone curve; below it, the colour holds, and a flame drawn
+ * opaque risks reading as a decal on the sheet rather than as light. The
+ * defaults sit below it (Noor, 2026-09-13), with the bloom carrying the glow.
  */
 export interface FireZones {
   root: { color: string; amount: number; reach: number }
@@ -261,28 +259,18 @@ export interface FireZones {
 export type FireZonesInput = { [Z in keyof FireZones]?: Partial<FireZones[Z]> }
 
 /**
- * The defaults reproduce the look arrived at by measurement against
- * Flame_base.png (yellow ~30%, orange ~40%, pale ~18% of a flame's pixels),
- * now expressed zone by zone. Each colour is the linear emission the previous
- * ramp used in that band, written as the sRGB a picker would show.
+ * Noor's tune in the lab on 2026-09-13, and the source of truth for how a
+ * flame looks: the lab starts from it and `/hands` inherits it. A gentler
+ * flame than the one it replaced — every zone sits under the bloom threshold,
+ * so its glow comes from the bloom's strength ({@link FX_BLOOM}) spreading
+ * the brightest gas, not from a core authored to over-expose. The values it
+ * replaced, measured against Flame_base.png, are in the history of this file.
  */
 export const FIRE_ZONES: FireZones = {
-  root: { color: '#3b6bff', amount: 0, reach: 0.5 },
-  // glow 6 (was 4.6): once the core became the hottest few percent of a
-  // flame instead of its whole root, 4.6 no longer cleared the bloom
-  // threshold — bloom's share of the peak frame fell to 0.48%, under the
-  // budget. Brighter keeps the same small area: 1.47% bloom, near-white 0.8%.
-  // Starting it lower (from 0.45) bloomed 6.4% but put near-white back at 4.7%.
-  core: { color: '#fff7d4', glow: 6, from: 0.55 },
-  // Saturated, because the tone curve takes saturation away from anything
-  // above paper white: #ffdd7c at this glow came out pale yellow (s ~0.4),
-  // and measured 7.5% yellow against Flame_base.png's 29%.
-  body: { color: '#ffcf3a', glow: 1.3 },
-  // to: 0.4, measured against Flame_base.png with bloom off (bloom's halo
-  // counts as flame in any diff): near-white / pale / yellow / orange came out
-  // 0.7 / 21 / 34 / 44% against the reference's 0.9 / 17 / 29 / 43. At 0.32
-  // the body took half the flame and it was 51% yellow; at 0.45, 64% orange.
-  tip: { color: '#ff9e2c', glow: 0.9, from: 0.08, to: 0.4, softness: 0.15, tearing: 0.35 },
+  root: { color: '#3b6bff', amount: 0.01, reach: 0.39 },
+  core: { color: '#fff7d4', glow: 2.1, from: 0.63 },
+  body: { color: '#ffcf3a', glow: 0.8 },
+  tip: { color: '#ff9e2c', glow: 0.21, from: 0, to: 0.5, softness: 0.02, tearing: 0.64 },
 }
 
 /** The defaults with `input` laid over them, zone by zone. */

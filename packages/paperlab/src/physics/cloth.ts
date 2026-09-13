@@ -156,6 +156,16 @@ export class ClothSim {
    * cannot do this job: it moves paper, and a uniformly curled sheet in still
    * air has no business going anywhere.
    */
+  /**
+   * An acceleration on each particle from whatever is in the air around the
+   * sheet, xyz — the fire's updraft, so far (`DamageCoupling`). Not the wind:
+   * the wind is one thing blowing on the whole sheet, and this is local, a
+   * hot column over a burning rim and nothing a hand's width away.
+   *
+   * An acceleration rather than a force, so it lifts a soaked sheet no
+   * differently from a dry one: hot air does not know what paper weighs.
+   */
+  readonly draught: Float64Array
   readonly restBend: Float64Array
   /** For each bend spring, the particle between its ends; -1 for every other kind. */
   readonly constraintMiddle: Int32Array
@@ -249,6 +259,7 @@ export class ClothSim {
     this.constraintStiffness = new Float64Array(m).fill(1)
     this.broken = new Uint8Array(m)
     this.restBend = new Float64Array(m)
+    this.draught = new Float64Array(this.count * 3)
     this.constraintMiddle = new Int32Array(m).fill(-1)
     for (let k = 0; k < m; k++) {
       const a = links[k * 3]!
@@ -665,9 +676,9 @@ export class ClothSim {
       this.prev[i3] = x
       this.prev[i3 + 1] = y
       this.prev[i3 + 2] = z
-      p[i3] = x + vx + ax * im * dt2
-      p[i3 + 1] = y + vy + (ay * im - gravity * 3.2) * dt2
-      p[i3 + 2] = z + vz + az * im * dt2
+      p[i3] = x + vx + (ax * im + this.draught[i3]!) * dt2
+      p[i3 + 1] = y + vy + (ay * im - gravity * 3.2 + this.draught[i3 + 1]!) * dt2
+      p[i3 + 2] = z + vz + (az * im + this.draught[i3 + 2]!) * dt2
       maxTravel = Math.max(maxTravel, vx * vx + vy * vy + vz * vz)
     }
 

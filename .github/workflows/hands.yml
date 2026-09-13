@@ -22,7 +22,7 @@ name: Hands
 on:
   pull_request:
     paths:
-      # The page and its gesture vocabulary.
+      # The page, its match and its flame detector.
       - 'apps/editor/src/harness/**'
       - 'apps/editor/hands/**'
       # How it is served and built — the wasm middleware lives here.
@@ -31,9 +31,9 @@ on:
       - 'tools/hands-check.mjs'
       - 'tools/hands-assets.mjs'
       - 'tools/harness.mjs'
-      # Every gesture lands on a library feature. A change to the cloth sim,
-      # a deformer or the schema is exactly what breaks a gesture silently,
-      # so those changes are the ones most worth running this on.
+      # The burn is the library's. A change to the damage field, the fire, the
+      # cloth coupling or the schema is exactly what breaks it silently, so
+      # those changes are the ones most worth running this on.
       - 'packages/paperlab/src/**'
       - '.github/workflows/hands.yml'
   push:
