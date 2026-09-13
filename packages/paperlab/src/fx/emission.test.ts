@@ -88,33 +88,34 @@ describe('the emission unit', () => {
       expect(lum(z.body.color) * z.body.glow).toBeLessThan(lum(z.core.color) * z.core.glow)
     })
 
-    it('a flame body is brighter than the paper it stands in front of', () => {
-      // It was held BELOW paper white for a while, and asserted here, because
-      // under a bright preset paper already sits at the top of the tone curve
-      // and a brighter body turned pastel. The price was worse: a flame dimmer
-      // than the sheet behind it, drawn opaque, read as a yellow decal. The
-      // answer to a bright room is the lighting, not a dim flame.
-      expect(FIRE_ZONES.body.glow).toBeGreaterThan(1)
+    it('a flame tip is dimmer than its body', () => {
+      // How bright the body is against paper white is a judgement that has
+      // gone both ways (see `FireZones`), so it is not asserted. The tip
+      // burning off dimmer than the body it comes from is not a judgement.
       expect(FIRE_ZONES.tip.glow).toBeLessThan(FIRE_ZONES.body.glow)
     })
 
-    it('only the core clears the bloom threshold, and it lands inside the spec band', () => {
+    it('no zone but the core could ever clear the bloom threshold', () => {
+      // The defaults (Noor, 2026-09-13) author nothing past it at all, and let
+      // the bloom's strength carry the glow — so there is no floor on the
+      // core here any more. What stays is the ceiling on everything else: if
+      // the body or tip cleared it, the whole flame would bloom into a blob.
       const z = FIRE_ZONES
       const lum = (hex: string) => luminance(hexToLinear(hex))
-      expect(lum(z.core.color) * z.core.glow * PAPER_WHITE).toBeGreaterThan(FX_BLOOM_THRESHOLD)
       expect(lum(z.body.color) * z.body.glow * PAPER_WHITE).toBeLessThan(FX_BLOOM_THRESHOLD)
-      expect(z.core.glow).toBeGreaterThanOrEqual(FIRE_GLOW[0])
+      expect(lum(z.tip.color) * z.tip.glow * PAPER_WHITE).toBeLessThan(FX_BLOOM_THRESHOLD)
       expect(z.core.glow).toBeLessThanOrEqual(FIRE_GLOW[1])
     })
 
-    it('the zones come in order up the flame, and the blue root starts off', () => {
+    it('the zones come in order up the flame, and the blue root is at most a trace', () => {
       const z = FIRE_ZONES
       // Colour bands, on temperature. (Where the flame starts, tip.from, is on
       // the soot's own axis and has no order against these.)
       expect(z.tip.to).toBeLessThan(z.core.from)
-      expect(z.tip.from).toBeGreaterThan(0)
-      // Blue light over cream paper reads lavender; it is there to be dialled in.
-      expect(z.root.amount).toBe(0)
+      expect(z.tip.from).toBeGreaterThanOrEqual(0)
+      // Blue light over cream paper reads lavender; more than a trace of it is
+      // for someone to dial in, not a default.
+      expect(z.root.amount).toBeLessThanOrEqual(0.05)
     })
 
     it('smoke and ash never glow — they are lit, not emitting', () => {

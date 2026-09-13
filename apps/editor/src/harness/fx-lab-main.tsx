@@ -18,6 +18,7 @@ import {
   DAMAGE_LOOK_DEFAULTS,
   FX_BLOOM,
   FX_BLOOM_THRESHOLD,
+  FIRE_LIGHT_GAIN,
   FIRE_ZONES,
   fireZones,
   type FireZones,
@@ -209,7 +210,9 @@ const SLIDERS: {
   { group: 'Scorch', key: 'scorchDarkness', label: 'Darkness', min: 0.3, max: 1.8, step: 0.01 },
   { group: 'Scorch', key: 'fingers', label: 'Fingers', min: 0, max: 2.5, step: 0.05 },
   { group: 'Edge shape', key: 'edgeWave', label: 'Waves', min: 0, max: 15, step: 0.5, unit: 'mm' },
-  { group: 'Edge shape', key: 'edgeBite', label: 'Bites', min: 0, max: 6, step: 0.1, unit: 'mm' },
+  // To 10: the default (6) was this slider's old ceiling, and a default needs
+  // room to move both ways.
+  { group: 'Edge shape', key: 'edgeBite', label: 'Bites', min: 0, max: 10, step: 0.1, unit: 'mm' },
 ]
 
 /**
@@ -260,7 +263,8 @@ const FLAME_CONTROLS: {
     step: 0.01,
   },
   { zone: 'tip', key: 'to', label: 'Where the tip becomes body', min: 0.1, max: 0.8, step: 0.01 },
-  { zone: 'tip', key: 'softness', label: 'Softness of the outline', min: 0.02, max: 0.5, step: 0.01 },
+  // From 0: the default (0.02) was this slider's old floor.
+  { zone: 'tip', key: 'softness', label: 'Softness of the outline', min: 0, max: 0.5, step: 0.01 },
   { zone: 'tip', key: 'tearing', label: 'Tearing', min: 0, max: 1.5, step: 0.01 },
 ]
 
@@ -455,8 +459,9 @@ const DEFAULT_SETTINGS: LabSettings = {
   fluid: fireFluidDefaults,
   zones: fireZones(),
   // FxFireLight's own gain, FxPost's own bloom, the tier's haze — the
-  // values tuned here on 2026-09-12, which are the library's defaults too.
-  light: 42,
+  // library's defaults, read from it and never copied, so the lab cannot
+  // show a fire the product does not have.
+  light: FIRE_LIGHT_GAIN,
   // The library's own, not copies of them: these three used to be literals
   // here and in `fx/emission.ts` both, which is exactly how a lab comes to
   // show a fire the product does not have.

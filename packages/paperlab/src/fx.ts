@@ -108,7 +108,7 @@ export {
   type FireFluidParams,
   type SolverUniforms,
 } from './fx/fluid/params'
-export { FxFireLight, type FxFireLightProps } from './fx/FxFireLight'
+export { FIRE_LIGHT_GAIN, FxFireLight, type FxFireLightProps } from './fx/FxFireLight'
 export { FxMatchFlame, type FxMatchFlameProps, type MatchFlameState } from './fx/FxMatchFlame'
 export { flameAnchors, flamePuff, FLAME_HEIGHT, type FlameAnchor } from './fx/flames'
 

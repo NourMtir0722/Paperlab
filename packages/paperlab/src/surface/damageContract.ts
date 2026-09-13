@@ -146,36 +146,30 @@ export interface DamageLook {
 }
 
 /**
- * What every burn is drawn with unless told otherwise — the combination Noor
- * tuned in the lab's sidebar on 2026-09-12, which is the look this ships.
+ * What every burn is drawn with unless told otherwise — Noor's tune in the
+ * lab's sidebar on 2026-09-13, and the source of truth for how a burn looks:
+ * the lab starts from it, `/hands` inherits it, and a user changes it through
+ * `look`. The values it replaced, and why each of those had moved, are in the
+ * history of this file.
  */
 export const DAMAGE_LOOK_DEFAULTS: Required<DamageLook> = {
-  // §5 asks for 0.3–1 mm. 1.8 was outside it, and outside the slider's range
-  // it was tuned in — a control at its limit is a report that something
-  // underneath is wrong, which in this case was a fire nothing could see.
-  emberWidth: 0.9,
-  emberIntensity: 1.45,
+  emberWidth: 1.25,
+  emberIntensity: 1.05,
   emberCoverage: 0.6,
   emberFlicker: 1.65,
   emberGlow: 1.25,
   sparkle: 0.5,
-  lipWidth: 1.2,
-  // Was 1.5, its slider's ceiling, which made the ash lip brighter than the
-  // paper it sits on. Ash is pale GREY; the reference's lip is dimmer than
-  // the sheet, not a highlight drawn on it.
-  lipBrightness: 0.85,
-  // Was 1, also a ceiling. At full warmth the char is milk chocolate —
-  // closer to cardboard than to charcoal (§5). Burnt paper keeps a little
-  // warmth in the plates and reads near black in a frame with a fire in it.
-  charWarmth: 0.3,
-  // Was 1, also a ceiling. The cracks are drawn as thin polygon outlines, so
-  // at full strength the char reads as a mosaic rather than as broken plates.
-  charCracks: 0.55,
-  scorchReach: 30,
-  scorchDarkness: 1.17,
-  fingers: 1.25,
-  edgeWave: 8.5,
-  edgeBite: 3.6,
+  // With the widest bead, 2.2 mm from the cut — inside the 2.5 mm the lip and
+  // the ember line are held to (`compose.ts`).
+  lipWidth: 0.95,
+  lipBrightness: 0.76,
+  charWarmth: 0.32,
+  charCracks: 0.45,
+  scorchReach: 9,
+  scorchDarkness: 0.86,
+  fingers: 1.95,
+  edgeWave: 13,
+  edgeBite: 6,
 }
 
 /**

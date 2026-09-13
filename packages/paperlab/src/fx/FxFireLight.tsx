@@ -70,5 +70,8 @@ export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN }: FxFireLig
 // the tone curve turns salmon — the pink the spec forbids.
 const FIRE_COLOR = new THREE.Color('#ffa24c')
 
-/** Light per unit of front length; the front runs to ~0.045 at a burn's peak. */
-export const FIRE_LIGHT_GAIN = 42
+/**
+ * Light per unit of front length; the front runs to ~0.045 at a burn's peak.
+ * Noor's tune, 2026-09-13 (it was 42).
+ */
+export const FIRE_LIGHT_GAIN = 26

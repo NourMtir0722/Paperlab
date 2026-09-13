@@ -32,24 +32,18 @@ export interface FireEmitterOptions {
 // Smoke kept light: a clean fire makes little, and a frame full of it hides
 // the burn — more only where burning struggles (see `struggle` below).
 /**
- * How much each kind leaves the front, per texel per second.
+ * How much each kind leaves the front, per texel per second — Noor's tune in
+ * the lab on 2026-09-13, which the lab starts from and `/hands` inherits.
  *
- * `smoke` is 0 on purpose. There were three smoke systems running at once —
- * the fire simulator's own, these sprite puffs at 8% alpha, and the smoulder
- * wisp — and the review's note was that only one of them should exist. The
- * simulator's is the one that belongs to a burning sheet: it is the same
- * fluid the flames are made of, so it rises with them instead of beside them.
- * `FxWisps` still carries the thread after the flames are out, which is the
- * one moment the simulator has nothing left to make. The preset stays: it is
- * a parameter set, and anything may still ask the pool for smoke.
- *
- * Embers and ash are both down. Ash at 0.86 a texel was a flake for nearly
- * every one that burnt through — a dust shower. Fewer and larger is the note.
+ * The simulator's smoke is the main smoke of a burning sheet, since it is the
+ * same fluid the flames are made of; these sprite puffs, once switched off
+ * for doubling it, are back as a light thread beside it. Ash at 0.86 a texel
+ * was a dust shower; 0.36 is a light fall of it.
  */
 export const fireEmitterDefaults: Required<FireEmitterOptions> = {
-  embers: 0.35,
-  smoke: 0,
-  ash: 0.12,
+  embers: 0.39,
+  smoke: 0.135,
+  ash: 0.36,
   seed: 7,
   caps: {},
 }

@@ -153,10 +153,16 @@ const bloomShare = await pixels([peak.png, noBloom.png], (frames) => {
 // that white back. What this check exists to catch is the original failure:
 // flames that never clear the threshold at all, which measured 0.01-0.07%.
 // 0.5% sits seven times above that.
-check(
-  bloomShare >= 0.005,
-  `the fire is bright enough to bloom — it changes ${(bloomShare * 100).toFixed(2)}% of the frame (want ≥ 0.5%)`,
-  'bloom barely touches the fire, so the flames are not clearing the threshold. Raise what they EMIT, never the threshold',
+//
+// Reported, not required, since Noor's tune of 2026-09-13 became the default:
+// its flame authors nothing past the threshold on purpose (`FIRE_ZONES`), so
+// a frame that blooms nothing is the look chosen, not the old failure. The
+// check that the fire is in the frame at all is (5), below. If the bloom is
+// ever wanted back, it is the core's glow that has to clear the threshold —
+// never the threshold that comes down to meet it.
+console.log(
+  `  · bloom changes ${(bloomShare * 100).toFixed(2)}% of the frame ` +
+    '(the default flame authors nothing past the threshold; raise the core’s glow, never lower the threshold)',
 )
 
 // 2. …and not so bright that it takes the room with it.

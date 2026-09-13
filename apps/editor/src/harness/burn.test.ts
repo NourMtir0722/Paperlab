@@ -271,10 +271,9 @@ describe('the scripted burn', () => {
   })
 
   it('with smoke off, throws no smoke at all — whatever rate is asked for', () => {
-    // A burning sheet's smoke is the fire simulator's now, so `FireEmitter`'s
-    // own rate is 0 and the pool throws no puffs by default. The setting still
-    // has to hold when something DOES ask for them, which is what a lab
-    // sidebar can do — so this asks, and checks the toggle still wins.
+    // The pool throws a light thread of puffs by default (Noor's tune,
+    // 2026-09-13), and a lab sidebar can ask for more. "Smoke off" has to win
+    // over both, which is what this checks.
     const off = new ScriptedBurn(flatSheet, { smoke: false })
     off.setEmit({ embers: true, smoke: true, ash: true }, { smoke: 0.2 })
     off.seek(phase('dying').at)
@@ -285,10 +284,14 @@ describe('the scripted burn', () => {
     on.seek(phase('dying').at)
     expect(on.pool.countOf('smoke')).toBeGreaterThan(0)
 
-    // And with nobody asking, the default really is none.
+    // With nobody asking, the default throws some; switched off, even the
+    // default is none.
     const quiet = new ScriptedBurn(flatSheet)
     quiet.seek(phase('dying').at)
-    expect(quiet.pool.countOf('smoke')).toBe(0)
+    expect(quiet.pool.countOf('smoke')).toBeGreaterThan(0)
+    const quietOff = new ScriptedBurn(flatSheet, { smoke: false })
+    quietOff.seek(phase('dying').at)
+    expect(quietOff.pool.countOf('smoke')).toBe(0)
   })
 
   it('sheds ash off the cooling edge as it dies', () => {
