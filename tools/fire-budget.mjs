@@ -56,7 +56,12 @@ async function shot(query, file) {
   const errors = []
   page.on('pageerror', (error) => errors.push(String(error)))
   try {
-    await page.goto(`${base}/fx-lab/?ui=0&${query}`, { waitUntil: 'networkidle' })
+    // On the flat sheet. The lab hangs its sheet as cloth now, and a live
+    // cloth settles on wall-clock frames: on CI's software renderer 60 frames
+    // is half a second of it, so two loads photograph it at two different
+    // moments of settling — and every budget here compares two loads pixel
+    // for pixel. These measure the fire's light, not how the paper drapes.
+    await page.goto(`${base}/fx-lab/?ui=0&physics=flat&${query}`, { waitUntil: 'networkidle' })
     await page.waitForFunction(() => window.__FXLAB__?.ready === true, null, { timeout: 180_000 })
     const state = await page.evaluate(() => window.__FXLAB__)
     const png = await page

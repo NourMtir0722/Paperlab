@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CHAR, PRESENCE } from 'paperlab/fx'
-import { DURATION, ScriptedBurn, phasesFor, type BurnOrigin } from './burn'
+import { DURATION, ScriptedBurn, planBurn, type BurnOrigin } from './burn'
 
 /**
  * **The budget the look is held to, in the numbers the spec states.**
@@ -141,10 +141,12 @@ describe('the burn, against the spec', () => {
 
   it('reaches every phase in order, inside the scrubber', () => {
     for (const origin of ['center', 'corner'] as const) {
-      const phases = phasesFor({ origin })
+      // The scrubber is as long as the burn now, not a fixed 24 s — a burn
+      // asked to eat the whole sheet runs for most of a minute.
+      const { phases, duration } = planBurn({ origin })
       const at = phases.map((p) => p.at)
       for (let i = 1; i < at.length; i++) expect(at[i]!).toBeGreaterThan(at[i - 1]!)
-      expect(at.at(-1)!).toBeLessThanOrEqual(DURATION)
+      expect(at.at(-1)!).toBeLessThanOrEqual(duration)
       // And none of them says the burn was still going when it was
       // photographed — `phasesFor` sets `gap` when it is.
       for (const p of phases.filter((q) => ['dying', 'smoulder', 'cold'].includes(q.id))) {

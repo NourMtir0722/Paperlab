@@ -15,6 +15,8 @@
  *
  *   pnpm film
  *   pnpm film --speed=0.25    slower, for the flicker
+ *   pnpm film --amount=0.42   how much of the sheet burns — from the centre,
+ *                             enough to cut it in two and watch the piece fall
  */
 import { mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -25,6 +27,7 @@ import { shotsDir, startApp } from './harness.mjs'
 const PORT = 5199
 const argv = process.argv.slice(2)
 const speed = Number((argv.find((a) => a.startsWith('--speed=')) ?? '--speed=1').slice(8)) || 1
+const amount = argv.find((a) => a.startsWith('--amount='))?.slice(9)
 const out = join(shotsDir(), 'fire-film')
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
@@ -38,9 +41,6 @@ const browser = await chromium.launch({
   args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [],
 })
 
-/** The burn is 24 simulated seconds; at 0.25× that is 96 of wall clock. */
-const SECONDS = Math.ceil(24 / speed) + 2
-
 for (const origin of ['center', 'corner']) {
   const dir = join(out, `${origin}-raw`)
   const context = await browser.newContext({
@@ -50,14 +50,20 @@ for (const origin of ['center', 'corner']) {
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  await page.goto(`${base}/fx-lab/?ui=0&play=1&t=0&origin=${origin}&speed=${speed}`, {
+  const asked = amount === undefined ? '' : `&amount=${amount}`
+  await page.goto(`${base}/fx-lab/?ui=0&play=1&t=0&origin=${origin}&speed=${speed}${asked}`, {
     waitUntil: 'networkidle',
   })
   await page.waitForFunction(() => window.__FXLAB__?.ready === true, null, { timeout: 180_000 })
+  // As long as THIS burn runs, which the page measured: 24 simulated seconds
+  // by default, most of a minute for a burn asked to eat the whole sheet. At
+  // 0.25× the default is 96 s of wall clock.
+  const duration = await page.evaluate(() => window.__FXLAB__?.duration ?? 24)
+  const seconds = Math.ceil(duration / speed) + 2
   // Wall clock on purpose: this is a recording of the page running, so the
   // thing being waited for IS elapsed time. Everything else in this repo is
   // frame-driven because it is waiting for a frame to be finished.
-  await page.waitForTimeout(SECONDS * 1000)
+  await page.waitForTimeout(seconds * 1000)
   await page.close()
   await context.close()
   if (errors.length) console.error(`  ${origin}: ${errors[0]}`)
@@ -73,14 +79,14 @@ for (const origin of ['center', 'corner']) {
     // Cut the dead lead-in. Recording starts when the page opens, and the
     // page then sits on a paused sheet for as long as its shaders take to
     // compile and its frames take to settle — about 38 s here, more than the
-    // burn itself. Everything before the last SECONDS is that wait, so it
+    // burn itself. Everything before the last `seconds` is that wait, so it
     // goes; a film that is 60% a still frame hides the burn it exists to show.
     const length = Number(
       execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', src])
         .toString()
         .trim(),
     )
-    const lead = Math.max(0, length - SECONDS)
+    const lead = Math.max(0, length - seconds)
     execFileSync('ffmpeg', [
       '-y',
       '-loglevel',

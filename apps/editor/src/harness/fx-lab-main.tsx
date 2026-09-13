@@ -35,12 +35,13 @@ import {
 import type { SurfaceLocator } from 'paperlab/fx'
 import {
   ALL_LAYERS,
-  DURATION,
   BURN_DEFAULTS,
   HOLD,
+  LONGEST,
   ORIGINS,
-  phasesFor,
+  planBurn,
   type BurnOrigin,
+  type BurnPlan,
   type BurnSettings,
   ScriptedBurn,
   TIER,
@@ -94,6 +95,9 @@ import {
  *   ?lighting=noir               any lighting preset
  *   ?play=1&speed=0.25           start it running, and how fast
  *   ?ui=0                        the stage alone — what the capture script loads
+ *   ?amount=0.5                  how much of the sheet burns, 0..1 — 1 is all of it
+ *   ?physics=flat                the sheet held flat and still, as it was before it
+ *                                hung: nothing curls, nothing falls
  *
  * Dev only. It is in no build's input list, and the references it draws come
  * from outside the repo through a dev-server middleware — see
@@ -115,6 +119,12 @@ declare global {
       /** Three points on the rim of the hole, for the close crops. */
       crops: Crop[]
       tier: string
+      /** How long this burn is worth watching, simulated seconds — what `pnpm film` records. */
+      duration: number
+      /** How much of the sheet it has eaten once it is cold, 0..1. */
+      burnt: number
+      /** When it cut a piece of the sheet loose, which then falls — or null. */
+      severedAt: number | null
     }
   }
 }
@@ -264,9 +274,58 @@ function num(name: string, fallback: number, lo: number, hi: number): number {
 /** `?origin=corner` — where the burn starts; honoured with ?ui=0, so a capture can photograph either. */
 const START_ORIGIN: BurnOrigin = query.get('origin') === 'corner' ? 'corner' : 'center'
 
+/** `?amount=0.5` — how much burns; honoured with ?ui=0, so a capture can photograph a sheet cut in two. */
+const START_BURN: Partial<BurnSettings> = {
+  origin: START_ORIGIN,
+  ...(query.has('amount') ? { amount: num('amount', BURN_DEFAULTS.amount, 0.05, 1) } : {}),
+}
+
 const START_T = query.has('phase')
-  ? (phasesFor({ origin: START_ORIGIN }).find((p) => p.id === query.get('phase'))?.at ?? 0)
-  : num('t', 0, 0, DURATION)
+  ? (planBurn(START_BURN).phases.find((p) => p.id === query.get('phase'))?.at ?? 0)
+  : num('t', 0, 0, LONGEST)
+
+/**
+ * How the sheet is held: hung by its top edge in still air — so a burn that
+ * cuts a piece loose drops it, and a burnt edge curls the way it does on
+ * `/hands`, where the sheet has always been a simulation. `?physics=flat`
+ * brings back the sheet this lab used to show, flat and still, for a picture
+ * of the burn with nothing moving the paper.
+ *
+ * No wind. A sheet swaying in a draught is a different picture on every load,
+ * and a capture that cannot be repeated cannot be compared.
+ */
+const PHYSICS: ComponentProps<typeof Paper>['physics'] =
+  query.get('physics') === 'flat'
+    ? undefined
+    : { type: 'cloth', pins: 'top-edge', wind: 0, stiffness: 0.8, gravity: 1, floor: -1.4 }
+
+/**
+ * Enough of the sheet that a burn from the centre cuts it in two. The fibre
+ * runs across the sheet, so the fire races sideways and reaches both edges
+ * at 11.2 s; from 42% burnt on, it is still eating when it gets there, and
+ * the paper under the hole is joined to nothing.
+ */
+const CUT_IN_TWO = 0.42
+
+/** "How much burns", in the words a person would use. The slider is the spectrum between. */
+const AMOUNTS: { label: string; amount: number }[] = [
+  { label: 'a hole', amount: BURN_DEFAULTS.amount },
+  { label: 'cut in two', amount: CUT_IN_TWO },
+  { label: 'most of it', amount: 0.75 },
+  { label: 'all of it', amount: 1 },
+]
+
+/** What this burn does, in a sentence — measured off it, so it is true of the burn on screen. */
+function burnNote(plan: BurnPlan, origin: BurnOrigin): string {
+  const out = plan.wentOut === null ? 'is still burning at the end' : `is out at ${plan.wentOut.toFixed(1)} s`
+  const loose =
+    plan.severedAt !== null
+      ? `At ${plan.severedAt.toFixed(1)} s it cuts the paper below the hole loose, and that falls.`
+      : origin === 'corner'
+        ? 'From a corner it eats upward as a line, so nothing comes loose.'
+        : 'Nothing comes loose: the sheet still holds all round the hole.'
+  return `Eats ${Math.round(plan.burnt * 100)}% of the sheet and ${out}. ${loose}`
+}
 
 /**
  * `?play=1` starts the burn running.
@@ -410,7 +469,7 @@ const DEFAULT_SETTINGS: LabSettings = {
     smoke: fireEmitterDefaults.smoke,
     ash: fireEmitterDefaults.ash,
   },
-  burn: { ...BURN_DEFAULTS, origin: START_ORIGIN },
+  burn: { ...BURN_DEFAULTS, ...START_BURN },
 }
 
 /** A saved combination, over the defaults — or the defaults, if there is none or it will not parse. */
@@ -471,6 +530,7 @@ function loadSettings(): LabSettings {
         ...DEFAULT_SETTINGS.burn,
         ...saved.burn,
         ...(query.has('origin') ? { origin: START_ORIGIN } : {}),
+        ...(query.has('amount') ? { amount: START_BURN.amount } : {}),
       },
     }
   } catch {
@@ -652,6 +712,7 @@ function Driver({
   onTime,
   match,
   locate,
+  until,
 }: {
   burn: ScriptedBurn
   view: FieldView
@@ -662,10 +723,12 @@ function Driver({
   onTime(t: number): void
   match: { current: MatchFlameState }
   locate: SurfaceLocator
+  /** Where playing stops: the end of this burn, which is not the same for every burn. */
+  until: number
 }) {
   useFrame((_, delta) => {
     if (playing) {
-      burn.play(delta, speed)
+      burn.play(delta, speed, until)
       onTime(burn.time)
     }
     view.sync(burn.glow, layers, detail)
@@ -702,7 +765,7 @@ function Ready({
   armed,
   nonce,
   playing,
-  phases,
+  plan,
   look,
   onReady,
 }: {
@@ -710,7 +773,8 @@ function Ready({
   armed: boolean
   nonce: string
   playing: boolean
-  phases: readonly Phase[]
+  /** The burn on screen, measured — its phases, length, and how much it eats. */
+  plan: BurnPlan
   look: Required<DamageLook>
   /** Called each time the frame settles — what `?play=1` starts the burn from. */
   onReady?: () => void
@@ -730,13 +794,16 @@ function Ready({
         ready,
         t: burn.time,
         stats: burn.stats,
-        phases,
+        phases: plan.phases,
         crops: rimCrops(burn.field),
         tier: TIER,
         look,
+        duration: plan.duration,
+        burnt: plan.burnt,
+        severedAt: plan.severedAt,
       }
     },
-    [burn, phases, look],
+    [burn, plan, look],
   )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` and `playing` are the TRIGGER — anything that changes the picture starts the count again
@@ -864,24 +931,30 @@ function Lab() {
   /** Whether the sheet can be located yet — see `SheetReady`. Nothing is burnt before it. */
   const [sheet, setSheet] = useState(false)
 
+  // Measured off this burn, for the settings in hand — its moments, how much
+  // it eats, how long it runs, and when it first cuts a piece loose. The
+  // burn is then told exactly when to start dying, the time that measured
+  // right, rather than guessing again.
+  const plan: BurnPlan = useMemo(() => planBurn(settings.burn), [settings.burn])
+
   useEffect(() => {
     if (!sheet) return
     burn.setEmit({ embers: layers.embers, smoke: layers.smoke, ash: layers.ash }, settings.rates)
-    burn.configure(settings.burn)
+    burn.configure({ ...settings.burn, decayAt: plan.decayAt })
     burn.seek(target)
     setShown(burn.time)
     setGeneration((g) => g + 1)
-  }, [burn, sheet, target, layers.embers, layers.smoke, layers.ash, settings.rates, settings.burn])
+  }, [burn, sheet, target, layers.embers, layers.smoke, layers.ash, settings.rates, settings.burn, plan])
 
   // The sheet reads the look every frame; hand it the sidebar's.
   view.look = settings.look
 
   useEffect(() => {
-    if (playing && shown >= DURATION) {
+    if (playing && shown >= plan.duration) {
       setPlaying(false)
       setTarget(shown)
     }
-  }, [playing, shown])
+  }, [playing, shown, plan.duration])
 
   // Smoke off means a clean background: none from the simulator either.
   const fluidParams = useMemo(() => {
@@ -902,8 +975,7 @@ function Lab() {
   }, [settings.zones])
   const fluidKey = `${generation}:${playing ? 'live' : JSON.stringify(fluidParams)}`
 
-  // Measured off this burn, for the settings in hand — see `phasesFor`.
-  const phases = useMemo(() => phasesFor(settings.burn), [settings.burn])
+  const phases = plan.phases
   const here = phases.reduce(
     (best, p) => (Math.abs(p.at - shown) < Math.abs(best.at - shown) ? p : best),
     phases[0]!,
@@ -929,6 +1001,22 @@ function Lab() {
   const hold = () => {
     setPlaying(false)
     setTarget(burn.time)
+  }
+
+  /** How much of the sheet burns. A new burn, so it re-seeks from where the burn is. */
+  const setAmount = (amount: number) => {
+    hold()
+    setSettings((s) => ({ ...s, burn: { ...s.burn, amount } }))
+  }
+
+  /**
+   * Seek and play from there. The fall is live physics, not part of the
+   * burn's replay: a seek past the cut drops the piece from where it hung,
+   * so to SEE it fall, play through the moment it comes loose.
+   */
+  const watchFrom = (t: number) => {
+    setTarget(Math.max(0, t))
+    setPlaying(true)
   }
 
   const [mode, setModeState] = useState<Mode>(START_MODE)
@@ -999,7 +1087,7 @@ function Lab() {
             <input
               type="range"
               min={0}
-              max={DURATION}
+              max={plan.duration}
               step={1 / 120}
               value={shown}
               onChange={(e) => jump(Number(e.target.value))}
@@ -1007,10 +1095,51 @@ function Lab() {
           </div>
           <div className="row clock">
             <span className="grow">
-              {shown.toFixed(2)}s of {DURATION}s
+              {shown.toFixed(2)}s of {plan.duration}s
             </span>
             <span>{near ? near.id : '—'}</span>
           </div>
+
+          {/* Beside the transport, not in Tune: how much burns changes what
+              HAPPENS — whether a piece falls, how long it all takes — not how
+              any of it looks. */}
+          <h2>
+            how much burns <span className="note">measured on the cold sheet</span>
+          </h2>
+          <div className="row">
+            {AMOUNTS.map((a) => (
+              <button
+                type="button"
+                key={a.amount}
+                aria-pressed={Math.abs(settings.burn.amount - a.amount) < 0.005}
+                onClick={() => setAmount(a.amount)}
+              >
+                {a.amount === CUT_IN_TWO && settings.burn.origin === 'corner' ? '42%' : a.label}
+              </button>
+            ))}
+          </div>
+          <label className="layer" style={{ display: 'block' }}>
+            <span className="row">
+              <span className="grow">of the sheet</span>
+              <span className="clock">{Math.round(settings.burn.amount * 100)}%</span>
+            </span>
+            <input
+              type="range"
+              min={0.05}
+              max={1}
+              step={0.01}
+              value={settings.burn.amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+            />
+          </label>
+          <p className="caption">{burnNote(plan, settings.burn.origin)}</p>
+          {plan.severedAt !== null && (
+            <div className="row">
+              <button type="button" onClick={() => watchFrom(plan.severedAt! - 1.5)}>
+                watch it fall
+              </button>
+            </div>
+          )}
 
           <h2>
             phases <span className="note">§9, at the times this burn reaches them</span>
@@ -1136,8 +1265,16 @@ function Lab() {
           // Frozen, like every harness that gets photographed: a sheet with an
           // idle sway in it is a different picture on every load, and a
           // capture that cannot be repeated cannot be compared.
-          reducedMotion
+          //
+          // Only for the flat sheet, though: `reducedMotion` switches every
+          // simulation OFF, and the hanging sheet is one. It needs none of the
+          // freezing either — no wind, so nothing sways. Passed as an explicit
+          // false, which also overrides a system that prefers reduced motion:
+          // this is a lab, and a burn that cannot cut a piece loose is not
+          // the burn being judged.
+          reducedMotion={PHYSICS === undefined}
           content={CONTENT}
+          physics={PHYSICS}
           damage={view}
           scene={LIGHTING ? ({ lighting: LIGHTING } as ComponentProps<typeof Paper>['scene']) : undefined}
         >
@@ -1189,9 +1326,10 @@ function Lab() {
             onTime={setShown}
             match={match}
             locate={locate}
+            until={plan.duration}
           />
           <Ready
-            phases={phases}
+            plan={plan}
             look={settings.look}
             burn={burn}
             armed={generation > 0}
@@ -1409,14 +1547,9 @@ function Tune({
             </button>
           ))}
         </div>
-        <Slider
-          label="Starts to die when this much is gone (1 = never)"
-          value={burn.decayAt}
-          min={0.2}
-          max={1}
-          step={0.01}
-          onInput={(v) => setBurn({ decayAt: v })}
-        />
+        {/* How much burns lives beside the transport now — it decides what
+            happens, and "starts to die when this much is gone" was a way of
+            asking for it that left a third more burnt than it said. */}
         <Slider
           label="Takes this long to die"
           value={burn.decay}

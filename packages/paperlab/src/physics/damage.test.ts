@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import * as THREE from 'three'
 import { DamageField } from '../fx/field'
 import { DAMAGE_CHANNELS, type DamageSource } from '../surface/damageContract'
 import { ClothSim, type ClothParams } from './cloth'
@@ -212,6 +213,146 @@ describe('damage → cloth', () => {
     const coupling = new DamageCoupling(sim)
     coupling.update(field)
     expect(Array.from(sim.broken).every((b) => b === 0)).toBe(true)
+  })
+
+  /**
+   * A cut exactly one particle row deep, so every gone particle on it borders
+   * BOTH pieces. Averaged between them — as it used to be — each one was
+   * dragged down the gap after the falling piece, and both burnt edges with it.
+   */
+  it('cuts a piece loose along a burn one row deep, and each rim particle leaves with ONE side', () => {
+    const field = new DamageField()
+    // Row 6 of 14 is at v = 1 − 6/13; rows 5 and 7 are a cell either side.
+    const v = 1 - 6 / 13
+    field.cut(0, v, 1, v, 0.03)
+    const sim = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const control = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const coupling = new DamageCoupling(sim)
+    run(sim, coupling, field, 1)
+    run(control, null, null, 1)
+    // The cut really is one row: the rows either side are paper.
+    expect(sim.invMass[6 * 12 + 5]).toBe(0)
+    expect(sim.invMass[5 * 12 + 5]).toBe(1)
+    expect(sim.invMass[7 * 12 + 5]).toBe(1)
+    // The piece below fell away; the sheet above stayed where it hangs.
+    expect(at(sim, 13, 5, 1)).toBeLessThan(at(control, 13, 5, 1) - 0.5)
+    expect(Math.abs(at(sim, 5, 5, 1) - at(control, 5, 5, 1))).toBeLessThan(0.02)
+    // And every particle on the cut is beside one side of it, not strung
+    // across the gap between them.
+    const cell = 1.4 / 13
+    const apart = (r: number, c: number) =>
+      Math.hypot(
+        at(sim, 6, c, 0) - at(sim, r, c, 0),
+        at(sim, 6, c, 1) - at(sim, r, c, 1),
+        at(sim, 6, c, 2) - at(sim, r, c, 2),
+      )
+    for (let c = 0; c < sim.cols; c++) expect(Math.min(apart(5, c), apart(7, c))).toBeLessThan(cell * 1.5)
+  })
+
+  it('hides the triangles left across the gap as the piece falls — and no triangle of paper', () => {
+    const field = new DamageField()
+    for (let v = 0.44; v <= 0.58; v += 0.01) field.cut(0, v, 1, v, 0.03)
+    const sim = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const coupling = new DamageCoupling(sim)
+    const index = new THREE.PlaneGeometry(1, 1.4, 11, 13).index!.array as Uint16Array
+    const built = index.slice()
+    let changed = false
+    for (let f = 0; f < 60; f++) {
+      coupling.update(field)
+      sim.step(1 / 60)
+      if (sim.asleep) continue
+      coupling.follow()
+      changed = coupling.tear(index) || changed
+    }
+    expect(changed).toBe(true)
+    const cellX = 1 / 11
+    const cellY = 1.4 / 13
+    const edge = (i: number, j: number) => {
+      const rest = Math.hypot(((i % 12) - (j % 12)) * cellX, (((i / 12) | 0) - ((j / 12) | 0)) * cellY)
+      const now = Math.hypot(
+        sim.positions[i * 3]! - sim.positions[j * 3]!,
+        sim.positions[i * 3 + 1]! - sim.positions[j * 3 + 1]!,
+        sim.positions[i * 3 + 2]! - sim.positions[j * 3 + 2]!,
+      )
+      return now / rest
+    }
+    let hidden = 0
+    for (let t = 0; t < index.length / 3; t++) {
+      const [a, b, c] = [built[t * 3]!, built[t * 3 + 1]!, built[t * 3 + 2]!]
+      const burnt = [a, b, c].some((i) => sim.invMass[i] === 0)
+      if (index[t * 3] === index[t * 3 + 1] && index[t * 3 + 1] === index[t * 3 + 2]) {
+        // Only ever a triangle with a burnt-away corner.
+        expect(burnt).toBe(true)
+        hidden++
+        continue
+      }
+      // Paper is drawn exactly as built, and nothing still drawn is a streak.
+      if (!burnt) expect([index[t * 3], index[t * 3 + 1], index[t * 3 + 2]]).toEqual([a, b, c])
+      expect(Math.max(edge(a, b), edge(b, c), edge(c, a))).toBeLessThanOrEqual(1.5 + 1e-6)
+    }
+    expect(hidden).toBeGreaterThan(0)
+  })
+
+  it('tears nothing on a sheet still in one piece — its index stays exactly as built', () => {
+    // A hole in the middle of a hanging sheet: the fire's usual case, and
+    // what every burn looks like until it cuts something loose.
+    const field = new DamageField()
+    field.cut(0.3, 0.5, 0.7, 0.5, 0.08)
+    const sim = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const coupling = new DamageCoupling(sim)
+    const index = new THREE.PlaneGeometry(1, 1.4, 11, 13).index!.array as Uint16Array
+    const built = Array.from(index)
+    for (let f = 0; f < 120; f++) {
+      coupling.update(field)
+      sim.step(1 / 60)
+      if (sim.asleep) continue
+      coupling.follow()
+      expect(coupling.tear(index)).toBe(false)
+    }
+    // There IS a hole — the paper in it left the solve — and still nothing tore.
+    expect(Array.from(sim.invMass).some((m) => m === 0)).toBe(true)
+    expect(Array.from(index)).toEqual(built)
+  })
+
+  it('starts the sheet over when its burn is rewound: fallen paper laid out again, the tear mended', () => {
+    const src = source()
+    src.paint(DAMAGE_CHANNELS.presence, 0.44, 0.58, 0)
+    const sim = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const laidOut = Array.from(sim.positions)
+    const coupling = new DamageCoupling(sim)
+    const index = new THREE.PlaneGeometry(1, 1.4, 11, 13).index!.array as Uint16Array
+    const built = Array.from(index)
+    for (let f = 0; f < 60; f++) {
+      coupling.update(src)
+      sim.step(1 / 60)
+      if (sim.asleep) continue
+      coupling.follow()
+      coupling.tear(index)
+    }
+    expect(Array.from(index)).not.toEqual(built)
+    // Played back from before the cut: the paper is all there again. Solved
+    // from the floor it would be hauled up through the sheet; it is laid out.
+    src.paint(DAMAGE_CHANNELS.presence, 0, 1, 255)
+    coupling.update(src)
+    expect(Array.from(sim.positions)).toEqual(laidOut)
+    expect(coupling.tear(index)).toBe(true)
+    expect(Array.from(index)).toEqual(built)
+  })
+
+  it('starts over when a different source takes the sheet — even one with the same holes', () => {
+    const first = source()
+    first.paint(DAMAGE_CHANNELS.presence, 0.44, 0.58, 0)
+    const sim = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const laidOut = Array.from(sim.positions)
+    const coupling = new DamageCoupling(sim)
+    run(sim, coupling, first, 1)
+    expect(Array.from(sim.positions)).not.toEqual(laidOut)
+    // Another sheet's burn with the very same cut. No paper comes back, so
+    // only the source's identity says this is a different history.
+    const second = source()
+    second.paint(DAMAGE_CHANNELS.presence, 0.44, 0.58, 0)
+    coupling.update(second)
+    expect(Array.from(sim.positions)).toEqual(laidOut)
   })
 
   it('makes wet paper heavier, and no paper at all massless', () => {

@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FIXED_DT } from 'paperlab/fx'
-import { DURATION, ORIGINS, PHASES, ScriptedBurn, phase, phasesFor, rimCrops } from './burn'
+import { FIXED_DT, HEAT } from 'paperlab/fx'
+import {
+  DURATION,
+  ORIGINS,
+  PHASES,
+  ScriptedBurn,
+  decayAtFor,
+  looseShare,
+  phase,
+  planBurn,
+  rimCrops,
+} from './burn'
 
 /**
  * The lab's burn, pinned where it matters: it is the same burn twice, and the
@@ -125,7 +135,15 @@ describe('the scripted burn', () => {
     burn.seek(phase('smoulder').at)
     expect(burn.stats.front).toBe(0)
     burn.seek(phase('cold').at)
-    expect(burn.field.asleep).toBe(true)
+    // Cold: no heat left in the sheet that 8 bits can draw — only the last
+    // beads' afterglow, fading. Not "the field asleep", which it used to
+    // check: paper charred just past the line where it is consumed goes on
+    // being eaten, a few ten-thousandths of the sheet over the next twenty
+    // seconds, and when THAT stops depends on exactly where the fire stopped.
+    // The old default happened to sleep; a third of the sheet does not.
+    let heat = 0
+    for (let i = HEAT; i < burn.field.pixels.length; i += 4) heat = Math.max(heat, burn.field.pixels[i]!)
+    expect(heat).toBe(0)
     // It finished while the hole was still a hole. `decayAt` is 0.22 now, not
     // 0.5: at the field's dilated clock a fire allowed to reach half the sheet
     // ran past 13 s and ate 62% of it, and the review's whole complaint about
@@ -141,13 +159,70 @@ describe('the scripted burn', () => {
       // ONE burn per origin. `at` used to call `phasesFor` itself, so this
       // test stepped ten full burns instead of two — invisible while a burn
       // was 12 simulated seconds, a timeout once it became 24.
-      const phases = phasesFor({ origin })
+      const { phases, duration } = planBurn({ origin })
       const at = (id: string) => phase(id, phases).at
       expect(at('catch')).toBeLessThan(at('peak'))
       expect(at('peak')).toBeLessThan(at('dying'))
       expect(at('dying')).toBeLessThan(at('smoulder'))
       expect(at('smoulder')).toBeLessThan(at('cold'))
-      expect(at('cold')).toBeLessThanOrEqual(DURATION)
+      expect(at('cold')).toBeLessThanOrEqual(duration)
+    }
+  })
+
+  /**
+   * How much burns is what the lab is asked for now, and it is measured on
+   * the cold sheet — not the moment the fire starts to die, which is what it
+   * used to be asked, and which left a third more burnt than it said.
+   */
+  it('burns the amount it is asked for, from either origin', () => {
+    const asks = [
+      ['center', [0.15, 0.5, 0.8]],
+      ['corner', [0.25, 0.6]],
+    ] as const
+    for (const [origin, amounts] of asks) {
+      for (const amount of amounts) {
+        expect(Math.abs(planBurn({ origin, amount }).burnt - amount)).toBeLessThanOrEqual(0.01)
+      }
+    }
+  })
+
+  it('told to burn all of it, burns all of it — and runs long enough to watch it end', () => {
+    const plan = planBurn({ amount: 1 })
+    expect(plan.burnt).toBeGreaterThan(0.99)
+    expect(plan.wentOut).not.toBeNull()
+    // Longer than the default scrubber, which would have cut the ending off.
+    expect(plan.duration).toBeGreaterThan(DURATION)
+    for (const p of plan.phases) expect(p.at).toBeLessThanOrEqual(plan.duration)
+    expect(phase('cold', plan.phases).at).toBeGreaterThan(plan.wentOut!)
+  })
+
+  /**
+   * The fibre runs across the sheet, so a burn from the centre races
+   * sideways to both edges — and once enough of it burns, the paper below
+   * the hole is joined to nothing. A sheet hung by its top edge drops it.
+   */
+  it('from the centre, cuts the bottom of the sheet loose once enough burns — and not at a third', () => {
+    expect(planBurn().severedAt).toBeNull()
+    const cut = planBurn({ amount: 0.42 })
+    expect(cut.severedAt).not.toBeNull()
+    expect(cut.severedAt!).toBeLessThan(cut.wentOut!)
+    // Off the sheet at that moment: there really is a piece joined to nothing.
+    const burn = new ScriptedBurn(flatSheet, { amount: 0.42, decayAt: cut.decayAt })
+    burn.seek(cut.severedAt!)
+    expect(looseShare(burn.field)).toBeGreaterThan(0.005)
+    // From a corner the fire eats upward as a line, and cuts nothing loose.
+    expect(planBurn({ origin: 'corner', amount: 0.42 }).severedAt).toBeNull()
+  })
+
+  it("guesses when to start dying close enough that the guess is worth making — the table isn't stale", () => {
+    // `decayAtFor`'s table against the burn it predicts. `planBurn` corrects
+    // a bad guess, so a stale table costs time rather than a wrong burn —
+    // which is exactly why nothing else would notice it going stale.
+    for (const origin of ['center', 'corner'] as const) {
+      for (const amount of [0.2, 0.45, 0.7]) {
+        const burnt = planBurn({ origin, decayAt: decayAtFor(amount, origin) }).burnt
+        expect(Math.abs(burnt - amount)).toBeLessThan(0.03)
+      }
     }
   })
 

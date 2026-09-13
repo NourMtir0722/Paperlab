@@ -65,7 +65,10 @@ async function photograph(query, file) {
   const errors = []
   page.on('pageerror', (error) => errors.push(String(error)))
   try {
-    await page.goto(`${base}/fx-lab/?ui=0&${query}`, { waitUntil: 'networkidle' })
+    // On the flat sheet, for the reason `fire-budget.mjs` gives: a hanging
+    // cloth settles on wall-clock frames, so two loads are not the same
+    // picture, and these checks compare loads pixel for pixel.
+    await page.goto(`${base}/fx-lab/?ui=0&physics=flat&${query}`, { waitUntil: 'networkidle' })
     // Frame-driven, never timed: CI renders about five times slower than the
     // laptop, and a wall-clock wait there photographs an unfinished frame.
     await page.waitForFunction(() => window.__FXLAB__?.ready === true, null, { timeout: 180_000 })

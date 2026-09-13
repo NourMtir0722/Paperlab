@@ -802,7 +802,13 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       coupling?.update(props.damage)
       sim.step(delta)
       const moved = !sim.asleep
-      if (moved) coupling?.follow()
+      if (moved && coupling) {
+        coupling.follow()
+        // A piece a burn cut loose leaves with its own edge: the triangles
+        // left spanning the gap are hidden once it opens — see `tear`.
+        const index = geometry.index
+        if (index && coupling.tear(index.array as Uint16Array | Uint32Array)) index.needsUpdate = true
+      }
       // The stack first refusal: if there is one, it owns the write, because
       // its base is the sim's own array and writing that array to the
       // geometry first would only be overwritten. If there is none, the sim's
