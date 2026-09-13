@@ -401,6 +401,114 @@ console.log(
     '(target: a ceiling set when ash comes off the lip instead of out of the hole)',
 )
 
+// 7. The camera is the same camera (G9).
+//
+// Every budget here compares two loads of one moment pixel for pixel, which
+// only means anything if the moment looks the same twice. The lab's camera
+// pushes in and drifts; `?camera=static` is what holds it still, and every
+// shot above passes it. This is the check that it really does.
+check(
+  (await shot(`t=${peakAt}`)).png.equals(peak.png),
+  'the same moment is the same picture — a still camera for anything measured',
+  'two loads of one moment differ: the camera moved, or something in the burn is on the wall clock',
+)
+
+// 8. The room yields to the fire (G3).
+//
+// The fire is the key light while it burns (L1): the paper away from the burn
+// is dimmer at the peak than it is when the fire has gone out, because the
+// room's own light has stepped back for it. Measured on the clean-paper mask,
+// which is the sheet well clear of the scorch.
+const paperLight = await pixels(
+  [peak.png, cold.png],
+  (frames, masks) => {
+    const [hot, out] = frames
+    const value = (f, [x, y]) => {
+      const i = (Math.round(y) * f.w + Math.round(x)) * 4
+      return Math.max(f.data[i], f.data[i + 1], f.data[i + 2]) / 255
+    }
+    const med = (xs) => (xs.length ? [...xs].sort((a, b) => a - b)[xs.length >> 1] : Number.NaN)
+    return {
+      peak: med(masks.paper.map((p) => value(hot, p))),
+      cold: med(masks.paper.map((p) => value(out, p))),
+    }
+  },
+  cold.state.masks,
+)
+check(
+  paperLight.peak < paperLight.cold * 0.97,
+  `the room yields while it burns — paper away from the fire is ${pct(paperLight.peak)} of white at the peak ` +
+    `against ${pct(paperLight.cold)} when it is out`,
+  'the room is lighting the sheet as brightly mid-burn as it does cold, so the fire is not its key light',
+)
+
+// 9. The stage stays black through the smoulder (G5).
+//
+// Smoke lit from below can fog a black stage as thoroughly as bloom can, and
+// it is thickest as the flames die — the one moment the earlier corner check
+// does not look at.
+const smoulderAt = boot.state.phases.find((p) => p.id === 'smoulder').at
+const smoke = await pixels([(await shot(`t=${smoulderAt}`, 'smoulder.png')).png], (frames) => {
+  const [f] = frames
+  const box = Math.round(Math.min(f.w, f.h) * 0.12)
+  let sum = 0
+  let n = 0
+  for (const [x0, y0] of [
+    [0, 0],
+    [f.w - box, 0],
+    [0, f.h - box],
+    [f.w - box, f.h - box],
+  ]) {
+    for (let y = y0; y < y0 + box; y++) {
+      for (let x = x0; x < x0 + box; x++) {
+        const i = (y * f.w + x) * 4
+        sum += (f.data[i] + f.data[i + 1] + f.data[i + 2]) / 3
+        n++
+      }
+    }
+  }
+  return sum / n
+})
+check(
+  smoke < 12,
+  `and through the smoulder — ${smoke.toFixed(1)} of 255 in the corners (want < 12)`,
+  'the smoke is fogging the stage as the fire dies',
+)
+
+// 10. No lavender either (A2).
+//
+// The pink check reads 300-355°, where red light on cream paper lands. Cool
+// grey smoke over a warm frame lands somewhere else entirely — 250-300°, the
+// violet the smoke's colour was chosen to avoid — and nothing was looking
+// there. Reported for now: it is the smoke's own colour to answer, and the
+// flames are not to be touched without Noor.
+const violet = await pixels([peak.png], (frames) => {
+  const [f] = frames
+  let lit = 0
+  let cool = 0
+  for (let i = 0; i < f.data.length; i += 4) {
+    const r = f.data[i] / 255
+    const g = f.data[i + 1] / 255
+    const b = f.data[i + 2] / 255
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    // Low, on purpose: the violet the smoke can leave is DARK, a smear on a
+    // black stage rather than a colour on the sheet.
+    if (max < 0.05 || max - min < 0.03) continue
+    lit++
+    let h = 0
+    if (max === r) h = ((g - b) / (max - min)) * 60
+    else if (max === g) h = ((b - r) / (max - min)) * 60 + 120
+    else h = ((r - g) / (max - min)) * 60 + 240
+    if (h < 0) h += 360
+    if (h >= 250 && h < 300) cool++
+  }
+  return lit ? cool / lit : 0
+})
+console.log(
+  `  · no lavender: ${(violet * 100).toFixed(2)}% of the lit frame in 250–300° (smoke over a warm frame)`,
+)
+
 writeFileSync(join(out, 'README.md'), `Measured budgets, not pictures. See tools/fire-budget.mjs.\n`)
 console.log(`\n.shots/fire-budget — ${failed ? `${failed} failed.` : 'all budgets met.'}`)
 
