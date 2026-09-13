@@ -47,6 +47,7 @@ export function ExportMenu({
   captureRef,
   fieldInput,
   stageInput,
+  onShare,
 }: {
   mode: 'paper' | 'field' | 'stage'
   config: PaperConfig
@@ -54,6 +55,12 @@ export function ExportMenu({
   captureRef: React.RefObject<CaptureHandle | null>
   fieldInput: () => FieldExportInput
   stageInput: () => StageExportInput
+  /**
+   * Copy a link that opens this paper in someone else's editor — Paper mode
+   * only. It was a topbar button of its own; a link is one more way out of
+   * the editor, so it lives with the others.
+   */
+  onShare?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
@@ -213,6 +220,23 @@ export function ExportMenu({
       </button>
       {open && (
         <div className="export-dropdown">
+          {onShare && (
+            <>
+              <p className="export-group">Link</p>
+              <button
+                type="button"
+                onClick={() => {
+                  // Closed first: a paper too big for a link answers with a
+                  // dialog, and it should not open under a menu.
+                  setOpen(false)
+                  onShare()
+                }}
+              >
+                <strong>Copy share link</strong>
+                <span>anyone who opens it gets an editable copy</span>
+              </button>
+            </>
+          )}
           <p className="export-group">Picture</p>
           <div className="export-frames">
             {EXPORT_FRAMES.map((frame) => (

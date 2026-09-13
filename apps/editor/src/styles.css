@@ -160,25 +160,53 @@ body {
   color: var(--ink-body);
 }
 
-.mode-switch {
+/* The five surfaces, and every other segmented choice in the chrome — the
+   lab's Tune/References, a camera or a speed. One look for "pick one of
+   these", so none of them has to be learned twice. */
+.mode-switch,
+.segmented {
   display: flex;
   background: var(--lift-2);
   border-radius: 6px;
   padding: 2px;
 }
 
-.mode-switch button {
+.mode-switch button,
+.mode-switch a,
+.mode-switch span,
+.segmented button {
   border: 0;
   background: transparent;
   color: var(--ink-body);
+  font: inherit;
   padding: 4px 14px;
   border-radius: 5px;
   cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.mode-switch button.active {
+.segmented button {
+  flex: 1;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.mode-switch a:hover,
+.mode-switch button:hover,
+.segmented button:hover {
+  color: var(--ink-2);
+}
+
+.mode-switch .active,
+.segmented button[aria-pressed="true"] {
   background: var(--hair-2);
   color: var(--ink);
+}
+
+/* The surface you are on is not a link to itself. */
+.mode-switch span.active {
+  cursor: default;
 }
 
 .mode-switch button:disabled {
@@ -203,53 +231,23 @@ body {
   background: var(--lift-2);
 }
 
-.save-preset,
-.share-paper {
+/* Saving lives with the presets it adds to, not in the topbar: the top-right
+   corner is Export's alone. A document verb, one step below the pill. */
+.save-preset {
+  width: 100%;
+  margin-bottom: 6px;
   background: var(--lift-2);
   color: var(--ink);
   border: 1px solid var(--hair-2);
   border-radius: 6px;
-  padding: 6px 14px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
 
-.save-preset:hover,
-.share-paper:hover {
+.save-preset:hover {
   background: var(--hair-2);
-}
-
-/*
-  The way out to /hands.
-
-  A peer of Save preset and Share rather than a quieter outline, because it
-  is the only chrome in the app whose job is to tell you a feature exists —
-  and it deliberately does NOT invert to a white pill: rule 5 allows one per
-  screen and Export already is it. So it sits one luminance step below the
-  primary action and level with the document verbs, which is the honest
-  place for "there is another surface over here".
-
-  The arrow is the whole new-tab affordance; a second glyph would make it
-  the only iconed control in a text-only topbar.
-*/
-.hands-link {
-  background: var(--lift-2);
-  color: var(--ink);
-  border: 1px solid var(--hair-2);
-  border-radius: 6px;
-  padding: 6px 14px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.hands-link:hover {
-  background: var(--hair-2);
-}
-
-/* Its own class, not `.hands-link span`: a bare descendant selector here
-   lands between two rules further down the sheet and quietly voids their
-   noDescendingSpecificity suppression. */
-.hands-arrow {
-  color: var(--ink-body);
 }
 
 .preset-panel.dropping {
@@ -1731,6 +1729,40 @@ button.export:hover {
   padding: 6px;
 }
 
+/* A label that is a sentence: the whole first line, the readout beside it,
+   the slider underneath. Laid out like a signature row, quiet like any other. */
+.control-row.wide {
+  grid-template-columns: 1fr 46px;
+  grid-template-areas:
+    "label value"
+    "input input";
+  gap: 3px 8px;
+  padding: 4px 0 6px;
+}
+
+.control-row.wide .control-label {
+  grid-area: label;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.control-row.wide .control-slider,
+.control-row.wide .select-trigger {
+  grid-area: input;
+  grid-column: auto;
+}
+
+.control-row.wide .control-value {
+  grid-area: value;
+}
+
+/* A toggle has no readout, so it takes the readout's place on the label line. */
+.control-row.wide .control-toggle {
+  grid-area: value;
+  grid-column: auto;
+  justify-self: end;
+}
+
 /* ── The coach-mark: one instruction, touching the handle ─────────────────── */
 
 .coach-mark {
@@ -2124,5 +2156,308 @@ button.export:hover {
   .viewport-guide,
   .coach-mark.placed {
     animation: none;
+  }
+}
+
+/* ── The lab shell: /hands and /fx-lab in the editor's own frame ──────────
+   The same grid, rails and transport as the editor, so the sheet is the
+   middle of every Paperlab screen and nothing has to be learned twice. The
+   left rail is the tool, the right rail is the settings, the bar underneath
+   is time. */
+
+.viewport .stage {
+  position: relative;
+  height: 100%;
+}
+
+.rail-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--l1);
+  border-bottom: 1px solid var(--hair);
+}
+
+.rail-head .segmented {
+  flex: 1;
+}
+
+.rail-head-label {
+  color: var(--ink-body);
+  font-size: 11px;
+}
+
+.rail-body {
+  padding: 2px 10px 16px;
+}
+
+/* The right rail's headings, the same as the left rail's. */
+.rail-body h2 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-body);
+  margin: 14px 0 8px;
+}
+
+.rail-caption {
+  color: var(--ink-body);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 4px 0 8px;
+}
+
+/* Something the rail has to say before anything else: a saved tune set aside. */
+.rail-notice {
+  margin: 10px 10px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--lift-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.left .rail-caption {
+  margin-top: 8px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  background: var(--lift-2);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--ink-body);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--lift-3);
+  color: var(--ink-2);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--hair-2);
+  border-color: var(--hair-2);
+  color: var(--ink);
+}
+
+.rail-action {
+  margin-top: 8px;
+}
+
+.moment-time {
+  display: inline-block;
+  width: 44px;
+  color: var(--ink-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-layer {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.lab-layer input {
+  margin: 0;
+  accent-color: var(--ink-2);
+}
+
+.lab-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-stats dt {
+  color: var(--ink-body);
+}
+
+.lab-reference img {
+  display: block;
+  width: 100%;
+  border-radius: var(--r-md);
+  background: var(--l0);
+}
+
+.lab-reference .preset-picker {
+  margin-top: 10px;
+}
+
+.lab-missing {
+  color: var(--ink-body);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.lab-missing code {
+  color: var(--ink-2);
+  font-family: var(--mono);
+}
+
+.transport .segmented {
+  flex: 0 0 auto;
+}
+
+.transport-time {
+  min-width: 132px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* When the clipboard is blocked the settings are handed over in a box instead. */
+.export-dropdown .export-fallback {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 0 14px 12px;
+  background: var(--l1);
+  color: var(--ink-2);
+  border: 1px solid var(--hair-2);
+  border-radius: 4px;
+  font: 11px var(--mono);
+}
+
+/* The one white pill on a screen that has no Export: Hands' camera. Rule 5,
+   the same inversion as Export and never beside it. */
+button.pill {
+  width: 100%;
+  background: var(--pill);
+  color: var(--l0);
+  border: 0;
+  border-radius: var(--r-md);
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--fast) var(--ease);
+}
+
+button.pill:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+button.pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hud .control-button {
+  margin-top: 6px;
+}
+
+/* Failure is the one other colour the budget allows. */
+.hud .error {
+  margin-top: 8px;
+  color: var(--alarm);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.status-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  font-size: 12px;
+}
+
+.status-list dt {
+  color: var(--ink-body);
+}
+
+.status-list dd {
+  margin: 0;
+  color: var(--ink-2);
+  text-align: right;
+}
+
+.how-to {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.how-to li + li {
+  margin-top: 6px;
+}
+
+/* Written straight to the DOM each tracked frame; until the first one, say what goes here. */
+.readout:empty::before {
+  content: "front · left · air · blow — once something is burning";
+  color: var(--ink-meta);
+}
+
+.readout {
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Under the breakpoint the rails stack under the sheet instead of falling
+   off the edge. The editor puts up a gate at this size (SmallScreen); these
+   two do not, because a phone is a camera with a screen on it and Hands is
+   a camera page. */
+@media (max-width: 900px) {
+  body:has(.app.lab) {
+    overflow: auto;
+  }
+
+  .app.lab {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(58vh, 1fr) auto auto auto;
+    grid-template-areas:
+      "topbar"
+      "viewport"
+      "transport"
+      "left"
+      "right";
+  }
+
+  .app.lab .topbar {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding-block: 8px;
+  }
+
+  .app.lab .left,
+  .app.lab .right {
+    overflow: visible;
+    border-left: 0;
+    border-right: 0;
+    border-top: 1px solid var(--hair);
+  }
+
+  .app.lab .transport {
+    flex-wrap: wrap;
+    padding-block: 8px;
   }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Control } from './controlModel'
+import type { Control, Emphasis } from './controlModel'
 import { Select } from './Select'
 
 /**
@@ -55,8 +55,8 @@ function ControlRow({ control }: { control: Control }) {
 
 type Of<K extends Control['kind']> = Extract<Control, { kind: K }>
 
-/** A behavior's nominated params get the loud row; everything else the quiet one. */
-const emphasisClass = (emphasis?: 'signature') => (emphasis ? ` ${emphasis}` : '')
+/** A behavior's nominated params get the loud row, a sentence-long label the wide one; everything else the quiet one. */
+const emphasisClass = (emphasis?: Emphasis) => (emphasis ? ` ${emphasis}` : '')
 
 function Folder({ control }: { control: Of<'folder'> }) {
   const [open, setOpen] = useState(!control.collapsed)

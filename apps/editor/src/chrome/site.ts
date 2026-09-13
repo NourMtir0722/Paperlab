@@ -7,7 +7,17 @@
  * correct in both places without a build-time branch or an absolute URL that
  * would break every local dev server and every preview deploy.
  *
- * It lives in its own file because two pieces of chrome now need it, and the
+ * `/hands` and `/fx-lab` are built from this same app with their own base, so
+ * the base is stripped of whichever of the three this bundle was built for.
+ *
+ * It lives in its own file because several pieces of chrome need it, and the
  * regex is small enough that a second copy would look harmless and drift.
  */
-export const SITE = import.meta.env.BASE_URL.replace(/editor\/?$/, '')
+export const SITE = import.meta.env.BASE_URL.replace(/(editor|hands|fx-lab)\/?$/, '')
+
+/**
+ * The editor itself. In dev it IS the site root — the dev server serves this
+ * app at `/`, with `/hands/` and `/fx-lab/` as directories inside it — and
+ * once deployed it sits at `/editor/` beside the others.
+ */
+export const EDITOR = import.meta.env.DEV ? SITE : `${SITE}editor/`
