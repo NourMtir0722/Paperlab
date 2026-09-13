@@ -6,6 +6,7 @@ import type { FilmName, LightingName } from '../config/schema'
 import { buildEnvironment } from './environment'
 import { resolveLighting, type LightingPreset, type LightOverrides } from './lighting'
 import { usePrefersReducedMotion } from '../a11y'
+import { roomLight, type DamageSource } from '../surface/damageContract'
 
 /**
  * The rig's film name, as a three constant.
@@ -171,6 +172,14 @@ export interface PaperLightingProps {
    * `light.studio` if you want less of it.
    */
   environment?: boolean
+  /**
+   * The damage the sheet is showing, for the light it gives off: a burn
+   * whose source carries `firelight` dims this rig's key, fill and studio
+   * light by `firelight.room` while it burns, and gives them back as it goes
+   * out. Without one — or with no `firelight` on it — the rig is exactly as
+   * set. See `DamageFirelight`.
+   */
+  damage?: DamageSource | null
 }
 
 /**
@@ -190,6 +199,7 @@ export function PaperLighting({
   shadowMapSize,
   contactShadow = true,
   environment = true,
+  damage,
 }: PaperLightingProps) {
   const p = useMemo(() => rig ?? resolveLighting(preset, light), [rig, preset, light])
   const mapSize = shadowMapSize ?? p.shadow.mapSize
@@ -231,6 +241,26 @@ export function PaperLighting({
     goboMap.offset.set(driftRef.current, driftRef.current * 0.6)
   })
 
+  // The fire's claim on the room, if it makes one. Written through the lights
+  // themselves and never through the rig: the key's intensity is part of the
+  // digest the environment map is built from, so dimming the RIG would
+  // rebuild that map every frame of a burn. Nothing is touched while the room
+  // is whole, so a rig with no fire in it runs exactly as it always has.
+  const keyIntensity = p.gobo && goboMap ? p.key.intensity * 3.2 : p.key.intensity
+  const keyRef = useRef<THREE.Light>(null)
+  const ambientRef = useRef<THREE.AmbientLight>(null)
+  const hemisphereRef = useRef<THREE.HemisphereLight>(null)
+  const roomRef = useRef(1)
+  useFrame(() => {
+    const room = roomLight(damage)
+    if (room === 1 && roomRef.current === 1) return
+    roomRef.current = room
+    if (keyRef.current) keyRef.current.intensity = keyIntensity * room
+    if (ambientRef.current) ambientRef.current.intensity = p.ambient * room
+    if (hemisphereRef.current) hemisphereRef.current.intensity = p.studio * HEMISPHERE_STAND_IN * room
+    if (p.studio > 0 && environment) scene.environmentIntensity = p.studio * room
+  })
+
   return (
     <>
       {p.studio > 0 &&
@@ -243,18 +273,20 @@ export function PaperLighting({
           // the environment still gets a lit figure with a top and a bottom
           // instead of a flat cut-out.
           <hemisphereLight
+            ref={hemisphereRef}
             color={p.sky.horizon}
             groundColor={p.sky.ground}
             intensity={p.studio * HEMISPHERE_STAND_IN}
           />
         ))}
-      <ambientLight intensity={p.ambient} />
+      <ambientLight ref={ambientRef} intensity={p.ambient} />
       {p.gobo && goboMap ? (
         <spotLight
+          ref={keyRef as React.RefObject<THREE.SpotLight>}
           position={p.key.position}
           color={p.key.color}
           // decay 0 keeps intensity art-directable rather than distance-driven.
-          intensity={p.key.intensity * 3.2}
+          intensity={keyIntensity}
           angle={p.gobo.angle}
           penumbra={0.5}
           decay={0}
@@ -266,9 +298,10 @@ export function PaperLighting({
         />
       ) : (
         <directionalLight
+          ref={keyRef as React.RefObject<THREE.DirectionalLight>}
           position={p.key.position}
           color={p.key.color}
-          intensity={p.key.intensity}
+          intensity={keyIntensity}
           castShadow={castShadow}
           shadow-mapSize={[mapSize || 1, mapSize || 1]}
           shadow-radius={p.shadow.radius}

@@ -70,6 +70,42 @@ export interface DamageSource {
    * Anything left out takes {@link DAMAGE_LOOK_DEFAULTS}.
    */
   readonly look?: DamageLook
+  /**
+   * The light the damage gives off, as the room around the sheet should feel
+   * it. Presentation only; the physics never sees it. Omitted, the room is
+   * lit exactly as its lighting says.
+   */
+  readonly firelight?: DamageFirelight
+}
+
+/**
+ * What a burning sheet does to the light around it.
+ *
+ * A fire big enough to see by is the key light while it burns, and a room's
+ * own light yields to it — a sheet burning under an unchanged studio key
+ * looks like a flame pasted onto a photograph. The source says by how much,
+ * because only the source knows how big its fire is; the lighting does the
+ * dimming, because only the lighting knows what its lights are.
+ */
+export interface DamageFirelight {
+  /**
+   * How much of the room's own light is left, 0..1; omitted means 1. The key,
+   * the ambient fill and the studio light are all scaled by it, every frame,
+   * without rebuilding anything.
+   */
+  readonly room?: number
+}
+
+/**
+ * How much of the room's light `source` leaves, 0..1 — the one reading of
+ * {@link DamageFirelight.room}, so every lighting rig reads it alike. Anything
+ * that is not a number in range is the room untouched: a firelight is a
+ * dimmer, and the worst a bad one may do is nothing.
+ */
+export function roomLight(source: DamageSource | null | undefined): number {
+  const room = source?.firelight?.room
+  if (room === undefined || !(room >= 0)) return 1
+  return Math.min(1, room)
 }
 
 /**

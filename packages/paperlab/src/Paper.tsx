@@ -45,6 +45,8 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
             floor={-1.05}
             scale={8}
             reducedMotion={meshProps.reducedMotion}
+            // A burn bright enough to light the room says so on its source.
+            damage={meshProps.damage}
           />
           <PaperMesh ref={ref} {...meshProps} />
           {children}
