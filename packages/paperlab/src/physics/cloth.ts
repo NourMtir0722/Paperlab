@@ -79,6 +79,8 @@ export class ClothSim {
   readonly height: number
   readonly positions: Float32Array
   private readonly prev: Float32Array
+  /** Where the constructor laid every particle out — what {@link restore} puts back. */
+  private readonly laidOut: Float32Array
   private readonly pinned: Uint8Array
   private readonly pinTargets: Float32Array
   /**
@@ -217,6 +219,7 @@ export class ClothSim {
       }
     }
     this.prev.set(this.positions)
+    this.laidOut = this.positions.slice()
 
     const idx = (r: number, c: number) => r * cols + c
     const links: number[] = []
@@ -347,6 +350,23 @@ export class ClothSim {
   wake(): void {
     this.asleep = false
     this.stillFrames = 0
+  }
+
+  /**
+   * Back to the sheet as it was laid out: flat, still, every particle where
+   * the constructor put it. Pins, a grab and every lever are left alone.
+   *
+   * For a history that has been rewound — a burn played back from an earlier
+   * moment, say, which hands back paper that had burnt away and paper that
+   * had FALLEN, lying on the floor with its springs to the sheet suddenly
+   * whole again. Solved from there, the solve hauls it up through the sheet
+   * in a tangle. Laid out afresh, it is simply the sheet it is again.
+   */
+  restore(): void {
+    this.positions.set(this.laidOut)
+    this.prev.set(this.laidOut)
+    this.accumulator = 0
+    this.wake()
   }
 
   /**
