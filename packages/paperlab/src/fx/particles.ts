@@ -115,7 +115,13 @@ export const particlePresets = {
    * simulation, on purpose; see the fx plan.
    */
   smoke: {
-    life: [1.8, 3.5],
+    // Shorter, and smaller below: these are the thread beside the
+    // simulator's smoke, and the simulator's is gone within a second or two
+    // of the last flame. Left to live three and a half seconds and grow to
+    // seven centimetres, the last few of them overlapped into a flat wash
+    // over the hole with nothing left to move them — the one moment of a
+    // burn Noor found the smoke wrong (2026-09-13).
+    life: [1.4, 2.6],
     speed: [0.05, 0.15],
     direction: [0, 1, 0],
     spread: 0.3,
@@ -123,13 +129,13 @@ export const particlePresets = {
     drag: 0.9,
     jitter: 0.3,
     windCatch: 1,
-    size: [0.05, 0.35],
+    size: [0.05, 0.18],
     // #6B6560 grey-brown, linear, and thin — the background stays clear.
     color: [
       [0.147, 0.13, 0.117],
       [0.2, 0.19, 0.18],
     ],
-    alpha: [0.08, 0],
+    alpha: [0.07, 0],
     spin: 0.4,
     blend: 'normal',
     shape: 'soft',
