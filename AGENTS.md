@@ -682,23 +682,23 @@ the sheet that `DamageField.ignite` is called at:
 | | | |
 |---|---|---|
 | hold a real flame up to the camera | the paper catches where the flame is | `lighter.ts` → `field.ignite` |
-| pinch and hold still in the air | you are holding a match | `match.ts` → `field.ignite` |
+| pinch and hold still, over the paper or beside it | you are holding a match, and the sheet catches where it touches | `match.ts` → `field.ignite` |
 | *strike a match* on the panel | for a machine with no camera | `field.ignite` low on the sheet, for a few seconds |
 | blow at it | the flame goes out, the edge smoulders | `coolFromBlow`, and `cloth.wind` |
 
 **The flame detector is arithmetic, not a model.** `lighter.ts` counts pixels
 that are bright, warm in the order red-green-blue, and almost blue-free, then
 asks two more questions of the count: is it a plausible SIZE for a lighter at
-arm's length (between 0.06% and 12% of the frame — below is noise, above is a
+arm's length (between 0.03% and 12% of the frame — below is noise, above is a
 lit wall or a hand over the lens), and does it MOVE? The flicker is the part
 that earns its keep. Bright warm pixels alone call a desk lamp, a
 candle-coloured bulb or sunlight on a wall a flame; a real flame's pixel count
 wanders by a few percent frame to frame and a lamp's does not move at all. It
-costs about a third of a second before the paper catches and it buys a page
+costs about a quarter of a second before the paper catches and it buys a page
 that does not set itself on fire under a desk lamp — which `pnpm test:hands`
 asserts, with a painted steady patch and a painted flickering one.
 
-It runs on a 160×120 crop of the camera, every third frame, in a 2D canvas
+It runs on a 320×240 crop of the camera, every other frame, in a 2D canvas
 that is never in the document. A flame is an enormous feature at that size,
 and the detector is pure arithmetic over a `Uint8Array`, so it runs in node
 under vitest as well as in the browser.
@@ -717,6 +717,36 @@ goes on burning — that is what a fire does — but `flameRef` is an ignition
 point, and one left behind goes on igniting fresh texels forever from wherever
 the lighter used to be. `sees()` clears it on a frame with no flame in it;
 the gate checks that too.
+
+**A flame that is SEEN lights the sheet for good.** The first sighting — a
+lighter in the frame, or a lit match touching the paper — commits a flame to
+that spot for the lab's `HOLD` (1.6 s of the burn's clock), whatever the
+camera sees next, and the fire then runs until the whole sheet has burnt. It
+used to ignite only while the flame was being seen, and a flame flickering in
+and out of the detector restarted `flameHeat`'s ramp from zero every time it
+dropped out — it scorched the paper and never properly caught. Only a sheet
+that is not already alight is committed, so the burn starts where the flame
+first touched, not wherever it was last.
+
+**The detector must never report a steady light, not even briefly.** It used
+to ask the flicker question only once its eight-frame history was full, which
+reported a steady warm lamp as a flame for the first third of a second it was
+in view. Harmless while a sighting only aimed a flame; a sheet set alight
+once a sighting committed one. Every sighting is asked now.
+
+**What the camera sees is drawn over the page** (`overlay.ts`): the hand's
+bones, a box round it, and a label with the tracker's confidence and what the
+hand is doing (`hold still…`, `match lit`); a box and a `fire 87%` label round
+a flame once one is found; and a banner while it is seen. A hand driving
+something it cannot feel has to be shown that it is being read. The tracker's
+confidence thresholds are 0.35 rather than MediaPipe's 0.5, which drops a hand
+the moment it turns side-on to pinch.
+
+**The room yields to the fire here too.** The sheet draws a `Firelit` view of
+the `Afterglow` that carries `DamageSource.firelight`, eased on the burn's
+clock with the lab's own `FIRE_FULL_FRONT`, `FIRE_LEVEL_EASE` and
+`roomYield` — imported from `burn.ts`, never copied. And the page is silent:
+no `FxAudio`, no `FireSound` (Noor, 2026-09-13).
 
 **The breath is half of the fire.** The same puckered mouth that raises
 `cloth.wind` also cools the field (`coolFromBlow`) and blows a held match out,
@@ -741,9 +771,13 @@ does not use; `gestures.test.ts` pins it.
 
 **A match is a pinch that HOLDS STILL.** A pinch is briefly part of every
 gesture a hand makes, so the dwell is what separates "I meant this" from "my
-hand passed through it": about a third of a second, motionless, in free air.
+hand passed through it": about a third of a second, motionless, anywhere.
 `match.ts` arms on the pinch, lights on the dwell, and gives up if the hand
-travels. The harness drives that on an injected clock for the reason above.
+travels. It used to refuse to light over the paper — a pinch there was a
+GRAB, latched until the hand opened, so a tear pulling off the sheet's edge
+could not turn into a match half way. The grab went with the other gestures
+and the latch stayed behind, making the sheet the one place a match would not
+light. Noor met that first ("the sensitivity is bad"); it is gone. The harness drives that on an injected clock for the reason above.
 
 **The pinch is measured in three dimensions and the curls are not.** The
 tracker reports a `z` per landmark and nothing read it. That is a live bug in

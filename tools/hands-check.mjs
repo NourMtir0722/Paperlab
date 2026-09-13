@@ -290,17 +290,15 @@ try {
   const release = () => page.evaluate((a) => window.__HANDS__.drive(null, a), ASPECT)
 
   /**
-   * Press "fresh sheet", if there is anything to undo.
+   * A fresh sheet, through the page's own hook rather than its button.
    *
-   * By NAME rather than by class, and that is not fussiness: the panel has two
-   * ghost buttons now, and the other one strikes a match. `.hud .ghost` finds
-   * whichever comes first in the DOM, so a reset would quietly have become an
-   * ignition halfway through this file.
+   * The button only appears once a frame has noticed the sheet burning, and
+   * a lit match that touches the paper now COMMITS a flame there — so right
+   * after the match checks the sheet may be alight with no button on the
+   * panel yet, and a click that found nothing to press left it burning into
+   * the next section, where the sheet never came to rest.
    */
-  const freshSheet = async () => {
-    const button = page.getByRole('button', { name: 'fresh sheet' })
-    if (await button.count()) await button.click()
-  }
+  const freshSheet = () => page.evaluate(() => window.__HANDS__.fresh())
 
   /** The largest distance any vertex travelled between two readings. */
   const moved = (before, after) => {
@@ -544,6 +542,8 @@ try {
       // the sheet is being lit, which is what the field is ignited with.
       let touching = null
       for (let i = 0; i < 10; i++) touching = hand(at.camX, at.camY, poses.pinch).at
+      // And the page is SHOWING the hand it is reading.
+      const drawn = window.__HANDS__.marks().hand
 
       // Blowing puts it out, and it stays out while the hand stays shut —
       // otherwise blowing a flame out would not mean anything.
@@ -556,7 +556,8 @@ try {
       // blow above is still in the cloth's wind, and a sheet in a gale never
       // comes to rest — every measurement after this one waits for it to.
       for (let i = 0; i < 80; i++) window.__HANDS__.drive(null, a)
-      return { moving, early, lit, touching, blown, relit }
+      const undrawn = window.__HANDS__.marks().hand
+      return { moving, early, lit, touching, drawn, undrawn, blown, relit }
     },
     [POSES, ASPECT, aim],
   )
@@ -621,6 +622,8 @@ try {
   const dark = await show({ x: 0.5, y: 0.5 }, { radius: 0, count: 12 })
   // And then a lighter.
   const flicker = await show(spot, { count: 14 })
+  const boxed = (await page.evaluate(() => window.__HANDS__.marks())).fire
+  const bannered = await page.locator('.banner').count()
   const aimed = (await release()).at
   const litByFlame = await until(
     () => page.evaluate((a) => window.__HANDS__.drive(null, a), ASPECT),
@@ -630,6 +633,11 @@ try {
   // fire does — but nothing is lighting fresh paper any more.
   const goneDark = await show({ x: 0.5, y: 0.5 }, { radius: 0, count: 12 })
   const unaimed = (await release()).at
+  // …and what caught goes on burning with the lighter gone. The sighting
+  // committed a flame to the paper and the fire runs from there: this is the
+  // difference between a detector that aims a flame and one that lights one.
+  await frames(30)
+  const burningOn = await page.evaluate((a) => window.__HANDS__.drive(null, a), ASPECT)
 
   // ── The burn. From the panel's button: no hand, no camera, real frames. ──
   // Last, because it burns the sheet and nothing after it would be measuring
@@ -675,7 +683,10 @@ try {
     `  and it aims the fire   ${aimed ? `u=${aimed.u.toFixed(2)} v=${aimed.v.toFixed(2)}` : 'nowhere'} → ${unaimed ? 'STILL AIMED' : 'let go when it left'}`,
   )
   console.log(
-    `  flame burns the paper  front ${litByFlame.front.toFixed(4)} · ${litByFlame.particles} in the air`,
+    `  flame burns the paper  front ${litByFlame.front.toFixed(4)} · ${litByFlame.particles} in the air · with it gone, front ${burningOn.front.toFixed(4)}`,
+  )
+  console.log(
+    `  drawn on the page      hand ${flame.drawn ? 'yes' : 'NO'} (gone with it ${flame.undrawn ? 'NO' : 'yes'}) · fire box ${boxed ? 'yes' : 'NO'} · banner ${bannered ? 'yes' : 'NO'}`,
   )
   console.log(
     `  struck match burns     front ${caught.front.toFixed(4)} · ${caught.particles} in the air · paper ${(eaten.remaining * 100).toFixed(1)}% · sheet moved ${burnMoved.toFixed(4)}`,
@@ -708,6 +719,8 @@ try {
     'and carrying it over the sheet is what lights the sheet',
     'the flame touched nothing',
   )
+  check(flame.drawn, 'the hand is drawn over the page while it is tracked', 'no hand on the overlay')
+  check(!flame.undrawn, 'and it leaves the overlay with the hand', 'a hand still drawn with none in frame')
   check(flame.blown !== 'lit', 'blowing puts the flame out', 'it stayed lit through a blow')
   check(flame.relit !== 'lit', 'and it stays out until the hand opens', 'it relit on its own')
   check(!lamp, 'a steady warm light is not a flame', 'a desk lamp would set the page alight')
@@ -719,6 +732,13 @@ try {
     litByFlame.front > 0 && litByFlame.particles > 0,
     'a flame the camera can see sets the paper burning',
     `front ${litByFlame.front} · ${litByFlame.particles} particles`,
+  )
+  check(boxed, 'a flame the camera found is boxed on the page', 'no box round the flame')
+  check(bannered > 0, 'and a banner says the fire was detected', 'no banner')
+  check(
+    burningOn.front > 0 || burningOn.remaining < litByFlame.remaining,
+    'what caught goes on burning with the lighter gone',
+    `front ${burningOn.front} · ${(burningOn.remaining * 100).toFixed(1)}% left`,
   )
   check(
     goneDark === false && !unaimed,

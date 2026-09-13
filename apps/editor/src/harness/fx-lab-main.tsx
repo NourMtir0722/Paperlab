@@ -44,6 +44,7 @@ import {
   LONGEST,
   ORIGINS,
   planBurn,
+  roomYield,
   type BurnOrigin,
   type BurnPlan,
   type BurnSettings,
@@ -494,18 +495,6 @@ const LOOK_OVERRIDES: Partial<typeof DAMAGE_LOOK_DEFAULTS> = (() => {
   }
   return out
 })()
-/**
- * How much of the room's light a fire at its height takes over, per lighting
- * preset (option O5 in the plan). In noir the fire IS the light: the room
- * drops to about a third and everything the fire does not light is black.
- * Under studio and window the fire reads by contrast rather than by light,
- * so the room barely yields.
- */
-function roomYield(lighting: string): number {
-  if (lighting === 'noir') return 0.67
-  if (lighting === 'studio' || lighting === 'window') return 0.15
-  return 0.4
-}
 
 /** What every knob starts at: the product's own values (and any `?look=`). */
 const DEFAULT_SETTINGS: LabSettings = {

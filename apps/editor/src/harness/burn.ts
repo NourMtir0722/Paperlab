@@ -117,14 +117,27 @@ export interface BurnSettings {
  * sees it: the front runs to about 0.045 at a burn's peak, and 0.03 is where
  * the flames are already lighting the whole sheet.
  */
-const FIRE_FULL_FRONT = 0.03
+export const FIRE_FULL_FRONT = 0.03
 
 /**
  * How quickly the room's light follows the fire, seconds: it answers the
  * fire's size, not its every gust — a light that pumped with each puff would
  * read as a fault in the room, not as a fire in it.
  */
-const FIRE_LEVEL_EASE = 0.8
+export const FIRE_LEVEL_EASE = 0.8
+
+/**
+ * How much of the room's light a fire at its height takes over, per lighting
+ * preset (option O5 in the plan). In noir the fire IS the light: the room
+ * drops to about a third and everything the fire does not light is black.
+ * Under studio and window the fire reads by contrast rather than by light,
+ * so the room barely yields.
+ */
+export function roomYield(lighting: string): number {
+  if (lighting === 'noir') return 0.67
+  if (lighting === 'studio' || lighting === 'window') return 0.15
+  return 0.4
+}
 
 export const BURN_DEFAULTS: BurnSettings = {
   origin: 'center',
