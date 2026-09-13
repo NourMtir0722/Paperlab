@@ -339,6 +339,22 @@ describe('damage → cloth', () => {
     expect(Array.from(index)).toEqual(built)
   })
 
+  it('starts over when a different source takes the sheet — even one with the same holes', () => {
+    const first = source()
+    first.paint(DAMAGE_CHANNELS.presence, 0.44, 0.58, 0)
+    const sim = new ClothSim(12, 14, 1, 1.4, 'top-edge', still)
+    const laidOut = Array.from(sim.positions)
+    const coupling = new DamageCoupling(sim)
+    run(sim, coupling, first, 1)
+    expect(Array.from(sim.positions)).not.toEqual(laidOut)
+    // Another sheet's burn with the very same cut. No paper comes back, so
+    // only the source's identity says this is a different history.
+    const second = source()
+    second.paint(DAMAGE_CHANNELS.presence, 0.44, 0.58, 0)
+    coupling.update(second)
+    expect(Array.from(sim.positions)).toEqual(laidOut)
+  })
+
   it('makes wet paper heavier, and no paper at all massless', () => {
     const src = source()
     src.paint(DAMAGE_CHANNELS.saturation, 0, 0.5, 255)

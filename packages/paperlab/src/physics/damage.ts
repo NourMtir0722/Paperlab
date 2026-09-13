@@ -185,8 +185,16 @@ export class DamageCoupling {
     const next = source ?? null
     if (next === this.source && (next === null || next.version === this.version)) return false
     // A different source is a different sheet's history — a fresh sheet has
-    // not rolled any way yet.
-    if (next !== this.source) this.curlWeight.fill(0)
+    // not rolled any way yet, and none of it has fallen. Even one with every
+    // hole the last one had: paper coming back is not the only way a history
+    // changes, and it is somebody else's burn.
+    if (next !== this.source) {
+      this.curlWeight.fill(0)
+      if (next && this.holed) {
+        this.rewind()
+        this.gone.fill(0)
+      }
+    }
     this.source = next
     if (!next) {
       this.reset()
