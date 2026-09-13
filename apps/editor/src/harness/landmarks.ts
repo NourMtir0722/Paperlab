@@ -114,16 +114,6 @@ export function pinchPoint(hand: readonly Landmark[]): { x: number; y: number } 
 }
 
 /**
- * One landmark, as a plain point. The anchor a gesture is aimed from depends
- * on the gesture — a pinch holds at the midpoint of the fingers, a pointing
- * hand is aimed from the fingertip — so the choice belongs to the caller.
- */
-export function landmarkPoint(hand: readonly Landmark[], index: number): { x: number; y: number } | null {
-  const point = hand[index]
-  return point ? { x: point.x, y: point.y } : null
-}
-
-/**
  * A curled fingertip returns toward its own knuckle; an extended one reaches
  * roughly a palm past it. Measured from the WRIST rather than the knuckle,
  * because the knuckle-to-tip distance barely changes when a finger folds —
@@ -214,4 +204,38 @@ export function palmsApart(
   aspect: number,
 ): number {
   return Math.hypot((a.x - b.x) * aspect, a.y - b.y) / palm
+}
+
+/**
+ * How much of the camera frame maps to the full canvas. Hands do not
+ * comfortably reach the edges of their own camera image — the corners are
+ * where tracking degrades and where your elbow runs out — so the middle 70%
+ * is stretched to cover everything and the rest is clamped away.
+ */
+const REACH_MARGIN = 0.15
+
+/** Map a normalised camera coordinate into the reachable sub-frame. */
+export function reach(value: number): number {
+  const span = 1 - REACH_MARGIN * 2
+  return Math.min(1, Math.max(0, (value - REACH_MARGIN) / span))
+}
+
+/**
+ * Where a point in the camera's frame lands on the canvas.
+ *
+ * Mirrored: the camera sees you face-on, so without the flip the cursor runs
+ * the opposite way to your hand and no one can aim it.
+ *
+ * Separate from the pointer because a SECOND hand needs the same mapping
+ * without dispatching anything — it has to know where it is over the sheet to
+ * score or to tear, and only one hand at a time can own the pointer.
+ */
+export function toClient(
+  point: { x: number; y: number },
+  rect: { left: number; top: number; width: number; height: number },
+): { x: number; y: number } {
+  return {
+    x: rect.left + reach(1 - point.x) * rect.width,
+    y: rect.top + reach(point.y) * rect.height,
+  }
 }

@@ -109,9 +109,11 @@ import {
  *   ?physics=flat                the sheet held flat and still, as it was before it
  *                                hung: nothing curls, nothing falls
  *
- * Dev only. It is in no build's input list, and the references it draws come
- * from outside the repo through a dev-server middleware — see
- * `tools/fx-refs.mjs`.
+ * It ships, as the site's `/fx-lab` route — its own build pass, the way
+ * `/hands` is. What does not ship is the reference stills it can put beside
+ * the render: they come from outside the repo through a dev-server
+ * middleware, so on the deployed page the reference pane says where they
+ * live instead of showing them — see `tools/fx-refs.mjs`.
  */
 
 declare global {

@@ -87,6 +87,14 @@ jobs:
           PAPERLAB_HANDS: '1'
           PAPERLAB_BASE: ${{ env.BASE }}hands/
 
+      - name: Build the fire lab (/fx-lab)
+        # A third pass, for the same reason the second one exists: its own
+        # base, so the route reads its JavaScript from its own directory.
+        run: pnpm --filter @paperlab/editor exec vite build
+        env:
+          PAPERLAB_FXLAB: '1'
+          PAPERLAB_BASE: ${{ env.BASE }}fx-lab/
+
       - name: Build the reference (/docs)
         run: pnpm --filter @paperlab/docs exec vite build
         env:
@@ -107,6 +115,10 @@ jobs:
           cp apps/editor/dist-hands/hands/index.html site/hands/index.html
           cp -r apps/editor/dist-hands/hands/tracker site/hands/tracker
           cp -r apps/editor/dist-hands/assets site/hands/assets
+          # The fire lab, the same way — a route of its own.
+          mkdir -p site/fx-lab
+          cp apps/editor/dist-fxlab/fx-lab/index.html site/fx-lab/index.html
+          cp -r apps/editor/dist-fxlab/assets site/fx-lab/assets
           mkdir -p site/docs
           cp -r apps/docs/dist/* site/docs/
           # Pages serves 404.html for unknown paths; point it at the root

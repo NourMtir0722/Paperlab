@@ -8,7 +8,7 @@
 
 A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [with your hands](https://paperlab.nawwara.studio/hands/) (webcam)  ·  [for coding agents](AGENTS.md)
+**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [with your hands](https://paperlab.nawwara.studio/hands/) (webcam)  ·  [the fire lab](https://paperlab.nawwara.studio/fx-lab/)  ·  [for coding agents](AGENTS.md)
 
 | | |
 |---|---|
@@ -207,11 +207,13 @@ The inspector is generated from the zod schema, so it can never drift from the A
 
 Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export code** ends the session in your codebase, and **Copy for AI** ends it in a coding agent's. It wants a real screen: under about 900px it says so and points you at the playground.
 
+**[The fire lab](https://paperlab.nawwara.studio/fx-lab/)** — every knob behind the burn, on one page: the flame's zones, the fluid, the bloom, the light it throws, the ash lip and the char, how fast it eats. The library's defaults are a tune made here. Scrub the burn, turn something, copy the tune out as JSON and pass it to `<Paper>`.
+
 **[The reference](https://paperlab.nawwara.studio/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
-**[Your hands](https://paperlab.nawwara.studio/hands/)** — the same paper, driven by a webcam instead of a mouse. Pinch to take hold and pull, point to score a line, make a fist to fold along it, turn your palm to change the stock, flick paint at it, blow at it to raise the wind, pull an edge to tear it. Every gesture lands on a feature the library already ships — the page is a hundred percent public API, and `packages/paperlab` doesn't know it exists.
+**[Your hands](https://paperlab.nawwara.studio/hands/)** — set fire to the paper with a real flame. Hold a lighter up to the camera and the sheet catches where the flame is; with no lighter, pinch and hold still in the air and you are holding a match. Blow to put it out. One feature, done properly: it burns the way the fire lab burns, from the same defaults, and the page is a hundred percent public API — `packages/paperlab` doesn't know it exists.
 
-The tracking is [MediaPipe](https://ai.google.dev/edge/mediapipe) (`@mediapipe/tasks-vision`, Apache-2.0) and it runs entirely in your browser: the models download from Google once, and after that no video and no measurement taken from it leaves the device. There is no server to send it to, and a `connect-src` CSP on the page makes that enforceable rather than a promise — including against MediaPipe's own usage telemetry, which the page blocks. Needs a camera, and asks before it takes one.
+The flame detector is arithmetic over the camera's pixels, not a model: a flame is bright, warm in the order red-green-blue, and never still, and the last of those three is what keeps a desk lamp from lighting your paper. The hand tracking is [MediaPipe](https://ai.google.dev/edge/mediapipe) (`@mediapipe/tasks-vision`, Apache-2.0) and it runs entirely in your browser: the models download from Google once, and after that no video and no measurement taken from it leaves the device. There is no server to send it to, and a `connect-src` CSP on the page makes that enforceable rather than a promise — including against MediaPipe's own usage telemetry, which the page blocks. Needs a camera, and asks before it takes one.
 
 ## Development
 
@@ -225,7 +227,7 @@ pnpm dev            # the editor at localhost:5173
 | | |
 |---|---|
 | [`packages/paperlab`](packages/paperlab/) | the npm library — the only published artifact |
-| [`apps/editor`](apps/editor/) | the editor — every knob, and the export. Also the `/hands` page, built from the same app in a second pass |
+| [`apps/editor`](apps/editor/) | the editor — every knob, and the export. Also `/hands` and `/fx-lab`, built from the same app in passes of their own |
 | [`apps/playground`](apps/playground/) | the playground — one input, one scene, shareable by link |
 | [`apps/docs`](apps/docs/) | the reference site, with every behavior running live |
 | [`tools/`](tools/) | browser harnesses — parity, perf, screenshots, the README's motion |
@@ -241,7 +243,7 @@ pnpm test:drive     # the stage really walks when you drag, wheel or arrow it
 pnpm test:share     # sculpt → link → a browser that has never seen the paper
 pnpm test:dropdown  # every dropdown option is reachable, including below the fold
 pnpm test:route     # the site root routes by device, and links every route it deploys
-pnpm test:hands     # scripted gestures really reach the paper (needs a camera-less Chromium)
+pnpm test:hands     # the three ways to light the paper really light it (needs a camera-less Chromium)
 pnpm typecheck
 pnpm lint
 pnpm knip           # dead code and unused exports
