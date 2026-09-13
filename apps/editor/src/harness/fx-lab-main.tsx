@@ -6,6 +6,8 @@ import { Paper, type PaperHandle } from 'paperlab'
 import {
   CHAR,
   FIELD_SIZE,
+  FireSound,
+  FxAudio,
   FxFireFluid,
   FxFireLight,
   FxMatchFlame,
@@ -32,6 +34,7 @@ import {
   fireFluidControls,
   fireFluidDefaults,
   fxQualityFor,
+  createAudioContext,
 } from 'paperlab/fx'
 import type { SurfaceLocator } from 'paperlab/fx'
 import {
@@ -97,6 +100,8 @@ import {
  *   ?play=1&speed=0.25           start it running, and how fast
  *   ?ui=0                        the stage alone — what the capture script loads
  *   ?amount=0.5                  how much of the sheet burns, 0..1 — 1 is all of it
+ *   ?camera=static               no push-in and no drift: the still camera every
+ *                                capture and budget is measured with
  *   ?physics=flat                the sheet held flat and still, as it was before it
  *                                hung: nothing curls, nothing falls
  *
@@ -351,6 +356,16 @@ function burnNote(plan: BurnPlan, origin: BurnOrigin): string {
  * fire-film.mjs` needs a way to say "go" with the panel hidden.
  */
 const START_PLAYING = query.get('play') === '1'
+
+/**
+ * A still camera, for anything that measures the frame.
+ *
+ * The lab's camera pushes in as the fire grows and drifts a little, because
+ * a fire filmed from a tripod bolted to the floor reads as a render. Every
+ * capture, budget and reference crop needs the opposite: the same camera in
+ * the same place every time, or two loads of one moment are two pictures.
+ */
+const CAMERA_STATIC = query.get('camera') === 'static'
 /** `?speed=0.25` — the transport's rate, so a film can be slowed for the flicker. */
 const START_SPEED = num('speed', 1, 0.05, 4)
 
@@ -688,10 +703,18 @@ function CameraRig({
   view,
   at,
   locate,
+  burn,
+  pushFrom,
+  pushTo,
 }: {
   view: 'wide' | 'close'
   at: { u: number; v: number }
   locate: (u: number, v: number) => { x: number; y: number; z: number } | null
+  /** The burn, for its own clock: the push-in follows the fire, not the page. */
+  burn: ScriptedBurn
+  /** The seconds the push-in runs between — catch to peak. */
+  pushFrom: number
+  pushTo: number
 }) {
   const camera = useThree((s) => s.camera)
   useFrame(() => {
@@ -700,12 +723,50 @@ function CameraRig({
       const point = locate(at.u, at.v)
       if (point) look.set(point.x, point.y, point.z)
     }
-    camera.position.set(look.x, look.y, look.z + (view === 'close' ? CLOSE_Z : WIDE.z))
+    // A slow push-in from the catch to the peak, and it stays in: a few
+    // percent of the frame, on the BURN's clock, so the same moment is
+    // always shot from the same place (K1). Held still for the macro view,
+    // which is a crop of the rim and has nothing to push toward.
+    const moving = !CAMERA_STATIC && view === 'wide'
+    const k = moving ? clamp01((burn.time - pushFrom) / Math.max(0.1, pushTo - pushFrom)) : 0
+    const push = 1 - PUSH_IN * (k * k * (3 - 2 * k))
+    // And a breath of handheld life: well under a degree, on smooth noise,
+    // never a shake (K2). Off with the push-in, so a capture is a capture.
+    const drift = moving ? DRIFT : 0
+    const wobbleX = (drift * (driftNoise(burn.time * 0.21) - 0.5)) as number
+    const wobbleY = (drift * (driftNoise(burn.time * 0.17 + 9.3) - 0.5)) as number
+    camera.position.set(
+      look.x + wobbleX,
+      look.y + wobbleY,
+      look.z + (view === 'close' ? CLOSE_Z : WIDE.z * push),
+    )
     camera.lookAt(look)
     // After `lookAt`, which resolves roll against world up and would undo it.
     camera.rotation.z = ROLL
   })
   return null
+}
+
+/** How much closer the wide camera stands at the peak than at the first contact. */
+const PUSH_IN = 0.07
+
+/** How far the handheld drift wanders, world units: about a third of a degree at this distance. */
+const DRIFT = 0.012
+
+function clamp01(x: number): number {
+  return x < 0 ? 0 : x > 1 ? 1 : x
+}
+
+/** Smooth value noise, 0..1 — a drift that wanders rather than swinging on a sine. */
+function driftNoise(x: number): number {
+  const i = Math.floor(x)
+  const f = x - i
+  const smooth = f * f * (3 - 2 * f)
+  const hash = (n: number) => {
+    const v = Math.sin(n * 127.1) * 43758.5453
+    return v - Math.floor(v)
+  }
+  return hash(i) + (hash(i + 1) - hash(i)) * smooth
 }
 
 /**
@@ -749,9 +810,14 @@ function Driver({
   until,
   yields,
   burstAt,
+  sound,
+  soundOn,
 }: {
   burn: ScriptedBurn
   view: FieldView
+  /** The burn's voice, once someone has asked for it — see `FireSound`. */
+  sound: { current: FireSound | null }
+  soundOn: boolean
   /** How much of the room's light a fire at its height takes over, 0..1. */
   yields: number
   /** When this burn cuts a piece loose, for the burst of sparks it throws — or null. */
@@ -766,11 +832,38 @@ function Driver({
   /** Where playing stops: the end of this burn, which is not the same for every burn. */
   until: number
 }) {
+  /** The burn's clock last frame, for the moments a sound belongs to. */
+  const was = useRef(0)
   useFrame((_, delta) => {
     burn.burstAt = burstAt
+    const before = was.current
     if (playing) {
       burn.play(delta, speed, until)
       onTime(burn.time)
+    }
+    was.current = burn.time
+
+    // Sound (§10). Only while it is actually playing, and only at a speed a
+    // crackle still means something at: paused or scrubbing, the room is
+    // silent rather than stuttering, and a seek resumes from the new moment
+    // with no burst of caught-up crackles — `FireSound` reads this step's
+    // stats and nothing older.
+    const voice = sound.current
+    if (voice) {
+      if (soundOn && playing && speed >= 0.5) {
+        // The match, at the moment it touches the paper.
+        if (before < 0.02 && burn.time >= 0.02) voice.strike()
+        // The cut: a soft breath as the piece lets go.
+        if (burstAt !== null && before < burstAt && burn.time >= burstAt) voice.puff()
+        voice.update(delta * speed, burn.stats, locate(0.5, 0.5))
+        // The smoulder: a bead popping now and then, once the flames are out.
+        const out = burn.wentOut
+        if (out !== null && burn.stats.front === 0 && burn.time < out + burn.settings.smoulder) {
+          if (Math.random() < delta * 1.5) voice.pop()
+        }
+      } else {
+        voice.stop()
+      }
     }
     view.sync(burn.glow, layers, detail)
     // The fire is the key light while it burns, and the room yields to it —
@@ -1084,6 +1177,40 @@ function Lab() {
   const [target, setTarget] = useState(START_T)
   const [shown, setShown] = useState(START_T)
   const [playing, setPlaying] = useState(false)
+
+  /**
+   * The burn's voice. Muted until someone asks for it (Noor, 13 Sep): a
+   * browser will not start audio without a gesture anyway, so the button IS
+   * the gesture, and a lab that spoke on load would be a lab nobody could
+   * leave open.
+   */
+  const [soundOn, setSoundOn] = useState(false)
+  const audioRef = useRef<FxAudio | null>(null)
+  const soundRef = useRef<FireSound | null>(null)
+  const toggleSound = useCallback(async () => {
+    if (soundRef.current && soundOn) {
+      soundRef.current.stop()
+      setSoundOn(false)
+      return
+    }
+    try {
+      audioRef.current ??= new FxAudio({ context: createAudioContext(), quality: TIER })
+      await audioRef.current.unlock()
+      soundRef.current ??= new FireSound(audioRef.current)
+      setSoundOn(true)
+    } catch {
+      // No Web Audio here: everything but the sound still works.
+    }
+  }, [soundOn])
+  useEffect(
+    () => () => {
+      soundRef.current?.stop()
+      void audioRef.current?.dispose()
+      soundRef.current = null
+      audioRef.current = null
+    },
+    [],
+  )
   // `?play=1` waits for the first settled frame. Started at mount, the burn
   // played itself out during the shader compile — and since `Ready` only
   // publishes while the burn is NOT playing, the page could only report
@@ -1327,6 +1454,11 @@ function Lab() {
               </button>
             </div>
           )}
+          <div className="row">
+            <button type="button" aria-pressed={soundOn} onClick={() => void toggleSound()}>
+              {soundOn ? 'sound on' : 'sound off'}
+            </button>
+          </div>
 
           <h2>
             phases <span className="note">§9, at the times this burn reaches them</span>
@@ -1466,7 +1598,14 @@ function Lab() {
           scene={LIGHTING ? ({ lighting: LIGHTING } as ComponentProps<typeof Paper>['scene']) : undefined}
         >
           <SheetReady locate={locate} onReady={() => setSheet(true)} />
-          <CameraRig view={camera} at={at} locate={locate} />
+          <CameraRig
+            view={camera}
+            at={at}
+            locate={locate}
+            burn={burn}
+            pushFrom={plan.phases.find((p) => p.id === 'catch')?.at ?? 0}
+            pushTo={plan.phases.find((p) => p.id === 'peak')?.at ?? plan.duration}
+          />
           <FxParticles pool={burn.pool} />
           {layers.fluid && (
             <FxFireFluid
@@ -1523,6 +1662,8 @@ function Lab() {
             until={plan.duration}
             yields={settings.firelight ?? roomYield(LIGHTING)}
             burstAt={plan.severedAt}
+            sound={soundRef}
+            soundOn={soundOn}
           />
           <Ready
             plan={plan}

@@ -15,6 +15,9 @@
  *
  *   pnpm film
  *   pnpm film --speed=0.25    slower, for the flicker
+ * The camera moves here, and only here: the push-in and the drift are part of
+ * what a film is for. Everything that MEASURES a frame loads `?camera=static`.
+ *
  *   pnpm film --amount=0.42   how much of the sheet burns — from the centre,
  *                             enough to cut it in two and watch the piece fall
  */

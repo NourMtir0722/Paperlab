@@ -61,7 +61,7 @@ async function shot(query, file) {
     // is half a second of it, so two loads photograph it at two different
     // moments of settling — and every budget here compares two loads pixel
     // for pixel. These measure the fire's light, not how the paper drapes.
-    await page.goto(`${base}/fx-lab/?ui=0&physics=flat&${query}`, { waitUntil: 'networkidle' })
+    await page.goto(`${base}/fx-lab/?ui=0&physics=flat&camera=static&${query}`, { waitUntil: 'networkidle' })
     await page.waitForFunction(() => window.__FXLAB__?.ready === true, null, { timeout: 180_000 })
     const state = await page.evaluate(() => window.__FXLAB__)
     const png = await page
