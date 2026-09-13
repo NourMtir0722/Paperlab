@@ -280,9 +280,18 @@ try {
         .catch(() => false)
     : false
   // Stopping is not optional, for the reason above.
+  //
+  // And it gets the same deadline as starting, not a quarter of it. This click
+  // lands the moment the face model arrives, which is the moment the page runs
+  // its FIRST face inference — a cold one, on the CPU where a runner has no
+  // GPU, in one long task on the main thread. The click waits behind it. On a
+  // CI runner that has taken longer than 15 s often enough to fail about one
+  // run in two, with the button found, visible, and the click never
+  // acknowledged. A deadline, not a pause: a page that never answers still
+  // fails here, just later.
   if (cameraLive) {
-    await live.click({ timeout: 15_000 })
-    await page.getByRole('button', { name: 'start the camera' }).waitFor({ timeout: 15_000 })
+    await live.click({ timeout: 120_000 })
+    await page.getByRole('button', { name: 'start the camera' }).waitFor({ timeout: 120_000 })
   }
   await frames(31)
 
