@@ -44,7 +44,9 @@ try {
   const sculpted = await row.locator('.control-value').textContent()
   check('sculpted a paper', sculpted?.startsWith('0.93') ?? false, `tightness ${sculpted}`)
 
-  await a.getByRole('button', { name: 'Share' }).click()
+  // Share lives in the Export menu — the top-right corner is Export's alone.
+  await a.getByRole('button', { name: 'Export', exact: true }).click()
+  await a.getByRole('button', { name: 'Copy share link' }).click()
   await a.waitForTimeout(600)
   const link = await a.evaluate(() => navigator.clipboard.readText())
   check('share produced a link', link.includes('?p=') || link.includes('&p='), `${link.length} chars`)

@@ -28,6 +28,8 @@ import { pinchPoint, palmLength, toClient, type Landmark } from './landmarks'
 import { LighterWatch, type FlameSighting } from './lighter'
 import { Match, type MatchState } from './match'
 import { drawOverlay, type HandMark } from './overlay'
+import '../styles.css'
+import { ModeTabs } from '../chrome/ModeTabs'
 
 /**
  * **Set fire to a sheet of paper with your hands.**
@@ -923,34 +925,127 @@ function App() {
     onBurnt: markBurnt,
   }
 
+  /** What went wrong starting the camera — `start` leaves it in `message` and puts the page back to idle. */
+  const failed = status === 'idle' && message !== ''
+
   return (
-    <>
-      <div className="stage">
-        <Paper ref={paperRef} {...PAPER} physics={physics} damage={rig.view}>
-          <CanvasBridge getMesh={getMesh} onReady={onReady} />
-          {/* At the canvas root, so the embers are in world space — which is
-              what `surfacePoint` hands the emitter. */}
-          <FxParticles pool={pool} />
-          <FxPost quality={FX_TIER} field={field} locate={locate} />
-          <FxFireFluid
-            field={field}
-            locate={locate}
-            quality={FX_TIER}
-            params={fireWind}
-            resetKey={field}
-            fallback={<FxFlames field={field} locate={locate} quality={FX_TIER} wind={pool.wind} />}
-          />
-          <FxFireLight field={field} locate={locate} />
-          {/* The match itself: arming sparks, the strike, the held flame and
-              the light it throws before anything has caught. */}
-          <FxMatchFlame match={matchFlameRef} />
-          {/* A thread of smoke from a bead left glowing after the flames. */}
-          <FxWisps glow={glow} field={field} locate={locate} wind={pool.wind} />
-          {/* The burn's own clock — see `<Fire>`. It runs whether or not a
-              camera is on, which is what lets the match button work. */}
-          <Fire rig={rig} />
-        </Paper>
-      </div>
+    <div className="app lab">
+      <header className="topbar">
+        <div className="brand">Paperlab</div>
+        <div className="filename">Fire, by hand</div>
+        <ModeTabs current="hands" />
+        <div className="spacer" />
+      </header>
+
+      {/* The tool: the camera, and the match for anyone without one. */}
+      <aside className="left hud">
+        <h2>Camera</h2>
+        {status === 'live' ? (
+          <button type="button" className="pill" onClick={stop}>
+            Stop the camera
+          </button>
+        ) : (
+          <button type="button" className="pill" onClick={start} disabled={status === 'starting'}>
+            {status === 'starting' ? 'Starting…' : 'Start the camera'}
+          </button>
+        )}
+        {failed ? (
+          <p className="error" role="alert">
+            {message}
+          </p>
+        ) : (
+          <p className="rail-caption">
+            {status === 'live'
+              ? sawLighter
+                ? 'A flame in the frame — hold it to the paper.'
+                : blowReady
+                  ? 'Blow to put it out.'
+                  : 'Loading the face model, for blowing it out…'
+              : message || 'The camera stays on this machine; one request is made to Google for the model.'}
+          </p>
+        )}
+        {/* The camera's own picture, small: it is how you aim a flame you are
+            holding, and without it nobody can tell what the tracker sees. */}
+        <video ref={videoRef} className="camera" playsInline muted hidden={status !== 'live'} />
+
+        <h2>No camera?</h2>
+        <button type="button" className="control-button" onClick={strike}>
+          Strike a match
+        </button>
+        {burnt && (
+          <button type="button" className="control-button" onClick={fresh}>
+            A fresh sheet
+          </button>
+        )}
+      </aside>
+
+      <main className="viewport">
+        <div className="stage">
+          <Paper ref={paperRef} {...PAPER} physics={physics} damage={rig.view}>
+            <CanvasBridge getMesh={getMesh} onReady={onReady} />
+            {/* At the canvas root, so the embers are in world space — which is
+                what `surfacePoint` hands the emitter. */}
+            <FxParticles pool={pool} />
+            <FxPost quality={FX_TIER} field={field} locate={locate} />
+            <FxFireFluid
+              field={field}
+              locate={locate}
+              quality={FX_TIER}
+              params={fireWind}
+              resetKey={field}
+              fallback={<FxFlames field={field} locate={locate} quality={FX_TIER} wind={pool.wind} />}
+            />
+            <FxFireLight field={field} locate={locate} />
+            {/* The match itself: arming sparks, the strike, the held flame and
+                the light it throws before anything has caught. */}
+            <FxMatchFlame match={matchFlameRef} />
+            {/* A thread of smoke from a bead left glowing after the flames. */}
+            <FxWisps glow={glow} field={field} locate={locate} wind={pool.wind} />
+            {/* The burn's own clock — see `<Fire>`. It runs whether or not a
+                camera is on, which is what lets the match button work. */}
+            <Fire rig={rig} />
+          </Paper>
+        </div>
+        {sawLighter && (
+          <div className="banner" role="status">
+            <span className="dot" aria-hidden="true" />
+            Fire detected — the paper is catching
+          </div>
+        )}
+      </main>
+
+      {/* How to use it, and what the page can see right now. */}
+      <aside className="right">
+        <div className="rail-body">
+          <h2>How to light it</h2>
+          <ol className="how-to">
+            <li>Start the camera.</li>
+            <li>Hold a real flame up to it — a lighter, a match. The sheet catches where the flame is.</li>
+            <li>No lighter? Pinch and hold still in the air: that is a match. Touch it to the paper.</li>
+            <li>
+              Blow at the camera to put it out. Blow hard and the whole burn goes out, leaving the edge to
+              smoulder.
+            </li>
+          </ol>
+
+          <h2>What it sees</h2>
+          <dl className="status-list">
+            <dt>Camera</dt>
+            <dd>{status === 'live' ? 'on' : status === 'starting' ? 'starting…' : 'off'}</dd>
+            <dt>Flame</dt>
+            <dd>{sawLighter ? 'detected' : 'none'}</dd>
+            <dt>Blowing</dt>
+            <dd>{status !== 'live' ? '—' : blowReady ? 'ready' : 'loading…'}</dd>
+            <dt>Sheet</dt>
+            <dd>{burnt ? 'burnt' : 'untouched'}</dd>
+          </dl>
+        </div>
+      </aside>
+
+      {/* The per-frame numbers, where the editor keeps its status line. */}
+      <footer className="transport">
+        <p ref={readoutRef} className="transport-hint readout" />
+      </footer>
 
       <canvas
         ref={overlayRef}
@@ -958,54 +1053,8 @@ function App() {
         role="img"
         aria-label="What the camera sees: your hand while it is tracked, and any flame it has found"
       />
-      {sawLighter && (
-        <div className="banner" role="status">
-          <span className="dot" aria-hidden="true" />
-          Fire detected — the paper is catching
-        </div>
-      )}
-
       <div ref={cursorRef} className="cursor" aria-hidden="true" />
-
-      <div className="hud">
-        <h1>Hands</h1>
-        <p className="sub">
-          Set fire to the paper. Hold a real flame up to the camera — a lighter, a match — and the sheet
-          catches where the flame is. With no lighter, pinch and hold still in the air: that is a match.
-        </p>
-        {status === 'live' ? (
-          <button type="button" onClick={stop}>
-            stop the camera
-          </button>
-        ) : (
-          <button type="button" onClick={start} disabled={status === 'starting'}>
-            {status === 'starting' ? 'starting…' : 'start the camera'}
-          </button>
-        )}
-        <button type="button" className="ghost" onClick={strike}>
-          strike a match
-        </button>
-        {burnt && (
-          <button type="button" className="ghost" onClick={fresh}>
-            a fresh sheet
-          </button>
-        )}
-        <p className="note">
-          {status === 'live'
-            ? sawLighter
-              ? 'a flame in the frame — hold it to the paper'
-              : blowReady
-                ? 'blow to put it out'
-                : 'loading the face model, for blowing it out…'
-            : message || 'the camera stays on this machine; one request is made to Google for the model.'}
-        </p>
-        <p ref={readoutRef} className="readout" />
-      </div>
-
-      {/* The camera's own picture, small: it is how you aim a flame you are
-          holding, and without it nobody can tell what the tracker sees. */}
-      <video ref={videoRef} className="camera" playsInline muted />
-    </>
+    </div>
   )
 }
 

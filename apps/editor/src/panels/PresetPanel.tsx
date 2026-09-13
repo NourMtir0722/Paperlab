@@ -10,8 +10,13 @@ import { reportSave } from '../chrome/saveReport'
  * The preset library: built-ins (duplicate to fork) and user presets
  * (rename / duplicate / download / delete). Drop a .paper JSON anywhere on
  * the panel to import it.
+ *
+ * Saving the sculpt on the canvas starts here too, beside the list it adds
+ * to. It used to be a topbar button, and the top-right corner is Export's
+ * alone now. `onSave` rather than the store call itself because only the app
+ * holds the live sheet — a sculpt is not in the store until it is saved.
  */
-export function PresetPanel() {
+export function PresetPanel({ onSave }: { onSave: () => void }) {
   const presetName = useEditor((s) => s.presetName)
   const userPresets = useEditor((s) => s.userPresets)
   const setPreset = useEditor((s) => s.setPreset)
@@ -114,6 +119,9 @@ export function PresetPanel() {
         hidden
         onChange={(e) => void importFiles(e.target.files)}
       />
+      <button type="button" className="save-preset" onClick={onSave}>
+        Save current as preset
+      </button>
       {userNames.length === 0 && <p className="hint">Save a sculpt, or drop a .paper file here.</p>}
       <ul className="presets user-presets">
         {userNames.map((name) => {

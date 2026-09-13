@@ -36,7 +36,7 @@ import { CoachMark, HandleAnchor, coachMarkUsed } from './chrome/CoachMark'
 import { CameraRig, ViewCluster } from './chrome/ViewCluster'
 import { CaptureRig, type CaptureHandle } from './chrome/CaptureRig'
 import { SmallScreen } from './chrome/SmallScreen'
-import { SITE } from './chrome/site'
+import { MODE_PARAM, ModeTabs } from './chrome/ModeTabs'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
@@ -115,10 +115,19 @@ export function App() {
   useEffect(() => {
     if (adopted.current) return
     adopted.current = true
+    const url = new URL(window.location.href)
+    // `?mode=` is how the Hands and FX Lab tabs send someone back to the mode
+    // they picked. Taken once and cleared, like a shared paper, so a refresh
+    // does not overrule whichever tab was chosen since.
+    const asked = url.searchParams.get(MODE_PARAM)
+    if (asked !== null) {
+      if (asked === 'paper' || asked === 'field' || asked === 'stage') setMode(asked)
+      url.searchParams.delete(MODE_PARAM)
+      window.history.replaceState(null, '', url)
+    }
     const share = readPaperShare(window.location.search)
     if (!share) return
     const outcome = importSharedPaper(share)
-    const url = new URL(window.location.href)
     url.searchParams.delete(SHARE_PARAM)
     window.history.replaceState(null, '', url)
     if (!outcome.ok) {
@@ -136,6 +145,58 @@ export function App() {
       reportSave(outcome)
     }
   }, [importSharedPaper, setMode])
+
+  /** Save the sculpt on the canvas as a preset of your own — from the Presets panel. */
+  const savePresetAs = () => {
+    void (async () => {
+      const name = await promptDialog({
+        title: 'Save preset as',
+        defaultValue: config.meta.name === 'untitled' ? '' : config.meta.name,
+        placeholder: 'preset name',
+        confirmLabel: 'Save',
+        validate: (v) =>
+          !v
+            ? 'Preset needs a name.'
+            : isBuiltinPreset(v)
+              ? `"${v}" is a built-in — pick another name.`
+              : null,
+      })
+      if (!name) return
+      // While a state chip / preview is live the canvas paper holds a
+      // derived view — saving from it would bake that state into the
+      // base and lose the machine. The preset is the store's base.
+      const snapshot = editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
+      reportSave(savePreset(name, snapshot, captureThumbnail()))
+    })()
+  }
+
+  /** Copy a link that opens this paper in someone else's editor — from the Export menu. */
+  const sharePaper = () => {
+    // Share what is on the canvas, including an un-saved sculpt — asking
+    // someone to save first before they can send a link is a step that stops
+    // the thing from being sent at all.
+    const snapshot = editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
+    const attempt = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
+    if (!attempt.ok) {
+      // The `.paper` file is the answer to both refusals, and it is offered
+      // here rather than described: telling someone whose share just failed
+      // to go and save a preset, find it in the left panel and download it is
+      // three steps and two panels away from the button they actually pressed.
+      void confirmDialog({
+        title: 'Too big for a link',
+        message:
+          attempt.reason === 'uploaded-image'
+            ? 'This paper carries an uploaded image. A picture cannot travel in a URL, but the .paper file carries it — download that and send it instead.'
+            : `This paper needs about ${Math.round(attempt.length / 1000)}KB and a link holds ${Math.round(MAX_SHARE_LENGTH / 1000)}KB. Shorten the text, or download the .paper file and send that instead.`,
+        confirmLabel: 'Download .paper',
+      }).then((ok) => {
+        if (ok) downloadPreset(snapshot.meta.name, diffConfig(snapshot))
+      })
+      return
+    }
+    void navigator.clipboard.writeText(attempt.url)
+    toast('Link copied — anyone who opens it gets an editable copy', 'success')
+  }
 
   // Presets are components: the field renders the live edit of its preset.
   // `getPreset` THROWS on a name it does not know, and this runs for every
@@ -211,17 +272,7 @@ export function App() {
         <div className="filename">
           {mode === 'paper' ? `${config.meta.name}.paper` : mode === 'field' ? 'Field composer' : 'Stage'}
         </div>
-        <div className="mode-switch">
-          <button type="button" className={mode === 'paper' ? 'active' : ''} onClick={() => setMode('paper')}>
-            Paper
-          </button>
-          <button type="button" className={mode === 'field' ? 'active' : ''} onClick={() => setMode('field')}>
-            Field
-          </button>
-          <button type="button" className={mode === 'stage' ? 'active' : ''} onClick={() => setMode('stage')}>
-            Stage
-          </button>
-        </div>
+        <ModeTabs current={mode} onMode={setMode} />
         <div className="history">
           <button
             type="button"
@@ -248,114 +299,6 @@ export function App() {
           </button>
         )}
         <div className="spacer" />
-        {/*
-          The one surface of this product the editor cannot show you.
-
-          /hands shipped as a real route and for weeks nothing pointed at it,
-          which made it a URL you had to already know. It is here rather than
-          in a menu because the whole problem was that nobody knew the feature
-          existed — a thing you have to open a dropdown to discover is a thing
-          you discover second.
-
-          A new tab on purpose: this is somewhere you go and come back from,
-          and the return trip through a cold three.js boot is worse than the
-          tab. The sculpt survives either way (see state/session.ts), so the
-          tab is for the reload, not for the work.
-        */}
-        <a
-          className="hands-link"
-          href={`${SITE}hands/`}
-          target="_blank"
-          rel="noopener"
-          title="Set fire to the paper with your webcam — hold a lighter up to it, or pinch and hold still to strike a match"
-        >
-          Use your hands{' '}
-          <span className="hands-arrow" aria-hidden="true">
-            ↗
-          </span>
-        </a>
-        {/* The fire lab, beside it and for the same reason: a feature nobody
-            can find is not one. Every knob behind the burn, on one page. */}
-        <a
-          className="hands-link"
-          href={`${SITE}fx-lab/`}
-          target="_blank"
-          rel="noopener"
-          title="Every knob behind the burn — tune the fire and copy it out as JSON"
-        >
-          Fire lab{' '}
-          <span className="hands-arrow" aria-hidden="true">
-            ↗
-          </span>
-        </a>
-        {mode === 'paper' && (
-          <button
-            type="button"
-            className="save-preset"
-            onClick={() => {
-              void (async () => {
-                const name = await promptDialog({
-                  title: 'Save preset as',
-                  defaultValue: config.meta.name === 'untitled' ? '' : config.meta.name,
-                  placeholder: 'preset name',
-                  confirmLabel: 'Save',
-                  validate: (v) =>
-                    !v
-                      ? 'Preset needs a name.'
-                      : isBuiltinPreset(v)
-                        ? `"${v}" is a built-in — pick another name.`
-                        : null,
-                })
-                if (!name) return
-                // While a state chip / preview is live the canvas paper holds a
-                // derived view — saving from it would bake that state into the
-                // base and lose the machine. The preset is the store's base.
-                const snapshot =
-                  editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-                reportSave(savePreset(name, snapshot, captureThumbnail()))
-              })()
-            }}
-          >
-            Save preset
-          </button>
-        )}
-        {mode === 'paper' && (
-          <button
-            type="button"
-            className="share-paper"
-            title="Copy a link that opens this paper in someone else's editor"
-            onClick={() => {
-              // Share what is on the canvas, including an un-saved sculpt —
-              // asking someone to save first before they can send a link is
-              // a step that stops the thing from being sent at all.
-              const snapshot =
-                editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-              const attempt = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
-              if (!attempt.ok) {
-                // The `.paper` file is the answer to both refusals, and it is
-                // offered here rather than described: telling someone whose
-                // share just failed to go and save a preset, find it in the
-                // left panel and download it is three steps and two panels
-                // away from the button they actually pressed.
-                void confirmDialog({
-                  title: 'Too big for a link',
-                  message:
-                    attempt.reason === 'uploaded-image'
-                      ? 'This paper carries an uploaded image. A picture cannot travel in a URL, but the .paper file carries it — download that and send it instead.'
-                      : `This paper needs about ${Math.round(attempt.length / 1000)}KB and a link holds ${Math.round(MAX_SHARE_LENGTH / 1000)}KB. Shorten the text, or download the .paper file and send that instead.`,
-                  confirmLabel: 'Download .paper',
-                }).then((ok) => {
-                  if (ok) downloadPreset(snapshot.meta.name, diffConfig(snapshot))
-                })
-                return
-              }
-              void navigator.clipboard.writeText(attempt.url)
-              toast('Link copied — anyone who opens it gets an editable copy', 'success')
-            }}
-          >
-            Share
-          </button>
-        )}
         <ExportMenu
           mode={mode}
           config={config}
@@ -363,12 +306,13 @@ export function App() {
           captureRef={captureRef}
           fieldInput={fieldExportInput}
           stageInput={stageExportInput}
+          onShare={mode === 'paper' ? sharePaper : undefined}
         />
       </header>
 
       <aside className="left">
         {mode === 'paper' ? (
-          <PresetPanel />
+          <PresetPanel onSave={savePresetAs} />
         ) : mode === 'stage' ? (
           <>
             <h2>Stages</h2>

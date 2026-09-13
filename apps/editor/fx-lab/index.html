@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Paperlab — fx lab · fire</title>
+    <title>Paperlab — FX Lab</title>
     <!--
-      The fire, and every knob behind it.
+      Effects on paper, and every knob behind them. Fire is the first.
 
       A directory with an index rather than `fx-lab.html`, so the URL is
       `/fx-lab` — the spec calls it that, and it reads as a page rather than as
@@ -18,133 +18,21 @@
       is an option a consumer can set, and this is where you try them and copy
       the result.
 
+      It wears the editor's frame (`src/styles.css`): the five-surface switch
+      on top, the tool on the left, the sheet in the middle, the settings on
+      the right, time underneath.
+
       What does NOT ship is the reference stills it can put beside the render:
       20 MB that live outside this repo (see `tools/fx-refs.mjs`), served by a
       dev-only middleware. The page says so where they would have been.
     -->
     <style>
-      :root { color-scheme: dark; }
-      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-      body {
-        font-family: "Inter", system-ui, -apple-system, sans-serif;
-        color: rgba(255,255,255,0.92);
-        font-size: 12px;
-      }
-      #root { height: 100%; }
-
-      /* Panel · stage · reference. The stage takes what is left, which is why
-         a capture is taken of the CANVAS and not of the viewport. */
-      .lab { display: grid; grid-template-columns: 322px 1fr auto; height: 100%; }
-      .lab.no-refs { grid-template-columns: 322px 1fr; }
-
-      .stage { position: relative; min-width: 0; background: #000; }
-
-      .panel {
-        overflow-y: auto;
-        padding: 16px 16px 40px;
-        border-right: 1px solid rgba(255,255,255,0.08);
-        background: #0b0b0c;
-      }
-      .panel h1 { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; }
-      .panel .sub { margin: 0 0 16px; color: rgba(255,255,255,0.42); line-height: 1.5; }
-      .panel h2 {
-        margin: 18px 0 8px;
-        font-size: 10px;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.38);
-        font-weight: 500;
-      }
-      .panel h2 .note { text-transform: none; letter-spacing: 0; color: rgba(255,255,255,0.28); }
-
-      button {
-        font: inherit;
-        color: inherit;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 7px;
-        padding: 6px 10px;
-        cursor: pointer;
-      }
-      button:hover { background: rgba(255,255,255,0.12); }
-      button[aria-pressed="true"] { background: rgba(255,255,255,0.9); color: #111; border-color: transparent; }
-      button:disabled { opacity: 0.35; cursor: default; }
-
-      .row { display: flex; gap: 6px; align-items: center; }
-      .row + .row { margin-top: 6px; }
-      .grow { flex: 1; }
-      input[type="range"] { width: 100%; accent-color: #ff7a2f; }
-
-      .clock { font-variant-numeric: tabular-nums; color: rgba(255,255,255,0.6); }
-      .phase-list { display: grid; gap: 4px; }
-      .phase {
-        display: grid;
-        grid-template-columns: 46px 1fr;
-        gap: 8px;
-        text-align: left;
-        align-items: baseline;
-        line-height: 1.4;
-      }
-      .phase .t { color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
-      .phase[aria-pressed="true"] .t { color: rgba(0,0,0,0.5); }
-      .gap {
-        margin: 4px 0 0;
-        padding: 6px 8px;
-        border-left: 2px solid #d2691e;
-        background: rgba(210,105,30,0.1);
-        color: rgba(255,255,255,0.66);
-        line-height: 1.45;
-      }
-
-      .layer { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; line-height: 1.35; }
-      .layer input { accent-color: #ff7a2f; margin: 0; }
-      .layer.todo { color: rgba(255,255,255,0.3); }
-      .layer .step {
-        margin-left: auto;
-        font-size: 10px;
-        color: rgba(255,255,255,0.3);
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 999px;
-        padding: 0 6px;
-        white-space: nowrap;
-      }
-      .layer .why { display: block; color: rgba(255,255,255,0.34); }
-
-      .stats { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-variant-numeric: tabular-nums; }
-      .stats dt { color: rgba(255,255,255,0.38); }
-      .stats dd { margin: 0; }
-
-      .refs {
-        width: 34vw;
-        min-width: 320px;
-        max-width: 620px;
-        overflow-y: auto;
-        border-left: 1px solid rgba(255,255,255,0.08);
-        background: #0b0b0c;
-        padding: 16px;
-      }
-      .refs img { width: 100%; display: block; border-radius: 8px; background: #000; }
-      .refs .caption { margin: 8px 0 0; color: rgba(255,255,255,0.46); line-height: 1.5; }
-      .refs .missing { color: #e0a060; line-height: 1.6; }
-      .refs code { color: rgba(255,255,255,0.72); }
+      html, body { margin: 0; height: 100%; background: #08090a; }
 
       /* `?ui=0`: the stage alone, at exactly the viewport's size. That is what
          the capture script loads, so a photograph is never at the mercy of how
-         wide the panel happened to render. */
-      .lab.bare { display: block; }
-      .lab.bare .panel, .lab.bare .refs { display: none; }
-      .lab.bare .stage { position: fixed; inset: 0; }
-      /* The Tune sidebar's groups. */
-      .refs details { border-top: 1px solid rgba(255,255,255,0.08); padding: 8px 0 10px; }
-      .refs summary {
-        cursor: pointer;
-        font-size: 10px;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.6);
-        margin-bottom: 6px;
-      }
-      .refs details button { margin-top: 6px; }
+         wide the rails happened to render. */
+      .lab.bare .stage { position: fixed; inset: 0; background: #000; }
     </style>
   </head>
   <body>

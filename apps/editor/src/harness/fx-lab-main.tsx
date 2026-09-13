@@ -55,6 +55,21 @@ import {
   type Layers,
   type Phase,
 } from './burn'
+import '../styles.css'
+import { ModeTabs } from '../chrome/ModeTabs'
+import { Panel } from '../controls/controls'
+import {
+  type Control,
+  button,
+  color,
+  emphasize,
+  folder,
+  note as noteControl,
+  num as numberControl,
+  toggle,
+} from '../controls/controlModel'
+import { Select } from '../controls/Select'
+import { UIHost, toast } from '../controls/ui'
 
 /**
  * `/fx-lab` — where fire is judged.
@@ -600,27 +615,21 @@ function loadSettings(): LabSettings {
 
 /** Any preset by name; unknown names fall back inside `<Paper>` like any config. */
 /**
- * Which of the lab's three jobs is on screen.
+ * How much of the lab is showing, and which side of it.
  *
- * It was doing all three at once: about sixty controls, thirteen rows of a
- * table of spec numbers nothing read, and a paragraph of argument under every
- * checkbox. That is what finding the look needed, and it is not what looking
- * at one needs.
+ * It used to be three modes — watch, tune, debug — each rearranging the page.
+ * It wears the editor's frame now, so the tool rail, the sheet and the
+ * settings are always where they are. What is left of the modes is how much
+ * of the machinery is showing (`Advanced`: the layers, the solver's own panel,
+ * the field's numbers, the constants) and whether the settings rail shows the
+ * knobs or the reference stills.
  *
- *   watch  the stage, big. Play, scrub, the phases, the camera, the reference.
- *   tune   the controls named for what a person SEES, grouped the same way.
- *   debug  layers, the solver's own panel, the field's numbers, the constants.
- *
- * `?mode=` so a capture can ask for one, and so the default is the one you
- * want when you open the page to look at a fire.
+ * `?mode=debug` (and the older `?debug=1`) still opens it advanced, and
+ * `?mode=watch` on the references, so every link and note that says so still
+ * works.
  */
-const MODES = ['watch', 'tune', 'debug'] as const
-type Mode = (typeof MODES)[number]
-const START_MODE: Mode = (MODES as readonly string[]).includes(query.get('mode') ?? '')
-  ? (query.get('mode') as Mode)
-  : query.get('debug') === '1'
-    ? 'debug'
-    : 'watch'
+const START_ADVANCED = query.get('mode') === 'debug' || query.get('debug') === '1'
+const START_SIDE: 'tune' | 'refs' = query.get('mode') === 'watch' ? 'refs' : 'tune'
 
 /**
  * `noir` unless asked otherwise: a sheet under one hard key in a dark room,
@@ -1255,7 +1264,6 @@ function Lab() {
   const [detail, setDetail] = useState(1)
   const [camera, setCamera] = useState<'wide' | 'close'>(query.get('view') === 'close' ? 'close' : 'wide')
   const [at, setAt] = useState({ u: num('u', 0.5, 0, 1), v: num('v', 0.5, 0, 1) })
-  const [showRefs, setShowRefs] = useState(!bare)
   const [post, setPost] = useState(START_POST)
   /**
    * Every layer's knobs (the Tune sidebar). A capture (`?ui=0`) always runs
@@ -1264,8 +1272,7 @@ function Lab() {
    */
   const [settings, setSettings] = useState<LabSettings>(() => (bare ? DEFAULT_SETTINGS : loadSettings()))
   const fluid = settings.fluid
-  // Follows the mode from the start, not only when one is clicked.
-  const [side, setSide] = useState<'tune' | 'refs'>(START_MODE === 'watch' ? 'refs' : 'tune')
+  const [side, setSide] = useState<'tune' | 'refs'>(START_SIDE)
   const [bloom, setBloom] = useState(START_BLOOM)
   const [refName, setRefName] = useState<string | null>(null)
   /** Bumped whenever the burn is rebuilt: the pool is a new object and the tree has to see it. */
@@ -1361,7 +1368,8 @@ function Lab() {
     setPlaying(true)
   }
 
-  const [mode, setModeState] = useState<Mode>(START_MODE)
+  /** Layers, the solver's own panel, the field's numbers — see `START_ADVANCED`. */
+  const [advanced, setAdvanced] = useState(START_ADVANCED)
   const match = useRef<MatchFlameState>({
     position: null,
     state: 'none',
@@ -1370,484 +1378,557 @@ function Lab() {
     time: 0,
     litAt: 0,
   })
-  /**
-   * The side panel follows the mode. Watching means the reference beside the
-   * render; tuning and debugging both mean controls, and the difference
-   * between those two is which controls (see `Tune`'s `advanced`).
-   */
-  const setMode = (m: Mode) => {
-    setModeState(m)
-    setSide(m === 'watch' ? 'refs' : 'tune')
-  }
 
   const setLayer = (key: keyof Layers, on: boolean) => {
     hold()
     setLayers((l) => ({ ...l, [key]: on }))
   }
 
-  return (
-    <div className={`lab${bare ? ' bare' : ''}${showRefs ? '' : ' no-refs'}`}>
-      {!bare && (
-        <div className="panel">
-          <h1>fx lab · fire</h1>
-          <p className="sub">A scripted burn, the same every time, beside the stills it has to look like.</p>
-          {savedState !== 'defaults' && (
-            <p className="gap">
-              {savedState === 'stale'
-                ? 'A tune saved in this browser was set aside — the defaults have changed since it was saved. This is what the library ships.'
-                : 'Showing a tune saved in this browser, not the shipped defaults. “reset all”, under tune, goes back to them.'}
-            </p>
-          )}
-          <div className="row modes">
-            {MODES.map((m) => (
-              <button type="button" key={m} onClick={() => setMode(m)} aria-pressed={mode === m}>
-                {m}
-              </button>
-            ))}
-          </div>
+  /**
+   * Where the burn starts. It sits in the tool rail beside how much burns
+   * rather than among the looks: both decide what HAPPENS — whether a piece
+   * falls, how long it all takes — and neither changes how any of it looks.
+   */
+  const setOrigin = (origin: BurnOrigin) => setSettings((s) => ({ ...s, burn: { ...s.burn, origin } }))
 
-          <h2>transport</h2>
-          <div className="row">
+  const resetAll = () => {
+    setSettings(DEFAULT_SETTINGS)
+    try {
+      window.localStorage.removeItem(SETTINGS_KEY)
+    } catch {
+      // Nothing saved, or nowhere to save it: the defaults are back either way.
+    }
+    toast('Back to the shipped defaults.')
+  }
+
+  const paper = (
+    <div className="stage">
+      <Paper
+        ref={paperRef}
+        // Frozen, like every harness that gets photographed: a sheet with an
+        // idle sway in it is a different picture on every load, and a
+        // capture that cannot be repeated cannot be compared.
+        //
+        // Only for the flat sheet, though: `reducedMotion` switches every
+        // simulation OFF, and the hanging sheet is one. It needs none of the
+        // freezing either — no wind, so nothing sways. Passed as an explicit
+        // false, which also overrides a system that prefers reduced motion:
+        // this is a lab, and a burn that cannot cut a piece loose is not
+        // the burn being judged.
+        reducedMotion={PHYSICS === undefined}
+        content={CONTENT}
+        physics={
+          typeof PHYSICS === 'object' ? { ...PHYSICS, floor: settings.floor ? FLOOR_Y : -1.4 } : PHYSICS
+        }
+        damage={view}
+        scene={
+          {
+            lighting: LIGHTING,
+            floor: { enabled: settings.floor, y: FLOOR_Y },
+          } as ComponentProps<typeof Paper>['scene']
+        }
+      >
+        <SheetReady locate={locate} onReady={() => setSheet(true)} />
+        <CameraRig
+          view={camera}
+          at={at}
+          locate={locate}
+          burn={burn}
+          floor={settings.floor}
+          pushFrom={plan.phases.find((p) => p.id === 'catch')?.at ?? 0}
+          pushTo={plan.phases.find((p) => p.id === 'peak')?.at ?? plan.duration}
+        />
+        <FxParticles pool={burn.pool} />
+        {layers.fluid && (
+          <FxFireFluid
+            field={burn.field}
+            locate={locate}
+            quality={TIER}
+            params={fluidParams}
+            zones={flameZones}
+            heatScale={FIRE_OVERRIDES.heatScale}
+            sootScale={FIRE_OVERRIDES.sootScale}
+            contrast={FIRE_OVERRIDES.contrast}
+            opacity={FIRE_OVERRIDES.opacity}
+            warm={FIRE_OVERRIDES.warm}
+            thin={FIRE_OVERRIDES.thin}
+            sharp={FIRE_OVERRIDES.sharp === undefined ? undefined : FIRE_OVERRIDES.sharp !== 0}
+            running={playing}
+            // Every seek starts the fire over, warmed up from the rim as it
+            // stands; paused, a slider change does too, so it shows at once.
+            resetKey={fluidKey}
+          />
+        )}
+        {layers.match && <FxMatchFlame match={match} />}
+        {layers.light && (
+          <FxFireLight
+            field={burn.field}
+            locate={locate}
+            gain={settings.light}
+            shadows={settings.fireShadows}
+          />
+        )}
+        {layers.wisps && settings.burn.smoke && (
+          <FxWisps glow={burn.glow} field={burn.field} locate={locate} wind={burn.pool.wind} />
+        )}
+        {post && (
+          <FxPost
+            quality={TIER}
+            bloom={bloom ? (BLOOM_STRENGTH ?? settings.bloom) : 0}
+            threshold={THRESHOLD ?? settings.threshold}
+            haze={settings.haze}
+            focus={settings.focus}
+            field={burn.field}
+            locate={locate}
+          />
+        )}
+        <Driver
+          burn={burn}
+          view={view}
+          layers={layers}
+          detail={detail}
+          playing={playing}
+          speed={speed}
+          onTime={setShown}
+          match={match}
+          locate={locate}
+          until={plan.duration}
+          yields={settings.firelight ?? roomYield(LIGHTING)}
+          burstAt={plan.severedAt}
+          sound={soundRef}
+          soundOn={soundOn}
+        />
+        <Ready
+          plan={plan}
+          look={settings.look}
+          burn={burn}
+          view={view}
+          locate={locate}
+          armed={generation > 0}
+          playing={playing}
+          nonce={`${fluidKey}:${camera}:${at.u},${at.v}:${detail}:${post}:${bloom}`}
+          onReady={startWhenReady}
+        />
+      </Paper>
+    </div>
+  )
+
+  // The capture script's page: the stage and nothing else.
+  if (bare) return <div className="lab bare">{paper}</div>
+
+  const fill = plan.duration > 0 ? Math.min(100, (shown / plan.duration) * 100) : 0
+  const references = [
+    ...new Set([
+      ...phases.map((p) => p.reference),
+      'Never_this.png',
+      'Ember_line.png',
+      'Ember_line__annotated.png',
+      'Char_and_ash_lip.png',
+      'Scorch.png',
+      'Flame_base.png',
+      'Hero.png',
+    ]),
+  ]
+
+  return (
+    <div className="app lab">
+      <header className="topbar">
+        <div className="brand">Paperlab</div>
+        <div className="filename">Fire</div>
+        <ModeTabs current="fx-lab" />
+        <div className="spacer" />
+        <LabExport settings={settings} />
+      </header>
+
+      {/* The tool: what happens to the sheet, and where you are looking at it from. */}
+      <aside className="left">
+        <h2>Where it starts</h2>
+        <div className="segmented">
+          {(['center', 'corner'] as const).map((origin) => (
             <button
               type="button"
-              onClick={() => (playing ? hold() : setPlaying(true))}
-              aria-pressed={playing}
+              key={origin}
+              aria-pressed={settings.burn.origin === origin}
+              onClick={() => setOrigin(origin)}
             >
-              {playing ? 'pause' : 'play'}
+              {origin === 'center' ? 'Centre' : 'Corner'}
             </button>
-            <button type="button" onClick={() => setSpeed(1)} aria-pressed={speed === 1}>
-              1×
-            </button>
-            <button type="button" onClick={() => setSpeed(0.25)} aria-pressed={speed === 0.25}>
-              0.25×
-            </button>
-            <button type="button" onClick={() => jump(0)}>
-              restart
-            </button>
-          </div>
-          <div className="row">
-            <input
-              type="range"
-              min={0}
-              max={plan.duration}
-              step={1 / 120}
-              value={shown}
-              onChange={(e) => jump(Number(e.target.value))}
-            />
-          </div>
-          <div className="row clock">
-            <span className="grow">
-              {shown.toFixed(2)}s of {plan.duration}s
-            </span>
-            <span>{near ? near.id : '—'}</span>
-          </div>
+          ))}
+        </div>
+        <p className="rail-caption">
+          {settings.burn.origin === 'center' ? 'A hole, eating outward.' : 'From a corner, eating upward.'}
+        </p>
 
-          {/* Beside the transport, not in Tune: how much burns changes what
-              HAPPENS — whether a piece falls, how long it all takes — not how
-              any of it looks. */}
-          <h2>
-            how much burns <span className="note">measured on the cold sheet</span>
-          </h2>
-          <div className="row">
-            {AMOUNTS.map((a) => (
-              <button
-                type="button"
-                key={a.amount}
-                aria-pressed={Math.abs(settings.burn.amount - a.amount) < 0.005}
-                onClick={() => setAmount(a.amount)}
-              >
-                {a.amount === CUT_IN_TWO && settings.burn.origin === 'corner' ? '42%' : a.label}
-              </button>
-            ))}
-          </div>
-          <label className="layer" style={{ display: 'block' }}>
-            <span className="row">
-              <span className="grow">of the sheet</span>
-              <span className="clock">{Math.round(settings.burn.amount * 100)}%</span>
-            </span>
-            <input
-              type="range"
-              min={0.05}
-              max={1}
-              step={0.01}
-              value={settings.burn.amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-            />
-          </label>
-          <p className="caption">{burnNote(plan, settings.burn.origin)}</p>
-          {plan.severedAt !== null && (
-            <div className="row">
-              <button type="button" onClick={() => watchFrom(plan.severedAt! - 1.5)}>
-                watch it fall
-              </button>
-            </div>
+        <h2>How much burns</h2>
+        <div className="chips">
+          {AMOUNTS.map((a) => (
+            <button
+              type="button"
+              key={a.amount}
+              className="chip"
+              aria-pressed={Math.abs(settings.burn.amount - a.amount) < 0.005}
+              onClick={() => setAmount(a.amount)}
+            >
+              {a.amount === CUT_IN_TWO && settings.burn.origin === 'corner' ? '42%' : a.label}
+            </button>
+          ))}
+        </div>
+        <Panel
+          controls={emphasize(
+            [
+              numberControl(
+                'amount',
+                Math.round(settings.burn.amount * 100),
+                { min: 5, max: 100, step: 1, label: 'Of the sheet (%)' },
+                (v) => setAmount(v / 100),
+              ),
+            ],
+            'wide',
           )}
-          <div className="row">
-            <button type="button" aria-pressed={soundOn} onClick={() => void toggleSound()}>
-              {soundOn ? 'sound on' : 'sound off'}
-            </button>
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.floor}
-                onChange={(e) => setSettings({ ...settings, floor: e.currentTarget.checked })}
-              />{' '}
-              floor
-            </label>
-          </div>
+        />
+        <p className="rail-caption">{burnNote(plan, settings.burn.origin)}</p>
+        {plan.severedAt !== null && (
+          <button
+            type="button"
+            className="control-button rail-action"
+            onClick={() => watchFrom(plan.severedAt! - 1.5)}
+          >
+            Watch it fall
+          </button>
+        )}
 
-          <h2>
-            phases <span className="note">§9, at the times this burn reaches them</span>
-          </h2>
-          <div className="phase-list">
-            {phases.map((p) => (
+        <h2>Moments</h2>
+        <ul className="presets">
+          {phases.map((p) => (
+            <li key={p.id}>
               <button
                 type="button"
-                key={p.id}
-                className="phase"
-                onClick={() => jump(p.at)}
+                className={near?.id === p.id ? 'active' : ''}
                 aria-pressed={near?.id === p.id}
+                onClick={() => jump(p.at)}
               >
-                <span className="t">{p.at.toFixed(2)}s</span>
-                <span>{p.label}</span>
+                <span className="moment-time">{p.at.toFixed(1)}s</span>
+                {p.label}
               </button>
-            ))}
-          </div>
-          {near?.gap && <p className="gap">{near.gap}</p>}
+            </li>
+          ))}
+        </ul>
+        {advanced && near?.gap && <p className="rail-caption">{near.gap}</p>}
 
-          <h2>camera</h2>
-          <div className="row">
-            <button type="button" onClick={() => setCamera('wide')} aria-pressed={camera === 'wide'}>
-              wide
+        <h2>Camera</h2>
+        <div className="chips">
+          <button
+            type="button"
+            className="chip"
+            onClick={() => setCamera('wide')}
+            aria-pressed={camera === 'wide'}
+          >
+            wide
+          </button>
+          {rimCrops(burn.field).map((crop) => (
+            <button
+              type="button"
+              key={crop.id}
+              className="chip"
+              onClick={() => {
+                setAt({ u: crop.u, v: crop.v })
+                setCamera('close')
+              }}
+              aria-pressed={camera === 'close' && at.u === crop.u && at.v === crop.v}
+            >
+              {crop.id}
             </button>
-            {rimCrops(burn.field).map((crop) => (
-              <button
-                type="button"
-                key={crop.id}
-                onClick={() => {
-                  setAt({ u: crop.u, v: crop.v })
-                  setCamera('close')
-                }}
-                aria-pressed={camera === 'close' && at.u === crop.u && at.v === crop.v}
-              >
-                {crop.id}
-              </button>
-            ))}
-          </div>
+          ))}
+        </div>
 
-          {mode === 'debug' && (
-            <>
-              <h2>
-                layers <span className="note">built</span>
-              </h2>
-              {BUILT.map((row) => (
-                <label className="layer" key={row.key}>
-                  <input
-                    type="checkbox"
-                    checked={layers[row.key]}
-                    onChange={(e) => setLayer(row.key, e.target.checked)}
-                  />
-                  <span>
-                    {row.name}
-                    <span className="why">{row.why}</span>
-                  </span>
-                </label>
-              ))}
-              <div className="layer">
-                <span className="grow">edge fray (detail) · {detail.toFixed(2)}</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={detail}
-                onChange={(e) => setDetail(Number(e.target.value))}
-              />
+        <h2>Scene</h2>
+        <Panel
+          controls={emphasize(
+            [
+              toggle(
+                'floor',
+                settings.floor,
+                (floor) => setSettings({ ...settings, floor }),
+                'Floor under the sheet',
+              ),
+              toggle('sound', soundOn, () => void toggleSound(), 'Sound'),
+            ],
+            'wide',
+          )}
+        />
 
-              <h2>
-                light &amp; post <span className="note">§7</span>
-              </h2>
-              <label className="layer">
-                <input type="checkbox" checked={post} onChange={(e) => setPost(e.target.checked)} />
-                <span>
-                  HDR + the tone curve
-                  <span className="why">
-                    a half-float frame, the rig's own film applied last. Off is the renderer's curve — the two
-                    must look the same on an unburnt sheet
-                  </span>
-                </span>
-              </label>
-              <label className="layer">
+        {advanced && (
+          <>
+            <h2>Layers</h2>
+            {BUILT.map((row) => (
+              <label className="lab-layer" key={row.key} title={row.why}>
                 <input
                   type="checkbox"
-                  checked={bloom}
-                  disabled={!post}
-                  onChange={(e) => setBloom(e.target.checked)}
+                  checked={layers[row.key]}
+                  onChange={(e) => setLayer(row.key, e.target.checked)}
                 />
-                <span>
-                  bloom
-                  <span className="why">
-                    threshold above paper white — paper never blooms; embers (past 1.0) do
-                  </span>
-                </span>
+                <span>{row.name}</span>
               </label>
-
-              <h2>the burn</h2>
-              <dl className="stats">
-                <dt>ignition</dt>
-                <dd>
-                  {settings.burn.origin} · u {ORIGINS[settings.burn.origin].u}, v{' '}
-                  {ORIGINS[settings.burn.origin].v} · held {HOLD.toFixed(2)}s
-                </dd>
-                <dt>front</dt>
-                <dd>{(stats.front * 100).toFixed(2)}%</dd>
-                <dt>remaining</dt>
-                <dd>{(stats.remaining * 100).toFixed(1)}%</dd>
-                <dt>charred</dt>
-                <dd>{stats.charred} cells this step</dd>
-                <dt>tier</dt>
-                <dd>{TIER}</dd>
-              </dl>
-            </>
-          )}
-        </div>
-      )}
-
-      <div className="stage">
-        <Paper
-          ref={paperRef}
-          // Frozen, like every harness that gets photographed: a sheet with an
-          // idle sway in it is a different picture on every load, and a
-          // capture that cannot be repeated cannot be compared.
-          //
-          // Only for the flat sheet, though: `reducedMotion` switches every
-          // simulation OFF, and the hanging sheet is one. It needs none of the
-          // freezing either — no wind, so nothing sways. Passed as an explicit
-          // false, which also overrides a system that prefers reduced motion:
-          // this is a lab, and a burn that cannot cut a piece loose is not
-          // the burn being judged.
-          reducedMotion={PHYSICS === undefined}
-          content={CONTENT}
-          physics={
-            typeof PHYSICS === 'object' ? { ...PHYSICS, floor: settings.floor ? FLOOR_Y : -1.4 } : PHYSICS
-          }
-          damage={view}
-          scene={
-            {
-              lighting: LIGHTING,
-              floor: { enabled: settings.floor, y: FLOOR_Y },
-            } as ComponentProps<typeof Paper>['scene']
-          }
-        >
-          <SheetReady locate={locate} onReady={() => setSheet(true)} />
-          <CameraRig
-            view={camera}
-            at={at}
-            locate={locate}
-            burn={burn}
-            floor={settings.floor}
-            pushFrom={plan.phases.find((p) => p.id === 'catch')?.at ?? 0}
-            pushTo={plan.phases.find((p) => p.id === 'peak')?.at ?? plan.duration}
-          />
-          <FxParticles pool={burn.pool} />
-          {layers.fluid && (
-            <FxFireFluid
-              field={burn.field}
-              locate={locate}
-              quality={TIER}
-              params={fluidParams}
-              zones={flameZones}
-              heatScale={FIRE_OVERRIDES.heatScale}
-              sootScale={FIRE_OVERRIDES.sootScale}
-              contrast={FIRE_OVERRIDES.contrast}
-              opacity={FIRE_OVERRIDES.opacity}
-              warm={FIRE_OVERRIDES.warm}
-              thin={FIRE_OVERRIDES.thin}
-              sharp={FIRE_OVERRIDES.sharp === undefined ? undefined : FIRE_OVERRIDES.sharp !== 0}
-              running={playing}
-              // Every seek starts the fire over, warmed up from the rim as it
-              // stands; paused, a slider change does too, so it shows at once.
-              resetKey={fluidKey}
+            ))}
+            <Panel
+              controls={emphasize(
+                [
+                  numberControl(
+                    'detail',
+                    detail,
+                    { min: 0, max: 1, step: 0.05, label: 'Edge fray (detail)' },
+                    setDetail,
+                  ),
+                ],
+                'wide',
+              )}
             />
-          )}
-          {layers.match && <FxMatchFlame match={match} />}
-          {layers.light && (
-            <FxFireLight
-              field={burn.field}
-              locate={locate}
-              gain={settings.light}
-              shadows={settings.fireShadows}
-            />
-          )}
-          {layers.wisps && settings.burn.smoke && (
-            <FxWisps glow={burn.glow} field={burn.field} locate={locate} wind={burn.pool.wind} />
-          )}
-          {post && (
-            <FxPost
-              quality={TIER}
-              bloom={bloom ? (BLOOM_STRENGTH ?? settings.bloom) : 0}
-              threshold={THRESHOLD ?? settings.threshold}
-              haze={settings.haze}
-              focus={settings.focus}
-              field={burn.field}
-              locate={locate}
-            />
-          )}
-          <Driver
-            burn={burn}
-            view={view}
-            layers={layers}
-            detail={detail}
-            playing={playing}
-            speed={speed}
-            onTime={setShown}
-            match={match}
-            locate={locate}
-            until={plan.duration}
-            yields={settings.firelight ?? roomYield(LIGHTING)}
-            burstAt={plan.severedAt}
-            sound={soundRef}
-            soundOn={soundOn}
-          />
-          <Ready
-            plan={plan}
-            look={settings.look}
-            burn={burn}
-            view={view}
-            locate={locate}
-            armed={generation > 0}
-            playing={playing}
-            nonce={`${fluidKey}:${camera}:${at.u},${at.v}:${detail}:${post}:${bloom}`}
-            onReady={startWhenReady}
-          />
-        </Paper>
-      </div>
 
-      {!bare && showRefs && (
-        <div className="refs">
-          <div className="row">
+            <h2>Light &amp; post</h2>
+            <Panel
+              controls={emphasize(
+                [
+                  toggle('post', post, setPost, 'HDR + the tone curve (off is the renderer’s own)'),
+                  // Bloom reads the HDR frame, so it has nothing to do without it.
+                  toggle(
+                    'bloom',
+                    bloom,
+                    (on) => post && setBloom(on),
+                    'Bloom — paper never blooms, embers do',
+                  ),
+                ],
+                'wide',
+              )}
+            />
+
+            <h2>The burn</h2>
+            <dl className="lab-stats">
+              <dt>ignition</dt>
+              <dd>
+                {settings.burn.origin} · u {ORIGINS[settings.burn.origin].u}, v{' '}
+                {ORIGINS[settings.burn.origin].v} · held {HOLD.toFixed(2)}s
+              </dd>
+              <dt>front</dt>
+              <dd>{(stats.front * 100).toFixed(2)}%</dd>
+              <dt>remaining</dt>
+              <dd>{(stats.remaining * 100).toFixed(1)}%</dd>
+              <dt>charred</dt>
+              <dd>{stats.charred} cells this step</dd>
+              <dt>tier</dt>
+              <dd>{TIER}</dd>
+            </dl>
+          </>
+        )}
+      </aside>
+
+      <main className="viewport">{paper}</main>
+
+      {/* The settings: how every layer of the burn looks — or the still it is judged against. */}
+      <aside className="right">
+        <div className="rail-head">
+          <div className="segmented">
             <button type="button" aria-pressed={side === 'tune'} onClick={() => setSide('tune')}>
-              tune
+              Tune
             </button>
             <button type="button" aria-pressed={side === 'refs'} onClick={() => setSide('refs')}>
-              references
-            </button>
-            <span className="grow" />
-            <button type="button" onClick={() => setShowRefs(false)}>
-              hide
+              References
             </button>
           </div>
-          {side === 'tune' ? (
-            <Tune settings={settings} onChange={setSettings} advanced={mode === 'debug'} />
-          ) : (
+          <label
+            className="control-toggle"
+            title="Layers, the fire simulator's own panel, the field's numbers and the constants"
+          >
+            <input
+              type="checkbox"
+              checked={advanced}
+              aria-label="Advanced"
+              onChange={(e) => setAdvanced(e.target.checked)}
+            />
+            <span className="control-toggle-track" aria-hidden="true" />
+          </label>
+          <span className="rail-head-label">Advanced</span>
+        </div>
+        {savedState !== 'defaults' && (
+          <p className="rail-notice">
+            {savedState === 'stale'
+              ? 'A tune saved in this browser was set aside — the defaults have changed since it was saved. This is what the library ships.'
+              : 'Showing a tune saved in this browser, not the shipped defaults. The reset at the bottom of Tune goes back to them.'}
+          </p>
+        )}
+        {side === 'tune' ? (
+          <Tune settings={settings} onChange={setSettings} advanced={advanced} onReset={resetAll} />
+        ) : (
+          <div className="rail-body lab-reference">
+            <div className="preset-picker">
+              <Select
+                className="preset-select"
+                label="Reference still"
+                value={reference}
+                options={references}
+                onChange={(name) => setRefName(name)}
+              />
+              <button
+                type="button"
+                className="chip"
+                aria-pressed={refName === null}
+                title="Show the still for whichever moment the burn is at"
+                onClick={() => setRefName(null)}
+              >
+                follow
+              </button>
+            </div>
+            <p className="rail-caption">{near ? near.shows : 'Scrub to a moment to follow its reference.'}</p>
+            <Reference key={reference} name={reference} />
+          </div>
+        )}
+      </aside>
+
+      {/* Time, where the editor keeps it. */}
+      <footer className="transport">
+        <button
+          type="button"
+          className="play"
+          aria-label={playing ? 'Pause' : 'Play'}
+          onClick={() => (playing ? hold() : setPlaying(true))}
+        >
+          {playing ? '❚❚' : '▶'}
+        </button>
+        <input
+          type="range"
+          className="scrubber"
+          min={0}
+          max={plan.duration}
+          step={1 / 120}
+          value={shown}
+          style={{ '--fill': `${fill}%` } as React.CSSProperties}
+          aria-label="Time in the burn"
+          onChange={(e) => jump(Number(e.target.value))}
+        />
+        <span className="transport-time">
+          {shown.toFixed(2)}s of {plan.duration.toFixed(1)}s · {near ? near.id : '—'}
+        </span>
+        <div className="segmented">
+          <button type="button" onClick={() => setSpeed(1)} aria-pressed={speed === 1}>
+            1×
+          </button>
+          <button type="button" onClick={() => setSpeed(0.25)} aria-pressed={speed === 0.25}>
+            ¼×
+          </button>
+        </div>
+        <button type="button" className="chip" onClick={() => jump(0)}>
+          Restart
+        </button>
+      </footer>
+      <UIHost />
+    </div>
+  )
+}
+
+/**
+ * The lab's way out, in the one place every Paperlab screen keeps it.
+ *
+ * What the lab makes is a TUNE — every knob behind the burn — so that is what
+ * it exports: copied as JSON to hand over and become the default, or kept in
+ * this browser for next time. There is no picture here: `<Paper>` draws
+ * without a preserved buffer, and the capture scripts photograph the page
+ * with `?ui=0` instead.
+ */
+function LabExport({ settings }: { settings: LabSettings }) {
+  const [open, setOpen] = useState(false)
+  const [done, setDone] = useState<'copy' | 'save' | null>(null)
+  /** The JSON, when the clipboard refused it — handed over in a box instead. */
+  const [fallback, setFallback] = useState<string | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [open])
+
+  const flash = (what: 'copy' | 'save') => {
+    setDone(what)
+    setTimeout(() => setDone((d) => (d === what ? null : d)), 1600)
+  }
+
+  const copy = () => {
+    const text = JSON.stringify(settings, null, 2)
+    if (!navigator.clipboard) {
+      setFallback(text)
+      return
+    }
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setFallback(null)
+        flash('copy')
+      },
+      () => setFallback(text),
+    )
+  }
+
+  const save = () => {
+    try {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, stamp: DEFAULTS_STAMP }))
+      flash('save')
+    } catch {
+      toast('This browser would not save it — copy it instead.', 'error')
+    }
+  }
+
+  return (
+    <div className="export-menu" ref={rootRef}>
+      <button type="button" className="export" onClick={() => setOpen((v) => !v)}>
+        Export
+      </button>
+      {open && (
+        <div className="export-dropdown">
+          <p className="export-group">This tune</p>
+          <button type="button" className="export-primary" onClick={copy}>
+            <strong>Copy settings</strong>
+            <span>JSON — send it over and it becomes the default</span>
+            {done === 'copy' && <span className="copied-badge">Copied ✓</span>}
+          </button>
+          <div className="export-secondary">
+            <button type="button" onClick={save}>
+              <strong>Save in this browser</strong>
+              <span>it loads next time you open the lab</span>
+              {done === 'save' && <span className="copied-badge">Saved ✓</span>}
+            </button>
+          </div>
+          {fallback && (
             <>
-              <div className="row" style={{ marginTop: 10 }}>
-                <select
-                  className="grow"
-                  value={reference}
-                  onChange={(e) => setRefName(e.target.value)}
-                  style={{
-                    background: 'transparent',
-                    color: 'inherit',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 7,
-                    padding: '6px 8px',
-                  }}
-                >
-                  {[
-                    ...new Set([
-                      ...phases.map((p) => p.reference),
-                      'Never_this.png',
-                      'Ember_line.png',
-                      'Ember_line__annotated.png',
-                      'Char_and_ash_lip.png',
-                      'Scorch.png',
-                      'Flame_base.png',
-                      'Hero.png',
-                    ]),
-                  ].map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => setRefName(null)}>
-                  follow phase
-                </button>
-              </div>
-              <p className="caption">{near ? near.shows : 'scrub to a phase to follow its reference'}</p>
-              <Reference key={reference} name={reference} />
+              <p className="export-note">The clipboard is blocked here — copy it from the box.</p>
+              <textarea className="export-fallback" readOnly rows={8} value={fallback} />
             </>
           )}
-        </div>
-      )}
-      {!bare && !showRefs && (
-        <div className="refs" style={{ width: 'auto', minWidth: 0, padding: 10 }}>
-          <button type="button" onClick={() => setShowRefs(true)}>
-            tune & references
-          </button>
         </div>
       )}
     </div>
   )
 }
 
-/** One slider row. */
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  onInput,
-}: {
-  label: string
-  value: number
-  min: number
-  max: number
-  step: number
-  unit?: string
-  onInput(value: number): void
-}) {
-  return (
-    <label className="layer" style={{ display: 'block' }}>
-      <span className="row">
-        <span className="grow">{label}</span>
-        <span className="clock">
-          {value.toFixed(step < 0.05 ? 3 : 2)}
-          {unit ? ` ${unit}` : ''}
-        </span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onInput(Number(e.target.value))}
-      />
-    </label>
-  )
-}
-
 /**
- * The Tune sidebar: every layer of the burn, live, each group with its own
- * reset — and the whole combination copied, saved or put back, so the one
- * that looks right can become the default.
+ * The Tune rail: every layer of the burn, live, each group with its own
+ * reset — in the editor's own controls, so a slider here is dragged, scrubbed
+ * and typed into exactly the way one is in the inspector.
+ *
+ * Folded, bar the burn: sixty sliders open at once is what finding the look
+ * needed, and it is not what looking at one needs.
  */
 function Tune({
   settings,
   onChange,
   advanced,
+  onReset,
 }: {
   settings: LabSettings
   onChange(next: LabSettings): void
   advanced: boolean
+  onReset(): void
 }) {
-  const [note, setNote] = useState('')
-  const [json, setJson] = useState<string | null>(null)
   const setLook = (key: keyof Required<DamageLook>, value: number) =>
     onChange({ ...settings, look: { ...settings.look, [key]: value } })
   const setFluid = (fluid: FireFluidParams) => onChange({ ...settings, fluid })
@@ -1866,321 +1947,227 @@ function Tune({
     onChange({ ...settings, look })
   }
 
-  const copy = () => {
-    const text = JSON.stringify(settings, null, 2)
-    navigator.clipboard?.writeText(text).then(
-      () => {
-        setJson(null)
-        setNote('Copied — paste it to Claude and it becomes the default.')
-      },
-      () => {
-        setJson(text)
-        setNote('The clipboard is blocked here; copy it from the box below.')
-      },
-    )
-  }
-  const save = () => {
-    try {
-      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, stamp: DEFAULTS_STAMP }))
-      setNote('Saved in this browser — it loads next time you open the lab.')
-    } catch {
-      setNote('This browser would not save it; copy it instead.')
-    }
-  }
-  const reset = () => {
-    onChange(DEFAULT_SETTINGS)
-    try {
-      window.localStorage.removeItem(SETTINGS_KEY)
-    } catch {
-      // Nothing saved, or nowhere to save it: the defaults are back either way.
-    }
-    setNote('Back to the defaults.')
-  }
+  /** One slider, its unit carried in the label — the readout is a number and nothing else. */
+  const slider = (
+    key: string,
+    value: number,
+    range: { min: number; max: number; step: number },
+    label: string,
+    onInput: (v: number) => void,
+    unit?: string,
+  ): Control => numberControl(key, value, { ...range, label: unit ? `${label} (${unit})` : label }, onInput)
+  const wide = (controls: Control[]) => emphasize(controls, 'wide')
+
+  const controls: Control[] = [
+    folder('Burn', [
+      ...wide([
+        slider(
+          'decay',
+          burn.decay,
+          { min: 0.5, max: 6, step: 0.1 },
+          'Takes this long to die',
+          (v) => setBurn({ decay: v }),
+          's',
+        ),
+        slider(
+          'smoulder',
+          burn.smoulder,
+          { min: 0.2, max: 6, step: 0.1 },
+          'Beads smoulder for up to',
+          (v) => setBurn({ smoulder: v }),
+          's',
+        ),
+        slider('ash', burn.ash, { min: 0, max: 3, step: 0.05 }, 'Ash off the cooling edge', (v) =>
+          setBurn({ ash: v }),
+        ),
+        toggle('smoke', burn.smoke, (smoke) => setBurn({ smoke }), 'Smoke — off keeps the background clean'),
+      ]),
+      button('Reset burn', () => onChange({ ...settings, burn: DEFAULT_SETTINGS.burn })),
+    ]),
+
+    ...groups.map((group) =>
+      folder(
+        group,
+        [
+          ...wide(
+            SLIDERS.filter((s) => s.group === group).map((s) =>
+              slider(s.key, settings.look[s.key], s, s.label, (v) => setLook(s.key, v), s.unit),
+            ),
+          ),
+          button(`Reset ${group.toLowerCase()}`, () => resetGroup(group)),
+        ],
+        { collapsed: true },
+      ),
+    ),
+
+    // The flame, in the four zones it actually has (FireZones) — the same
+    // pattern as the sheet's zones above, so a flame is art-directed the way
+    // a burnt edge is.
+    ...FLAME_ZONE_NAMES.map(({ zone, title, note }) =>
+      folder(
+        `Flame · ${title}`,
+        [
+          noteControl(`${zone}-note`, note),
+          color(`${zone}-color`, settings.zones[zone].color, (v) => setZone(zone, { color: v }), 'Colour'),
+          ...wide(
+            FLAME_CONTROLS.filter((c) => c.zone === zone).map((c) =>
+              slider(
+                `${zone}-${c.key}`,
+                (settings.zones[zone] as unknown as Record<string, number>)[c.key] ?? 0,
+                c,
+                c.label,
+                (v) => setZone(zone, { [c.key]: v }),
+                c.unit,
+              ),
+            ),
+          ),
+          button(`Reset ${title.toLowerCase()}`, () => setZone(zone, { ...FIRE_ZONES[zone] })),
+        ],
+        { collapsed: true },
+      ),
+    ),
+
+    // The solver's own panel, in the vocabulary of the tool it was borrowed
+    // from: seventeen sliders where at least five move the same thing on
+    // screen. It found the look and it is the wrong surface for using one,
+    // so it lives behind Advanced rather than being deleted — the next time
+    // the fire's motion is wrong, this is what fixes it.
+    ...(advanced
+      ? [
+          folder(
+            'Fire simulator',
+            [
+              ...[...new Set(fireFluidControls.map((c) => c.group))].map((group) =>
+                folder(group, [
+                  ...wide(
+                    fireFluidControls
+                      .filter((c) => c.group === group)
+                      .map((c) =>
+                        slider(c.key, fluid[c.key], c, c.label, (v) => setFluid({ ...fluid, [c.key]: v })),
+                      ),
+                  ),
+                  ...(group === 'Emission'
+                    ? wide([
+                        slider(
+                          'initialVelocityY',
+                          fluid.initialVelocity[1],
+                          { min: 0, max: 5, step: 0.05 },
+                          'Initial velocity Y',
+                          (v) =>
+                            setFluid({
+                              ...fluid,
+                              initialVelocity: [fluid.initialVelocity[0], v, fluid.initialVelocity[2]],
+                            }),
+                        ),
+                      ])
+                    : []),
+                ]),
+              ),
+              button('Reset fire simulator', () => setFluid(fireFluidDefaults)),
+            ],
+            { collapsed: true },
+          ),
+        ]
+      : []),
+
+    folder(
+      'Fire light',
+      wide([
+        slider('light', settings.light, { min: 0, max: 80, step: 1 }, 'Gain', (v) =>
+          onChange({ ...settings, light: v }),
+        ),
+        slider(
+          'firelight',
+          settings.firelight ?? roomYield(LIGHTING),
+          { min: 0, max: 1, step: 0.01 },
+          'How much the room yields at the fire’s height',
+          (v) => onChange({ ...settings, firelight: v }),
+        ),
+        toggle(
+          'fireShadows',
+          settings.fireShadows,
+          (fireShadows) => onChange({ ...settings, fireShadows }),
+          'Casts shadows (one extra shadow pass a frame)',
+        ),
+      ]),
+      { collapsed: true },
+    ),
+
+    folder(
+      'Bloom & haze',
+      wide([
+        slider('bloom', settings.bloom, { min: 0, max: 3, step: 0.05 }, 'Bloom strength', (v) =>
+          onChange({ ...settings, bloom: v }),
+        ),
+        // A correctness constant, not a look: below it paper blooms, which is
+        // the painted-glow failure the whole pass exists to prevent. It is
+        // not something to tune a fire with, so it is only here to be ruled
+        // out when something is wrong.
+        ...(advanced
+          ? [
+              slider(
+                'threshold',
+                settings.threshold,
+                { min: 1, max: 6, step: 0.05 },
+                'Bloom starts at (a correctness constant — below ~1.6 paper blooms)',
+                (v) => onChange({ ...settings, threshold: v }),
+              ),
+            ]
+          : []),
+        slider('focus', settings.focus, { min: 0, max: 1, step: 0.01 }, 'Shallow focus on the burn', (v) =>
+          onChange({ ...settings, focus: v }),
+        ),
+        // Last polish item, not a look — see `fxQualityTiers.haze`. It is off
+        // on this lab's tier, and it is still placed from where the sprite
+        // flames stand rather than from where the fluid burns.
+        ...(advanced
+          ? [
+              slider(
+                'haze',
+                settings.haze,
+                { min: 0, max: 6, step: 0.1 },
+                'Heat haze (off on this tier)',
+                (v) => onChange({ ...settings, haze: v }),
+                'px',
+              ),
+            ]
+          : []),
+      ]),
+      { collapsed: true },
+    ),
+
+    folder(
+      'Particles',
+      wide([
+        slider('embers', settings.rates.embers, { min: 0, max: 1, step: 0.01 }, 'Embers', (v) =>
+          onChange({ ...settings, rates: { ...settings.rates, embers: v } }),
+        ),
+        slider('smoke-rate', settings.rates.smoke, { min: 0, max: 0.3, step: 0.005 }, 'Smoke puffs', (v) =>
+          onChange({ ...settings, rates: { ...settings.rates, smoke: v } }),
+        ),
+        slider('ash-rate', settings.rates.ash, { min: 0, max: 1, step: 0.01 }, 'Ash flakes', (v) =>
+          onChange({ ...settings, rates: { ...settings.rates, ash: v } }),
+        ),
+      ]),
+      { collapsed: true },
+    ),
+  ]
 
   return (
-    <div className="tune">
-      <p className="caption">
-        Every layer of the burn, live. When a combination looks right, copy it and send it over — it becomes
-        the default.
-      </p>
-      <div className="row">
-        <button type="button" onClick={copy}>
-          copy settings
-        </button>
-        <button type="button" onClick={save}>
-          save in this browser
-        </button>
-        <button type="button" onClick={reset}>
-          reset all
+    <>
+      <div className="rail-body">
+        <p className="rail-caption">
+          Every layer of the burn, live. When a combination looks right, Export copies it — send it over and
+          it becomes the default.
+        </p>
+      </div>
+      <Panel controls={controls} />
+      <div className="rail-body">
+        <button type="button" className="control-button" onClick={onReset}>
+          Reset everything to the shipped defaults
         </button>
       </div>
-      {note && <p className="caption">{note}</p>}
-      {json && <textarea readOnly value={json} rows={8} style={{ width: '100%', fontSize: 11 }} />}
-
-      <details open>
-        <summary>Burn</summary>
-        <div className="row">
-          {(['center', 'corner'] as const).map((origin) => (
-            <button
-              type="button"
-              key={origin}
-              aria-pressed={burn.origin === origin}
-              onClick={() => setBurn({ origin })}
-            >
-              {origin === 'center' ? 'centre — a hole' : 'corner — eats upward'}
-            </button>
-          ))}
-        </div>
-        {/* How much burns lives beside the transport now — it decides what
-            happens, and "starts to die when this much is gone" was a way of
-            asking for it that left a third more burnt than it said. */}
-        <Slider
-          label="Takes this long to die"
-          value={burn.decay}
-          min={0.5}
-          max={6}
-          step={0.1}
-          unit="s"
-          onInput={(v) => setBurn({ decay: v })}
-        />
-        <Slider
-          label="Beads smoulder for up to"
-          value={burn.smoulder}
-          min={0.2}
-          max={6}
-          step={0.1}
-          unit="s"
-          onInput={(v) => setBurn({ smoulder: v })}
-        />
-        <Slider
-          label="Ash off the cooling edge"
-          value={burn.ash}
-          min={0}
-          max={3}
-          step={0.05}
-          onInput={(v) => setBurn({ ash: v })}
-        />
-        <label className="layer">
-          <input
-            type="checkbox"
-            checked={burn.smoke}
-            onChange={(e) => setBurn({ smoke: e.target.checked })}
-          />{' '}
-          Smoke <span className="why">off keeps the background clean</span>
-        </label>
-        <button type="button" onClick={() => onChange({ ...settings, burn: DEFAULT_SETTINGS.burn })}>
-          reset burn
-        </button>
-      </details>
-
-      {groups.map((group) => (
-        <details open key={group}>
-          <summary>{group}</summary>
-          {SLIDERS.filter((s) => s.group === group).map((s) => (
-            <Slider
-              key={s.key}
-              label={s.label}
-              value={settings.look[s.key]}
-              min={s.min}
-              max={s.max}
-              step={s.step}
-              unit={s.unit}
-              onInput={(v) => setLook(s.key, v)}
-            />
-          ))}
-          <button type="button" onClick={() => resetGroup(group)}>
-            reset {group.toLowerCase()}
-          </button>
-        </details>
-      ))}
-
-      {/* The solver's own panel, in the vocabulary of the tool it was borrowed
-          from: seventeen sliders where at least five move the same thing on
-          screen. It found the look and it is the wrong surface for using one,
-          so it lives in debug rather than being deleted — the next time the
-          fire's motion is wrong, this is what fixes it. */}
-      {/* The flame, in the four zones it actually has (FireZones) — the same
-          pattern as the sheet's zones above, so a flame is art-directed the
-          way a burnt edge is. */}
-      {FLAME_ZONE_NAMES.map(({ zone, title, note }) => (
-        <details open key={zone}>
-          <summary>Flame · {title}</summary>
-          <p className="caption">{note}</p>
-          <label className="layer" style={{ display: 'block' }}>
-            <span className="row">
-              <span className="grow">Colour</span>
-              <input
-                type="color"
-                value={settings.zones[zone].color}
-                onChange={(e) => setZone(zone, { color: e.target.value })}
-              />
-            </span>
-          </label>
-          {FLAME_CONTROLS.filter((c) => c.zone === zone).map((c) => (
-            <Slider
-              key={c.key}
-              label={c.label}
-              value={(settings.zones[zone] as unknown as Record<string, number>)[c.key] ?? 0}
-              min={c.min}
-              max={c.max}
-              step={c.step}
-              {...(c.unit ? { unit: c.unit } : {})}
-              onInput={(v) => setZone(zone, { [c.key]: v })}
-            />
-          ))}
-          <button type="button" onClick={() => setZone(zone, { ...FIRE_ZONES[zone] })}>
-            reset {title.toLowerCase()}
-          </button>
-        </details>
-      ))}
-      {advanced && (
-        <details open>
-          <summary>Fire simulator</summary>
-          {[...new Set(fireFluidControls.map((c) => c.group))].map((group) => (
-            <div key={group}>
-              <div className="layer" style={{ color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>
-                {group}
-              </div>
-              {fireFluidControls
-                .filter((c) => c.group === group)
-                .map((c) => (
-                  <Slider
-                    key={c.key}
-                    label={c.label}
-                    value={fluid[c.key]}
-                    min={c.min}
-                    max={c.max}
-                    step={c.step}
-                    onInput={(v) => setFluid({ ...fluid, [c.key]: v })}
-                  />
-                ))}
-              {group === 'Emission' && (
-                <Slider
-                  label="Initial velocity Y"
-                  value={fluid.initialVelocity[1]}
-                  min={0}
-                  max={5}
-                  step={0.05}
-                  onInput={(v) =>
-                    setFluid({
-                      ...fluid,
-                      initialVelocity: [fluid.initialVelocity[0], v, fluid.initialVelocity[2]],
-                    })
-                  }
-                />
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={() => setFluid(fireFluidDefaults)}>
-            reset fire simulator
-          </button>
-        </details>
-      )}
-
-      <details open>
-        <summary>Fire light</summary>
-        <Slider
-          label="Gain"
-          value={settings.light}
-          min={0}
-          max={80}
-          step={1}
-          onInput={(v) => onChange({ ...settings, light: v })}
-        />
-        <Slider
-          label="How much the room yields at the fire's height"
-          value={settings.firelight ?? roomYield(LIGHTING)}
-          min={0}
-          max={1}
-          step={0.01}
-          onInput={(v) => onChange({ ...settings, firelight: v })}
-        />
-        <label>
-          <input
-            type="checkbox"
-            checked={settings.fireShadows}
-            onChange={(e) => onChange({ ...settings, fireShadows: e.currentTarget.checked })}
-          />{' '}
-          casts shadows (one extra shadow pass a frame)
-        </label>
-      </details>
-
-      <details open>
-        <summary>Bloom &amp; haze</summary>
-        <Slider
-          label="Bloom strength"
-          value={settings.bloom}
-          min={0}
-          max={3}
-          step={0.05}
-          onInput={(v) => onChange({ ...settings, bloom: v })}
-        />
-        {/* A correctness constant, not a look: below it paper blooms, which is
-            the painted-glow failure the whole pass exists to prevent. It is
-            not something to tune a fire with, so it is only here to be ruled
-            out when something is wrong. */}
-        {advanced && (
-          <Slider
-            label="Bloom starts at (a correctness constant — below ~1.6 paper blooms)"
-            value={settings.threshold}
-            min={1}
-            max={6}
-            step={0.05}
-            onInput={(v) => onChange({ ...settings, threshold: v })}
-          />
-        )}
-        {/* Last polish item, not a look — see `fxQualityTiers.haze`. It is off
-            on this lab's tier, and it is still placed from where the sprite
-            flames stand rather than from where the fluid burns. */}
-        <Slider
-          label="Shallow focus on the burn"
-          value={settings.focus}
-          min={0}
-          max={1}
-          step={0.01}
-          onInput={(v) => onChange({ ...settings, focus: v })}
-        />
-        {advanced && (
-          <Slider
-            label="Heat haze (off on this tier)"
-            value={settings.haze}
-            min={0}
-            max={6}
-            step={0.1}
-            unit="px"
-            onInput={(v) => onChange({ ...settings, haze: v })}
-          />
-        )}
-      </details>
-
-      <details open>
-        <summary>Particles</summary>
-        <Slider
-          label="Embers"
-          value={settings.rates.embers}
-          min={0}
-          max={1}
-          step={0.01}
-          onInput={(v) => onChange({ ...settings, rates: { ...settings.rates, embers: v } })}
-        />
-        <Slider
-          label="Smoke puffs"
-          value={settings.rates.smoke}
-          min={0}
-          max={0.3}
-          step={0.005}
-          onInput={(v) => onChange({ ...settings, rates: { ...settings.rates, smoke: v } })}
-        />
-        <Slider
-          label="Ash flakes"
-          value={settings.rates.ash}
-          min={0}
-          max={1}
-          step={0.01}
-          onInput={(v) => onChange({ ...settings, rates: { ...settings.rates, ash: v } })}
-        />
-      </details>
-    </div>
+    </>
   )
 }
 
@@ -2189,7 +2176,7 @@ function Reference({ name }: { name: string }) {
   const [missing, setMissing] = useState(false)
   if (missing) {
     return (
-      <p className="missing">
+      <p className="lab-missing">
         <code>{name}</code> did not load. The references live beside <code>paperlab-fx-fire-spec.md</code>,
         outside this repo — set <code>PAPERLAB_FX_REFS</code> to the <code>fx-refs</code> directory that holds
         them and restart the dev server.

@@ -49,7 +49,7 @@ export function App() {
           <a href="../">Playground</a>
           <a href="../editor/">Editor</a>
           <a href="../hands/">Hands</a>
-          <a href="../fx-lab/">Fire lab</a>
+          <a href="../fx-lab/">FX Lab</a>
           <a href="https://github.com/NourMtir0722/Paperlab">GitHub</a>
         </div>
       </nav>

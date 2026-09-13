@@ -66,7 +66,15 @@ export type Control =
  * behavior get a full-width row instead of a 88px label and a hairline
  * slider. Nothing else about them differs: same descriptor, same write path.
  */
-export type Emphasis = 'signature'
+export type Emphasis = 'signature' | 'wide'
+
+/*
+ * `wide` is not louder, only laid out differently: the label is a sentence
+ * too long for the 88px column ("Where the flame begins (how dense its
+ * soot)"), so it takes the whole first line with the readout beside it and the
+ * slider runs full width underneath. The FX Lab's controls are named for what
+ * a person SEES, and that takes more than one word.
+ */
 
 // ── Constructors — the inspectors read better building trees from these. ────
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Paperlab — hands · set the paper alight</title>
+    <title>Paperlab — Hands</title>
     <!--
       This page may talk to its own origin, and to exactly one other place.
 
@@ -36,52 +36,16 @@
       content="default-src 'self' blob: data:; connect-src 'self' https://storage.googleapis.com ws: wss: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: mediastream:"
     />
     <style>
-      :root { color-scheme: dark; }
-      html, body { margin: 0; height: 100%; background: #0b0b0b; overflow: hidden; }
-      body { font-family: "Inter", system-ui, -apple-system, sans-serif; color: rgba(255,255,255,0.92); }
-      #root { height: 100%; }
-      .stage { position: fixed; inset: 0; }
+      html, body { margin: 0; height: 100%; background: #08090a; }
 
-      .hud {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        width: 260px;
-        padding: 16px;
-        border-radius: 12px;
-        background: rgba(18,18,18,0.82);
-        border: 1px solid rgba(255,255,255,0.09);
-        backdrop-filter: blur(12px);
-      }
-      .hud h1 { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; }
-      .sub { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.5); }
-      .hud button {
-        width: 100%;
-        padding: 9px 12px;
-        font: inherit;
-        font-size: 13px;
-        color: #111;
-        background: rgba(255,255,255,0.94);
-        border: 0;
-        border-radius: 8px;
-        cursor: pointer;
-      }
-      .hud button:disabled { opacity: 0.5; cursor: default; }
-      .readout {
-        margin: 12px 0 0;
-        font-family: ui-monospace, monospace;
-        font-size: 11px;
-        color: rgba(255,255,255,0.55);
-        min-height: 1em;
-      }
-      .note { margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: rgba(255,255,255,0.5); }
-      .hud button.ghost {
-        margin-top: 10px;
-        color: rgba(255,255,255,0.8);
-        background: transparent;
-        border: 1px solid rgba(255,255,255,0.16);
-      }
-      .error { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: #ff8a8a; }
+      /*
+        The frame is the editor's (`src/styles.css`): the five-surface switch
+        on top, the camera and the match on the left, the sheet in the middle,
+        what the tracker sees on the right. Only what is particular to a page
+        that watches a camera is here — and it is the one page whose chrome
+        speaks in the fire's own colours, because what it is saying is "the
+        camera found a flame".
+      */
 
       /*
         What the camera sees, drawn over the stage: the hand's bones and a box
@@ -90,11 +54,12 @@
       */
       .overlay { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
-      /* The proof a flame was found, at the top of the page, while it is seen. */
+      /* The proof a flame was found, at the top of the sheet, while it is seen. */
       .banner {
-        position: fixed;
+        position: absolute;
         top: 20px;
         left: 50%;
+        z-index: 3;
         transform: translateX(-50%);
         display: flex;
         align-items: center;
@@ -104,6 +69,7 @@
         font-size: 13px;
         font-weight: 600;
         letter-spacing: 0.02em;
+        white-space: nowrap;
         color: #1a0b00;
         background: #ff8a2a;
         box-shadow: 0 0 0 1px rgba(255,190,120,0.6), 0 0 28px rgba(255,120,30,0.55);
@@ -125,19 +91,19 @@
 
       /*
         The camera's own picture, mirrored so the hand on screen moves the way
-        your hand moves. Small and under the panel: it is how you aim a flame
-        you are holding, and how anyone can see what the page can see.
+        your hand moves. In the tool rail, under the button that started it:
+        it is how you aim a flame you are holding, and how anyone can see what
+        the page can see. Hidden until there is a picture to show.
       */
       .camera {
-        position: fixed;
-        left: 20px;
-        bottom: 20px;
-        width: 220px;
-        border-radius: 10px;
-        border: 1px solid rgba(255,255,255,0.09);
-        transform: scaleX(-1);
         display: block;
+        width: 100%;
+        margin-top: 12px;
+        border-radius: 8px;
+        background: #000;
+        transform: scaleX(-1);
       }
+      .camera[hidden] { display: none; }
 
       .cursor {
         position: fixed;
