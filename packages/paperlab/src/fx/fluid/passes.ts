@@ -539,10 +539,17 @@ void main() {
   float rootMask = smoothstep(mix(0.4, 0.02, uRootReach), mix(0.6, 0.12, uRootReach), fuel) * (1.0 - smoothstep(0.25, 0.6, t));
   fire += uRootColor * rootMask * uRootAmount * uPaperWhite * uGlow * 0.6;
 
-  // Smoke: warm grey-brown (a cool grey over cream reads lavender), lit by
-  // the fire under it.
+  // Smoke: grey-brown, warm (a cool grey over cream reads lavender), and LIT
+  // BY THE FIRE UNDER IT rather than by nothing.
+  //
+  // The base used to be bright enough to read on its own — beige — which is
+  // right while flames are lighting it and wrong the moment they stop: the
+  // last of the smoke hung over a black stage as flat beige slabs, the same
+  // colour everywhere, which reads as a filled shape rather than as smoke
+  // (Noor, 2026-09-13). Dim at the base and warm where the fire is: smoke by
+  // the flames looks as it did, smoke after them goes to a dim grey.
   float smokeAlpha = 1.0 - exp(-smoke * uSmokeDensity);
-  vec3 smokeColor = vec3(0.16, 0.13, 0.10) + vec3(0.22, 0.09, 0.02) * smoothstep(0.15, 0.9, t);
+  vec3 smokeColor = vec3(0.075, 0.068, 0.062) + vec3(0.3, 0.14, 0.045) * smoothstep(0.12, 0.9, t);
   float alpha = smokeAlpha + fireAlpha - smokeAlpha * fireAlpha;
   // No square edge: the domain fades out before its borders.
   float edge = smoothstep(0.0, 0.06, vUv.x) * smoothstep(1.0, 0.94, vUv.x) * smoothstep(0.0, 0.03, vUv.y) * smoothstep(1.0, 0.9, vUv.y);
