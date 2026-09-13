@@ -173,6 +173,11 @@ interface LabSettings {
   zones: FireZones
   /** The fire light's gain (`FxFireLight`). */
   light: number
+  /**
+   * How much of the room's light a fire at its height takes over, 0..1
+   * (`DamageFirelight`); null is the lighting preset's own — see `roomYield`.
+   */
+  firelight: number | null
   /** Bloom strength, and the scene luminance it starts at. */
   bloom: number
   threshold: number
@@ -454,6 +459,19 @@ const LOOK_OVERRIDES: Partial<typeof DAMAGE_LOOK_DEFAULTS> = (() => {
   }
   return out
 })()
+/**
+ * How much of the room's light a fire at its height takes over, per lighting
+ * preset (option O5 in the plan). In noir the fire IS the light: the room
+ * drops to about a third and everything the fire does not light is black.
+ * Under studio and window the fire reads by contrast rather than by light,
+ * so the room barely yields.
+ */
+function roomYield(lighting: string): number {
+  if (lighting === 'noir') return 0.67
+  if (lighting === 'studio' || lighting === 'window') return 0.15
+  return 0.4
+}
+
 /** What every knob starts at: the product's own values (and any `?look=`). */
 const DEFAULT_SETTINGS: LabSettings = {
   look: { ...DAMAGE_LOOK_DEFAULTS, ...LOOK_OVERRIDES },
@@ -463,6 +481,9 @@ const DEFAULT_SETTINGS: LabSettings = {
   // library's defaults, read from it and never copied, so the lab cannot
   // show a fire the product does not have.
   light: FIRE_LIGHT_GAIN,
+  // The preset's own until someone moves the slider — so switching presets
+  // in the URL does not make a saved tune look stale.
+  firelight: null,
   // The library's own, not copies of them: these three used to be literals
   // here and in `fx/emission.ts` both, which is exactly how a lab comes to
   // show a fire the product does not have.
@@ -615,6 +636,8 @@ class FieldView implements DamageSource {
   time = 0
   /** How the burn is drawn — the Tune sidebar's, read by the sheet every frame. */
   look: DamageLook = {}
+  /** How much of the room's light is left, as the fire takes over — set by `Driver` every frame. */
+  firelight = { room: 1 }
   private from = -1
   private mask = ''
 
@@ -721,9 +744,12 @@ function Driver({
   match,
   locate,
   until,
+  yields,
 }: {
   burn: ScriptedBurn
   view: FieldView
+  /** How much of the room's light a fire at its height takes over, 0..1. */
+  yields: number
   layers: Layers
   detail: number
   playing: boolean
@@ -740,6 +766,10 @@ function Driver({
       onTime(burn.time)
     }
     view.sync(burn.glow, layers, detail)
+    // The fire is the key light while it burns, and the room yields to it —
+    // but only while its light is on: with the light layer off, nothing on
+    // screen is lighting the sheet in the room's place.
+    view.firelight.room = layers.light ? 1 - yields * burn.fireLevel : 1
     // The match that lights it.
     //
     // The lab had none, so the scorch and then the first hole appeared with
@@ -1477,6 +1507,7 @@ function Lab() {
             match={match}
             locate={locate}
             until={plan.duration}
+            yields={settings.firelight ?? roomYield(LIGHTING)}
           />
           <Ready
             plan={plan}
@@ -1854,6 +1885,14 @@ function Tune({
           max={80}
           step={1}
           onInput={(v) => onChange({ ...settings, light: v })}
+        />
+        <Slider
+          label="How much the room yields at the fire's height"
+          value={settings.firelight ?? roomYield(LIGHTING)}
+          min={0}
+          max={1}
+          step={0.01}
+          onInput={(v) => onChange({ ...settings, firelight: v })}
         />
       </details>
 

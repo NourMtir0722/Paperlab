@@ -112,6 +112,20 @@ export interface BurnSettings {
   smoke: boolean
 }
 
+/**
+ * The front's length at which a fire counts as at its height, as the room
+ * sees it: the front runs to about 0.045 at a burn's peak, and 0.03 is where
+ * the flames are already lighting the whole sheet.
+ */
+const FIRE_FULL_FRONT = 0.03
+
+/**
+ * How quickly the room's light follows the fire, seconds: it answers the
+ * fire's size, not its every gust — a light that pumped with each puff would
+ * read as a fault in the room, not as a fire in it.
+ */
+const FIRE_LEVEL_EASE = 0.8
+
 export const BURN_DEFAULTS: BurnSettings = {
   origin: 'center',
   // A third: the fire gives up while the hole is still a hole, with paper all
@@ -742,6 +756,8 @@ export class ScriptedBurn {
   /** The shed's own random stream, so ash off a cooling edge cannot shift the emitter's. */
   private shedState = 11
   private ashCap: number | undefined
+  /** How big the fire is, 0..1, eased — see {@link fireLevel}. */
+  private level = 0
   private last: FieldStats = {
     front: 0,
     charred: 0,
@@ -781,6 +797,15 @@ export class ScriptedBurn {
   /** When the fire started to die, or null while it is still growing. */
   get decayStarted(): number | null {
     return this.decayFrom
+  }
+
+  /**
+   * How big the fire is, 0..1, eased over about a second on the burn's clock:
+   * what the room's light yields to (`DamageFirelight`). 1 is a fire at its
+   * height; it falls back to 0 as the fire dies.
+   */
+  get fireLevel(): number {
+    return this.level
   }
 
   /** When the front went out, or null while anything is burning. */
@@ -831,6 +856,7 @@ export class ScriptedBurn {
     this.decayFrom = null
     this.outAt = null
     this.shedState = 11
+    this.level = 0
     this.last = { front: 0, charred: 0, consumed: 0, wetted: 0, saturation: 0, remaining: 1 }
   }
 
@@ -878,6 +904,11 @@ export class ScriptedBurn {
       this.field.paint(HEAT, 0.5, 0.5, 1, -DECAY_COOL * dying * FIXED_DT, 1)
     }
     this.last = this.field.step(FIXED_DT)
+    // The fire's size as the room sees it. On the burn's clock, so a seek
+    // lands on the same light every time — the captures compare two loads
+    // pixel for pixel, and a light eased on the wall clock would differ.
+    const target = Math.min(1, this.last.front / FIRE_FULL_FRONT)
+    this.level += (target - this.level) * (1 - Math.exp(-FIXED_DT / FIRE_LEVEL_EASE))
     if (this.outAt === null && this.t > HOLD && this.last.front === 0 && this.last.remaining < 1) {
       this.outAt = this.t
     }
