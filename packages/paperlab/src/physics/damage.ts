@@ -18,7 +18,7 @@ import type { ClothSim } from './cloth'
  * Cheap at rest: nothing is read unless the source's `version` moved.
  */
 
-const { char: CHAR, saturation: SATURATION, presence: PRESENCE } = DAMAGE_CHANNELS
+const { char: CHAR, saturation: SATURATION, heat: HEAT, presence: PRESENCE } = DAMAGE_CHANNELS
 
 /**
  * Presence below this, as a byte, is paper the sheet does not draw.
@@ -31,13 +31,46 @@ const { char: CHAR, saturation: SATURATION, presence: PRESENCE } = DAMAGE_CHANNE
 const GONE_BELOW = 128
 
 /**
- * How far fully-charred paper shrinks in its own plane.
+ * How far fully-charred paper shrinks in its own plane, ALONG the burn front.
  *
  * Char shrinks — it does not soften, which would only make the sheet droop.
- * Every kind of spring alike: the shrinking is of the paper, and the curl is
- * {@link CHAR_CURL}'s job, not a difference in how far the springs shrink.
  */
 const CHAR_SHRINK = 0.12
+
+/**
+ * How much of that shrink a spring lying ACROSS the front gets instead, 0..1.
+ *
+ * Char shrinks every way at once in the paper, but what a sheet DOES about it
+ * depends on which way: shortened along the front, the rim has less edge than
+ * the paper behind it and rolls, which is what a burnt edge does. Shortened
+ * across the front, the burnt ring pulls the whole sheet toward the hole —
+ * and a hanging sheet answers that by buckling into long smooth folds that
+ * converge on the burn, which is what cloth does and paper does not.
+ *
+ * Measured on a hanging sheet (2026-09-13): with the shrink the same every
+ * way, the unburnt paper was 4.6 times further out of plane at the peak than
+ * with it switched off, in folds running from the hole to the bottom edge.
+ * Just over half: enough less pull to take the worst of the folds out, and
+ * not so much less that the roll goes with it. The pull across the front is
+ * part of what rolls a burnt edge up, so cutting it to a quarter cost the
+ * scroll — measured on the burnt-edge test, which holds the free edge to
+ * 50 mm of lift: full 78 mm, a quarter 42 mm, half 49 mm, this 53 mm. A
+ * stronger curl does not buy it back: past about 6 the band snaps through
+ * and rolls the other way.
+ */
+const ACROSS_SHRINK = 0.55
+
+/**
+ * How hard the hottest paper is pushed up by the air over it, world units a
+ * second squared, and how much of that pushes it toward its front face.
+ *
+ * The gas over a burning rim rises, and the rim rises with it: the edge lifts,
+ * flutters while it burns, and settles when the fire goes out. Cloth gravity
+ * is 3.2 of these units, so a third of it is a lift a burning edge feels and
+ * the rest of the sheet does not. Local, not wind: only where it is hot.
+ */
+const UPDRAFT = 1.1
+const UPDRAFT_OUT = 0.35
 
 /**
  * The curvature fully-charred paper relaxes into, toward the sheet's front,
@@ -48,6 +81,10 @@ const CHAR_SHRINK = 0.12
  * drove the curl from heat and it held only while the heat did; see
  * `ClothSim.restBend`. Toward the front because that is the side a flame is
  * held on, and the side that chars first shrinks most.
+ *
+ * Not higher: the shrink across the front helps roll the edge, and with less
+ * of that ({@link ACROSS_SHRINK}) the obvious answer is more curl — but past
+ * about 6 the burnt band snaps through and rolls AWAY from the front instead.
  */
 const CHAR_CURL = 6
 
@@ -141,8 +178,11 @@ export class DamageCoupling {
   /** Union-find over the particles, reused on every read. */
   private readonly parent: Int32Array
   /**
-   * Per bend spring, how squarely it lies ACROSS the burn front, 0..1 — and
+   * Per spring, how squarely it lies ACROSS the burn front, 0..1 — and
    * remembered once it has been.
+   *
+   * It decides two things: how far the spring shrinks ({@link ACROSS_SHRINK})
+   * and, for a bend spring, which way the paper rolls ({@link CHAR_CURL}).
    *
    * A burnt edge rolls about an axis along the front, like a scroll; it does
    * not dish into a bowl. Measured with the curl in every bend spring alike: a
@@ -156,7 +196,7 @@ export class DamageCoupling {
    * gone by, the char behind it is uniform and says nothing about direction,
    * but the paper stays rolled the way it rolled.
    */
-  private readonly curlWeight: Float32Array
+  private readonly acrossFront: Float32Array
   /** The mesh's index as it was built — what {@link tear} hides triangles from and mends them back to. */
   private original: Uint16Array | Uint32Array | null = null
   /** Per triangle of that index: torn, and hidden until the history is rewound. */
@@ -172,7 +212,7 @@ export class DamageCoupling {
     this.gone = new Uint8Array(sim.count)
     this.piece = new Int32Array(sim.count)
     this.parent = new Int32Array(sim.count)
-    this.curlWeight = new Float32Array(sim.constraintCount)
+    this.acrossFront = new Float32Array(sim.constraintCount)
   }
 
   /**
@@ -189,7 +229,7 @@ export class DamageCoupling {
     // hole the last one had: paper coming back is not the only way a history
     // changes, and it is somebody else's burn.
     if (next !== this.source) {
-      this.curlWeight.fill(0)
+      this.acrossFront.fill(0)
       if (next && this.holed) {
         this.rewind()
         this.gone.fill(0)
@@ -341,8 +381,10 @@ export class DamageCoupling {
   }
 
   private read(pixels: Uint8Array): void {
-    const { sim, gone, particleTexel, curlWeight, size } = this
+    const { sim, gone, particleTexel, acrossFront, size } = this
     const {
+      draught,
+      cols,
       invMass,
       restLength,
       naturalLength,
@@ -368,6 +410,15 @@ export class DamageCoupling {
       // Exactly 1 at a dry texel — an undamaged sheet must stay bit-identical
       // to one with no source at all.
       invMass[i] = isGone ? 0 : 1 / (1 + (WET_MASS * pixels[t + SATURATION]!) / 255)
+      // The updraft over paper that is burning: hot gas rises, and the rim
+      // rises with it. Nothing at all where the paper is cold, so an
+      // untouched sheet is the same simulation it always was.
+      const heat = isGone ? 0 : pixels[t + HEAT]! / 255
+      const lift = heat > 0.15 ? (heat - 0.15) / 0.85 : 0
+      const i3 = i * 3
+      draught[i3] = 0
+      draught[i3 + 1] = UPDRAFT * lift
+      draught[i3 + 2] = UPDRAFT * UPDRAFT_OUT * lift
     }
     if (rewound) this.rewind()
     this.holed = holed
@@ -392,28 +443,37 @@ export class DamageCoupling {
       }
       const char = charSum / (samples * 255)
       // Exactly the natural length, and exactly no bend, at char 0.
-      restLength[k] = naturalLength[k]! * (1 - CHAR_SHRINK * char)
+      // Is a front passing here, and which way does this spring lie against
+      // it? The char gradient at the spring's middle, by central difference.
+      const t = particleTexel[m >= 0 ? m : a]!
+      const x = t % size
+      const y = (t / size) | 0
+      const gx =
+        pixels[(y * size + Math.min(size - 1, x + 2)) * 4 + CHAR]! -
+        pixels[(y * size + Math.max(0, x - 2)) * 4 + CHAR]!
+      const gy =
+        pixels[(Math.min(size - 1, y + 2) * size + x) * 4 + CHAR]! -
+        pixels[(Math.max(0, y - 2) * size + x) * 4 + CHAR]!
+      const steep = gx * gx + gy * gy
+      if (steep > FRONT_GRADIENT) {
+        // The spring in the field's own axes. Rows run DOWN the sheet and the
+        // grid's v runs up it, so a step to the next row is a step back in y.
+        const dc = (b % cols) - (a % cols)
+        const dr = ((b / cols) | 0) - ((a / cols) | 0)
+        const along = dc * gx - dr * gy
+        const span = dc * dc + dr * dr || 1
+        const across = (along * along) / (span * steep)
+        if (across > acrossFront[k]!) acrossFront[k] = across
+      }
+      const across = acrossFront[k]!
+      // Char shrinks along the front in full, and across it only a little:
+      // a rim with less edge than the paper behind it rolls, where one
+      // pulling inward drags the whole sheet into folds. See ACROSS_SHRINK.
+      restLength[k] = naturalLength[k]! * (1 - CHAR_SHRINK * char * (1 - (1 - ACROSS_SHRINK) * across))
       if (constraintKind[k] === 2) {
-        // Is a front passing here, and does this spring run across it? The
-        // char gradient at the spring's middle, by central difference.
-        const t = particleTexel[m]!
-        const x = t % size
-        const y = (t / size) | 0
-        const gx =
-          pixels[(y * size + Math.min(size - 1, x + 2)) * 4 + CHAR]! -
-          pixels[(y * size + Math.max(0, x - 2)) * 4 + CHAR]!
-        const gy =
-          pixels[(Math.min(size - 1, y + 2) * size + x) * 4 + CHAR]! -
-          pixels[(Math.max(0, y - 2) * size + x) * 4 + CHAR]!
-        const steep = gx * gx + gy * gy
-        if (steep > FRONT_GRADIENT) {
-          // A spring along a row spans two columns; one down a column, two rows.
-          const across = (b - a === 2 ? gx * gx : gy * gy) / steep
-          if (across > curlWeight[k]!) curlWeight[k] = across
-        }
         // A curvature as the sagitta of this spring's span: κL²/8.
         const span = naturalLength[k]!
-        restBend[k] = (CHAR_CURL * char * curlWeight[k]! * span * span) / 8
+        restBend[k] = (CHAR_CURL * char * across * span * span) / 8
       }
     }
 
@@ -503,7 +563,7 @@ export class DamageCoupling {
    */
   private rewind(): void {
     this.sim.restore()
-    this.curlWeight.fill(0)
+    this.acrossFront.fill(0)
     this.torn.fill(0)
     this.mend = true
   }
@@ -511,12 +571,13 @@ export class DamageCoupling {
   private reset(): void {
     const { sim } = this
     if (this.holed) this.rewind()
+    sim.draught.fill(0)
     sim.invMass.fill(1)
     sim.restBend.fill(0)
     sim.broken.fill(0)
     sim.restLength.set(sim.naturalLength)
     this.gone.fill(0)
-    this.curlWeight.fill(0)
+    this.acrossFront.fill(0)
     this.followers = []
     this.holed = false
     this.version = -1
