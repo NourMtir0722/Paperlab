@@ -30,6 +30,8 @@ export interface FireCluster {
   tallest: number
   /** How far its tongues have puffed up right now — `flamePuff`, averaged. */
   flicker: number
+  /** How hot the paper under its tongues is, 0..1, averaged — what colours its light. */
+  heat: number
   /** How many tongues it holds. */
   count: number
 }
@@ -156,7 +158,7 @@ export class FireState {
         weight[best] = 0
         let cluster = clusters[best]
         if (!cluster) {
-          cluster = { x: 0, y: 0, z: 0, height: 0, tallest: 0, flicker: 0, count: 0 }
+          cluster = { x: 0, y: 0, z: 0, height: 0, tallest: 0, flicker: 0, heat: 0, count: 0 }
           clusters[best] = cluster
         }
         cluster.x = 0
@@ -165,6 +167,7 @@ export class FireState {
         cluster.height = 0
         cluster.tallest = f.height
         cluster.flicker = 0
+        cluster.heat = 0
         cluster.count = 0
       }
       const cluster = clusters[best]!
@@ -175,6 +178,7 @@ export class FireState {
       weight[best] = weight[best]! + w
       cluster.height += f.height
       cluster.flicker += flamePuff(f.seed, this.field.time)
+      cluster.heat += f.heat
       cluster.count++
     }
     for (let c = 0; c < k; c++) {
@@ -191,6 +195,7 @@ export class FireState {
       }
       cluster.height /= cluster.count
       cluster.flicker /= cluster.count
+      cluster.heat /= cluster.count
     }
     this.clusterCount = k
   }

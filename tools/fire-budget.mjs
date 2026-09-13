@@ -203,7 +203,7 @@ check(
 //
 // Red light added to cream paper is the failure the whole spec opens with,
 // and `Never_this.png` is a picture of it.
-const pink = await pixels([peak.png], (frames) => {
+const pinkShare = (frames) => {
   const [f] = frames
   let lit = 0
   let pinkish = 0
@@ -223,11 +223,22 @@ const pink = await pixels([peak.png], (frames) => {
     if (h >= 300 && h <= 355) pinkish++
   }
   return lit ? pinkish / lit : 0
-})
+}
+const pink = await pixels([peak.png], pinkShare)
 check(
   pink < 0.005,
   `no pink — ${(pink * 100).toFixed(2)}% of the lit frame in 300–355° (want < 0.5%)`,
   'red light on cream paper',
+)
+// …and as it dies. The fire light deepens toward orange as its paper cools,
+// which is the colour nearest the red end — so a pink would show here first,
+// not at the peak.
+const dyingAt = boot.state.phases.find((p) => p.id === 'dying').at
+const pinkDying = await pixels([(await shot(`t=${dyingAt}&bloom=0`)).png], pinkShare)
+check(
+  pinkDying < 0.005,
+  `no pink as it dies — ${(pinkDying * 100).toFixed(2)}% of the lit frame in 300–355° (want < 0.5%)`,
+  'the dying fire light has reached the red end',
 )
 
 // 4. Paper never blooms — the invariant the threshold exists for, kept here
@@ -348,10 +359,18 @@ const tones = await pixels(
   cold.state.masks,
 )
 const pct = (x) => `${Math.round(x * 100)}%`
+// Still a report, not a check. The masks measure distance from the FIELD's
+// edge, and the edge the sheet draws is somewhere else: the look's waves and
+// bites move it by up to ±13 mm, and even with both off the drawn cut sits a
+// few millimetres out from the field's — a point meant for "3.5 mm into the
+// char" lands in the void or the scorch as often as the char. Measured with
+// the scorch's darkening switched off, the char itself is (21, 18, 16) at
+// saturation 0.11 — the reference's black. This becomes a check once the
+// masks follow the edge the shader draws.
 console.log(
   `  · G1 the cold char: rgb(${tones.char.rgb.join(', ')}), saturation ${tones.char.sat.toFixed(2)}, ` +
     `${pct(tones.char.value / tones.paper)} of paper's value over ${tones.char.n} points ` +
-    '(target: saturation ≤ 0.30, value ≤ 15% of paper)',
+    '(target: saturation ≤ 0.30, value ≤ 15% of paper; the masks do not yet follow the drawn edge)',
 )
 console.log(
   `  · G6 the scorch, darker than paper by distance from the cut: ${tones.scorch

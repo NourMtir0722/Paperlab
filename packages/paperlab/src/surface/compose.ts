@@ -656,7 +656,12 @@ vec3 plScorchTint(float t) {
   vec3 c3 = plLinear(vec3(0.541, 0.310, 0.141)); // #8A4F24
   vec3 c4 = plLinear(vec3(0.471, 0.275, 0.149)); // #784626
   vec3 c5 = plLinear(vec3(0.380, 0.216, 0.133)); // #613722
-  vec3 c6 = plLinear(vec3(0.310, 0.200, 0.137)); // #4F3323
+  // The dark end hands over to the char's black: a nearly neutral umber, not
+  // the saturated brown (#4F3323) it used to stop at. Beside black char that
+  // brown showed through wherever the band thinned, and turned the black
+  // brown — measured, the cold char's saturation went from 0.43 to 0.11 with
+  // the scorch's darkening switched off.
+  vec3 c6 = plLinear(vec3(0.169, 0.133, 0.110)); // #2B221C
   float s = clamp(t, 0.0, 1.0) * 6.0;
   // Each stop is blended with a SMOOTH step, not a linear one.
   //
@@ -746,6 +751,33 @@ void plDamage(inout vec4 color, inout float roughness) {
     charWide += texture2D(uDamage, uv + vec2(cos(a), sin(a)) * 7.0 * mmUv).r;
   }
   charWide /= 8.0;
+  // How much paper has burnt AWAY near here, at two reaches — the zones'
+  // own measure of the cut, the same all the way round. The field carries
+  // char in about one texel beside the cut and the borrowed scorch above
+  // only reaches UP, so the band beside and below a hole was a millimetre of
+  // char and then orange. A ring of eight each: a point on the edge sees
+  // about half of it burnt, one a ring's radius away sees none.
+  //
+  // Burnt away, not charred. Read off char, this blackened everything near a
+  // scorch before anything had burnt through — the paper went black where it
+  // should still be toasting, and ran black a centimetre ahead of the hole
+  // while it burnt. The order of a burn is paper, scorch, char, then the
+  // hole; the black belongs to the paper beside a cut.
+  //
+  // charNear, 8 mm: the char band, about 7 mm wide — ember : char : scorch
+  // is about 1 : 10 : 11 at a live front (Ember_line annotated).
+  // burntFar, 8 mm plus the scorch's reach: the scorch round the char, dark
+  // umber to tan to paper, all the way round and not only above.
+  float charNear = 0.0;
+  float burntFar = 0.0;
+  for (int k = 0; k < 8; k++) {
+    float a = float(k) * 0.7853982 + 0.39;
+    vec2 dir = vec2(cos(a), sin(a));
+    charNear += 1.0 - texture2D(uDamage, uv + dir * 8.0 * mmUv).a;
+    burntFar += 1.0 - texture2D(uDamage, uv + dir * (8.0 + uLook2.y) * mmUv).a;
+  }
+  charNear /= 8.0;
+  burntFar /= 8.0;
   // Only paper that has a CUT beside it has an edge: a half-eaten cell out
   // in the middle of the sheet reads as "half a presence" too, and without
   // this the ember line and the ash lip drew on it — islands of glow on
@@ -772,7 +804,7 @@ void plDamage(inout vec4 color, inout float roughness) {
 
   // An untouched texel is left exactly as it was — the identity the whole
   // seam is built on. Nothing here has happened to this paper.
-  if (d.r <= 0.0 && d.g <= 0.0 && d.a >= 1.0 && charBelow <= 0.0 && charWide <= 0.0 && e.a >= 1.0 && w.a >= 1.0 && n.a >= 1.0 && s.a >= 1.0) {
+  if (d.r <= 0.0 && d.g <= 0.0 && d.a >= 1.0 && charBelow <= 0.0 && charWide <= 0.0 && charNear <= 0.0 && burntFar <= 0.0 && e.a >= 1.0 && w.a >= 1.0 && n.a >= 1.0 && s.a >= 1.0) {
     return;
   }
 
@@ -816,6 +848,13 @@ void plDamage(inout vec4 color, inout float roughness) {
   float soft = (2.0 * d.r + e.r + w.r + n.r + s.r) / 6.0;
   float self_ = clamp(mix(d.r, soft, 0.65) + fingers * smoothstep(0.0, 0.08, d.r), 0.0, 1.0);
   float c = 1.0 - (1.0 - self_) * (1.0 - clamp(0.62 * charBelow * reach, 0.0, 1.0)) * (1.0 - clamp(0.4 * charWide * reach, 0.0, 1.0));
+  // The scorch round a cut: up to the umber just short of char, falling to
+  // paper at the far ring. Held under the char zone's start, so the char band
+  // is charNear's to draw and this is only ever scorch.
+  // Smooth on purpose: scaled by the finger noise, as it first was, a strong
+  // fingers setting broke it into high-contrast blotches — a leopard print,
+  // not a toast. The fingers already shape the front through reach and self_.
+  c = max(c, 0.42 * smoothstep(0.02, 0.45, burntFar));
   // Fibre-scale grain in the scorch, so a smooth field magnified never shows
   // its contours — real scorch is fibrous (Scorch.png), not banded.
   c = clamp(c + ((plNoise(p * 300.0) - 0.5) * 0.07 + (plNoise(p * 90.0) - 0.5) * 0.06) * smoothstep(0.0, 0.1, c), 0.0, 1.0);
@@ -829,27 +868,53 @@ void plDamage(inout vec4 color, inout float roughness) {
   // being finer than a level it can only ever move a value into the
   // neighbouring one.
   c = clamp(c + (plNoise(p * 900.0) - 0.5) * (1.5 / 255.0), 0.0, 1.0);
+  // The colour INSIDE the scorch reads a smoothed c: the same char and the
+  // same reaches, without the fingers. The fingers belong to the front's
+  // silhouette (lead, below); carried into the ramp as well, a strong fingers
+  // setting swung the scorch between tan and near-black umber a few
+  // millimetres apart — a leopard print, not a toast.
+  float cSmooth = 1.0 - (1.0 - clamp(mix(d.r, soft, 0.65), 0.0, 1.0)) * (1.0 - clamp(0.62 * charBelow * 0.75, 0.0, 1.0)) * (1.0 - clamp(0.4 * charWide * 0.75, 0.0, 1.0));
+  cSmooth = max(cSmooth, 0.42 * smoothstep(0.02, 0.45, burntFar));
+  cSmooth = clamp(cSmooth + ((plNoise(p * 300.0) - 0.5) * 0.05 + (plNoise(p * 90.0) - 0.5) * 0.04) * smoothstep(0.0, 0.1, cSmooth), 0.0, 1.0);
   // A steep leading edge — paper to straw in a sliver — then the long ramp.
-  float lead = smoothstep(0.02, 0.05, c);
-  float ramp = smoothstep(0.05, 0.7, c);
+  // The front's teeth from the noisy c; filled in behind them from the smooth
+  // one, so a dip in the noise cannot open a patch of clean paper inside it.
+  float lead = max(smoothstep(0.02, 0.05, c), smoothstep(0.1, 0.2, cSmooth));
+  // The browns are done by 0.45, where the char's umber hand-over takes them:
+  // the ramp used to run on to 0.7, over the char, and most of what read as
+  // "char" was this ramp's darkest brown.
+  float ramp = smoothstep(0.05, 0.45, cSmooth);
   color.rgb *= mix(vec3(1.0), pow(plScorchTint(ramp), vec3(uLook2.z)), lead);
 
   // ── Char ────────────────────────────────────────────────────────────────
   // A wide, smooth hand-over from scorch to char — the gradient is the point.
-  float charZone = smoothstep(0.5, 0.9, c);
+  // From 0.3: the field carries char in about one texel beside the cut, so
+  // past a couple of millimetres c is mostly the scorch borrowed from below,
+  // and a zone that began at 0.5 was hardly ever char at all.
+  // And the band itself from charNear: char to about 7 mm from the cut all
+  // the way round, and further up wherever the borrowed scorch says so.
+  // c only makes char where it is really high — above the hole, where the
+  // borrowed scorch is strong. At 0.3–0.6 the finger noise pushed it across
+  // the line all through the scorch, and every crossing was a black island in
+  // the orange: a leopard print. The band next to the cut is charNear's.
+  float charZone = max(smoothstep(0.6, 0.85, cSmooth), smoothstep(0.06, 0.16, charNear));
   vec2 cells = plVoronoi(p / (3.6 * PL_MM));
   // Sparse: a real crack network is broken, not a tiled floor — most cell
   // borders never split.
   float crack = (1.0 - smoothstep(0.008, 0.03, cells.y - cells.x)) * smoothstep(0.45, 0.65, plNoise(p / (7.0 * PL_MM)));
   float plate = plHash(floor(p / (3.6 * PL_MM)) + 3.7);
-  // Dark orange where the char meets the scorch, deep brown toward the cut —
-  // warm all the way, and fading smoothly into the scorch's lighter browns
-  // rather than stopping at a grey band.
-  // Warm (dark orange → deep brown) or, turned down, the sampled greys.
-  vec3 body = mix(plLinear(vec3(0.255, 0.239, 0.227)), plLinear(vec3(0.165, 0.086, 0.043)), uLook1.w);
-  vec3 under = mix(plLinear(vec3(0.275, 0.169, 0.090)), plLinear(vec3(0.42, 0.18, 0.06)), uLook1.w);
+  // Black. Real char is a near-neutral black — (22, 20, 18) on the cold
+  // macro references, about 11% of the paper's value. The warm brown this
+  // used to be was Hero.png's char LIT BY ITS FLAMES, painted into the paper,
+  // which is why ours stayed orange on a frame with no fire in it. Warmth on
+  // char comes from the fire's light now, and goes when the fire does.
+  // charWarmth adds only a trace of brown to the black, and a warmer umber
+  // where the char hands over to the scorch.
+  vec3 body = mix(plLinear(vec3(0.086, 0.078, 0.071)), plLinear(vec3(0.11, 0.08, 0.06)), uLook1.w);
+  vec3 under = mix(plLinear(vec3(0.20, 0.15, 0.11)), plLinear(vec3(0.28, 0.16, 0.08)), uLook1.w);
   vec3 cracks = plLinear(vec3(0.039, 0.024, 0.016));    // #0A0604
-  vec3 charColor = mix(under, body, smoothstep(0.66, 1.0, c));
+  // Black nearest the cut; the umber only in the band's outer millimetre.
+  vec3 charColor = mix(under, body, max(smoothstep(0.45, 0.8, cSmooth), smoothstep(0.1, 0.22, charNear)));
   // Mottled at the plate scale and finer, and darker than the sampled body
   // under a bright key — the reference's char reads near black in the frame.
   charColor *= (0.75 + 0.35 * plate) * (0.8 + 0.4 * plNoise(p * 260.0));
@@ -878,9 +943,14 @@ void plDamage(inout vec4 color, inout float roughness) {
   // middle of it, which read as a neon tube round the hole — the single most
   // synthetic thing at wide view.
   float lipAlong = dot(p, tangentP) / (3.2 * PL_MM);
-  float lipBreak = smoothstep(0.34, 0.56, plFbm(vec2(lipAlong, 0.9)));
+  // Still broken, but mostly there: against black char the lip is the white
+  // line that says where the paper ends (Ember_line annotated, zone 2), and at
+  // 0.34–0.56 half of it was missing.
+  float lipBreak = smoothstep(0.18, 0.4, plFbm(vec2(lipAlong, 0.9)));
   float lip = (1.0 - smoothstep(lipWidth - aa, lipWidth + aa, mm)) * step(d.a, 0.999) * cutNear * lipBreak;
-  vec3 ash = plLinear(mix(vec3(0.525, 0.498, 0.490), vec3(0.741, 0.725, 0.725), plNoise(p * 520.0) * 0.6 + plNoise(p * 90.0) * 0.4)) * uLook1.z;
+  // Pale: the reference's #A49E9D up to a near-white grey, so it reads white
+  // beside the char. Still matte and still dimmer than the paper.
+  vec3 ash = plLinear(mix(vec3(0.643, 0.620, 0.616), vec3(0.84, 0.82, 0.81), plNoise(p * 520.0) * 0.6 + plNoise(p * 90.0) * 0.4)) * uLook1.z;
   color.rgb = mix(color.rgb, ash, lip);
   roughness = mix(roughness, 0.99, lip);
   // Barely raised. THIS is where the highlight came from: a 0.7 mm ridge
