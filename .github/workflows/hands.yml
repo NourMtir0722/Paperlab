@@ -64,7 +64,15 @@ permissions:
 jobs:
   hands:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 35, not 20. Every frame here is drawn by SwiftShader on the CPU, and the
+    # test drives the page frame by frame, so its length is the page's frame
+    # cost times the frames it needs: 4m47 on main before fire, 14m41 on the
+    # PR that added it, and 19m37 — cancelled — on main straight after, with
+    # nothing changed but the runner. A cancellation says nothing about the
+    # gestures, and this check is not required, so it gets room rather than a
+    # coin toss. If it creeps toward this limit too, the page got slower:
+    # measure it (/hands frame rate, layer by layer) rather than raising it.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
 
