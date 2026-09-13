@@ -125,8 +125,10 @@ export interface DamageLook {
   emberGlow?: number
   /** Specks of glowing fibre along the edge, 0..2. */
   sparkle?: number
-  /** The pale ash lip's widest point, mm. */
+  /** How wide the pale ash lip is, from the cut out to the ember line, mm. */
   lipWidth?: number
+  /** How wide the black char band is, past the ember line, mm. */
+  charWidth?: number
   /** How pale the ash lip is, × the sampled grey. */
   lipBrightness?: number
   /** 0 is grey char, 1 is dark orange to deep brown. */
@@ -159,9 +161,10 @@ export const DAMAGE_LOOK_DEFAULTS: Required<DamageLook> = {
   emberFlicker: 1.65,
   emberGlow: 1.25,
   sparkle: 0.5,
-  // With the widest bead, 2.2 mm from the cut — inside the 2.5 mm the lip and
-  // the ember line are held to (`compose.ts`).
-  lipWidth: 0.95,
+  // As wide as the char band (Noor, 2026-09-13): the lip has to be seen. At
+  // 0.95 mm it was a hairline tracing the edge.
+  lipWidth: 3.5,
+  charWidth: 3.5,
   lipBrightness: 0.76,
   charWarmth: 0.32,
   charCracks: 0.45,

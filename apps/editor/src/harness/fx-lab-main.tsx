@@ -202,8 +202,9 @@ const SLIDERS: {
   { group: 'Ember line', key: 'emberFlicker', label: 'Flicker speed', min: 0, max: 3, step: 0.05 },
   { group: 'Ember line', key: 'emberGlow', label: 'Crimson glow in the char', min: 0, max: 2, step: 0.05 },
   { group: 'Ember line', key: 'sparkle', label: 'Glowing fibre specks', min: 0, max: 2, step: 0.05 },
-  { group: 'Ash lip', key: 'lipWidth', label: 'Width', min: 0.2, max: 3, step: 0.05, unit: 'mm' },
+  { group: 'Ash lip', key: 'lipWidth', label: 'Width', min: 0.2, max: 8, step: 0.05, unit: 'mm' },
   { group: 'Ash lip', key: 'lipBrightness', label: 'Paleness', min: 0.3, max: 1.5, step: 0.01 },
+  { group: 'Char', key: 'charWidth', label: 'Width', min: 0.5, max: 10, step: 0.05, unit: 'mm' },
   { group: 'Char', key: 'charWarmth', label: 'Warmth (grey → dark orange)', min: 0, max: 1, step: 0.01 },
   { group: 'Char', key: 'charCracks', label: 'Cracks', min: 0, max: 1, step: 0.01 },
   { group: 'Scorch', key: 'scorchReach', label: 'Reach upward', min: 0, max: 30, step: 0.5, unit: 'mm' },
@@ -863,8 +864,11 @@ interface FieldMasks {
   scorch: [number, number, number][]
 }
 
-/** Where along each ray the char is sampled, mm: clear of the 2.5 mm the lip and beads may take. */
-const CHAR_AT = [3.5, 5]
+/**
+ * Where along each ray the char is sampled, mm: past the default lip (3.5)
+ * and widest bead (1.25), inside the default char band (3.5 more).
+ */
+const CHAR_AT = [6, 7.5]
 /** And the scorch, out to past its reach. */
 const SCORCH_AT = [6, 8, 10, 14, 18, 24, 30, 40]
 /** A millimetre of A4 in world units: a default sheet is one unit, 210 mm, across. */
