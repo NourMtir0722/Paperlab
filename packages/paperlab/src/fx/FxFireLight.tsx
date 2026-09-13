@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type { DamageField } from './field'
 import type { SurfaceLocator } from './fire'
-import { flameAnchors, flamePuff, type FlameAnchor } from './flames'
+import { fireStateOf } from './fireState'
 
 export interface FxFireLightProps {
   field: DamageField
@@ -26,48 +26,33 @@ export interface FxFireLightProps {
  * thin, and a fire in front of it glows through to the back, warm and
  * diffused (§7). A second light is the whole trick — the sheet's own
  * material already lights its back face from whatever is behind it.
+ *
+ * Where the fire is comes from {@link fireStateOf}, the summary every reader
+ * of the fire shares in a frame.
  */
 export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN }: FxFireLightProps) {
   const front = useRef<THREE.PointLight>(null)
   const through = useRef<THREE.PointLight>(null)
-  const anchors = useRef<FlameAnchor[]>([])
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     const a = front.current
     const b = through.current
     if (!a || !b) return
-    const n = flameAnchors(field, locate, 32, anchors.current)
-    if (n === 0) {
+    const fire = fireStateOf(field, locate).update(clock.elapsedTime)
+    if (fire.count === 0) {
       a.intensity = 0
       b.intensity = 0
       return
     }
-    let x = 0
-    let y = 0
-    let z = 0
-    let h = 0
-    let flicker = 0
-    for (let i = 0; i < n; i++) {
-      const f = anchors.current[i]!
-      x += f.x
-      y += f.y
-      z += f.z
-      h += f.height
-      flicker += flamePuff(f.seed, field.time)
-    }
-    x /= n
-    y /= n
-    z /= n
-    h /= n
-    flicker /= n
+    const { x, y, z } = fire
     // Off the sheet toward whoever is looking, a little; its twin the same
     // distance behind.
     const toCamera = new THREE.Vector3(camera.position.x - x, 0, camera.position.z - z)
     toCamera.normalize().multiplyScalar(0.035)
-    const lift = h * 0.5
+    const lift = fire.height * 0.5
     a.position.set(x + toCamera.x, y + lift, z + toCamera.z)
     b.position.set(x - toCamera.x, y + lift, z - toCamera.z)
-    const level = field.lastStats.front * gain * flicker
+    const level = field.lastStats.front * gain * fire.flicker
     a.intensity = level
     b.intensity = level * 0.35
   })
