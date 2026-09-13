@@ -75,12 +75,16 @@ async function shot(query, file) {
   }
 }
 
-/** Run `body` over the decoded pixels of one or two PNGs, in a page. */
-async function pixels(pngs, body) {
+/**
+ * Run `body` over the decoded pixels of one or two PNGs, in a page. `extra`
+ * is handed to it as a second argument — `body` is sent as source text, so it
+ * cannot close over anything.
+ */
+async function pixels(pngs, body, extra = null) {
   const page = await browser.newPage()
   try {
     return await page.evaluate(
-      async ([sources, source]) => {
+      async ([sources, source, extra]) => {
         const load = async (src) => {
           const image = new Image()
           image.src = src
@@ -99,9 +103,9 @@ async function pixels(pngs, body) {
         const frames = []
         for (const s of sources) frames.push(await load(s))
         // eslint-disable-next-line no-new-func
-        return new Function('frames', `return (${source})(frames)`)(frames)
+        return new Function('frames', 'extra', `return (${source})(frames, extra)`)(frames, extra)
       },
-      [pngs.map((png) => `data:image/png;base64,${png.toString('base64')}`), body.toString()],
+      [pngs.map((png) => `data:image/png;base64,${png.toString('base64')}`), body.toString(), extra],
     )
   } finally {
     await page.close()
@@ -273,6 +277,103 @@ check(
   fireOnly.energy > 1.2,
   `and they carry detail finer than the grid — ${fireOnly.energy.toFixed(2)} levels between neighbours (want > 1.2)`,
   'the flames are smooth blobs: advection has smeared away everything the solver resolved',
+)
+
+// 6. Measured, not gated yet.
+//
+// The gates the next pieces of work are judged by, standing before that work
+// does: the cold char is BLACK, the scorch fades out softly, and there is no
+// confetti in the hole. Every one of them fails today, and fails by design —
+// the char is orange because the shading paints firelight into it — so each
+// prints its number and fails nothing. Each becomes a check in the change that
+// fixes it, with the number it prints here as the before.
+//
+// Sampled where the FIELD says each thing is (`__FXLAB__.masks`), never found
+// by its colour: the colour is what is being measured.
+console.log('\nmeasured, not gated yet\n')
+const coldAt = boot.state.phases.find((p) => p.id === 'cold').at
+const cold = await shot(`t=${coldAt}&off=${QUIET}&bloom=0`, 'cold-masks.png')
+const tones = await pixels(
+  [cold.png],
+  (frames, masks) => {
+    const [f] = frames
+    const at = ([x, y]) => {
+      let r = 0
+      let g = 0
+      let b = 0
+      let n = 0
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const i = ((Math.round(y) + dy) * f.w + Math.round(x) + dx) * 4
+          r += f.data[i]
+          g += f.data[i + 1]
+          b += f.data[i + 2]
+          n++
+        }
+      }
+      return [r / n, g / n, b / n]
+    }
+    const value = ([r, g, b]) => Math.max(r, g, b) / 255
+    const sat = ([r, g, b]) => {
+      const max = Math.max(r, g, b)
+      return max ? (max - Math.min(r, g, b)) / max : 0
+    }
+    const median = (xs) => {
+      const s = [...xs].sort((a, b) => a - b)
+      return s.length ? s[s.length >> 1] : Number.NaN
+    }
+    const paper = median(masks.paper.map((p) => value(at(p))))
+    const char = masks.char.map(at)
+    const reach = [...new Set(masks.scorch.map(([, , mm]) => mm))].sort((a, b) => a - b)
+    return {
+      paper,
+      char: {
+        n: char.length,
+        rgb: [0, 1, 2].map((k) => Math.round(median(char.map((c) => c[k])))),
+        sat: median(char.map(sat)),
+        value: median(char.map(value)),
+      },
+      scorch: reach.map((mm) => {
+        const vs = masks.scorch.filter((p) => p[2] === mm).map((p) => value(at(p)))
+        return { mm, n: vs.length, drop: vs.length ? 1 - median(vs) / paper : Number.NaN }
+      }),
+    }
+  },
+  cold.state.masks,
+)
+const pct = (x) => `${Math.round(x * 100)}%`
+console.log(
+  `  · G1 the cold char: rgb(${tones.char.rgb.join(', ')}), saturation ${tones.char.sat.toFixed(2)}, ` +
+    `${pct(tones.char.value / tones.paper)} of paper's value over ${tones.char.n} points ` +
+    '(target: saturation ≤ 0.30, value ≤ 15% of paper)',
+)
+console.log(
+  `  · G6 the scorch, darker than paper by distance from the cut: ${tones.scorch
+    .map((b) => `${b.mm} mm ${Number.isNaN(b.drop) ? '—' : pct(b.drop)}`)
+    .join(' · ')} (target: fading to paper over ≥ 10 mm, never a step)`,
+)
+
+const lit = `t=${peakAt}&off=match,flames,fluid,light&bloom=0`
+const withAsh = await shot(lit)
+const withoutAsh = await shot(`${lit.replace('light', 'light,ash')}`)
+const confetti = await pixels(
+  [withAsh.png, withoutAsh.png],
+  (frames, masks) => {
+    const [a, b] = frames
+    let ash = 0
+    for (const [x, y] of masks.hole) {
+      const i = (Math.round(y) * a.w + Math.round(x)) * 4
+      const on = Math.max(a.data[i], a.data[i + 1], a.data[i + 2])
+      const off = Math.max(b.data[i], b.data[i + 1], b.data[i + 2])
+      if (on - off > 12) ash++
+    }
+    return { n: masks.hole.length, share: masks.hole.length ? ash / masks.hole.length : 0 }
+  },
+  withAsh.state.masks,
+)
+console.log(
+  `  · G4 the void at the peak: ${(confetti.share * 100).toFixed(1)}% of ${confetti.n} points lit by ash ` +
+    '(target: a ceiling set when ash comes off the lip instead of out of the hole)',
 )
 
 writeFileSync(join(out, 'README.md'), `Measured budgets, not pictures. See tools/fire-budget.mjs.\n`)

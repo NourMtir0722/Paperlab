@@ -125,6 +125,8 @@ declare global {
       burnt: number
       /** When it cut a piece of the sheet loose, which then falls — or null. */
       severedAt: number | null
+      /** Where on the screen the field says char, hole, paper and scorch are — null until ready. */
+      masks: FieldMasks | null
     }
   }
 }
@@ -762,6 +764,8 @@ function Driver({
  */
 function Ready({
   burn,
+  view,
+  locate,
   armed,
   nonce,
   playing,
@@ -770,6 +774,9 @@ function Ready({
   onReady,
 }: {
   burn: ScriptedBurn
+  /** The field as the sheet draws it — what the masks are read from. */
+  view: FieldView
+  locate: SurfaceLocator
   armed: boolean
   nonce: string
   playing: boolean
@@ -781,6 +788,8 @@ function Ready({
 }) {
   const frames = useRef(0)
   const fonts = useRef(false)
+  const camera = useThree((s) => s.camera)
+  const canvas = useThree((s) => s.gl.domElement)
 
   useEffect(() => {
     document.fonts.ready.then(() => {
@@ -801,9 +810,10 @@ function Ready({
         duration: plan.duration,
         burnt: plan.burnt,
         severedAt: plan.severedAt,
+        masks: ready ? fieldMasks(view, locate, camera, canvas) : null,
       }
     },
-    [burn, plan, look],
+    [burn, plan, look, view, locate, camera, canvas],
   )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` and `playing` are the TRIGGER — anything that changes the picture starts the count again
@@ -821,6 +831,137 @@ function Ready({
     }
   })
   return null
+}
+
+/**
+ * Where on the screen the burn says each thing is.
+ *
+ * So a budget can measure the colour of char where the burn says char is,
+ * instead of finding the char by its colour — which is the thing being
+ * measured, and a mask drawn from it could only ever agree with it.
+ *
+ * The char and the scorch are found by DISTANCE from the drawn edge, never by
+ * the field's char. The field carries char in about one texel beside the cut,
+ * and the shader builds the whole band and its halo out of that; a mask keyed
+ * on char levels found nothing at all on a cold sheet. So from every texel on
+ * the rim a ray goes out into the paper, and points are taken along it at set
+ * distances in millimetres.
+ */
+interface FieldMasks {
+  /** On the char band, past the lip and the beads: {@link CHAR_AT} from the edge. */
+  char: [number, number][]
+  /** The middle of the hole, two texels or more from any paper. */
+  hole: [number, number][]
+  /** Clean paper, well beyond the scorch's reach. */
+  paper: [number, number][]
+  /** Out through the scorch, with the distance from the edge in mm. */
+  scorch: [number, number, number][]
+}
+
+/** Where along each ray the char is sampled, mm: clear of the 2.5 mm the lip and beads may take. */
+const CHAR_AT = [3.5, 5]
+/** And the scorch, out to past its reach. */
+const SCORCH_AT = [6, 8, 10, 14, 18, 24, 30, 40]
+/** A millimetre of A4 in world units: a default sheet is one unit, 210 mm, across. */
+const WORLD_MM = 1 / 210
+
+const projected = new THREE.Vector3()
+
+function fieldMasks(
+  view: FieldView,
+  locate: SurfaceLocator,
+  camera: THREE.Camera,
+  canvas: HTMLCanvasElement,
+): FieldMasks {
+  const { size, pixels } = view
+  const last = size - 1
+  const w = canvas.clientWidth
+  const h = canvas.clientHeight
+  const presence = (x: number, y: number) => pixels[(y * size + x) * 4 + PRESENCE]!
+  const near = (x: number, y: number, r: number, test: (x: number, y: number) => boolean) => {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = x + dx
+        const ny = y + dy
+        if (nx >= 0 && ny >= 0 && nx <= last && ny <= last && test(nx, ny)) return true
+      }
+    }
+    return false
+  }
+  const paper = (x: number, y: number) => presence(x, y) >= 128
+  const cut = (x: number, y: number) => presence(x, y) < 128
+  const drawn = (u: number, v: number) => {
+    const x = Math.round(u * last)
+    const y = Math.round(v * last)
+    return x >= 0 && y >= 0 && x <= last && y <= last && paper(x, y)
+  }
+  const screen = (u: number, v: number): [number, number] | null => {
+    const at = locate(u, v)
+    if (!at) return null
+    projected.set(at.x, at.y, at.z).project(camera)
+    const sx = Math.round((projected.x * 0.5 + 0.5) * w * 10) / 10
+    const sy = Math.round((0.5 - projected.y * 0.5) * h * 10) / 10
+    return sx < 1 || sy < 1 || sx > w - 2 || sy > h - 2 ? null : [sx, sy]
+  }
+  const masks: FieldMasks = { char: [], hole: [], paper: [], scorch: [] }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (cut(x, y)) {
+        const at = near(x, y, 2, paper) ? null : screen(x / last, y / last)
+        if (at) masks.hole.push(at)
+        continue
+      }
+      // Clean paper: twelve texels, about 40 mm, from any cut — past the
+      // farthest the scorch's halo reaches up.
+      if (!near(x, y, 12, cut)) {
+        const at = screen(x / last, y / last)
+        if (at) masks.paper.push(at)
+        continue
+      }
+      // A texel on the rim: paper, with the cut beside it. Out, away from it.
+      let nx = 0
+      let ny = 0
+      if (x > 0 && cut(x - 1, y)) nx++
+      if (x < last && cut(x + 1, y)) nx--
+      if (y > 0 && cut(x, y - 1)) ny++
+      if (y < last && cut(x, y + 1)) ny--
+      const length = Math.hypot(nx, ny)
+      if (length === 0) continue
+      nx /= length
+      ny /= length
+      // The drawn edge is half a texel back toward the cut: presence is cut
+      // at one half, between this texel and the gone one.
+      const eu = (x - nx * 0.5) / last
+      const ev = (y - ny * 0.5) / last
+      // Copied out before the second call: the locator writes every answer
+      // into one reused vector, so `edge` would otherwise BECOME `next`.
+      const edge = locate(eu, ev)
+      if (!edge) continue
+      const ex = edge.x
+      const ey = edge.y
+      const ez = edge.z
+      const next = locate(eu + nx / last, ev + ny / last)
+      if (!next) continue
+      // A texel is not the same number of millimetres both ways on a sheet
+      // that is not square, so measure this one.
+      const texelMm = Math.hypot(next.x - ex, next.y - ey, next.z - ez) / WORLD_MM
+      if (!(texelMm > 0)) continue
+      const along = (mm: number) => {
+        const u = eu + (nx * mm) / texelMm / last
+        const v = ev + (ny * mm) / texelMm / last
+        return drawn(u, v) ? screen(u, v) : null
+      }
+      for (const mm of CHAR_AT) {
+        const at = along(mm)
+        if (at) masks.char.push(at)
+      }
+      for (const mm of SCORCH_AT) {
+        const at = along(mm)
+        if (at) masks.scorch.push([at[0], at[1], mm])
+      }
+    }
+  }
+  return masks
 }
 
 /** What is wired today, and what it actually draws. */
@@ -1332,6 +1473,8 @@ function Lab() {
             plan={plan}
             look={settings.look}
             burn={burn}
+            view={view}
+            locate={locate}
             armed={generation > 0}
             playing={playing}
             nonce={`${fluidKey}:${camera}:${at.u},${at.v}:${detail}:${post}:${bloom}`}
