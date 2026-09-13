@@ -889,7 +889,10 @@ function Driver({
         if (before < 0.02 && burn.time >= 0.02) voice.strike()
         // The cut: a soft breath as the piece lets go.
         if (burstAt !== null && before < burstAt && burn.time >= burstAt) voice.puff()
-        voice.update(delta * speed, burn.stats, locate(0.5, 0.5))
+        // Where the fire is, not where the sheet is: the crackle comes from
+        // the burn (S8), which on a corner burn is nowhere near the middle.
+        const origin = ORIGINS[burn.settings.origin]
+        voice.update(delta * speed, burn.stats, locate(origin.u, origin.v) ?? locate(0.5, 0.5))
         // The smoulder: a bead popping now and then, once the flames are out.
         const out = burn.wentOut
         if (out !== null && burn.stats.front === 0 && burn.time < out + burn.settings.smoulder) {
