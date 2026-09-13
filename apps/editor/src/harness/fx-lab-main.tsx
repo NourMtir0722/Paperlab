@@ -104,6 +104,8 @@ import {
  *                                capture and budget is measured with
  *   ?floor=1                     a floor under the sheet, and the shot framed
  *                                to include it
+ *   ?focus=0.8                   shallow focus on the burn, 0..1 — the macro
+ *                                look of the reference crops
  *   ?physics=flat                the sheet held flat and still, as it was before it
  *                                hung: nothing curls, nothing falls
  *
@@ -194,6 +196,8 @@ interface LabSettings {
   threshold: number
   /** Heat haze, pixels at 1080p. */
   haze: number
+  /** Shallow focus on the burn, 0..1 — the macro look of the reference crops (K4). */
+  focus: number
   /** How much of each particle the burn throws — the emitter's rates. */
   rates: { embers: number; smoke: number; ash: number }
   /** Where the burn starts and how it ends — see `BurnSettings`. */
@@ -522,6 +526,10 @@ const DEFAULT_SETTINGS: LabSettings = {
   bloom: FX_BLOOM,
   threshold: FX_BLOOM_THRESHOLD,
   haze: fxQualityFor(TIER).haze,
+  // Sharp: a shallow focus is a look to reach for, not the lab's default,
+  // and every capture is judged on a sharp frame. `?focus=0.8` for a macro
+  // shot of the rim without a saved tune.
+  focus: num('focus', 0, 0, 1),
   // FireEmitter's own, read from it rather than copied: these were stale the
   // moment the library's changed, and a lab showing a fire the product does
   // not have is worse than no lab.
@@ -1687,6 +1695,7 @@ function Lab() {
               bloom={bloom ? (BLOOM_STRENGTH ?? settings.bloom) : 0}
               threshold={THRESHOLD ?? settings.threshold}
               haze={settings.haze}
+              focus={settings.focus}
               field={burn.field}
               locate={locate}
             />
@@ -2129,6 +2138,14 @@ function Tune({
         {/* Last polish item, not a look — see `fxQualityTiers.haze`. It is off
             on this lab's tier, and it is still placed from where the sprite
             flames stand rather than from where the fluid burns. */}
+        <Slider
+          label="Shallow focus on the burn"
+          value={settings.focus}
+          min={0}
+          max={1}
+          step={0.01}
+          onInput={(v) => onChange({ ...settings, focus: v })}
+        />
         {advanced && (
           <Slider
             label="Heat haze (off on this tier)"

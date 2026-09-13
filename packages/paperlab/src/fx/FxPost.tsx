@@ -29,6 +29,15 @@ export interface FxPostProps {
   locate?: SurfaceLocator
   /** Heat haze in pixels at 1080p, overriding the tier's; 0 turns it off. */
   haze?: number
+  /**
+   * Shallow focus on the burn, 0..1; 0 keeps everything sharp.
+   *
+   * A macro lens held close to a burning edge has a few millimetres of
+   * focus and nothing else (§K4): the rim is sharp, the rest of the sheet
+   * goes soft. It focuses on the fire itself — the burning rim is what the
+   * shot is about — so it needs `field` and `locate` like the haze does.
+   */
+  focus?: number
 }
 
 /**
