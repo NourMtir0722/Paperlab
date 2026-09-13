@@ -640,8 +640,37 @@ export const backdropSchema = z.object({
 
 export type BackdropConfig = z.infer<typeof backdropSchema>
 
+/**
+ * The floor under the sheet: off unless a scene asks for it.
+ *
+ * A sheet on a black stage has nothing for its light to fall on and nothing
+ * for a piece it drops to land on — the burn's own ash falls out of the
+ * frame and into nowhere. A floor answers all three: it takes the contact
+ * shadow, the warm pool a fire throws, and whatever the paper lets go of.
+ *
+ * Off by default because most papers are photographed against nothing at
+ * all, and a floor that arrived uninvited would change every one of them.
+ */
+export const floorSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Dark and matte: it is the ground, not the subject. */
+  color: z.string().default('#1a1917').describe('color'),
+  /**
+   * Where it lies, in the sheet's own space. The contact shadow falls here
+   * too, and a simulated sheet stops here — one floor, one height, so paper
+   * cannot land through the thing its shadow is on.
+   */
+  y: z.number().min(-4).max(0).default(-1.05),
+  /** How rough it is, 0 mirror to 1 chalk. Slate, by default. */
+  roughness: z.number().min(0).max(1).default(0.92),
+})
+
+export type FloorConfig = z.infer<typeof floorSchema>
+
 export const sceneSchema = z.object({
   lighting: z.enum(lightingNames).default('studio'),
+  /** The ground under the sheet — see `floorSchema`. Off unless asked for. */
+  floor: floorSchema.prefault({}),
   /** What is behind the sheet. Unset leaves the canvas alone. */
   backdrop: backdropSchema.optional(),
   /**

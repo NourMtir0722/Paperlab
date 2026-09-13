@@ -102,6 +102,8 @@ import {
  *   ?amount=0.5                  how much of the sheet burns, 0..1 — 1 is all of it
  *   ?camera=static               no push-in and no drift: the still camera every
  *                                capture and budget is measured with
+ *   ?floor=1                     a floor under the sheet, and the shot framed
+ *                                to include it
  *   ?physics=flat                the sheet held flat and still, as it was before it
  *                                hung: nothing curls, nothing falls
  *
@@ -185,6 +187,8 @@ interface LabSettings {
   firelight: number | null
   /** One fire light casts shadows (`FxFireLight`'s `shadows`) — a shadow pass a frame, so off on this tier. */
   fireShadows: boolean
+  /** A floor under the sheet: what the fire's light pools on, and what a cut-loose piece lands on. */
+  floor: boolean
   /** Bloom strength, and the scene luminance it starts at. */
   bloom: number
   threshold: number
@@ -324,6 +328,14 @@ const PHYSICS: ComponentProps<typeof Paper>['physics'] =
  * at 11.2 s; from 42% burnt on, it is still eating when it gets there, and
  * the paper under the hole is joined to nothing.
  */
+/**
+ * Where the floor lies when it is on — `<Paper>`'s own contact-shadow height.
+ * The cloth stops here too: one height, so a falling piece cannot land
+ * through the thing its shadow is on. With the floor off the cloth keeps its
+ * old floor, well below the frame.
+ */
+const FLOOR_Y = -1.05
+
 const CUT_IN_TWO = 0.42
 
 /** "How much burns", in the words a person would use. The slider is the spectrum between. */
@@ -502,6 +514,8 @@ const DEFAULT_SETTINGS: LabSettings = {
   // in the URL does not make a saved tune look stale.
   firelight: null,
   fireShadows: false,
+  // `?floor=1` so a capture can ask for the ground without a saved tune.
+  floor: query.get('floor') === '1',
   // The library's own, not copies of them: these three used to be literals
   // here and in `fx/emission.ts` both, which is exactly how a lab comes to
   // show a fire the product does not have.
@@ -706,8 +720,11 @@ function CameraRig({
   burn,
   pushFrom,
   pushTo,
+  floor,
 }: {
   view: 'wide' | 'close'
+  /** With a floor in the scene the shot includes it, so the fall lands in frame (K3). */
+  floor: boolean
   at: { u: number; v: number }
   locate: (u: number, v: number) => { x: number; y: number; z: number } | null
   /** The burn, for its own clock: the push-in follows the fire, not the page. */
@@ -718,7 +735,9 @@ function CameraRig({
 }) {
   const camera = useThree((s) => s.camera)
   useFrame(() => {
-    look.set(0, WIDE.y, 0)
+    // With a floor, the shot sits lower and looks down a little, so the
+    // ground — and anything that lands on it — is in frame.
+    look.set(0, floor ? FLOOR_FRAMING.look : WIDE.y, 0)
     if (view === 'close') {
       const point = locate(at.u, at.v)
       if (point) look.set(point.x, point.y, point.z)
@@ -737,8 +756,8 @@ function CameraRig({
     const wobbleY = (drift * (driftNoise(burn.time * 0.17 + 9.3) - 0.5)) as number
     camera.position.set(
       look.x + wobbleX,
-      look.y + wobbleY,
-      look.z + (view === 'close' ? CLOSE_Z : WIDE.z * push),
+      look.y + wobbleY + (floor && view === 'wide' ? FLOOR_FRAMING.lift : 0),
+      look.z + (view === 'close' ? CLOSE_Z : WIDE.z * push * (floor ? FLOOR_FRAMING.back : 1)),
     )
     camera.lookAt(look)
     // After `lookAt`, which resolves roll against world up and would undo it.
@@ -746,6 +765,13 @@ function CameraRig({
   })
   return null
 }
+
+/**
+ * How the wide shot changes when there is a floor: it aims lower and stands a
+ * little higher, so the ground is in frame and the camera looks down on it
+ * rather than along it (K3, F4).
+ */
+const FLOOR_FRAMING = { look: -0.32, lift: 0.34, back: 1.34 }
 
 /** How much closer the wide camera stands at the peak than at the first contact. */
 const PUSH_IN = 0.07
@@ -1458,6 +1484,14 @@ function Lab() {
             <button type="button" aria-pressed={soundOn} onClick={() => void toggleSound()}>
               {soundOn ? 'sound on' : 'sound off'}
             </button>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.floor}
+                onChange={(e) => setSettings({ ...settings, floor: e.currentTarget.checked })}
+              />{' '}
+              floor
+            </label>
           </div>
 
           <h2>
@@ -1593,9 +1627,16 @@ function Lab() {
           // the burn being judged.
           reducedMotion={PHYSICS === undefined}
           content={CONTENT}
-          physics={PHYSICS}
+          physics={
+            typeof PHYSICS === 'object' ? { ...PHYSICS, floor: settings.floor ? FLOOR_Y : -1.4 } : PHYSICS
+          }
           damage={view}
-          scene={LIGHTING ? ({ lighting: LIGHTING } as ComponentProps<typeof Paper>['scene']) : undefined}
+          scene={
+            {
+              lighting: LIGHTING,
+              floor: { enabled: settings.floor, y: FLOOR_Y },
+            } as ComponentProps<typeof Paper>['scene']
+          }
         >
           <SheetReady locate={locate} onReady={() => setSheet(true)} />
           <CameraRig
@@ -1603,6 +1644,7 @@ function Lab() {
             at={at}
             locate={locate}
             burn={burn}
+            floor={settings.floor}
             pushFrom={plan.phases.find((p) => p.id === 'catch')?.at ?? 0}
             pushTo={plan.phases.find((p) => p.id === 'peak')?.at ?? plan.duration}
           />
