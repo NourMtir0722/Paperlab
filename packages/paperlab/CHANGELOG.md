@@ -1,5 +1,25 @@
 # paperlab
 
+## 0.8.0
+
+### Minor Changes
+
+- e6e7c65: A sheet can stand on a floor.
+  
+  `scene.floor` puts dark, matte ground under the paper: `{ enabled, color, y, roughness }`, off by default. With it on, the contact shadow, a simulated sheet and anything the paper lets go of all meet at the same height, so a falling piece lands on the thing casting its shadow instead of through it. It is also what the warm light of a `<Paper damage>` burn pools on.
+- e6e7c65: A burnt edge is drawn in layers, and the char band has its own width.
+  
+  From the hole out, a `<Paper damage>` burn now draws a pale ash lip, the ember line, a black char band, and a dark scorch with a steep edge into clean paper. The lip used to be a hairline; it now defaults to 3.5 mm, as wide as the char. `DamageLook` takes a new `charWidth` (mm, default 3.5), and `lipWidth` now means the whole width of the lip.
+- e6e7c65: A burn can now dim the room it is burning in.
+  
+  `DamageSource` takes an optional `firelight: { room }`: how much of the room's own light is left while the damage burns, from 0 to 1. `<Paper damage>` hands it to its lighting, and `PaperLighting` takes a new `damage` prop that does the same for your own scene. The key, the ambient fill and the studio light are scaled by it every frame, without rebuilding the environment map. Leave it out, and the lighting is exactly what it was.
+
+### Patch Changes
+
+- e6e7c65: A `<Paper damage>` burn has a new default look.
+  
+  `DAMAGE_LOOK_DEFAULTS` is retuned: a tighter scorch that reaches 9 mm up instead of 30, a paler and narrower ash lip, fewer char cracks, wider ember beads burning a little less bright, more fingers in the scorch front, and a more ragged burnt edge (13 mm waves, 6 mm bites). Set any of them through the source's `look` to keep the look you had.
+
 ## 0.7.1
 
 ### Patch Changes
