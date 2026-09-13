@@ -60,6 +60,13 @@ export const fireEmitterDefaults: Required<FireEmitterOptions> = {
 const PER_UPDATE = 24
 
 /**
+ * Sparks per texel that chars, on top of the front's steady rate: a crackle
+ * throws a spark, so they come in ones and twos with the sound of it rather
+ * than as an even drizzle.
+ */
+const CRACKLE_SPARKS = 0.06
+
+/**
  * What a burn throws into the air, read off the field that is burning.
  *
  * Nothing here decides where a fire IS — the field does. Embers and smoke
@@ -124,7 +131,10 @@ export class FireEmitter {
       const oxygen = 1 + air * 1.5
       // Capped rather than trusted — see `PER_UPDATE`. A NaN delta falls
       // through both loops on its own, which is the right answer for it.
-      this.emberDebt = Math.min(this.emberDebt + front * o.embers * oxygen * dt, PER_UPDATE)
+      this.emberDebt = Math.min(
+        this.emberDebt + front * o.embers * oxygen * dt + field.lastStats.charred * o.embers * CRACKLE_SPARKS,
+        PER_UPDATE,
+      )
       this.smokeDebt = Math.min(this.smokeDebt + front * o.smoke * struggle * dt, PER_UPDATE)
       while (this.emberDebt >= 1) {
         this.emberDebt -= 1

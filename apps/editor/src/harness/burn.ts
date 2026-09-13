@@ -758,6 +758,12 @@ export class ScriptedBurn {
   private ashCap: number | undefined
   /** How big the fire is, 0..1, eased — see {@link fireLevel}. */
   private level = 0
+  /**
+   * When a piece of the sheet is cut loose, simulated seconds — the moment
+   * for a burst of sparks and ash off the rim. Set by whoever planned the
+   * burn (`planBurn`'s `severedAt`); null throws none.
+   */
+  burstAt: number | null = null
   private last: FieldStats = {
     front: 0,
     charred: 0,
@@ -901,7 +907,18 @@ export class ScriptedBurn {
     // cooling the field quickly costs nothing on screen.
     const coolUntil = this.outAt === null ? Number.POSITIVE_INFINITY : this.outAt + this.config.smoulder
     if (dying > 0 && (this.last.front > 0 || this.t < coolUntil)) {
-      this.field.paint(HEAT, 0.5, 0.5, 1, -DECAY_COOL * dying * FIXED_DT, 1)
+      // It dies from the bottom up. The whole sheet loses heat as it always
+      // has, and the lower part more on top of that: the lower rim runs out
+      // of fuel and air first, so its flames go first and the last tongues
+      // live on the upper rim — rather than every flame going out at once,
+      // which read as someone switching the fire off.
+      //
+      // Only ever MORE cooling than before, never less: at the hole's middle
+      // height, where the front runs sideways, less would carry a burn meant
+      // to leave a hole all the way to both edges and cut the sheet in two.
+      const cool = -DECAY_COOL * dying * FIXED_DT
+      this.field.paint(HEAT, 0.5, 0.5, 1, cool, 1)
+      this.field.paint(HEAT, 0.5, 0, 0.75, cool * 0.9, 0.3)
     }
     this.last = this.field.step(FIXED_DT)
     // The fire's size as the room sees it. On the burn's clock, so a seek
@@ -915,6 +932,7 @@ export class ScriptedBurn {
     this.glow.step(FIXED_DT)
     this.emitter.update(FIXED_DT)
     this.shed(FIXED_DT)
+    if (this.burstAt !== null && this.t < this.burstAt && this.t + FIXED_DT >= this.burstAt) this.burst()
     this.pool.step(FIXED_DT)
     this.t += FIXED_DT
   }
@@ -955,6 +973,41 @@ export class ScriptedBurn {
         if (this.nextShed() >= chance) continue
         const at = this.locate(x / last, y / last)
         if (at) pool.spawn('ash', at.x, at.y, at.z)
+      }
+    }
+  }
+
+  /**
+   * The moment a piece is cut loose: a small burst of sparks and ash off the
+   * rim. An event, not a rate — the cut is the one moment a burn does
+   * something all at once. Rows are walked from the bottom, which is where a
+   * piece cut loose from a centre burn hangs.
+   */
+  private burst(): void {
+    const { field, pool } = this
+    const size = field.size
+    const last = size - 1
+    const pixels = field.pixels
+    let thrown = 0
+    for (let y = 1; y < last && thrown < 24; y++) {
+      for (let x = 1; x < last && thrown < 24; x++) {
+        const cell = y * size + x
+        if (pixels[cell * 4 + PRESENCE]! < 128) continue
+        if (
+          pixels[(cell - 1) * 4 + PRESENCE]! >= 128 &&
+          pixels[(cell + 1) * 4 + PRESENCE]! >= 128 &&
+          pixels[(cell - size) * 4 + PRESENCE]! >= 128 &&
+          pixels[(cell + size) * 4 + PRESENCE]! >= 128
+        ) {
+          continue
+        }
+        if (this.nextShed() >= 0.08) continue
+        const spark = this.nextShed() < 0.7
+        if (spark ? !this.emit.embers : !this.emit.ash) continue
+        const at = this.locate(x / last, y / last)
+        if (!at) continue
+        pool.spawn(spark ? 'ember' : 'ash', at.x, at.y, at.z)
+        thrown++
       }
     }
   }

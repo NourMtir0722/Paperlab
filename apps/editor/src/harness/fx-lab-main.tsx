@@ -178,6 +178,8 @@ interface LabSettings {
    * (`DamageFirelight`); null is the lighting preset's own — see `roomYield`.
    */
   firelight: number | null
+  /** One fire light casts shadows (`FxFireLight`'s `shadows`) — a shadow pass a frame, so off on this tier. */
+  fireShadows: boolean
   /** Bloom strength, and the scene luminance it starts at. */
   bloom: number
   threshold: number
@@ -484,6 +486,7 @@ const DEFAULT_SETTINGS: LabSettings = {
   // The preset's own until someone moves the slider — so switching presets
   // in the URL does not make a saved tune look stale.
   firelight: null,
+  fireShadows: false,
   // The library's own, not copies of them: these three used to be literals
   // here and in `fx/emission.ts` both, which is exactly how a lab comes to
   // show a fire the product does not have.
@@ -745,11 +748,14 @@ function Driver({
   locate,
   until,
   yields,
+  burstAt,
 }: {
   burn: ScriptedBurn
   view: FieldView
   /** How much of the room's light a fire at its height takes over, 0..1. */
   yields: number
+  /** When this burn cuts a piece loose, for the burst of sparks it throws — or null. */
+  burstAt: number | null
   layers: Layers
   detail: number
   playing: boolean
@@ -761,6 +767,7 @@ function Driver({
   until: number
 }) {
   useFrame((_, delta) => {
+    burn.burstAt = burstAt
     if (playing) {
       burn.play(delta, speed, until)
       onTime(burn.time)
@@ -1482,7 +1489,14 @@ function Lab() {
             />
           )}
           {layers.match && <FxMatchFlame match={match} />}
-          {layers.light && <FxFireLight field={burn.field} locate={locate} gain={settings.light} />}
+          {layers.light && (
+            <FxFireLight
+              field={burn.field}
+              locate={locate}
+              gain={settings.light}
+              shadows={settings.fireShadows}
+            />
+          )}
           {layers.wisps && settings.burn.smoke && (
             <FxWisps glow={burn.glow} field={burn.field} locate={locate} wind={burn.pool.wind} />
           )}
@@ -1508,6 +1522,7 @@ function Lab() {
             locate={locate}
             until={plan.duration}
             yields={settings.firelight ?? roomYield(LIGHTING)}
+            burstAt={plan.severedAt}
           />
           <Ready
             plan={plan}
@@ -1894,6 +1909,14 @@ function Tune({
           step={0.01}
           onInput={(v) => onChange({ ...settings, firelight: v })}
         />
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.fireShadows}
+            onChange={(e) => onChange({ ...settings, fireShadows: e.currentTarget.checked })}
+          />{' '}
+          casts shadows (one extra shadow pass a frame)
+        </label>
       </details>
 
       <details open>

@@ -141,7 +141,9 @@ export const particlePresets = {
    * burn that proves paper was there.
    */
   ash: {
-    life: [2.5, 5],
+    // A second or two: ash that hung in the air for five read as grey
+    // confetti over the hole, dust or stars rather than something falling.
+    life: [1.2, 2.6],
     // Thrown UP by the heat it came off, before it is heavier than the air.
     // It used to leave at almost nothing (0.02–0.1) with a lift of −0.35, so
     // every flake began falling the moment it was born — straight through the
@@ -149,7 +151,9 @@ export const particlePresets = {
     speed: [0.14, 0.3],
     direction: [0, 1, 0],
     spread: 0.55,
-    lift: -0.22,
+    // Heavier than the air once the throw is spent: most flakes tumble down,
+    // only the lightest ride the heat up a little first.
+    lift: -0.42,
     drag: 1.6,
     jitter: 1.2,
     windCatch: 1,
@@ -157,9 +161,11 @@ export const particlePresets = {
     // 3.8 mm and there were far too many of them: a shower of specks rather
     // than a few flakes you would notice.
     size: [0.03, 0.026],
+    // Charred paper, near black: under a bright key the old value read as
+    // pale grey against the black stage, which is the confetti.
     color: [
-      [0.07, 0.065, 0.06],
-      [0.12, 0.115, 0.11],
+      [0.04, 0.037, 0.034],
+      [0.07, 0.066, 0.062],
     ],
     alpha: [0.95, 0],
     spin: 4,

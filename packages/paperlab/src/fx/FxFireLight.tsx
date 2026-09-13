@@ -10,6 +10,13 @@ export interface FxFireLightProps {
   locate: SurfaceLocator
   /** How bright the fire is per unit of burning front. */
   gain?: number
+  /**
+   * The brightest cluster's light casts shadows: a curled edge, a lifted
+   * plate and a hanging flap throw flickering shade across the sheet, which
+   * is much of what makes firelight read as firelight. One shadow pass a
+   * frame, so off unless asked for.
+   */
+  shadows?: boolean
 }
 
 /**
@@ -38,9 +45,10 @@ export interface FxFireLightProps {
  * fire gathering into more places or fewer never makes three recompile a
  * shader.
  */
-export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN }: FxFireLightProps) {
+export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN, shadows = false }: FxFireLightProps) {
   const front = useRef<(THREE.PointLight | null)[]>([])
   const through = useRef<THREE.PointLight>(null)
+  const spot = useRef<THREE.SpotLight>(null)
 
   useFrame(({ camera, clock }) => {
     const b = through.current
@@ -48,10 +56,21 @@ export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN }: FxFireLig
     const fire = fireStateOf(field, locate).update(clock.elapsedTime)
     const level = field.lastStats.front * gain
     let total = 0
+    let brightest = -1
+    let most = 0
     for (let c = 0; c < fire.clusterCount; c++) {
       const cluster = fire.clusters[c]!
-      total += cluster.count * cluster.height
+      const share = cluster.count * cluster.height
+      total += share
+      if (share > most) {
+        most = share
+        brightest = c
+      }
     }
+    // The shadow light stands in for the brightest cluster's own, so the
+    // fire gives off no more light with shadows than without.
+    const s = shadows ? spot.current : null
+    if (s) s.intensity = 0
     for (let i = 0; i < FIRE_CLUSTERS; i++) {
       const light = front.current[i]
       if (!light) continue
@@ -68,6 +87,14 @@ export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN }: FxFireLig
       light.position.set(cluster.x + toward.x, cluster.y + cluster.height * 0.5, cluster.z + toward.z)
       light.intensity = level * cluster.flicker * ((cluster.count * cluster.height) / total)
       light.color.copy(COOLING).lerp(FIRE_COLOR, Math.min(1, Math.max(0, cluster.heat)))
+      if (s && i === brightest) {
+        s.position.copy(light.position)
+        s.target.position.set(cluster.x, cluster.y, cluster.z)
+        s.target.updateMatrixWorld()
+        s.intensity = light.intensity
+        s.color.copy(light.color)
+        light.intensity = 0
+      }
     }
     if (fire.count === 0) {
       b.intensity = 0
@@ -96,6 +123,22 @@ export function FxFireLight({ field, locate, gain = FIRE_LIGHT_GAIN }: FxFireLig
           distance={0}
         />
       ))}
+      {shadows && (
+        <spotLight
+          ref={spot}
+          color={FIRE_COLOR}
+          intensity={0}
+          decay={0.9}
+          distance={0}
+          // Wide and soft: a flame is not a lamp with a beam, only a light
+          // that happens to be close to the paper it lights.
+          angle={1.3}
+          penumbra={0.8}
+          castShadow
+          shadow-mapSize={[512, 512]}
+          shadow-bias={-0.0004}
+        />
+      )}
       <pointLight ref={through} color={FIRE_COLOR} intensity={0} decay={0.9} distance={0} />
     </>
   )
