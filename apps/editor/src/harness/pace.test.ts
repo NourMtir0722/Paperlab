@@ -8,18 +8,18 @@ import { DURATION, ScriptedBurn, planBurn, type BurnOrigin } from './burn'
  * Every check in `tools/fire-look.mjs` is of one shape: nothing changed that
  * should not have — post leaves an unburnt sheet alone, heat lights only the
  * rim, paper never blooms. Not one of them measures the fire against a number
- * `paperlab-fx-fire-spec.md` asks for, which is how all twelve passed while
+ * a real burn has, which is how all twelve passed while
  * the burn was six times too fast and the flames never bloomed at all. The
  * gate's own file says so: "Passing it is still not done."
  *
- * These are the other half. The review measured five things in an afternoon —
+ * These are the other half. A visual review measured five things in an afternoon —
  * spread in mm/s, how much of the sheet was gone and when, the char band, the
  * life of the fire, the phase times — and every one of them is a property of
  * the simulation alone: no renderer, no references, no browser. So they run
  * here, in `pnpm test`, on every commit, rather than in a harness that needs
  * 20 MB of stills that are deliberately not in this repo.
  *
- * The ranges are the spec's, not this burn's. A number that drifts out of one
+ * The ranges are a real burn's, not this one's. A number that drifts out of one
  * is a fire that has stopped being paper burning, and it should fail here
  * rather than wait for somebody to notice in a screenshot.
  */
@@ -98,9 +98,9 @@ describe('the burn, against the spec', () => {
   const center = pace('center')
   const corner = pace('corner')
 
-  it('spreads at 3-8 mm/s (§9)', () => {
+  it('spreads at 3-8 mm/s', () => {
     // It was 39 mm/s from the centre and 27 from a corner — six times too
-    // fast, and the root cause of most of the review: there was no time to
+    // fast, and the root cause of most of what a visual review found: there was no time to
     // watch it spread, so every phase was judged at the wrong size.
     expect(center.spread).toBeGreaterThanOrEqual(3)
     expect(center.spread).toBeLessThanOrEqual(8)
@@ -108,7 +108,7 @@ describe('the burn, against the spec', () => {
     expect(corner.spread).toBeLessThanOrEqual(8)
   })
 
-  it('leaves a charred band of 2-8 mm behind the front (§5)', () => {
+  it('leaves a charred band of 2-8 mm behind the front', () => {
     // The band is the front's speed over `consumeRate`, so it moves whenever
     // the pace does — which is exactly why it is checked beside it.
     expect(center.band).toBeGreaterThanOrEqual(2)

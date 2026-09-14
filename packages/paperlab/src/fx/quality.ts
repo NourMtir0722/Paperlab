@@ -57,21 +57,21 @@ export interface FxQualitySettings {
    * Bloom is a blur, and a blur at half resolution is a quarter of the
    * fill-rate for a glow that is soft anyway — the cheapest thing a phone
    * can give up that still leaves every zone and every flame on screen
-   * (spec §12: tiers thin post quality, never what is shown). Read by
+   * (tiers thin post quality, never what is shown). Read by
    * `FxPost`.
    */
   bloomScale: number
   /**
-   * The most flames standing at once. The spec's §12 said 8 / 16 / 32; a ring
+   * The most flames standing at once. It was 8 / 16 / 32; a ring
    * of fire that is dense in clusters and broken by gaps needs more tongues
-   * than that, and Noor's direction (a living, uneven ring, never a crown)
-   * came later and wins — 16 / 36 / 64. Every tier has real flames; a phone
+   * than that (a living, uneven ring, never a crown), so it is
+   * 16 / 36 / 64. Every tier has real flames; a phone
    * gets fewer tongues, never the cheap version.
    * Read by `FxFlames`.
    */
   flames: number
   /**
-   * The most of each particle kind in the air at once (spec §12), inside the
+   * The most of each particle kind in the air at once, inside the
    * `particles` budget. Read by `FireEmitter` through its `caps` option.
    */
   caps: { ember: number; smoke: number; ash: number }
@@ -79,7 +79,7 @@ export interface FxQualitySettings {
    * Heat haze strength in pixels at 1080p; 0 turns it off. Read by `FxPost`.
    *
    * High tier only, and half what it was. It was 3.8 px on two tiers against
-   * §10's 1–3, and invisible in every capture at either — a few pixels of
+   * the 1–3 wanted, and invisible in every capture at either — a few pixels of
    * wobble reads as nothing while the fluid beside it is moving. It is also
    * still driven from `flameAnchors`, which is where the SPRITE flames stand,
    * not where the fluid actually burns; until it reads the fluid's own heat

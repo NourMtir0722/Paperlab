@@ -4,8 +4,8 @@ import { useEffect, useMemo } from 'react'
 import type { ParticlePool, ParticleTarget } from './particles'
 
 /**
- * The pool, drawn — three kinds, three ways, because the spec's three
- * particles are three different things (paperlab-fx-fire-spec.md §8).
+ * The pool, drawn — three kinds, three ways, because a fire's three
+ * particles are three different things.
  *
  * - **Embers** are light, moving fast: quads STRETCHED along their own
  *   screen-space velocity into streaks, a bright head and a fading tail,
@@ -118,7 +118,7 @@ void main() {
   // It used to be flat-topped across (smoothstep from 0.35, so the middle
   // seventy per cent of the width was all at full brightness) and to keep a
   // quarter of that brightness all the way to the end of the quad. Both
-  // together drew a wide bar with a squared-off end, which is what the review
+  // together drew a wide bar with a squared-off end, which is what a visual review
   // saw up close. A spark is a point of light smeared by its own motion: it
   // is brightest on its centre line and it runs out.
   float across = abs(vQuad.x);
@@ -230,14 +230,14 @@ void main() {
   float edge = 0.62 + 0.3 * flNoise(vec2(a * 1.6 + vSeed * 31.0, vSeed * 7.0));
   float mask = 1.0 - smoothstep(edge - 0.06, edge, r);
   if (mask <= 0.0) discard;
-  // Char in the middle, pale brittle ash at the edge (§8.3) — in patches
+  // Char in the middle, pale brittle ash at the edge — in patches
   // along it, not all the way round: a flake is a few pixels across, and a
   // continuous pale rim round a dark middle drew it as a hollow ring.
   float rim = smoothstep(edge - 0.32, edge - 0.04, r);
   float patches = smoothstep(0.45, 0.75, flNoise(vec2(a * 2.2 + vSeed * 17.0, vSeed * 13.0)));
   float grain = flNoise(vQuad * 3.0 + vSeed * 23.0);
   vec3 charC = vec3(0.05, 0.043, 0.038) * (0.7 + 0.6 * grain);
-  // #A49E9D, the spec's own sample of ash (§8.3), in linear.
+  // #A49E9D, sampled from the reference ash, in linear.
   vec3 ashC = vec3(0.372, 0.344, 0.340);
   // Pale ash with char under it, not char with a pale rim.
   //

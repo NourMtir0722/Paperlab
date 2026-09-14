@@ -150,7 +150,7 @@ export function Hero() {
         Want to feel it rather than read it? <a href="../hands/">Set fire to the paper with your hands</a> —
         hold a lighter up to the webcam and the sheet catches where the flame is, or pinch and hold still to
         strike a match, then blow it out. It needs a camera and it asks first; the video never leaves your
-        machine. Every knob behind the burn is in <a href="../fx-lab/">the fire lab</a>.
+        machine. Every knob behind the burn is in <a href="../fx-lab/">the FX Lab</a>.
       </p>
     </section>
   )

@@ -32,8 +32,8 @@ export interface FireEmitterOptions {
 // Smoke kept light: a clean fire makes little, and a frame full of it hides
 // the burn — more only where burning struggles (see `struggle` below).
 /**
- * How much each kind leaves the front, per texel per second — Noor's tune in
- * the lab on 2026-09-13, which the lab starts from and `/hands` inherits.
+ * How much each kind leaves the front, per texel per second — the tune made in
+ * the lab, which the lab starts from and `/hands` inherits.
  *
  * The simulator's smoke is the main smoke of a burning sheet, since it is the
  * same fluid the flames are made of; these sprite puffs, once switched off
@@ -121,13 +121,13 @@ export class FireEmitter {
       const air = Math.hypot(wx, wy, wz)
       // How well it is burning: the mean heat along the front. A clean, hot
       // front makes little smoke; one that is catching, dying or being blown
-      // on makes a lot (fire spec §4.9, §8.2 — smoke peaks when burning
+      // on makes a lot (smoke peaks when burning
       // struggles, never at the peak).
       let heat = 0
       for (let k = 0; k < front; k++) heat += field.data[field.frontCells[k]! * 4 + HEAT]!
       heat /= front
       const struggle = 0.35 + 1.6 * Math.max(0, 0.7 - heat) + air * 0.8
-      // Blown on, a fire gets air: the embers flare and more fly (§10.6).
+      // Blown on, a fire gets air: the embers flare and more fly.
       const oxygen = 1 + air * 1.5
       // Capped rather than trusted — see `PER_UPDATE`. A NaN delta falls
       // through both loops on its own, which is the right answer for it.

@@ -6,7 +6,7 @@
  * meant to look like, and that settles everything about a burn except the
  * half that only exists between frames: whether a tongue tears or dissolves,
  * how fast the beads flicker, whether "smoulder" and "cold" are two moments
- * or one. Every one of the review's findings about MOTION was inferred from
+ * or one. Every finding a visual review made about MOTION was inferred from
  * stills, which is a large part of why it took an afternoon.
  *
  * So this records the page playing, from the first contact to cold, and

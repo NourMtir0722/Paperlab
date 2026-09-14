@@ -45,7 +45,7 @@ void mainUv(inout vec2 uv) {
 }
 
 // The grade: the whole frame warms as the fire grows — a few percent, no
-// more (spec §7). A multiply, so black stays black.
+// more. A multiply, so black stays black.
 void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
   outputColor = vec4(inputColor.rgb * mix(vec3(1.0), uWarm, uGrade), inputColor.a);
 }
@@ -53,7 +53,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
 
 /**
  * Heat haze above the flames, and the warm grade of a frame with a fire in
- * it — spec §7's last two items, as one pass because both are cheap and both
+ * it, as one pass because both are cheap and both
  * run on the HDR frame before the tone curve.
  *
  * Fed each frame by `FxPostPass`: `sources` holds up to {@link HAZE_SOURCES}

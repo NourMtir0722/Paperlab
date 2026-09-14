@@ -19,9 +19,9 @@ const OUT = 0.004
 /**
  * The embers a burn leaves behind, drawn over the field it came from.
  *
- * `paperlab-fx-fire-spec.md` §9, "Smoulder": after the flames, glowing spots
+ * Smoulder: after the flames, glowing spots
  * crawl along the edge, flare on a breath, and go out one by one over
- * seconds (§4.10). The field cannot do this, and it is not a tuning problem:
+ * seconds. The field cannot do this, and it is not a tuning problem:
  * a burn blown out loses its heat in a fraction of a second — below ignition
  * everywhere or it recovers — so its own heat channel has nothing left to
  * smoulder with.
@@ -35,7 +35,7 @@ const OUT = 0.004
  * breath flares what is left.
  *
  * Only the sheet reads it. Flames and the fire light read the FIELD, so the
- * flames die with the gas (§4.1) while the edge keeps glowing; the physics
+ * flames die with the gas while the edge keeps glowing; the physics
  * reads char, saturation and presence, which pass through untouched.
  */
 export class Afterglow implements DamageSource {
@@ -86,7 +86,7 @@ export class Afterglow implements DamageSource {
 
   /**
    * Advance by `dt`, after the field has stepped. `blow` is the breath on the
-   * sheet, 0..1: it flares what is left (§10.6, "on smoulder: beads flare,
+   * sheet, 0..1: it flares what is left ("on smoulder: beads flare,
    * then fade").
    */
   step(dt: number, blow = 0): void {

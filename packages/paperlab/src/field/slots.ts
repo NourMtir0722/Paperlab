@@ -11,7 +11,7 @@ import { mergeConfig } from '../config/merge'
 import { resolveConfig } from '../PaperMesh'
 import { outwardCorner, sheetLayoutSchema } from './sheetGrid'
 
-/** A field slot references a preset — the spec's component/instance model. */
+/** A field slot references a preset — a component/instance model. */
 export interface FieldPaperSlot {
   preset?: string | PaperConfigInput
   /**

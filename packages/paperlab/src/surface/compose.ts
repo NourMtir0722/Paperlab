@@ -558,7 +558,7 @@ void plDamageCut(inout vec4 color, vec4 d) {
 `
 
 /**
- * What a burn LOOKS like: the zones of `paperlab-fx-fire-spec.md` §5, drawn
+ * What a burn LOOKS like: the zones of a real burnt edge, drawn
  * per fragment from a grid that is coarser than every one of them.
  *
  * From the hole outward: void · ash lip · ember line · char · scorch · paper.
@@ -573,7 +573,7 @@ void plDamageCut(inout vec4 color, vec4 d) {
  *   through the sampled browns, then a steep jump to clean paper in its last
  *   stretch — an even blur is half of what made the first version read as a
  *   gradient. It reaches further ABOVE the burn than below, because hot gas
- *   rises and cooks the paper over it (§4.5): world up is worked out here, in
+ *   rises and cooks the paper over it: world up is worked out here, in
  *   the sheet's own UV, from the surface's screen derivatives.
  * - **Char** is not black: near-black in a crack network of 1–4 mm cells, a
  *   dark grey body, a brown undertone toward the scorch, and plates tilted so
@@ -588,7 +588,7 @@ void plDamageCut(inout vec4 color, vec4 d) {
  *   added after transmission, which owns `csm_Emissive`.
  *
  * Heat paints nothing anywhere else. The wide glow this chunk once drew over
- * unburnt paper was the spec's first complaint: red added to white is pink.
+ * unburnt paper was the first fire's failure: red added to white is pink.
  */
 const DAMAGE_SHADE_CHUNK = /* glsl */ `
 uniform float uDamageTime;
@@ -691,7 +691,7 @@ vec3 plScorchTint(float t) {
   return min(c / paper, vec3(1.0));
 }
 
-/** The ember ramp (§5 zone 3): off → #870E03 → #A12108 → #F77E14 → #FEFBE0, hottest last. */
+/** The ember ramp: off → #870E03 → #A12108 → #F77E14 → #FEFBE0, hottest last. */
 vec3 plEmberRamp(float t) {
   vec3 c0 = plLinear(vec3(0.529, 0.055, 0.012));
   vec3 c1 = plLinear(vec3(0.631, 0.129, 0.031));
@@ -721,7 +721,7 @@ void plDamage(inout vec4 color, inout float roughness) {
   vec2 gradC = vec2(e.r - w.r, n.r - s.r) * 0.5 * perWorld;
   // Scorch reaches ahead of the char, and further UP than anywhere else:
   // the char a centimetre below this point, and the char a few millimetres
-  // around it, each lent to the scorch at a discount (§4.2, §4.5).
+  // around it, each lent to the scorch at a discount.
   vec2 mmUv = vec2(PL_MM) / uSheetSize;
   float charBelow = max(texture2D(uDamage, uv - upUv * uLook2.y * mmUv).r, texture2D(uDamage, uv - upUv * 0.5 * uLook2.y * mmUv).r);
   // A ring of eight, averaged: four diagonal maxima drew the grid back in as
@@ -780,7 +780,7 @@ void plDamage(inout vec4 color, inout float roughness) {
   float lipEdge = uLook1.y * mix(0.7, 1.1, plFbm(vec2(dot(p, tangentR) / (5.0 * PL_MM), 1.7)));
   float charEnd = lipEdge + uLook0.x + uLook3.w * mix(0.8, 1.2, plFbm(vec2(dot(p, tangentR) / (7.0 * PL_MM), 4.3)));
   // Further above the burn than below it — hot gas rises and cooks the paper
-  // over it (§4.5) — out to the scorch's full reach straight up, and about
+  // over it — out to the scorch's full reach straight up, and about
   // half of it below and beside.
   vec2 upMm = normalize(upUv * uSheetSize);
   float above = length(toward) > 1e-3 ? max(0.0, dot(-normalize(toward), upMm)) : 0.0;

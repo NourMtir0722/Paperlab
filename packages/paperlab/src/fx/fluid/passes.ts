@@ -545,8 +545,8 @@ void main() {
   // The base used to be bright enough to read on its own — beige — which is
   // right while flames are lighting it and wrong the moment they stop: the
   // last of the smoke hung over a black stage as flat beige slabs, the same
-  // colour everywhere, which reads as a filled shape rather than as smoke
-  // (Noor, 2026-09-13). Dim at the base and warm where the fire is: smoke by
+  // colour everywhere, which reads as a filled shape rather than as smoke.
+  // Dim at the base and warm where the fire is: smoke by
   // the flames looks as it did, smoke after them goes to a dim grey.
   float smokeAlpha = 1.0 - exp(-smoke * uSmokeDensity);
   vec3 smokeColor = vec3(0.075, 0.068, 0.062) + vec3(0.3, 0.14, 0.045) * smoothstep(0.12, 0.9, t);

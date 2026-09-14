@@ -114,7 +114,7 @@ export class FireSound {
 
   /**
    * A match struck: the scratch of the head across the box, then the hiss of
-   * it flaring as the head burns off (spec §10.2). Two bursts of the shared
+   * it flaring as the head burns off. Two bursts of the shared
    * noise, one bright and short, one breathier and longer.
    */
   strike(): void {
@@ -122,12 +122,12 @@ export class FireSound {
     this.burst('fire-flare', 0.8, { type: 'highpass', frequency: 1800, q: 0.7 }, 0.03, 0.45, 0.45, 0.05)
   }
 
-  /** Blown out: a soft, low breath of noise (spec §10.6). */
+  /** Blown out: a soft, low breath of noise. */
   puff(): void {
     this.burst('fire-puff', 0.6, { type: 'lowpass', frequency: 520, q: 0.6 }, 0.02, 0.28, 0.55)
   }
 
-  /** One ember popping in the air — a tiny click on the frame it flashes (spec §8.1). */
+  /** One ember popping in the air — a tiny click on the frame it flashes. */
   pop(): void {
     const f = 3000 + this.next() * 3000
     this.burst(

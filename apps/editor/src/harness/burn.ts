@@ -33,7 +33,7 @@ import { FLAME_RADIUS, flameHeat } from './flame'
  * seconds is 960 steps of a 64² grid and costs a few milliseconds.
  *
  * The numbers in `PHASES` are MEASURED off this script, not copied out of the
- * spec's §9 table. Where the two disagree the phase says so — see `gap`. That
+ * reference timeline. Where the two disagree the phase says so — see `gap`. That
  * disagreement is a finding, not a rounding error, and `burn.test.ts` pins it
  * so it cannot quietly go away.
  */
@@ -284,14 +284,14 @@ export interface Phase {
   id: string
   /** Simulated seconds from the flame touching the paper. */
   at: number
-  /** What this moment is, in the spec's words (§9). */
+  /** What this moment looks like, in words. */
   label: string
   /** The still in `fx-refs/fire/` this frame is judged against. */
   reference: string
   /** What the reference shows, for the caption under the pair. */
   shows: string
   /**
-   * Where the simulation and the spec's §9 disagree about this phase, if they
+   * Where the simulation and the reference timeline disagree about this phase, if they
    * do. Printed by the capture script and shown in the lab, because a
    * comparison against a reference that the burn cannot reach is worse than
    * no comparison — it invites tuning the LOOK to hide a hole in the
@@ -304,7 +304,7 @@ export interface Phase {
 const moment = (t: number) => Math.round(t * 20) / 20
 
 /**
- * The seven moments of §9, at the times THIS burn reaches them.
+ * The seven moments of a burn, at the times THIS burn reaches them.
  *
  * Measured, not written down: the burn is stepped headlessly with the given
  * settings and each moment is read off it — the first burn-through, the
@@ -354,7 +354,7 @@ export interface BurnPlan {
    * falls.
    */
   severedAt: number | null
-  /** §9's moments, at the times this burn reaches them. */
+  /** A burn's seven moments, at the times this burn reaches them. */
   phases: Phase[]
 }
 
@@ -394,7 +394,7 @@ const plans = new Map<string, BurnPlan>()
 
 /**
  * The burn these settings ask for, stepped headlessly and measured — the
- * seven moments of §9, how much it eats, how long it lasts, and whether it
+ * seven moments of a burn, how much it eats, how long it lasts, and whether it
  * cuts a piece loose.
  *
  * Asked for an amount, it guesses when the fire should start to die
@@ -626,7 +626,7 @@ export interface Crop {
  * "front" is every cell that is charring and hot, and at the peak that band is
  * three to four times wider than the hole: its extremes sit out at the leading
  * edge of the scorch, on unburnt paper, and a macro aimed there photographs
- * nothing but the glow. The ember line (§5.3) lives on the rim, so the crops
+ * nothing but the glow. The ember line lives on the rim, so the crops
  * aim there.
  *
  * Kept two cells in from the sheet's own edges: the burn spreads three times
@@ -636,8 +636,8 @@ export interface Crop {
  * same three — the capture script asks the page for these and photographs
  * them.
  *
- * The compass matters for what the crops are FOR. §6 says upper-rim flames
- * are tall and lower-rim ones short; §5.3 says the ember line is beaded
+ * The compass matters for what the crops are FOR. Upper-rim flames
+ * should be tall and lower-rim ones short, and the ember line beaded
  * everywhere. A crop of each is how you tell whether either is true.
  */
 export function rimCrops(field: DamageField): Crop[] {

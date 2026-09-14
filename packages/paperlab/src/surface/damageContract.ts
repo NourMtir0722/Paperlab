@@ -148,8 +148,8 @@ export interface DamageLook {
 }
 
 /**
- * What every burn is drawn with unless told otherwise — Noor's tune in the
- * lab's sidebar on 2026-09-13, and the source of truth for how a burn looks:
+ * What every burn is drawn with unless told otherwise — the tune made in the
+ * lab's sidebar, and the source of truth for how a burn looks:
  * the lab starts from it, `/hands` inherits it, and a user changes it through
  * `look`. The values it replaced, and why each of those had moved, are in the
  * history of this file.
@@ -161,7 +161,7 @@ export const DAMAGE_LOOK_DEFAULTS: Required<DamageLook> = {
   emberFlicker: 1.65,
   emberGlow: 1.25,
   sparkle: 0.5,
-  // As wide as the char band (Noor, 2026-09-13): the lip has to be seen. At
+  // As wide as the char band: the lip has to be seen. At
   // 0.95 mm it was a hairline tracing the edge.
   lipWidth: 3.5,
   charWidth: 3.5,

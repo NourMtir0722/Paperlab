@@ -72,7 +72,7 @@ export const particlePresets = {
    * caught the bug in the version before this one. That version said "the hot
    * end is now ~5.6, well over the bloom threshold" — and 5.6 was an ABSOLUTE
    * luminance, while paper white under `window` is 1.6. So the hottest spark
-   * in the frame was **3.5× paper, under the spec's own 4× floor**, and its
+   * in the frame was **3.5× paper, under the 4× floor**, and its
    * own comment said otherwise. A number that cannot be compared to anything
    * is a number nobody can check.
    *
@@ -92,12 +92,12 @@ export const particlePresets = {
     drag: 0.8,
     jitter: 1.5,
     windCatch: 0.8,
-    // 0.3-1 mm of core (§5). A sheet is one world unit across, 210 mm, so
+    // 0.3-1 mm of core. A sheet is one world unit across, 210 mm, so
     // 0.0035 is 0.7 mm. It was 0.005 — a full millimetre wide before the
     // streak stretched it, which is where "wide bars" started.
     size: [0.0035, 0.0012],
     color: [
-      // 6× paper white: inside §4.3's 4–8 band, so it blooms.
+      // 6× paper white: inside the 4–8× band, so it blooms.
       emitHex('#FFC271', 6),
       // 0.7× — UNDER the bloom threshold on purpose, so a dying spark stops
       // glowing rather than merely fading.
@@ -120,7 +120,7 @@ export const particlePresets = {
     // of the last flame. Left to live three and a half seconds and grow to
     // seven centimetres, the last few of them overlapped into a flat wash
     // over the hole with nothing left to move them — the one moment of a
-    // burn Noor found the smoke wrong (2026-09-13).
+    // burn where the smoke looked wrong.
     life: [1.4, 2.6],
     speed: [0.05, 0.15],
     direction: [0, 1, 0],
@@ -163,7 +163,7 @@ export const particlePresets = {
     drag: 1.6,
     jitter: 1.2,
     windCatch: 1,
-    // 5–10 mm across (§8.3). A sheet is 210 mm, so 0.03 is 6.3 mm. They were
+    // 5–10 mm across. A sheet is 210 mm, so 0.03 is 6.3 mm. They were
     // 3.8 mm and there were far too many of them: a shower of specks rather
     // than a few flakes you would notice.
     size: [0.03, 0.026],
@@ -398,7 +398,7 @@ export class ParticlePool {
           : 1
       const k4 = k * 4
       // One ember in ten dies in the air with a flash — a tiny pop at the end
-      // of its life (spec §8.1), which the sound can follow.
+      // of its life, which the sound can follow.
       const pop = preset.blend === 'additive' && this.seed[i]! < 0.1 && t > 0.86 ? 2.6 : 1
       target.color[k4] = (c0[0] + (c1[0] - c0[0]) * t) * pop
       target.color[k4 + 1] = (c0[1] + (c1[1] - c0[1]) * t) * pop

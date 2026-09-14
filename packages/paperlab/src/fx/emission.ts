@@ -1,7 +1,7 @@
 /**
  * How bright fire is, in one unit: **multiples of paper white.**
  *
- * `paperlab-fx-fire-spec.md` §4.3 makes exactly one quantitative claim about
+ * There is exactly one quantitative claim to make about
  * what fire must look like — an ember is 4–8× brighter than the whitest paper
  * in the frame, which is what makes a bloom pass spread it and a tone curve
  * roll it to white. Everything else about the look is a colour or a
@@ -54,7 +54,7 @@ export const LUMA = [0.2126, 0.7152, 0.0722] as const
  * were identical: most presets are safe from 0.8–0.9, `studio` from 1.1, and
  * `window` — the brightest — only from 1.6. The brightest preset has to set
  * this, because a threshold that lets paper bloom under any preset brings back
- * the painted-glow failure of §0.
+ * the painted-glow failure of the first fire.
  *
  * Re-measure it with `pnpm test:fire-look` if a preset's lighting changes.
  */
@@ -68,7 +68,7 @@ export const PAPER_WHITE = 1.6
  * the number survives: it is not "3.6", it is "clear of the brightest paper".
  *
  * **Do not lower it to make fire bloom.** That is the wrong end of the
- * problem, and the review that found the fluid's flames under it said so:
+ * problem, and a visual review that found the fluid's flames under it said so:
  * `window`'s paper blooms from 1.6, so lowering the threshold blooms paper,
  * which is the painted glow again. Raise what the fire EMITS.
  */
@@ -76,7 +76,7 @@ export const FX_BLOOM_THRESHOLD = PAPER_WHITE * 2.25
 
 /**
  * What the spec asks a glowing part of a fire to reach, in multiples of paper
- * white (§4.3). The band `emission.test.ts` holds every emitter to.
+ * white. The band `emission.test.ts` holds every emitter to.
  */
 export const FIRE_GLOW = [4, 8] as const
 
@@ -168,8 +168,8 @@ export const FIRE_SOOT_SCALE = 3
  * multiplier on whatever clears the threshold, so its right value depends
  * entirely on how much fire is authored above it. With a core authored to
  * over-expose, 0.55 was the most the black stage could take; the flame of
- * {@link FIRE_ZONES} (Noor, 2026-09-13) authors none of it past the
- * threshold, and 1.25 is her tune for it. `pnpm test:fire-budget` holds the
+ * {@link FIRE_ZONES} authors none of it past the
+ * threshold, and 1.25 is the tune for it. `pnpm test:fire-budget` holds the
  * stage black and the paper unbloomed whatever this is set to.
  */
 export const FX_BLOOM = 1.25
@@ -190,7 +190,7 @@ export const FIRE_CONTRAST = 0.9
  *
  * Fire used to be pure added light, which is why a tongue standing in front
  * of the sheet came out salmon: orange added to cream paper is pink, the one
- * colour §13.3 forbids. A flame is thin at the tip and nearly opaque through
+ * colour fire must never be. A flame is thin at the tip and nearly opaque through
  * its bright heart, and that opacity is what lets it read as its own colour
  * instead of as a tint on whatever is behind it. 0 restores the old purely
  * additive fire.
@@ -246,7 +246,7 @@ export const FIRE_THIN = 0.55
  * both ways. Above it, a flame keeps its light in a bright room but loses its
  * colour to the tone curve; below it, the colour holds, and a flame drawn
  * opaque risks reading as a decal on the sheet rather than as light. The
- * defaults sit below it (Noor, 2026-09-13), with the bloom carrying the glow.
+ * defaults sit below it, with the bloom carrying the glow.
  */
 export interface FireZones {
   root: { color: string; amount: number; reach: number }
@@ -259,7 +259,7 @@ export interface FireZones {
 export type FireZonesInput = { [Z in keyof FireZones]?: Partial<FireZones[Z]> }
 
 /**
- * Noor's tune in the lab on 2026-09-13, and the source of truth for how a
+ * The tune made in `/fx-lab`, and the source of truth for how a
  * flame looks: the lab starts from it and `/hands` inherits it. A gentler
  * flame than the one it replaced — every zone sits under the bloom threshold,
  * so its glow comes from the bloom's strength ({@link FX_BLOOM}) spreading

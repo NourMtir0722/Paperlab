@@ -146,7 +146,7 @@ describe('the scripted burn', () => {
     expect(heat).toBe(0)
     // It finished while the hole was still a hole. `decayAt` is 0.22 now, not
     // 0.5: at the field's dilated clock a fire allowed to reach half the sheet
-    // ran past 13 s and ate 62% of it, and the review's whole complaint about
+    // ran past 13 s and ate 62% of it, and a visual review's whole complaint about
     // the ending was that "dying" was a strip of paper under huge flames.
     // About a third burnt, with paper all round the hole.
     expect(burn.stats.remaining).toBeLessThan(0.8)
@@ -271,8 +271,8 @@ describe('the scripted burn', () => {
   })
 
   it('with smoke off, throws no smoke at all — whatever rate is asked for', () => {
-    // The pool throws a light thread of puffs by default (Noor's tune,
-    // 2026-09-13), and a lab sidebar can ask for more. "Smoke off" has to win
+    // The pool throws a light thread of puffs by default (the tuned
+    // defaults), and a lab sidebar can ask for more. "Smoke off" has to win
     // over both, which is what this checks.
     const off = new ScriptedBurn(flatSheet, { smoke: false })
     off.setEmit({ embers: true, smoke: true, ash: true }, { smoke: 0.2 })

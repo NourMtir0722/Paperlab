@@ -33,7 +33,7 @@ export function wispAlpha(age: number): number {
   return Math.min(1, age / 0.25) * (1 - age / LIFE) ** 1.6 * 0.42
 }
 
-/** At most this many threads at once (spec §8.2: one or two). */
+/** At most this many threads at once (one or two). */
 const WISPS = 2
 /** Points along one thread. */
 const POINTS = 64

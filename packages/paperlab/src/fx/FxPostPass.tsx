@@ -20,7 +20,7 @@ import { fxQualityFor } from './quality'
  * anywhere else would put the specifier back into fx's module graph and a
  * consumer without the peers could no longer load fx.
  *
- * Why it exists, in the words of `paperlab-fx-fire-spec.md` §0 and §7: the
+ * Why it exists: the
  * first fire's glow was PAINT — a warm colour added to `csm_Emissive` over
  * paper that had not burnt — and red added to white makes pink. Real glow is
  * light too bright for the film: an ember is brighter than the whitest paper
@@ -37,8 +37,8 @@ import { fxQualityFor } from './quality'
  * back.** `<EffectComposer>` sets `gl.toneMapping = NoToneMapping` while it is
  * mounted; without the `<ToneMapping>` below, mounting this pass would
  * silently throw away the rig's film and the unburnt sheet would change. The
- * spec's own test for this pass is that it does not: with no fire in frame,
- * post on and post off are the same picture (§14.3, `pnpm test:fire-look`).
+ * test for this pass is that it does not: with no fire in frame,
+ * post on and post off are the same picture (`pnpm test:fire-look`).
  */
 
 const modes = {
@@ -97,7 +97,7 @@ export function FxPostPass({
     haze.count = n
     haze.time = field.time
     haze.amount = hazePx
-    // A few percent at most, and only as the fire grows (§7).
+    // A few percent at most, and only as the fire grows.
     haze.grade = Math.min(1, field.lastStats.front / 0.03)
   })
 
@@ -109,7 +109,7 @@ export function FxPostPass({
           luminanceThreshold={threshold}
           // Nearly a hard knee. A wide one reaches BELOW the threshold, and
           // below it is paper: the whole point of the threshold is that paper
-          // never blooms (§7), and a soft knee would bloom it a little.
+          // never blooms, and a soft knee would bloom it a little.
           luminanceSmoothing={0.02}
           mipmapBlur
           resolutionScale={bloomScale}

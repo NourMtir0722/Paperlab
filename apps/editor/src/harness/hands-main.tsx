@@ -67,14 +67,14 @@ import { ModeTabs } from '../chrome/ModeTabs'
  * one is found, with a banner that says so. A hand driving something it cannot
  * feel has to be shown that it is being read.
  *
- * No sound (Noor, 2026-09-13).
+ * No sound.
  *
  * **Everything else that used to be here is gone.** Scoring, folding,
  * crumpling, painting, tearing, ripping, resizing, peeling, throwing, the
  * stock dial and the synthetic pointer were a vocabulary built to show that
  * the library could be driven by a hand. That case is made; this page is now
  * the fire's, and one page doing one thing well is worth more than twelve
- * gestures nobody can remember (Noor, 2026-09-13).
+ * gestures nobody can remember.
  */
 
 /**
@@ -771,8 +771,8 @@ function App() {
         numHands: 1,
         // Forgiving on purpose. At the defaults (0.5 each) the tracker drops a
         // hand the moment it turns side-on to hold a pinch, and a match that
-        // goes out because the tracker blinked was the first thing Noor met:
-        // "the sensitivity is bad".
+        // goes out because the tracker blinked was the first thing testing
+        // turned up.
         minHandDetectionConfidence: 0.35,
         minHandPresenceConfidence: 0.35,
         minTrackingConfidence: 0.35,

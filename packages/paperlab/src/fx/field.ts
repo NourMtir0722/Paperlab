@@ -177,7 +177,7 @@ export interface DamageFieldOptions {
  *
  * Measured on the scripted burn: the front spread at 39 mm/s from the centre
  * and 27 mm/s from a corner, against the 3–8 mm/s
- * `paperlab-fx-fire-spec.md` §9 asks for. A sheet was 76% gone in 4.8 s, so
+ * a real sheet of A4 manages. A sheet was 76% gone in 4.8 s, so
  * there was no time to watch it spread and every phase was judged at the
  * wrong size — "dying" was a strip of paper under huge flames, and "smoulder"
  * and "cold" were the same frame.
@@ -205,7 +205,7 @@ export interface DamageFieldOptions {
  * `consumeRate` comes back DOWN, from 20 to 6, for the same reason it went up.
  * At 20 it was holding the charred band to 8.5 mm against a front moving six
  * times too fast; the band is `v / consumeRate`, so once the front slowed, 20
- * squeezed it to 2.9 mm. 6 puts it at 5.3 mm — mid-range of §5's 2–8 mm.
+ * squeezed it to 2.9 mm. 6 puts it at 5.3 mm — mid-range of a real burn's 2–8 mm.
  * Measured band against this number, at the new pace: 5 → 6.0 mm, 6 → 5.3,
  * 7 → 4.7, 9 → 4.0, 20 → 2.9.
  */
