@@ -57,6 +57,7 @@ import {
 } from './burn'
 import '../styles.css'
 import { ModeTabs } from '../chrome/ModeTabs'
+import { Feedback } from '../chrome/Feedback'
 import { Panel } from '../controls/controls'
 import {
   type Control,
@@ -1717,7 +1718,10 @@ function Lab() {
         )}
       </aside>
 
-      <main className="viewport">{paper}</main>
+      <main className="viewport">
+        {paper}
+        <Feedback context={() => ({ page: 'fx-lab' })} />
+      </main>
 
       {/* The settings: how every layer of the burn looks — or the still it is judged against. */}
       <aside className="right">

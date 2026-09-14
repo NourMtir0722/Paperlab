@@ -30,6 +30,7 @@ import { Match, type MatchState } from './match'
 import { drawOverlay, type HandMark } from './overlay'
 import '../styles.css'
 import { ModeTabs } from '../chrome/ModeTabs'
+import { Feedback } from '../chrome/Feedback'
 
 /**
  * **Set fire to a sheet of paper with your hands.**
@@ -1012,6 +1013,7 @@ function App() {
             Fire detected — the paper is catching
           </div>
         )}
+        <Feedback context={() => ({ page: 'hands' })} />
       </main>
 
       {/* How to use it, and what the page can see right now. */}

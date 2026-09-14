@@ -165,7 +165,8 @@ may appear **at most twice** in a stylesheet, once for the recipe and once for
 the modal scrim, which is a different job. A third one is how this style turns
 into every other translucent editor, so the test fails on it.
 
-In the editor the list is `.view-cluster, .viewport-guide, .guide-toggle`. In
+In the editor the list is `.view-cluster, .viewport-guide, .guide-toggle,
+.feedback-tab`. In
 the playground — where the whole app is chrome floating over a live scene — it
 is `.wordmark, button, textarea`. The docs have no glass at all, because
 nothing on that page floats over anything.

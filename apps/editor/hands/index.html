@@ -30,10 +30,15 @@
       `ws:` is for Vite's dev HMR socket, which shares the origin but not the
       scheme; `blob:` is how the wasm loader instantiates its worker;
       `mediastream:` is the camera feed reaching the <video> element.
+
+      One more origin may be FRAMED, never fetched from: tally.so, for the
+      feedback form, and only once someone opens it. A frame is a document of
+      its own — it reads nothing of this page, the camera included, beyond
+      what its URL carries (which page this is, and the browser).
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' blob: data:; connect-src 'self' https://storage.googleapis.com ws: wss: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: mediastream:"
+      content="default-src 'self' blob: data:; frame-src 'self' https://tally.so; connect-src 'self' https://storage.googleapis.com ws: wss: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: mediastream:"
     />
     <style>
       html, body { margin: 0; height: 100%; background: #08090a; }
