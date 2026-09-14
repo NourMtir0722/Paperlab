@@ -152,6 +152,27 @@ main a:hover {
   text-transform: uppercase;
 }
 
+/* The name and its beta mark on one line, above "reference". Not a span:
+   `.rail .brand span` is the small line underneath. */
+.rail .brand .brand-name {
+  font-weight: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* "beta", beside the name. A hairline and a dimmer white, never a hue. */
+.rail .brand .beta {
+  padding: 1px 6px;
+  border: 1px solid var(--hair-2);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-body);
+}
+
 .rail ul {
   list-style: none;
   margin: 0;

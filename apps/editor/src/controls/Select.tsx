@@ -43,9 +43,24 @@ export interface SelectProps {
   /** Render an option as something other than its raw value. */
   format?(option: string): string
   title?: string
+  /**
+   * Why an option cannot be chosen yet, printed beside it — or null if it
+   * can. An unavailable option is still listed, so people can see it exists;
+   * it just refuses the click and the Enter.
+   */
+  unavailable?(option: string): string | null
 }
 
-export function Select({ value, options, onChange, label, className, format, title }: SelectProps) {
+export function Select({
+  value,
+  options,
+  onChange,
+  label,
+  className,
+  format,
+  title,
+  unavailable,
+}: SelectProps) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(() => Math.max(0, options.indexOf(value)))
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -63,6 +78,9 @@ export function Select({ value, options, onChange, label, className, format, tit
 
   const commit = (index: number) => {
     const option = options[index]
+    // An unavailable option says why beside itself; choosing it does nothing,
+    // and the list stays open so the note is still there to read.
+    if (option !== undefined && unavailable?.(option)) return
     setOpen(false)
     triggerRef.current?.focus()
     if (option !== undefined && option !== value) onChange(option)
@@ -165,6 +183,7 @@ export function Select({ value, options, onChange, label, className, format, tit
           value={value}
           active={active}
           show={show}
+          unavailable={unavailable}
           onHover={setActive}
           onPick={commit}
           onDismiss={() => {
@@ -187,6 +206,7 @@ interface SelectListProps {
   value: string
   active: number
   show(option: string): string
+  unavailable?(option: string): string | null
   onHover(index: number): void
   onPick(index: number): void
   onDismiss(): void
@@ -202,6 +222,7 @@ function SelectList({
   value,
   active,
   show,
+  unavailable,
   onHover,
   onPick,
   onDismiss,
@@ -268,20 +289,25 @@ function SelectList({
             the key that opened the list — press End, and the highlight landed
             on whatever happened to be under your hand instead of on the last
             option. Hover should follow the hand, and only when it moves. */}
-        {options.map((option, i) => (
-          <button
-            key={option}
-            type="button"
-            role="option"
-            aria-selected={option === value}
-            data-active={i === active}
-            className={`select-option${option === value ? ' selected' : ''}${i === active ? ' active' : ''}`}
-            onMouseMove={() => onHover(i)}
-            onClick={() => onPick(i)}
-          >
-            {show(option)}
-          </button>
-        ))}
+        {options.map((option, i) => {
+          const note = unavailable?.(option) ?? null
+          return (
+            <button
+              key={option}
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              aria-disabled={note ? true : undefined}
+              data-active={i === active}
+              className={`select-option${option === value ? ' selected' : ''}${i === active ? ' active' : ''}${note ? ' unavailable' : ''}`}
+              onMouseMove={() => onHover(i)}
+              onClick={() => onPick(i)}
+            >
+              {show(option)}
+              {note && <span className="select-option-note">{note}</span>}
+            </button>
+          )
+        })}
       </div>
     </>,
     document.body,

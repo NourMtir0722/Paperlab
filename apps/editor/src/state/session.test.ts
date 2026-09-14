@@ -139,6 +139,18 @@ describe('a remembered session names things that may be gone', () => {
     expect(readSession()?.field?.slots).toEqual(['photo-print', 'photo-print'])
   })
 
+  it('does not reopen a preset the editor has closed ("Coming soon")', () => {
+    // Someone who left toilet-roll open comes back to the default paper, and
+    // a Field slot holding it falls back the same way a missing preset does.
+    const input = baseInput()
+    input.field.slots = ['toilet-roll', 'photo-print']
+    writeSession({ ...input, presetName: 'toilet-roll', config: getPreset('toilet-roll'), mode: 'field' })
+
+    const session = readSession()
+    expect(session?.paper).toBeUndefined()
+    expect(session?.field?.slots).toEqual(['photo-print', 'photo-print'])
+  })
+
   it('takes the field population from the slot list, not a count that disagrees', () => {
     const input = baseInput()
     input.field.slots = ['photo-print', 'photo-print', 'photo-print']

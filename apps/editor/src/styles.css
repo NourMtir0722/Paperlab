@@ -156,6 +156,21 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* "beta", beside the name on every surface (chrome/Brand.tsx). A hairline
+   and a dimmer white, never a hue — rule 4 has no budget left for a badge. */
+.beta {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--hair-2);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  color: var(--ink-body);
+}
+
 .filename {
   color: var(--ink-body);
 }
@@ -1600,6 +1615,28 @@ button.export:hover {
   content: "✓";
   float: right;
   margin-left: 12px;
+}
+
+/* Listed but not open yet ("Coming soon" presets): dimmed, with the reason
+   beside it. The reason takes the body step, not the meta one — it is the
+   text that explains why the click does nothing. */
+.select-option.unavailable {
+  color: var(--ink-meta);
+  cursor: default;
+}
+
+.select-option.unavailable.active {
+  background: var(--lift);
+  color: var(--ink-meta);
+}
+
+.select-option-note {
+  float: right;
+  margin-left: 12px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-body);
 }
 
 /* The row grid gives the select column 2; the trigger is a button, so it

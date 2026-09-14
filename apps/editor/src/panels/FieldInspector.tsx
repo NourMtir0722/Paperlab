@@ -14,6 +14,7 @@ import { Panel } from '../controls/controls'
 import { lightControls } from './lightControls'
 import { backdropControls } from './backdropControls'
 import { useEditor, type EditorZone } from '../state/store'
+import { isComingSoon } from '../state/comingSoon'
 
 /**
  * Field mode inspector: Layout / Motion / Paper / Drop zones. Layout options
@@ -71,7 +72,15 @@ export function FieldInspector() {
     folder(
       'Paper',
       [
-        select('replaceWith', replaceTarget, listPresets(), setReplaceTarget, 'replace all with'),
+        // Left out rather than greyed: this is a bulk action, and a list the
+        // slot pickers already explain does not need its closed rows twice.
+        select(
+          'replaceWith',
+          replaceTarget,
+          listPresets().filter((name) => !isComingSoon(name)),
+          setReplaceTarget,
+          'replace all with',
+        ),
         button('Replace all →', () => setAllSlots(replaceTarget)),
       ],
       { collapsed: true },

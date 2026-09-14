@@ -5,6 +5,7 @@ import { downloadPreset } from '../state/userPresets'
 import { confirmDialog, promptDialog, toast } from '../controls/ui'
 import { Select } from '../controls/Select'
 import { reportSave } from '../chrome/saveReport'
+import { comingSoonNote } from '../state/comingSoon'
 
 /**
  * The preset library: built-ins (duplicate to fork) and user presets
@@ -87,6 +88,7 @@ export function PresetPanel({ onSave }: { onSave: () => void }) {
           options={builtinNames.includes(presetName) ? builtinNames : ['', ...builtinNames]}
           format={(name) => name || 'Pick a preset…'}
           onChange={(name) => name && setPreset(name)}
+          unavailable={comingSoonNote}
         />
         <button
           type="button"

@@ -38,6 +38,8 @@ import { CaptureRig, type CaptureHandle } from './chrome/CaptureRig'
 import { SmallScreen } from './chrome/SmallScreen'
 import { MODE_PARAM, ModeTabs } from './chrome/ModeTabs'
 import { Feedback } from './chrome/Feedback'
+import { Brand } from './chrome/Brand'
+import { comingSoonNote } from './state/comingSoon'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
@@ -284,7 +286,7 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">Paperlab</div>
+        <Brand />
         <div className="filename">
           {mode === 'paper' ? `${config.meta.name}.paper` : mode === 'field' ? 'Field composer' : 'Stage'}
         </div>
@@ -372,6 +374,7 @@ export function App() {
                     value={name}
                     options={listPresets()}
                     onChange={(next) => setSlotPreset(i, next)}
+                    unavailable={comingSoonNote}
                   />
                   <button
                     type="button"

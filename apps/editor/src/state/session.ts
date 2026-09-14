@@ -10,6 +10,7 @@ import {
 } from 'paperlab'
 import { listStagePresets, qualityNames, stageSchema, walkNames } from 'paperlab/stage'
 import type { EditorMode, EditorZone, FieldState, StageState } from './store'
+import { isComingSoon } from './comingSoon'
 
 /**
  * The editor remembers where you left it.
@@ -124,7 +125,10 @@ function sanitize(parsed: z.infer<typeof sessionSchema>): EditorSession {
   const layouts = new Set(listLayouts())
   const session: EditorSession = { mode: parsed.mode }
 
-  if (parsed.paper) session.paper = parsed.paper
+  // A paper left open on a preset the editor has since closed comes back as
+  // the default instead: "Coming soon" is a door, and a remembered session
+  // must not walk through it.
+  if (parsed.paper && !isComingSoon(parsed.paper.name)) session.paper = parsed.paper
 
   if (parsed.field && layouts.has(parsed.field.layout)) {
     const slotStates: Record<number, PaperStatesInput> = {}
@@ -134,9 +138,11 @@ function sanitize(parsed: z.infer<typeof sessionSchema>): EditorSession {
     }
     session.field = {
       ...parsed.field,
-      // A slot pointing at a preset that is gone falls back the same way a
-      // deleted preset's slots do.
-      slots: parsed.field.slots.map((name) => (presets.has(name) ? name : 'photo-print')),
+      // A slot pointing at a preset that is gone — or closed for now — falls
+      // back the same way a deleted preset's slots do.
+      slots: parsed.field.slots.map((name) =>
+        presets.has(name) && !isComingSoon(name) ? name : 'photo-print',
+      ),
       // The slot list IS the population — the store keeps the two equal, so
       // trust the list rather than a count that could disagree with it.
       count: parsed.field.slots.length,

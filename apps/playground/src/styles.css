@@ -128,6 +128,20 @@ body,
   border: 1px solid var(--hair-2);
 }
 
+/* "beta", inside the wordmark. A hairline and a dimmer white, never a hue. */
+.beta {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--hair-2);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  color: var(--ink-body);
+}
+
 .actions {
   display: flex;
   gap: 8px;

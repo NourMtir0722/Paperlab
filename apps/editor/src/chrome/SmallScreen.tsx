@@ -41,7 +41,9 @@ export function SmallScreen() {
   return (
     <section className={`small-screen${dismissed ? ' dismissed' : ''}`} aria-label="Small screen">
       <div className="small-screen-card">
-        <p className="small-screen-kicker">Paperlab</p>
+        <p className="small-screen-kicker">
+          Paperlab <span className="beta">beta</span>
+        </p>
         <h1>The editor wants a bigger screen.</h1>
         <p>
           It is a canvas tool — a preset library on the left, an inspector on the right, and a sheet in the
