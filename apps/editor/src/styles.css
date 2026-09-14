@@ -2028,7 +2028,8 @@ button.export:hover {
  */
 .view-cluster,
 .viewport-guide,
-.guide-toggle {
+.guide-toggle,
+.feedback-tab {
   background: var(--glass-fill);
   border: 1px solid var(--hair-2);
   box-shadow:
@@ -2043,7 +2044,8 @@ button.export:hover {
 @media (prefers-reduced-transparency: reduce) {
   .view-cluster,
   .viewport-guide,
-  .guide-toggle {
+  .guide-toggle,
+  .feedback-tab {
     background: var(--l3);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -2157,6 +2159,122 @@ button.export:hover {
   .coach-mark.placed {
     animation: none;
   }
+}
+
+/* ── Feedback ─────────────────────────────────────────────────────────────
+ * A tab on the canvas's right edge that opens "report a problem" or
+ * "suggest an idea" (chrome/Feedback.tsx). It floats over the sheet, so it
+ * wears the glass above. Written vertically and turned to read upward, the
+ * way a tab on a page edge does — which puts its box's LEFT side against the
+ * canvas edge, hence the border and the corners.
+ */
+.feedback-tab {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  z-index: 20;
+  transform: translateY(-50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  padding: 14px 7px;
+  border-left: 0;
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+
+.feedback-tab:hover {
+  color: var(--ink);
+}
+
+/* The dialog is the app's own (.dialog), wider for a form. */
+.feedback-dialog {
+  width: 440px;
+}
+
+.feedback-dialog.has-form {
+  width: 560px;
+}
+
+/* The dialog holds focus itself only for the thank-you, which has nothing to
+   press — a ring round the whole panel there would read as a selection. */
+.feedback-dialog:focus {
+  outline: none;
+}
+
+.feedback-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.feedback-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-md);
+  background: var(--lift);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--fast) var(--ease);
+}
+
+.feedback-choice:hover,
+.feedback-choice:focus-visible {
+  background: var(--lift-3);
+  outline: none;
+}
+
+/* Classes rather than `.feedback-choice strong`: a bare descendant selector
+   here sits under stronger `strong`/`span` rules elsewhere in this file. */
+.feedback-choice-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feedback-choice-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-body);
+}
+
+.feedback-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.feedback-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-body);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.feedback-back:hover {
+  color: var(--ink);
+}
+
+.feedback-form {
+  display: block;
+  width: 100%;
+  height: min(560px, 70vh);
+  margin-top: 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--l2);
 }
 
 /* ── The lab shell: /hands and /fx-lab in the editor's own frame ──────────

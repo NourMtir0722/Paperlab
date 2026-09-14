@@ -26,6 +26,16 @@ const SECTIONS = [
   ['pitfalls', 'Pitfalls'],
 ] as const
 
+/**
+ * The feedback form (Tally), by id — the same one the editor and the
+ * playground open, and held to it by the editor's `feedbackForm.test.ts`.
+ * Here it is two plain links out, each saying which it is; an empty id hides
+ * them.
+ */
+const FEEDBACK_FORM: string = 'vGldDg'
+const feedbackLink = (kind: 'problem' | 'idea') =>
+  `https://tally.so/r/${FEEDBACK_FORM}?${new URLSearchParams({ kind, page: 'docs', browser: navigator.userAgent })}`
+
 export function App() {
   const active = useScrollSpy(SECTIONS.map(([id]) => id))
 
@@ -51,6 +61,16 @@ export function App() {
           <a href="../hands/">Hands</a>
           <a href="../fx-lab/">FX Lab</a>
           <a href="https://github.com/NourMtir0722/Paperlab">GitHub</a>
+          {FEEDBACK_FORM && (
+            <>
+              <a href={feedbackLink('problem')} target="_blank" rel="noreferrer">
+                Report a problem
+              </a>
+              <a href={feedbackLink('idea')} target="_blank" rel="noreferrer">
+                Suggest an idea
+              </a>
+            </>
+          )}
         </div>
       </nav>
 

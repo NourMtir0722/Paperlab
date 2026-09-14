@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PaperStage, buildStageAgentPayload, getStagePreset, listStagePresets } from 'paperlab/stage'
 import { MAX_TEXT_LENGTH, readStageShare, stageShareUrl, type StageShare } from './share'
+import { Feedback } from './Feedback'
 
 /**
  * The playground: one screen, one input, one scene.
@@ -217,6 +218,9 @@ export function App() {
           </div>
         </div>
       </footer>
+
+      {/* The scene being looked at travels with a report, so it reopens exactly. */}
+      <Feedback link={() => stageShareUrl(window.location.href, shareFrom(preset, text))} />
     </div>
   )
 }

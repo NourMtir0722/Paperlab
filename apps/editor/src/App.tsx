@@ -37,6 +37,7 @@ import { CameraRig, ViewCluster } from './chrome/ViewCluster'
 import { CaptureRig, type CaptureHandle } from './chrome/CaptureRig'
 import { SmallScreen } from './chrome/SmallScreen'
 import { MODE_PARAM, ModeTabs } from './chrome/ModeTabs'
+import { Feedback } from './chrome/Feedback'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
@@ -146,6 +147,13 @@ export function App() {
     }
   }, [importSharedPaper, setMode])
 
+  // The paper on the canvas, to save, share or report. While a state chip /
+  // preview is live the canvas holds a derived view — taking it from there
+  // would bake that state into the base and lose the machine, so the paper is
+  // the store's base then.
+  const canvasPaper = (): PaperConfig =>
+    editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
+
   /** Save the sculpt on the canvas as a preset of your own — from the Presets panel. */
   const savePresetAs = () => {
     void (async () => {
@@ -162,11 +170,7 @@ export function App() {
               : null,
       })
       if (!name) return
-      // While a state chip / preview is live the canvas paper holds a
-      // derived view — saving from it would bake that state into the
-      // base and lose the machine. The preset is the store's base.
-      const snapshot = editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
-      reportSave(savePreset(name, snapshot, captureThumbnail()))
+      reportSave(savePreset(name, canvasPaper(), captureThumbnail()))
     })()
   }
 
@@ -175,7 +179,7 @@ export function App() {
     // Share what is on the canvas, including an un-saved sculpt — asking
     // someone to save first before they can send a link is a step that stops
     // the thing from being sent at all.
-    const snapshot = editingState || statePreview ? config : (paperRef.current?.snapshot() ?? config)
+    const snapshot = canvasPaper()
     const attempt = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
     if (!attempt.ok) {
       // The `.paper` file is the answer to both refusals, and it is offered
@@ -196,6 +200,18 @@ export function App() {
     }
     void navigator.clipboard.writeText(attempt.url)
     toast('Link copied — anyone who opens it gets an editable copy', 'success')
+  }
+
+  /**
+   * What a feedback form carries without anyone typing it: where they were,
+   * and on a paper, a link that reopens it — a report with its own repro.
+   * A paper too big for a link still gets reported, just without one.
+   */
+  const feedbackContext = () => {
+    if (mode !== 'paper') return { page: `editor/${mode}` }
+    const snapshot = canvasPaper()
+    const attempt = paperShareUrl(window.location.href, snapshot.meta.name, snapshot)
+    return { page: 'editor/paper', link: attempt.ok ? attempt.url : undefined }
   }
 
   // Presets are components: the field renders the live edit of its preset.
@@ -492,6 +508,7 @@ export function App() {
         {mode === 'paper' && <CoachMark />}
         {mode === 'paper' && <ViewportGuide />}
         {mode !== 'stage' && <ViewCluster key={`cluster:${mode}`} />}
+        <Feedback context={feedbackContext} />
       </main>
 
       <aside className="right">
