@@ -37,7 +37,7 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
     o.path === 'loop' ? 'tumbling through a seamless airborne loop' : 'tumbling across the scene on the wind',
   crumple: (o) =>
     (o.progress as number) < 0.3
-      ? 'lightly handled — a few soft creases across it'
+      ? 'lightly handled, with a few soft creases across it'
       : (o.progress as number) < 0.7
         ? 'crushed into irregular creased facets, as if screwed up and flattened out again'
         : 'balled up in a fist',
@@ -121,8 +121,8 @@ export function ${name}() {
    give the parent an explicit height.
 
 4. Verify: run the dev server. You should see ${describeConfig(config)}.
-   If the canvas is blank, the parent container almost certainly has no height —
-   give it one (this is the classic React Three Fiber integration bug, not a
+   If the canvas is blank, the parent container almost certainly has no height.
+   Give it one (this is the classic React Three Fiber integration bug, not a
    paperlab bug).
 
 Constraints: don't modify the preset values; three >= 0.160 and React 19 are

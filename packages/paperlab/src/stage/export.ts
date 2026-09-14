@@ -225,7 +225,7 @@ export function buildStageComponentSource(input: StageExportInput): string {
   const imagesConst = images
     ? `\n${
         images.substituted
-          ? '\n// Your uploaded pictures cannot travel in a snippet — these are\n// placeholders in the same order. Point them at your own files.'
+          ? '\n// Your uploaded pictures cannot travel in a snippet, so these are\n// placeholders in the same order. Point them at your own files.'
           : ''
       }\nconst images = ${JSON.stringify(images.list, null, 2)}`
     : ''
@@ -289,7 +289,7 @@ ${propLines(input, '          ')}
 export function buildStageAgentPayload(input: StageExportInput): string {
   const name = input.componentName ?? 'PaperNave'
   const sizing = input.scroll
-    ? `4. Sizing: the component brings its own height — it reserves ${SCROLL_HEIGHTS} viewport
+    ? `4. Sizing: the component brings its own height. It reserves ${SCROLL_HEIGHTS} viewport
    heights of scroll and pins the canvas inside that. Drop it into the page
    flow as a section; do NOT wrap it in a fixed-height container.`
     : `4. Sizing: the component fills its parent container. Place it where I ask;
@@ -304,19 +304,19 @@ export function buildStageAgentPayload(input: StageExportInput): string {
     ? 'paper as architecture, with a figure walking through it'
     : 'paper as architecture, banners hung along a walk you move through'
 
-  return `Integrate a Paperlab stage — ${subject} — into this project. (paperlab agent-payload v${AGENT_PAYLOAD_VERSION})
+  return `Integrate a Paperlab stage (${subject}) into this project. (paperlab agent-payload v${AGENT_PAYLOAD_VERSION})
 
 1. Install the dependencies:
 
    npm i paperlab three @react-three/fiber gsap @react-three/postprocessing postprocessing
 
-   The last two are only needed by stage mode — <Paper> and <PaperField> do
-   not use them — and they are optional even here: <PaperStage> loads the
+   The last two are only needed by stage mode (<Paper> and <PaperField> do
+   not use them), and they are optional even here: <PaperStage> loads the
    print pass on demand, so a stage without them renders, just without the
    tone curve, bloom, vignette and grain. Install them to get the grade.
 
 2. Create the component below as \`components/${name}.tsx\` (or the project's
-   component convention). It is self-contained — it owns its own <Canvas>,
+   component convention). It is self-contained: it owns its own <Canvas>,
    its own camera and its own lighting:
 
 \`\`\`tsx
@@ -329,7 +329,7 @@ ${buildStageComponentSource(input)}
 ${sizing}
 
 5. Verify: run the dev server. You should see ${describeStage(input)}.
-   If the canvas is blank, the container almost certainly has no height — give
+   If the canvas is blank, the container almost certainly has no height. Give
    it one (this is the classic React Three Fiber integration bug, not a
    paperlab bug).
 

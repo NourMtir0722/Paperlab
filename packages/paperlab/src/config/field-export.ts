@@ -210,7 +210,7 @@ export function buildFieldComponentSource(input: FieldExportInput): string {
         id="${zone.id}"${accept}
         bounds={${JSON.stringify(zone.bounds)}}${highlight}
         onPlace={(paper, zone) => {
-          // First-run smoke test — you should see this in the console on drop:
+          // First-run smoke test. You should see this in the console on drop:
           console.log(paper.presetName, '→', zone.id)
           // Then replace it: stamp a postmark, advance the flow, persist the placement, …
         }}
@@ -266,7 +266,7 @@ export function buildFieldAgentPayload(input: FieldExportInput): string {
    npm i paperlab three @react-three/fiber gsap
 
 2. Create the component below as \`components/PaperGallery.tsx\` (or the
-   project's component convention). It is self-contained — every preset it
+   project's component convention). It is self-contained: every preset it
    uses is inlined, and it owns its own <Canvas>:
 
 \`\`\`tsx
@@ -277,8 +277,8 @@ ${buildFieldComponentSource(input)}
    give the parent an explicit height.
 
 4. Verify: run the dev server. You should see ${describeFieldConfig(input)}.
-   If the canvas is blank, the parent container almost certainly has no height —
-   give it one (this is the classic React Three Fiber integration bug, not a
+   If the canvas is blank, the parent container almost certainly has no height.
+   Give it one (this is the classic React Three Fiber integration bug, not a
    paperlab bug).
 
 Constraints: don't modify the preset values; three >= 0.160 and React 19 are

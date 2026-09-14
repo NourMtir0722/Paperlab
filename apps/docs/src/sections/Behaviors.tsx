@@ -41,13 +41,13 @@ const CONTENT: ContentConfigInput = {
 /** What the motion is *of* — the thing a params table cannot tell you. */
 const NOTE: Record<string, string> = {
   peel: 'A corner lifts and curls back on itself. The hero move.',
-  unroll: 'A receipt coming off the roll — tight at the top, flattening as it runs.',
+  unroll: 'A receipt coming off the roll, tight at the top and flattening as it runs.',
   flip: 'A page turning about its spine.',
   'letter-fold': 'A tri-fold, creased where a letter creases.',
   hang: 'Pinned along the top edge and rippling. Sag is gravity, wind is the room.',
   fly: 'A note in the air, fluttering along a curve.',
   fall: 'A dropped sheet, curling as it goes.',
-  carry: 'Held at one point and drooping from it — the pinch does the work.',
+  carry: 'Held at one point and drooping from it. The pinch does the work.',
   flight: 'Free paper travelling across the whole scene on the wind.',
 }
 

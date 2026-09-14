@@ -38,16 +38,16 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
   const hasHandles = Boolean(behavior?.handles?.length)
   const hint =
     simType === 'cloth'
-      ? 'Cloth simulation — grab the sheet and drag to pull it.'
+      ? 'Cloth simulation: grab the sheet and drag to pull it.'
       : simType === 'strip'
         ? // The transport is no use here: a strip has no progress to scrub, only
           // a scroll position it differentiates. Point at the control that does
           // move it, and at the pull, which is the thing worth discovering.
-          'Strip simulation — drag `scroll` in the Physics panel to pay out paper, or grab the sheet and pull.'
+          'Strip simulation: drag `scroll` in the Physics panel to feed out paper, or grab the sheet and pull.'
         : !behavior
-          ? 'No behavior yet — pick one in the Behavior panel to bring this paper to life.'
+          ? 'No behavior yet. Pick one in the Behavior panel to bring this paper to life.'
           : hasHandles
-            ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'} — or press Space to autoplay.`
+            ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'}, or press Space to autoplay.`
             : `Space plays/pauses the ${behavior.label.toLowerCase()} · drag the timeline below to pose it by hand.`
   const [playing, setPlaying] = useState(true)
   const scrubbingRef = useRef(false)

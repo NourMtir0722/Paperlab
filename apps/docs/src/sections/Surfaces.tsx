@@ -20,7 +20,7 @@ const EFFECTS: { key: keyof SurfaceConfigInput; title: string; note: string; sur
     {
       key: 'aging',
       title: 'aging',
-      note: 'Yellowing and foxing spots — paper that has been somewhere.',
+      note: 'Yellowing and foxing spots, like paper that has been somewhere.',
       surface: { aging: 0.8, grain: 0.5 },
     },
     {
@@ -32,7 +32,7 @@ const EFFECTS: { key: keyof SurfaceConfigInput; title: string; note: string; sur
     {
       key: 'creaseLines',
       title: 'creaseLines',
-      note: 'The shading companion to a fold — where the sheet has been creased, whether or not it is folded now.',
+      note: 'The shading companion to a fold. It shows where the sheet has been creased, whether or not it is folded now.',
       surface: { creaseLines: { angle: 0, positions: [1 / 3, 2 / 3], strength: 0.9 }, grain: 0.3 },
     },
     {
@@ -44,7 +44,7 @@ const EFFECTS: { key: keyof SurfaceConfigInput; title: string; note: string; sur
     {
       key: 'translucency',
       title: 'translucency',
-      note: 'Light coming through from behind. Distinct from opacity — newsprint is opaque and still glows on a lightbox.',
+      note: 'Light coming through from behind. Not the same as opacity: newsprint is opaque and still glows on a lightbox.',
       surface: { translucency: 0.9 },
     },
   ]
@@ -54,8 +54,8 @@ export function Surfaces() {
     <section id="surfaces">
       <h2>Surface</h2>
       <p className="lede">
-        Stocks contribute surface defaults; anything you set explicitly wins, per effect. All of these compose
-        — a vintage note is aging plus grain plus a deckled top and bottom.
+        Stocks contribute surface defaults; anything you set explicitly wins, per effect. All of these
+        compose. A vintage note is aging plus grain plus a deckled top and bottom.
       </p>
 
       <div className="grid">

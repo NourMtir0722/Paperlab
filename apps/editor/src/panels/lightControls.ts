@@ -45,6 +45,6 @@ export function lightControls(
     num('haze', light.haze ?? 1, range('haze'), (v) => set('haze', v)),
     touched
       ? button('reset to preset', () => patch({ light: {} }), 'lightReset')
-      : note('lightNote', `these are ${preset}'s own numbers — move one and it becomes yours`),
+      : note('lightNote', `these are ${preset}'s own numbers. Move one and it becomes yours`),
   ]
 }

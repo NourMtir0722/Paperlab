@@ -25,9 +25,9 @@ export function Memory() {
     <section id="memory">
       <h2>Memory</h2>
       <p className="lede">
-        Paper is plastic where cloth is elastic. Fold it and the fold stays — so a sheet carries the creases
-        it has been folded along, whether or not it is folded now. Creases are recorded by folding the paper
-        and they are ordinary config: they save into a preset and travel down a share link.
+        Paper is plastic where cloth is elastic. Fold it and the fold stays, so a sheet carries the creases it
+        has been folded along, whether or not it is folded now. Creases are recorded by folding the paper and
+        they are ordinary config: they save into a preset and travel down a share link.
       </p>
 
       <div className="grid">
@@ -48,7 +48,7 @@ export function Memory() {
           </Live>
           <h3>folded once</h3>
           <p className="describe">
-            Two creases, thirteen degrees. A crease bends the sheet as well as marking it — the flaps sit open
+            Two creases, thirteen degrees. A crease bends the sheet as well as marking it: the flaps sit open
             at the angle the fibres gave up at.
           </p>
         </article>
@@ -80,7 +80,7 @@ export function Memory() {
 
       <p className="describe">
         <code>set</code> overrides the stock's own <code>takesSet</code>, so leaving it out lets the paper
-        decide. <code>memory={'{{ set: 0 }}'}</code> is the opt-out — perfectly elastic paper, which is how
+        decide. <code>memory={'{{ set: 0 }}'}</code> is the opt-out: perfectly elastic paper, which is how
         every sheet behaved before this existed. Stocks, most to least retentive:{' '}
         {[...stockNames]
           .sort((a, b) => getStock(b).takesSet - getStock(a).takesSet)

@@ -15,7 +15,7 @@ const NOTE: Record<string, string> = {
   tumble: 'Slow end-over-end rotation, as if turning in space.',
   dangle: 'Hanging from a point and swinging under it.',
   taped: 'Stuck at one corner, the rest lifting and settling.',
-  breeze: 'A draught across the sheet — small, constant, never repeating.',
+  breeze: 'A draught across the sheet: small, constant, never repeating.',
 }
 
 export function Physics() {
@@ -23,7 +23,7 @@ export function Physics() {
     <section id="physics">
       <h2>Physics</h2>
       <p className="lede">
-        Idle presets are curated motion — a few sines, no simulation — and they compose with whatever behavior
+        Idle presets are curated motion (a few sines, no simulation), and they compose with whatever behavior
         is already running.
       </p>
 
@@ -56,7 +56,7 @@ export function Physics() {
           <p className="describe">
             A real verlet simulation. Pin it by <code>'top-edge'</code>, <code>'top-corners'</code>,{' '}
             <code>'corner'</code> or <code>'none'</code> and it falls. With <code>interactive</code> you can
-            grab it — try it.
+            grab it. Try it.
           </p>
         </article>
       </div>

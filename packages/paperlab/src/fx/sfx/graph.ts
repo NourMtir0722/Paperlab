@@ -203,7 +203,7 @@ export class FxAudio {
     const { quality = 'auto', context, volume = 0.8 } = options
     this.quality = typeof quality === 'string' ? fxQualityFor(quality) : quality
     // The type already requires it; this is for callers without one.
-    if (!context) throw new Error('FxAudio needs a context — see createAudioContext()')
+    if (!context) throw new Error('FxAudio needs a context. See createAudioContext()')
     this.ctx = context
     this.master = this.ctx.createGain()
     this.master.gain.value = volume

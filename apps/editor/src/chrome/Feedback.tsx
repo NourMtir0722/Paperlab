@@ -114,10 +114,8 @@ export function Feedback({ context }: { context: () => FeedbackContext }) {
           >
             {view === 'choose' && (
               <>
-                <h3 className="dialog-title">Tell us something</h3>
-                <p className="dialog-message">
-                  It goes straight to the person who makes Paperlab. No account needed.
-                </p>
+                <h3 className="dialog-title">Tell me something</h3>
+                <p className="dialog-message">It goes straight to me, Noor. No account needed.</p>
                 <div className="feedback-choices">
                   {CHOICES.map((c, i) => (
                     <button
@@ -163,7 +161,7 @@ export function Feedback({ context }: { context: () => FeedbackContext }) {
             {view === 'thanks' && (
               <>
                 <h3 className="dialog-title">Thank you</h3>
-                <p className="dialog-message">It has been sent, and every one is read.</p>
+                <p className="dialog-message">Sent. I read every one.</p>
               </>
             )}
           </div>

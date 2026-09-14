@@ -470,7 +470,7 @@ export function getPreset(name: string): PaperConfig {
 /** Register a user preset (validated). Built-in names are reserved. */
 export function registerPreset(name: string, input: PaperConfigInput): void {
   if (name in builtins) {
-    throw new Error(`[paperlab] "${name}" is a built-in preset — pick another name.`)
+    throw new Error(`[paperlab] "${name}" is a built-in preset. Pick another name.`)
   }
   paperConfigSchema.parse(input) // fail fast on invalid configs
   userPresets.set(name, input)

@@ -2563,7 +2563,7 @@ button.pill:disabled {
 
 /* Written straight to the DOM each tracked frame; until the first one, say what goes here. */
 .readout:empty::before {
-  content: "front · left · air · blow — once something is burning";
+  content: "front · left · air · blow (shows once something is burning)";
   color: var(--ink-meta);
 }
 

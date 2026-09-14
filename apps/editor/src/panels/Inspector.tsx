@@ -414,7 +414,7 @@ function contentControls(
       text('items', formatItems(content.items), (v) => set({ items: parseItems(v) }), { rows: 5 }),
       // A visible line, not a tooltip: the format is not guessable, and a
       // hint nobody hovers is a hint nobody reads.
-      note('itemsFormat', 'One item per line — NAME | PRICE'),
+      note('itemsFormat', 'One item per line, as NAME | PRICE'),
     )
   }
 

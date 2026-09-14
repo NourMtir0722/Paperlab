@@ -57,7 +57,7 @@ function warnOnce(cause?: unknown) {
   if (warned) return
   warned = true
   console.warn(
-    '[paperlab/stage] Rendering without the print pass — tone curve, bloom, vignette and grain are off.\n' +
+    '[paperlab/stage] Rendering without the print pass, so tone curve, bloom, vignette and grain are off.\n' +
       'They need two optional peers:\n' +
       '  npm i @react-three/postprocessing postprocessing\n' +
       'Set `grade` to all zeros to turn the pass off deliberately and silence this.',

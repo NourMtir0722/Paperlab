@@ -141,9 +141,10 @@ export function ExportMenu({
 
   /** Why there is no clip to record, or null when there is. */
   const clipBlocker = (): string | null => {
-    if (mode === 'field') return 'Field motion runs on its own clock — there is no timeline to step.'
+    if (mode === 'field')
+      return 'Field motion runs on its own clock, so there is no timeline to step through.'
     if (mode === 'paper' && !config.behavior)
-      return 'Pick a behavior first — a still sheet has no motion to record.'
+      return 'Pick a behavior first. A still sheet has no motion to record.'
     return null
   }
 
@@ -272,7 +273,7 @@ export function ExportMenu({
                 onClick={() => copy('AI brief', buildStageAgentPayload({ ...stageInput(), scroll: true }))}
               >
                 <strong>Copy for AI</strong>
-                <span>scroll-driven stage — the page scroll walks the figure</span>
+                <span>scroll-driven stage: scrolling the page walks the figure</span>
                 {badge('AI brief')}
               </button>
               <div className="export-secondary">
@@ -354,7 +355,7 @@ export function ExportMenu({
                 onClick={() => copy('AI brief', buildFieldAgentPayload(fieldInput()))}
               >
                 <strong>Copy for AI</strong>
-                <span>gallery brief — all presets inlined</span>
+                <span>gallery brief, with every preset included</span>
                 {badge('AI brief')}
               </button>
               <div className="export-secondary">

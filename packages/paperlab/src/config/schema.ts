@@ -820,7 +820,7 @@ export const paperConfigSchema = z
         code: z.ZodIssueCode.custom,
         path: ['physics'],
         message:
-          "the strip simulation and behavior/deformers are exclusive — the roll owns the vertices, and its rows are chain nodes rather than the sheet's own grid (pick Shape OR Strip)",
+          "the strip simulation and behavior/deformers cannot be used together. The roll owns the vertices, and its rows are chain nodes rather than the sheet's own grid (pick Shape OR Strip)",
       })
     }
     // State overrides must stay serializable schema paths: merging them over
@@ -847,7 +847,7 @@ export const paperConfigSchema = z
             code: z.ZodIssueCode.custom,
             path: ['states', 'states', name, 'overrides'],
             message: `state "${name}" overrides don't validate against the paper schema: ${
-              first ? `${first.path.join('.')} — ${first.message}` : 'invalid'
+              first ? `${first.path.join('.')}: ${first.message}` : 'invalid'
             }`,
           })
         }

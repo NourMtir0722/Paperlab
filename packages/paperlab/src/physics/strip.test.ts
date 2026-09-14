@@ -476,7 +476,7 @@ describe('the schema', () => {
 
   it('rejects a strip alongside a behavior — the sim owns the vertices', () => {
     expect(() => paperConfigSchema.parse({ physics: 'strip', behavior: { type: 'unroll' } })).toThrow(
-      /exclusive/,
+      /cannot be used together/,
     )
   })
 

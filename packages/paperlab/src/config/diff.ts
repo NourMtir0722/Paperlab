@@ -149,7 +149,7 @@ export function withoutUploads<T>(value: T): { value: T; replaced: number } {
 
 /** The one-line warning a code export carries when it had to substitute. */
 export const UPLOAD_NOTE =
-  '// Uploaded pictures cannot travel in a snippet — the paths below are\n// stand-ins, in order. Point them at your own files.'
+  '// Uploaded pictures cannot travel in a snippet, so the paths below are\n// stand-ins, in order. Point them at your own files.'
 
 /**
  * A plain `<Paper />` snippet with only the non-default props — the

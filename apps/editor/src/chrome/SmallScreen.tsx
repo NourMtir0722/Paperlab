@@ -46,9 +46,9 @@ export function SmallScreen() {
         </p>
         <h1>The editor wants a bigger screen.</h1>
         <p>
-          It is a canvas tool — a preset library on the left, an inspector on the right, and a sheet in the
-          middle you sculpt by dragging a handle on the paper itself. That does not fold down to a phone
-          honestly, so we are not pretending it does.
+          It is a canvas tool, with presets on the left, settings on the right, and a sheet in the middle you
+          shape by dragging a handle on the paper. That does not fit on a phone, and I would rather say so
+          than pretend it does.
         </p>
         <a className="small-screen-go" href={SITE}>
           Open the playground instead →

@@ -141,7 +141,7 @@ export function App() {
               )
             }
           >
-            {copied === 'code' ? 'Copied — paste into Claude Code' : 'Get the code'}
+            {copied === 'code' ? 'Copied. Paste it into Claude Code' : 'Get the code'}
           </button>
         </div>
       </header>
@@ -157,7 +157,7 @@ export function App() {
             // come back — see MAX_TEXT_LENGTH.
             maxLength={MAX_TEXT_LENGTH}
             spellCheck={false}
-            placeholder="type anything — it becomes the architecture"
+            placeholder="type anything and it becomes the architecture"
             onChange={(e) => setText(e.target.value)}
           />
         </label>

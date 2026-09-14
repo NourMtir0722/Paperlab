@@ -13,7 +13,7 @@ const NOTE: Record<StockName, string> = {
   thermal: 'Receipt paper: warm, faintly banded, grey-black ink.',
   kraft: 'Brown packing paper, rough and opaque.',
   newsprint: 'Cheap, greyed, and thin enough to read through.',
-  vellum: 'Translucent — put a light behind it and it glows.',
+  vellum: 'Translucent: put a light behind it and it glows.',
   'photo-gloss': 'Smooth and specular. Photographs live here.',
   sticker: 'Glossy white adhesive back; nothing shows through.',
 }
@@ -23,8 +23,8 @@ export function Stocks() {
     <section id="stocks">
       <h2>Stocks</h2>
       <p className="lede">
-        Seven named papers. A stock is a bundle of material and surface defaults — picking paper at a print
-        shop — and every individual control still overrides it.
+        Seven named papers. A stock is a bundle of material and surface defaults, like picking paper at a
+        print shop, and every individual control still overrides it.
       </p>
 
       <div className="grid">

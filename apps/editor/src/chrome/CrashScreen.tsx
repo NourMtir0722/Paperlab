@@ -50,9 +50,9 @@ export class CrashScreen extends Component<{ children: ReactNode }, State> {
           <h1>The editor hit an error</h1>
           <p className="crash-message">{error.message || String(error)}</p>
           <p className="crash-hint">
-            Your saved presets are safe — they live separately from the view that broke. If this happens again
-            the moment you reload, the remembered session is the likely cause; forget it and you'll come back
-            up on the default paper.
+            Your saved presets are safe. They are stored apart from the view that broke. If this happens again
+            as soon as you reload, the remembered session is the likely cause. Forget it and you will come
+            back to the default paper.
           </p>
           <div className="crash-actions">
             <button type="button" onClick={() => window.location.reload()}>

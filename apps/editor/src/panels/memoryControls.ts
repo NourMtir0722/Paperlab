@@ -44,7 +44,7 @@ export function memoryControls(
     memory.set === undefined
       ? note(
           'setNote',
-          `${stock.label.toLowerCase()} keeps this much on its own — move it and it becomes yours`,
+          `${stock.label.toLowerCase()} keeps this much on its own. Move it and it becomes yours`,
         )
       : button('reset to stock', () => patch({ set: undefined }), 'setReset'),
   ]

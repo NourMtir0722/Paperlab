@@ -2,7 +2,7 @@ import type { ParamDoc } from './schemaDoc'
 
 /** A parameter table, straight off the schema. Nothing here is hand-typed. */
 export function Params({ rows }: { rows: ParamDoc[] }) {
-  if (rows.length === 0) return <p className="meta">No parameters — it does one thing.</p>
+  if (rows.length === 0) return <p className="meta">No parameters. It does one thing.</p>
   return (
     <table className="params">
       <thead>
@@ -23,7 +23,7 @@ export function Params({ rows }: { rows: ParamDoc[] }) {
               {row.range && <span className="range"> {row.range}</span>}
               {row.options && <span className="range"> {row.options.join(' · ')}</span>}
             </td>
-            <td>{row.fallback ? <code>{row.fallback}</code> : <span className="meta">—</span>}</td>
+            <td>{row.fallback ? <code>{row.fallback}</code> : <span className="meta">none</span>}</td>
           </tr>
         ))}
       </tbody>

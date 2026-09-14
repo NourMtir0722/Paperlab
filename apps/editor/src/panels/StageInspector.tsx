@@ -78,7 +78,7 @@ export function StageInspector() {
       note(
         'qualityNote',
         stage.quality === 'auto'
-          ? `adapting — now at ${stage.settled ?? 'medium'}`
+          ? `adapting, now at ${stage.settled ?? 'medium'}`
           : 'fixed: this is what that tier looks like everywhere',
       ),
     ]),
@@ -152,8 +152,8 @@ function contentControls(stage: StageState, patchStage: (patch: Partial<StageSta
         })
       }),
       stage.images.length > 0
-        ? note('imageCount', `${stage.images.length} hanging — one per banner, in the order added`)
-        : note('imageCount', 'No pictures yet — the banners hang blank until you add some.'),
+        ? note('imageCount', `${stage.images.length} hanging, one per banner, in the order added`)
+        : note('imageCount', 'No pictures yet. The banners hang blank until you add some.'),
     )
     if (stage.images.length > 0) {
       controls.push(
@@ -161,7 +161,7 @@ function contentControls(stage: StageState, patchStage: (patch: Partial<StageSta
         button('remove all', () => patchStage({ images: [] }), 'removeAll'),
         // Said where it is found out, not in a summary somewhere: an upload
         // is the one thing in this panel the session deliberately forgets.
-        note('imageMemory', 'Pictures are not remembered after a reload — export the code to keep them.'),
+        note('imageMemory', 'Pictures are not remembered after a reload. Export the code to keep them.'),
       )
     }
   }

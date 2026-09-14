@@ -60,7 +60,7 @@ export function buildDisplacementGLSL(stack: DeformerInstance[], sheet: SheetDim
     const deformer = getDeformer(instance.type)
     if (!deformer.glsl) {
       throw new Error(
-        `[paperlab] Deformer "${instance.type}" has no GLSL implementation — it can't run in field mode.`,
+        `[paperlab] Deformer "${instance.type}" has no GLSL implementation, so it can't run in field mode.`,
       )
     }
     const ns = `u${cap(instance.type)}${i}_`
