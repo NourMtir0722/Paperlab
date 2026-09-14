@@ -211,9 +211,16 @@ jobs:
   # The fire's budgets on their own: every shot seeks a burn and warms the
   # fire simulator up from still air, on the CPU. With the damage seam gate in
   # the same job it ran past 16 minutes of its 20.
+  #
+  # 30 minutes, not 20: alone, it has grown with the fire it measures — 10m on
+  # main before the burn gained its char, light and motion (#88), 15–19m since
+  # (19m16 at its slowest), and a PR run at 20m13 was cancelled mid-pass with
+  # every check it had reached still green. The known next cut is to take the
+  # peak and the peak without bloom from one page load: each load re-warms the
+  # simulator on the CPU.
   gates-fire:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
