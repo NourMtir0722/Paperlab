@@ -43,7 +43,9 @@ export function App() {
     <div className="app">
       <nav className="rail">
         <a className="brand" href="#start">
-          Paperlab
+          <strong className="brand-name">
+            Paperlab <small className="beta">beta</small>
+          </strong>
           <span>reference</span>
         </a>
         <ul>

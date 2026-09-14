@@ -58,6 +58,7 @@ import {
 import '../styles.css'
 import { ModeTabs } from '../chrome/ModeTabs'
 import { Feedback } from '../chrome/Feedback'
+import { Brand } from '../chrome/Brand'
 import { Panel } from '../controls/controls'
 import {
   type Control,
@@ -1530,7 +1531,7 @@ function Lab() {
   return (
     <div className="app lab">
       <header className="topbar">
-        <div className="brand">Paperlab</div>
+        <Brand />
         <div className="filename">Fire</div>
         <ModeTabs current="fx-lab" />
         <div className="spacer" />

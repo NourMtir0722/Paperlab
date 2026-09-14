@@ -110,7 +110,9 @@ export function App() {
       </div>
 
       <header className="chrome top">
-        <div className="wordmark">Paperlab</div>
+        <div className="wordmark">
+          Paperlab <span className="beta">beta</span>
+        </div>
         <div className="actions">
           <button
             type="button"

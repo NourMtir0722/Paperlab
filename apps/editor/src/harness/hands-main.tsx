@@ -31,6 +31,7 @@ import { drawOverlay, type HandMark } from './overlay'
 import '../styles.css'
 import { ModeTabs } from '../chrome/ModeTabs'
 import { Feedback } from '../chrome/Feedback'
+import { Brand } from '../chrome/Brand'
 
 /**
  * **Set fire to a sheet of paper with your hands.**
@@ -932,7 +933,7 @@ function App() {
   return (
     <div className="app lab">
       <header className="topbar">
-        <div className="brand">Paperlab</div>
+        <Brand />
         <div className="filename">Fire, by hand</div>
         <ModeTabs current="hands" />
         <div className="spacer" />

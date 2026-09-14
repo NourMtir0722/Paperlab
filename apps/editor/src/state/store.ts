@@ -23,6 +23,7 @@ import {
   type SceneConfigInput,
   type SurfaceConfig,
 } from 'paperlab'
+import { isComingSoon } from './comingSoon'
 import {
   type StageConfigInput,
   type WalkName,
@@ -502,8 +503,12 @@ export const useEditor = create<EditorState>((set, get) => ({
     })),
   backToField: () =>
     set((s) => ({ mode: 'field', cameFromField: false, inspectorEpoch: s.inspectorEpoch + 1 })),
-  setPreset: (name) =>
-    set({ presetName: name, config: getPreset(name), editingState: null, statePreview: false }),
+  setPreset: (name) => {
+    // A "Coming soon" preset stays closed whatever asks for it — the pickers
+    // grey it out, and this is the lock behind them.
+    if (isComingSoon(name)) return
+    set({ presetName: name, config: getPreset(name), editingState: null, statePreview: false })
+  },
   // Every config setter below delegates to writeConfig — the ONE place that
   // decides base-vs-state-override, so a live state chip can never be bypassed.
   patchConfig: (patch, opts) =>
