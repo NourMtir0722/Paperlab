@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 
 /**
@@ -77,6 +77,39 @@ export function toast(message: string, tone: ToastTone = 'info'): void {
   useUI.getState().push(message, tone)
 }
 
+const FOCUSABLE =
+  'button:not(:disabled), input:not(:disabled), textarea, select, iframe, [href], [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Keep Tab inside an open dialog: past either end, it wraps to the other.
+ *
+ * `aria-modal` tells a screen reader the page behind is inert; it does not
+ * stop the Tab key reaching it. A framed form in the middle needs no help —
+ * the browser tabs into and out of an iframe on its own — so only the two
+ * ends are caught, plus focus sitting on the dialog itself.
+ */
+export function trapTab(e: ReactKeyboardEvent, dialog: HTMLElement | null): void {
+  if (e.key !== 'Tab' || !dialog) return
+  const list = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)]
+  const first = list[0]
+  const last = list.at(-1)
+  if (!first || !last) {
+    e.preventDefault()
+    return
+  }
+  const at = list.indexOf(document.activeElement as HTMLElement)
+  if (at === -1) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+  } else if (e.shiftKey && at === 0) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && at === list.length - 1) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
 export function UIHost() {
   const dialog = useUI((s) => s.dialog)
   const toasts = useUI((s) => s.toasts)
@@ -99,6 +132,17 @@ function DialogView({ spec }: { spec: DialogSpec }) {
   const confirmRef = useRef<HTMLButtonElement>(null)
   const [value, setValue] = useState(spec.kind === 'prompt' ? (spec.defaultValue ?? '') : '')
   const [error, setError] = useState<string | null>(null)
+
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  // Give focus back to whatever had it when the dialog opened: someone on a
+  // keyboard who closes a dialog should land where they were, not at the top
+  // of the page. Declared before the autofocus below, so it captures the
+  // opener rather than the dialog's own field.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null
+    return () => opener?.focus()
+  }, [])
 
   // Autofocus the field (prompt) or the confirm button, and pre-select text so
   // the common "rename over the old name" gesture is one keystroke.
@@ -133,6 +177,7 @@ function DialogView({ spec }: { spec: DialogSpec }) {
     // biome-ignore lint/a11y/noStaticElementInteractions: click-outside is a pointer affordance; Escape and Cancel are the keyboard paths, and the effect above puts focus inside the dialog so both are reachable.
     <div className="dialog-backdrop" onMouseDown={cancel}>
       <div
+        ref={dialogRef}
         className="dialog"
         role="dialog"
         aria-modal="true"
@@ -141,6 +186,7 @@ function DialogView({ spec }: { spec: DialogSpec }) {
         onKeyDown={(e) => {
           if (e.key === 'Escape') cancel()
           if (e.key === 'Enter' && spec.kind !== 'prompt') submit()
+          trapTab(e, dialogRef.current)
         }}
       >
         <h3 className="dialog-title">{spec.title}</h3>

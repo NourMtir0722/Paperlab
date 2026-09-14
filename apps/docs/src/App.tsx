@@ -34,7 +34,7 @@ const SECTIONS = [
  */
 const FEEDBACK_FORM: string = 'vGldDg'
 const feedbackLink = (kind: 'problem' | 'idea') =>
-  `https://tally.so/r/${FEEDBACK_FORM}?kind=${kind}&page=docs`
+  `https://tally.so/r/${FEEDBACK_FORM}?${new URLSearchParams({ kind, page: 'docs', browser: navigator.userAgent })}`
 
 export function App() {
   const active = useScrollSpy(SECTIONS.map(([id]) => id))

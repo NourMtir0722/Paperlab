@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from 'react'
 
 /**
  * The feedback tab, for the playground: a glass edge on the scene that opens
@@ -52,18 +52,63 @@ function isSubmitted(message: MessageEvent): boolean {
   }
 }
 
+const FOCUSABLE =
+  'button:not(:disabled), input:not(:disabled), textarea, select, iframe, [href], [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Keep Tab inside the open dialog: past either end, it wraps to the other.
+ * `aria-modal` does not stop the Tab key reaching the page behind. The framed
+ * form in the middle needs no help — the browser tabs through an iframe on
+ * its own. The editor's copy is `trapTab` in its controls/ui.tsx.
+ */
+function trapTab(e: ReactKeyboardEvent, dialog: HTMLElement | null): void {
+  if (e.key !== 'Tab' || !dialog) return
+  const list = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)]
+  const first = list[0]
+  const last = list.at(-1)
+  if (!first || !last) {
+    e.preventDefault()
+    return
+  }
+  const at = list.indexOf(document.activeElement as HTMLElement)
+  if (at === -1) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+  } else if (e.shiftKey && at === 0) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && at === list.length - 1) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
 type View = 'closed' | 'choose' | FeedbackKind | 'thanks'
 
 /** `link` reopens the scene being looked at — asked for when a form opens. */
 export function Feedback({ link }: { link: () => string | null }) {
   const [view, setView] = useState<View>('closed')
   const [src, setSrc] = useState<string | null>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const firstChoice = useRef<HTMLButtonElement>(null)
+  const back = useRef<HTMLButtonElement>(null)
+  const wasOpen = useRef(false)
   const kind = view === 'problem' || view === 'idea' ? view : null
   const chosen = CHOICES.find((c) => c.kind === kind)
 
+  // Focus goes where the next key is wanted, and back to the tab on every way
+  // out — keyed on the view, so no close path can forget it.
   useEffect(() => {
+    if (view === 'closed') {
+      if (wasOpen.current) trigger.current?.focus()
+      wasOpen.current = false
+      return
+    }
+    wasOpen.current = true
     if (view === 'choose') firstChoice.current?.focus()
+    else if (view === 'thanks') dialogRef.current?.focus()
+    else back.current?.focus()
   }, [view])
 
   useEffect(() => {
@@ -91,13 +136,21 @@ export function Feedback({ link }: { link: () => string | null }) {
 
   return (
     <>
-      <button type="button" className="feedback-tab" aria-haspopup="dialog" onClick={() => setView('choose')}>
+      <button
+        ref={trigger}
+        type="button"
+        className="feedback-tab"
+        aria-haspopup="dialog"
+        onClick={() => setView('choose')}
+      >
         Feedback
       </button>
       {view !== 'closed' && (
         // biome-ignore lint/a11y/noStaticElementInteractions: click-outside is the pointer path; Escape and the Close button are the keyboard ones.
         <div className="feedback-scrim" onMouseDown={close}>
           <div
+            ref={dialogRef}
+            tabIndex={-1}
             className={`feedback-dialog${kind ? ' has-form' : ''}`}
             role="dialog"
             aria-modal="true"
@@ -105,6 +158,7 @@ export function Feedback({ link }: { link: () => string | null }) {
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === 'Escape') close()
+              trapTab(e, dialogRef.current)
             }}
           >
             {view === 'choose' && (
@@ -135,7 +189,7 @@ export function Feedback({ link }: { link: () => string | null }) {
             {kind && src && (
               <>
                 <div className="feedback-head">
-                  <button type="button" className="chip" onClick={() => setView('choose')}>
+                  <button ref={back} type="button" className="chip" onClick={() => setView('choose')}>
                     ← Back
                   </button>
                   <h2>{chosen?.title}</h2>

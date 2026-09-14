@@ -2200,6 +2200,12 @@ button.export:hover {
   width: 560px;
 }
 
+/* The dialog holds focus itself only for the thank-you, which has nothing to
+   press — a ring round the whole panel there would read as a selection. */
+.feedback-dialog:focus {
+  outline: none;
+}
+
 .feedback-choices {
   display: flex;
   flex-direction: column;

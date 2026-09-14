@@ -6,6 +6,7 @@ import {
   feedbackUrl,
   isSubmitted,
 } from './feedbackForm'
+import { trapTab } from '../controls/ui'
 
 /**
  * The feedback tab: a quiet edge on the canvas that opens two choices —
@@ -36,12 +37,28 @@ type View = 'closed' | 'choose' | FeedbackKind | 'thanks'
 export function Feedback({ context }: { context: () => FeedbackContext }) {
   const [view, setView] = useState<View>('closed')
   const [src, setSrc] = useState<string | null>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const firstChoice = useRef<HTMLButtonElement>(null)
+  const back = useRef<HTMLButtonElement>(null)
+  const wasOpen = useRef(false)
   const kind = view === 'problem' || view === 'idea' ? view : null
   const chosen = CHOICES.find((c) => c.kind === kind)
 
+  // Focus goes where the next key is wanted — the first choice, the form's
+  // Back, or the dialog itself for the thank-you — and back to the tab on
+  // every way out: Cancel, Close, Escape, a click outside, or the thank-you
+  // timing out. Keyed on the view, so no close path can forget it.
   useEffect(() => {
+    if (view === 'closed') {
+      if (wasOpen.current) trigger.current?.focus()
+      wasOpen.current = false
+      return
+    }
+    wasOpen.current = true
     if (view === 'choose') firstChoice.current?.focus()
+    else if (view === 'thanks') dialogRef.current?.focus()
+    else back.current?.focus()
   }, [view])
 
   // Tally says when the form has been sent; the dialog answers and goes.
@@ -70,13 +87,21 @@ export function Feedback({ context }: { context: () => FeedbackContext }) {
 
   return (
     <>
-      <button type="button" className="feedback-tab" aria-haspopup="dialog" onClick={() => setView('choose')}>
+      <button
+        ref={trigger}
+        type="button"
+        className="feedback-tab"
+        aria-haspopup="dialog"
+        onClick={() => setView('choose')}
+      >
         Feedback
       </button>
       {view !== 'closed' && (
         // biome-ignore lint/a11y/noStaticElementInteractions: as in ui.tsx's dialog — click-outside is the pointer path; Escape and the Close button are the keyboard ones.
         <div className="dialog-backdrop" onMouseDown={close}>
           <div
+            ref={dialogRef}
+            tabIndex={-1}
             className={`dialog feedback-dialog${kind ? ' has-form' : ''}`}
             role="dialog"
             aria-modal="true"
@@ -84,6 +109,7 @@ export function Feedback({ context }: { context: () => FeedbackContext }) {
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === 'Escape') close()
+              trapTab(e, dialogRef.current)
             }}
           >
             {view === 'choose' && (
@@ -116,7 +142,12 @@ export function Feedback({ context }: { context: () => FeedbackContext }) {
             {kind && src && (
               <>
                 <div className="feedback-head">
-                  <button type="button" className="feedback-back" onClick={() => setView('choose')}>
+                  <button
+                    ref={back}
+                    type="button"
+                    className="feedback-back"
+                    onClick={() => setView('choose')}
+                  >
                     ← Back
                   </button>
                   <h3 className="dialog-title">{chosen?.title}</h3>
