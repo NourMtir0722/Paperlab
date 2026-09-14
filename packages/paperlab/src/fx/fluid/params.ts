@@ -1,7 +1,7 @@
 /**
  * The fire simulator's controls — by the names, and at the defaults, of the
- * fluid-fire tool Noor pointed at (Emission, Combustion, Fuel & air, Motion
- * & turbulence), so the lab's panel reads like the one she knows.
+ * fluid-fire tool it was modelled on (Emission, Combustion, Fuel & air, Motion
+ * & turbulence), so the lab's panel reads like that one.
  *
  * The numbers are the panel's, not the solver's. `solverUniforms` is the one
  * place they are turned into this solver's units — world units (a default
@@ -65,8 +65,7 @@ export interface FireFluidParams {
 }
 
 /**
- * The defaults — the panel's names, at the values Noor tuned in the lab on
- * 2026-09-12. No turbulence of its own: the motion comes from vorticity,
+ * The defaults — the panel's names, at the values tuned in the lab. No turbulence of its own: the motion comes from vorticity,
  * the radial impulse and the uneven rim that feeds it.
  */
 export const fireFluidDefaults: FireFluidParams = {
@@ -76,7 +75,7 @@ export const fireFluidDefaults: FireFluidParams = {
   smoke: 0.7,
   // Was 5 — a full unit a second, 210 mm/s, of gas pushed sideways out of the
   // rim. Against a buoyancy of 1.7 units/s² that is what rolled the flames
-  // into mushroom caps: the grey spirals over the text that the review called
+  // into mushroom caps: the grey spirals over the text that a visual review called
   // the most synthetic thing in the frame. A flame leaves paper going UP.
   radialImpulse: 0.8,
   // In world units a second now (see `solverUniforms`): 1.4 is ~0.3 m/s, the
@@ -109,7 +108,7 @@ export const fireFluidDefaults: FireFluidParams = {
   // reached the text (~150 mm), 1.6 ~100 mm, 2.1 short licks (~60 mm);
   // Hero.png's tallest is ~70 mm.
   cooling: 1.8,
-  // Was 1.4, which made a thick grey column, then 0.5. Noor's direction is
+  // Was 1.4, which made a thick grey column, then 0.5. The direction is
   // light smoke, and with MacCormack advection keeping the smoke's fine
   // structure it needs less of it to read: at 0.5 it veiled the upper sheet.
   smokeProduction: 0.25,

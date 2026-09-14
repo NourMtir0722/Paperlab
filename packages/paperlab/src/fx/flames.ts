@@ -5,7 +5,7 @@ import type { SurfaceLocator } from './fire'
 /**
  * Where a burn's flames stand, read off the field.
  *
- * `paperlab-fx-fire-spec.md` §4.1: paper does not burn, the gas does. Heat
+ * Paper does not burn, the gas does. Heat
  * cooks the cellulose into gas, which burns just ABOVE the surface, rooted
  * over the char right behind the ember line — so a flame belongs on the edge
  * of the hole, where it is hot, and nowhere else. Where the heat has gone
@@ -24,7 +24,7 @@ export interface FlameAnchor {
   x: number
   y: number
   z: number
-  /** World units. 10–40 mm at A4 (§6), scaled by heat and by which rim it is on. */
+  /** World units. 10–40 mm at A4, scaled by heat and by which rim it is on. */
   height: number
   width: number
   /** Stable while the cell burns, so a flame keeps its own flicker frame to frame. */
@@ -209,7 +209,7 @@ export function flameAnchors(
     // Square root: the edge of a hole is rarely at full heat.
     const hot = Math.sqrt(Math.min(1, (heat - FLAME_HEAT) / 0.35))
     // Tall on the upper rim, where the gas rises over paper it is preheating;
-    // short on the lower one, where it rises across the hole (§6).
+    // short on the lower one, where it rises across the hole.
     const rim = 0.35 + 0.65 * (0.5 + 0.5 * upper)
     const base = (FLAME_HEIGHT[0] + (FLAME_HEIGHT[1] - FLAME_HEIGHT[0]) * hot) * rim
     // Tall tongues where the cluster is strong, short licks where it is weak.
@@ -290,7 +290,7 @@ function noise2(x: number, y: number): number {
 /**
  * How much a flame has puffed up at a moment — the same function the flame
  * shader runs, so the fire light flickers WITH the flames rather than beside
- * them (§7). Value noise, 10–15 Hz, seeded per flame: neighbours never move
+ * them. Value noise, 10–15 Hz, seeded per flame: neighbours never move
  * in step, and nothing is a sine.
  */
 export function flamePuff(seed: number, time: number): number {

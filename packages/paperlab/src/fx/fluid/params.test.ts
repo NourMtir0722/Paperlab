@@ -18,7 +18,7 @@ describe('the fire simulator controls', () => {
    * numbers, which is a test that can only ever be wrong or redundant — it
    * pinned `flamePersistence` to 0.005, and 0.005 was the slider's FLOOR,
    * which is to say the flame channel's history was switched off and the test
-   * was holding it there. The review found the same shape of thing all over
+   * was holding it there. A visual review found the same shape of thing all over
    * the look panel: `lipBrightness`, `charWarmth` and `charCracks` all sat at
    * their maxima, and a control at its limit means the problem is underneath.
    *

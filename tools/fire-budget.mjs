@@ -14,7 +14,7 @@
  * `test:damage`.
  *
  * It exists because of a specific hole. All twelve of `fire-look`'s checks
- * passed while the review scored the result 3.5/10, and they passed because
+ * passed while a visual review scored the result 3.5/10, and they passed because
  * every one of them asks "did nothing change that should not have" — post
  * leaves an unburnt sheet alone, heat lights only the rim, paper never blooms.
  * None asked whether the fire was any good. These do, in the two ways a
@@ -154,7 +154,7 @@ const bloomShare = await pixels([peak.png, noBloom.png], (frames) => {
 // flames that never clear the threshold at all, which measured 0.01-0.07%.
 // 0.5% sits seven times above that.
 //
-// Reported, not required, since Noor's tune of 2026-09-13 became the default:
+// Reported, not required, since the lab's tune became the default:
 // its flame authors nothing past the threshold on purpose (`FIRE_ZONES`), so
 // a frame that blooms nothing is the look chosen, not the old failure. The
 // check that the fire is in the frame at all is (5), below. If the bloom is
@@ -199,7 +199,7 @@ check(
   'the bloom of a large bright area is tinting the whole background',
 )
 
-// 3. No pink (§13.3).
+// 3. No pink.
 //
 // Red light added to cream paper is the failure the whole spec opens with,
 // and `Never_this.png` is a picture of it.
@@ -258,7 +258,7 @@ for (const lighting of ['studio', 'window']) {
 //
 // "Butter" has a number: the energy in a frame at fine spatial scales. A
 // flame that has been advected into a smooth blob has almost none, and no
-// check could see the difference — the review had to say "tongues and tips
+// check could see the difference — a visual review had to say "tongues and tips
 // blur into butter" and hope. Measured as the mean absolute difference
 // between neighbouring pixels over the region the fire is in, against the
 // same frame with the fire switched off, so the sheet's own texture does not
@@ -480,8 +480,8 @@ check(
 // The pink check reads 300-355°, where red light on cream paper lands. Cool
 // grey smoke over a warm frame lands somewhere else entirely — 250-300°, the
 // violet the smoke's colour was chosen to avoid — and nothing was looking
-// there. Reported for now: it is the smoke's own colour to answer, and the
-// flames are not to be touched without Noor.
+// there. Reported for now: it is the smoke's own colour to answer, not the
+// flames'.
 const violet = await pixels([peak.png], (frames) => {
   const [f] = frames
   let lit = 0

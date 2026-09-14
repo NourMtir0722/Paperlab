@@ -33,7 +33,7 @@ export interface FxMatchFlameProps {
   match: { readonly current: MatchFlameState }
 }
 
-/** A match flame at A4 scale: 15–25 mm tall (§10.3). */
+/** A match flame at A4 scale: 15–25 mm tall. */
 const HEIGHT = 20 / 210
 /** How long a strike flares for, in seconds, and by how much. */
 const FLARE = 0.42
@@ -42,8 +42,7 @@ const FLARE_GAIN = 1
 const ARM = 0.32
 
 /**
- * A match, held: `paperlab-fx-fire-spec.md` §10, the parts that are the
- * flame's to draw.
+ * A match, held: the parts of it that are the flame's to draw.
  *
  * - **Arming.** Friction building: a few tiny sparks and a warm point that
  *   grows at the pinch. A pinch released early (a flick) fizzles — nothing
@@ -57,7 +56,7 @@ const ARM = 0.32
  * - **Blown.** It leans away and flickers hard; when the page says it has
  *   gone out, it leaves a soft puff behind.
  * - **Light.** It lights the sheet warm before anything scorches — bringing
- *   the flame near the paper is the first thing people notice (§10.4).
+ *   the flame near the paper is the first thing people notice.
  *
  * It owns its own clock and its own handful of particles: nothing here is
  * part of a burn anyone replays.
@@ -159,7 +158,7 @@ export function FxMatchFlame({ match }: FxMatchFlameProps) {
       width = (HEIGHT * 0.32 * (now.touching ? 1.6 : 1)) / Math.sqrt(stretch)
       // A hard blow makes it gutter.
       gain = 1 - now.blow * 0.45 * (0.5 + 0.5 * Math.sin(m.time * 61))
-      // Enough to warm the sheet as it comes near (§10.4), not to scald it:
+      // Enough to warm the sheet as it comes near, not to scald it:
       // at 0.12 the paper a few centimetres away read ~12× white and bloomed
       // into a peach disc on the capture of the contact frame.
       lightLevel = 0.035 * flare + (m.flash > 0 ? 0.25 : 0)

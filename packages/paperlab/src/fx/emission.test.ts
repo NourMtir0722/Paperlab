@@ -96,7 +96,7 @@ describe('the emission unit', () => {
     })
 
     it('no zone but the core could ever clear the bloom threshold', () => {
-      // The defaults (Noor, 2026-09-13) author nothing past it at all, and let
+      // The defaults author nothing past it at all, and let
       // the bloom's strength carry the glow — so there is no floor on the
       // core here any more. What stays is the ceiling on everything else: if
       // the body or tip cleared it, the whole flame would bloom into a blob.

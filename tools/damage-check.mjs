@@ -106,7 +106,7 @@ try {
     // Heat on its own draws NOTHING. This used to check that a burning line
     // glowed warm, and the glow it passed was paint — a warm band added over
     // paper that had not burnt, which is what made the first fire's rim read
-    // salmon (paperlab-fx-fire-spec.md §0). §13.2: no emissive light on
+    // salmon. No emissive light on
     // unburnt paper. Heat emits only from the ember line, flames and embers,
     // and through bloom. `scorched` is the same field with the heat left out.
     const glowing = await photograph(`stock=${stock}&damage=glowing`)

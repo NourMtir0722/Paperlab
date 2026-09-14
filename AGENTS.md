@@ -579,7 +579,7 @@ pnpm lint           # biome
 pnpm knip           # dead code and unused exports
 ```
 
-**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor`. All of them are dev-only — `pnpm build` emits `index.html` and nothing else — with two exceptions, each built in a pass of its own so the default build stays lean: `hands/index.html` ships as the site's `/hands` route (`PAPERLAB_HANDS=1`, into `dist-hands/`), and `fx-lab/index.html` as `/fx-lab` (`PAPERLAB_FXLAB=1`, into `dist-fxlab/`) — the fire lab is a feature of the site now, not only a harness. Its reference stills do not ship; they live outside the repo and the page says so where they would have been.
+**The browser harnesses.** Anything that needs a real GPU, real pointer events or a second browser profile lives here rather than in vitest. Each one boots a Vite dev server on its own port and drives an HTML entry point in `apps/editor`. All of them are dev-only — `pnpm build` emits `index.html` and nothing else — with two exceptions, each built in a pass of its own so the default build stays lean: `hands/index.html` ships as the site's `/hands` route (`PAPERLAB_HANDS=1`, into `dist-hands/`), and `fx-lab/index.html` as `/fx-lab` (`PAPERLAB_FXLAB=1`, into `dist-fxlab/`) — the FX Lab is a feature of the site now, not only a harness. Its reference stills do not ship; they live outside the repo and the page says so where they would have been.
 
 | | | |
 |---|---|---|
@@ -746,7 +746,7 @@ the moment it turns side-on to pinch.
 the `Afterglow` that carries `DamageSource.firelight`, eased on the burn's
 clock with the lab's own `FIRE_FULL_FRONT`, `FIRE_LEVEL_EASE` and
 `roomYield` — imported from `burn.ts`, never copied. And the page is silent:
-no `FxAudio`, no `FireSound` (Noor, 2026-09-13).
+no `FxAudio`, no `FireSound`.
 
 **The breath is half of the fire.** The same puckered mouth that raises
 `cloth.wind` also cools the field (`coolFromBlow`) and blows a held match out,
@@ -777,7 +777,7 @@ travels. It used to refuse to light over the paper — a pinch there was a
 GRAB, latched until the hand opened, so a tear pulling off the sheet's edge
 could not turn into a match half way. The grab went with the other gestures
 and the latch stayed behind, making the sheet the one place a match would not
-light. Noor met that first ("the sensitivity is bad"); it is gone. The harness drives that on an injected clock for the reason above.
+light. It is gone. The harness drives that on an injected clock for the reason above.
 
 **The pinch is measured in three dimensions and the curls are not.** The
 tracker reports a `z` per landmark and nothing read it. That is a live bug in

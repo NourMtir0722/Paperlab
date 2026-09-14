@@ -3,17 +3,17 @@
  * Photograph the fire at every moment the spec has a reference for, and lay
  * each shot beside the still it is meant to look like.
  *
- * §14.2 of `paperlab-fx-fire-spec.md`. It exists because the first fire
+ * It exists because the first fire
  * passed every test in this directory and looked cheap: `test:damage` asks
  * whether a burning sheet is warmer than a cold one, and a radial gradient
  * answers yes. No assertion was ever going to catch that. What catches it is
  * a contact sheet — this render, that photograph, next to each other, at the
  * same moment of the same burn — and then somebody's eyes.
  *
- * So most of what it does is take pictures. It also runs the §14.3 checks
+ * So most of what it does is take pictures. It also runs the checks
  * that have something to check yet — they catch the old failure mode, not
- * ugliness — and fails if one does. **Passing it is still not "done".**
- * §14.4: a step is done when Noor says so.
+ * ugliness — and fails if one does. **Passing it is still not "done"** —
+ * a look is done when someone has looked at it.
  *
  *   pnpm test:fire-look            every phase, plus three crops on the front
  *   pnpm test:fire-look --phase=peak   just one
@@ -85,11 +85,11 @@ async function photograph(query, file) {
 }
 
 /**
- * Two of §14.3's checks, measured and PRINTED rather than asserted.
+ * Two of the checks, measured and PRINTED rather than asserted.
  *
- * They are the two the first fire failed. "No pink" (§13.3): red added to
+ * They are the two the first fire failed. "No pink": red added to
  * white paper makes pink, which is why `Never_this.png` reads salmon. "The
- * glow must be brighter than the whitest paper" (§4.3): it cannot be, while
+ * glow must be brighter than the whitest paper": it cannot be, while
  * the glow is a colour blended into the surface rather than a value that
  * blooms.
  *
@@ -310,11 +310,11 @@ async function nearVoid(a, b, voidPng, radius) {
 }
 
 /**
- * §14.3's checks that step 2 makes checkable. Each is paired with a control,
+ * The checks that can be measured. Each is paired with a control,
  * because a comparison that cannot fail proves nothing.
  */
 async function gate(peakAt, look) {
-  console.log('\nthe §14.3 checks that apply so far')
+  console.log('\nthe look checks')
   // Everything a fire puts in the frame besides the sheet's own shading —
   // the scripted match included, which stands on the sheet from t = 0 and
   // would otherwise be the only thing an "unburnt sheet" check measured.
@@ -347,7 +347,7 @@ async function gate(peakAt, look) {
     )
   }
 
-  // Heat emits ONLY at the ember line (§5.3, §13.2). Bloom and particles off,
+  // Heat emits ONLY at the ember line. Bloom and particles off,
   // so what is compared is the sheet's own light and nothing else: turning
   // heat on may change pixels only within a few of the hole's edge. The band
   // is measured off the same frame with the heat off — its near-black pixels
@@ -357,7 +357,7 @@ async function gate(peakAt, look) {
   const hot = await shot(`t=${peakAt}&bloom=0&off=${quiet}`)
   // How far heat may light from the void: the ember zone the look sets —
   // the ash lip plus the widest bead, and half a millimetre of antialiasing —
-  // at this camera's ~2.3 px a millimetre. 8 px at the spec's numbers; wider
+  // at this camera's ~2.3 px a millimetre. 8 px at a real burn's numbers; wider
   // only as far as the tuned look is wider, never as a margin of its own.
   const zoneMm = look ? look.lipWidth + look.emberWidth + 0.5 : 3.5
   const radius = Math.max(8, Math.ceil((zoneMm * 8) / 3.5))
@@ -377,7 +377,7 @@ async function gate(peakAt, look) {
     'heat is lighting paper away from the edge, which is the painted glow again',
   )
 
-  // Paper never blooms (§7). With the heat off as well as the particles,
+  // Paper never blooms. With the heat off as well as the particles,
   // nothing on the sheet emits — so bloom on and bloom off must be the same
   // picture, at the peak (scorched, charred, holed, ash-lipped paper as well
   // as clean), under `studio` and under `window`, which lights paper
@@ -393,7 +393,7 @@ async function gate(peakAt, look) {
     }
   }
 
-  // Fire is a light (§4.8, §13.13): it has to reach the whole sheet — Hero.png
+  // Fire is a light: it has to reach the whole sheet — Hero.png
   // warms it to the top edge. Measured in the band of type at the top of the
   // sheet, far from the burn, with the flames and particles off so the light
   // is the only thing that differs.
@@ -488,7 +488,7 @@ try {
     console.log(`  pink (hue 300–355°)   ${(measured.pink * 100).toFixed(2)}% of the lit frame`)
     console.log(
       `  brightest / paper     ${measured.brightest.toFixed(3)} / ${measured.paper.toFixed(3)}` +
-        `   §4.3 wants the fire above the whitest paper`,
+        `   the fire should be above the whitest paper`,
     )
   }
 
@@ -497,11 +497,11 @@ try {
     '',
     'Renders of the scripted burn in `/fx-lab`, each beside the still it is judged against.',
     '',
-    '- `phases.jpg` — §9, moment by moment',
+    '- `phases.jpg` — the burn, moment by moment',
     '- `edge.jpg` — three crops on the burning edge',
     '',
-    'Before claiming a step done: write, per capture, what differs from its reference,',
-    'using §4 and §13 as the checklist. Then Noor reviews. (§14.4)',
+    'Before calling a look done: write, per capture, what differs from its reference,',
+    'then have someone look at it.',
     '',
   ].join('\n')
   writeFileSync(join(out, 'README.md'), index)
@@ -511,7 +511,7 @@ try {
     console.error(`${failed} check${failed === 1 ? '' : 's'} failed.`)
     process.exitCode = 1
   }
-  console.log('Passing is not done: write what differs from each reference, then Noor decides. (§14.4)')
+  console.log('Passing is not done: write what differs from each reference, then have someone look.')
 } finally {
   await browser.close()
   stop()

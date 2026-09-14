@@ -20,7 +20,7 @@ export interface FxFireLightProps {
 }
 
 /**
- * Fire is a light source (§4.8, §7). A fire that changes nothing around it
+ * Fire is a light source. A fire that changes nothing around it
  * looks pasted on.
  *
  * One warm point light for each place the fire is gathered — up to
@@ -38,7 +38,7 @@ export interface FxFireLightProps {
  *
  * And one dimmer light on the FAR side of the sheet, at the fire as a whole,
  * for translucency: paper is thin, and a fire in front of it glows through to
- * the back (§7). The sheet's own material lights its back face from whatever
+ * the back. The sheet's own material lights its back face from whatever
  * is behind it.
  *
  * Every light is mounted all the time and only its intensity changes, so a
@@ -160,6 +160,6 @@ const COOLING = new THREE.Color('#ff8a33')
 
 /**
  * Light per unit of front length; the front runs to ~0.045 at a burn's peak.
- * Noor's tune, 2026-09-13 (it was 42).
+ * Tuned in `/fx-lab` (it was 42).
  */
 export const FIRE_LIGHT_GAIN = 26

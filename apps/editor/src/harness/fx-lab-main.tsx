@@ -74,9 +74,8 @@ import { UIHost, toast } from '../controls/ui'
 /**
  * `/fx-lab` — where fire is judged.
  *
- * §14 of `paperlab-fx-fire-spec.md`, and the first thing built for it. The
- * spec exists because the first fire passed every test and looked cheap, and
- * the root cause it names is not a shader: it is that **visual quality had no
+ * It exists because the first fire passed every test and looked cheap, and
+ * the root cause was not a shader: it was that **visual quality had no
  * gate**. `test:damage` asks whether a burning sheet is warmer than a cold
  * one, and a radial gradient answers yes. So the gate cannot be another
  * assertion. It has to be a render, put beside the photograph it is meant to
@@ -90,14 +89,11 @@ import { UIHost, toast } from '../controls/ui'
  *   - a way to take the picture apart — each channel off, each kind of
  *     particle off — so "it looks wrong" can become "the scorch is wrong".
  *
- * Step 1 of §15 deliberately changes nothing about how fire is drawn. What it
- * produces is the first honest photograph of where the work starts: the lab,
- * the captures, and a list of everything the spec asks for that does not
- * exist yet, each against the step that owes it. If this page is doing its
- * job, the render next to `Hero.png` is embarrassing.
+ * It began as a tuning harness and ships as a feature: the library's fire
+ * defaults are a tune made here, and every knob behind them is on the page.
  *
  *   /fx-lab                      the lab
- *   ?phase=peak                  jump to one of §9's moments
+ *   ?phase=peak                  jump to one of the burn's moments
  *   ?t=2.2                       or to any simulated second
  *   ?view=close&u=0.5&v=0.52     macro on a point of the sheet
  *   ?off=heat,embers             layers off, by name
@@ -142,7 +138,7 @@ declare global {
       /** Simulated seconds the burn is at. */
       t: number
       stats: FieldStats
-      /** §9's moments, at the times this burn actually reaches them. */
+      /** The burn's moments, at the times this burn actually reaches them. */
       phases: readonly Phase[]
       /** Three points on the rim of the hole, for the close crops. */
       crops: Crop[]
@@ -877,7 +873,7 @@ function Driver({
     }
     was.current = burn.time
 
-    // Sound (§10). Only while it is actually playing, and only at a speed a
+    // Sound. Only while it is actually playing, and only at a speed a
     // crackle still means something at: paused or scrubbing, the room is
     // silent rather than stuttering, and a seek resumes from the new moment
     // with no burst of caught-up crackles — `FireSound` reads this step's
@@ -1145,7 +1141,7 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'char',
     name: 'scorch, char, ash lip',
-    why: 'the albedo zones of §5, measured in mm from the cut: scorch fingers reaching up, cracked char, a pale lifted lip',
+    why: 'the albedo zones, measured in mm from the cut: scorch fingers reaching up, cracked char, a pale lifted lip',
   },
   {
     key: 'heat',
@@ -1155,7 +1151,7 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'presence',
     name: 'the hole',
-    why: 'presence cut at one half, frayed at fibre scale along the grain (§5.1)',
+    why: 'presence cut at one half, frayed at fibre scale along the grain',
   },
   {
     key: 'fluid',
@@ -1165,7 +1161,7 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'light',
     name: 'fire light + glow-through',
-    why: 'FxFireLight — ~1900 K at the rim, as bright as the front is long, flickering with the flames (§7)',
+    why: 'FxFireLight — ~1900 K at the rim, as bright as the front is long, flickering with the flames',
   },
   {
     key: 'match',
@@ -1175,7 +1171,7 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'wisps',
     name: 'smoulder wisp',
-    why: 'FxWisps — a pale thread from a glowing bead once the flames are out, S-curving as it climbs (§8.2)',
+    why: 'FxWisps — a pale thread from a glowing bead once the flames are out, S-curving as it climbs',
   },
   {
     key: 'saturation',
@@ -1185,17 +1181,17 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'embers',
     name: 'embers',
-    why: 'soft round points on a ballistic arc. §8.1 wants streaks along screen velocity',
+    why: 'soft round points on a ballistic arc. The target is streaks along screen velocity',
   },
   {
     key: 'smoke',
     name: 'smoke',
-    why: 'soft round points. §8.2 wants depth-faded sprites and a threadlike wisp',
+    why: 'soft round points. The target is depth-faded sprites and a threadlike wisp',
   },
   {
     key: 'ash',
     name: 'ash',
-    why: 'tumbling curled planes, char with pale edges, a few with a hot edge (§8.3)',
+    why: 'tumbling curled planes, char with pale edges, a few with a hot edge',
   },
 ]
 
@@ -1216,7 +1212,7 @@ function Lab() {
   const [playing, setPlaying] = useState(false)
 
   /**
-   * The burn's voice. Muted until someone asks for it (Noor, 13 Sep): a
+   * The burn's voice. Muted until someone asks for it: a
    * browser will not start audio without a gesture anyway, so the button IS
    * the gesture, and a lab that spoke on load would be a lab nobody could
    * leave open.
@@ -2177,9 +2173,9 @@ function Reference({ name }: { name: string }) {
   if (missing) {
     return (
       <p className="lab-missing">
-        <code>{name}</code> did not load. The references live beside <code>paperlab-fx-fire-spec.md</code>,
-        outside this repo — set <code>PAPERLAB_FX_REFS</code> to the <code>fx-refs</code> directory that holds
-        them and restart the dev server.
+        <code>{name}</code> did not load. The reference stills live outside this repo — set{' '}
+        <code>PAPERLAB_FX_REFS</code> to the <code>fx-refs</code> directory that holds them and restart the
+        dev server.
       </p>
     )
   }

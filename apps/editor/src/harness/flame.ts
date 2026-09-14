@@ -49,7 +49,7 @@ export function flameHeat(heldSeconds: number, dt: number): number {
 
 /**
  * Below this much breath nothing cools: a gentle blow leans the flames and
- * stirs the smoke, and only a real one puts a fire out (fire spec §10.6).
+ * stirs the smoke, and only a real one puts a fire out.
  */
 export const BLOW_COOL_FROM = 0.3
 

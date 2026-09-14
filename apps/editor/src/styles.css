@@ -1480,7 +1480,7 @@ button.export:hover {
   word-break: break-word;
 }
 
-/* ── Undo / redo (Phase 06) ──────────────────────────────────────────────── */
+/* ── Undo / redo ─────────────────────────────────────────────────────────── */
 
 .history {
   display: flex;
@@ -1910,7 +1910,7 @@ button.export:hover {
   left: -3.5px;
 }
 
-/* ── The small-screen gate (Phase 07) ────────────────────────────────────── */
+/* ── The small-screen gate ───────────────────────────────────────────────── */
 
 /* Above the breakpoint it does not exist. The editor's grid is a 220px rail,
    a viewport and a 300px inspector — under about 900px the inspector is off

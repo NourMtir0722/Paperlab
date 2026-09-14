@@ -21,8 +21,8 @@ const HANDS_BUILD = process.env.PAPERLAB_HANDS === '1'
  * Whether this is the /fx-lab pass.
  *
  * The lab was a dev page in no build's input list, on the grounds that it is a
- * tuning harness. It is a FEATURE now: the fire's defaults are Noor's tune
- * from this lab, every knob behind them is an option the library exposes, and
+ * tuning harness. It is a FEATURE now: the fire's defaults are the tune
+ * made in this lab, every knob behind them is an option the library exposes, and
  * the page that turns them is the honest place to try them. So it ships, in
  * its own pass with its own base for the same reason `/hands` does.
  *
@@ -80,15 +80,15 @@ function handsAssets(): Plugin {
 /**
  * Serve the fire references to `/fx-lab` in dev.
  *
- * `paperlab-fx-fire-spec.md` is written against twelve stills, and the lab's
- * whole point is to put a render beside the one it is meant to look like. The
- * stills are 20 MB and live with the spec, outside this repo — see
+ * The fire is judged against twelve stills, and the lab's References view
+ * puts a render beside the one it is meant to look like. The stills are
+ * 20 MB and live outside this repo — see
  * `tools/fx-refs.mjs` — so they are neither in `public/` (which is copied into
  * every build, for every page, whether or not the page that wanted it was an
  * entry point) nor in git.
  *
- * Dev only, and deliberately: `/fx-lab` is a dev page and is in no build's
- * input list, so there is nothing to copy at `closeBundle` the way the hand
+ * Dev only, and deliberately: `/fx-lab` ships, but its stills do not, so
+ * there is nothing to copy at `closeBundle` the way the hand
  * tracker's wasm has to be.
  */
 function fxRefs(): Plugin {

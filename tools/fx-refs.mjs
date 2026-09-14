@@ -1,16 +1,13 @@
 /**
  * Where the fire references live.
  *
- * `paperlab-fx-fire-spec.md` says what fire must look like, and every claim in
- * it points at an image in `fx-refs/fire/` beside it. Those images are 20 MB
- * of AI-generated stills. They are not in this repo, for the same reason the
- * plan they sit beside is not: they are the argument for the work, not the
- * work, and a library that ships at 38 KB gzipped does not want 20 MB of
+ * The fire is judged against reference stills in `fx-refs/fire/`. Those
+ * images are 20 MB of AI-generated stills. They are not in this repo: they
+ * are the argument for the work, not the work, and a library that ships at 38 KB gzipped does not want 20 MB of
  * research in its history.
  *
- * So they are resolved rather than vendored. The default is where the spec
- * actually lives — `../plans/fx-refs`, beside `paperlab-fx-plan.md` — and
- * `PAPERLAB_FX_REFS` overrides it for anyone whose checkout is somewhere
+ * So they are resolved rather than vendored. The default is `../plans/fx-refs`,
+ * beside the checkout, and `PAPERLAB_FX_REFS` overrides it for anyone whose checkout is somewhere
  * else. Nothing here fetches anything; if the directory is not there, the
  * things that need it say so in one sentence rather than rendering a page of
  * broken images.
@@ -37,5 +34,5 @@ export function fireRefsDir() {
 /** The one sentence to print when they are missing. */
 export const NO_REFS =
   `the fire references are not at ${resolve(fxRefsDir(), 'fire')}.\n` +
-  'They live beside paperlab-fx-fire-spec.md — set PAPERLAB_FX_REFS to the fx-refs\n' +
+  'They live outside this repo — set PAPERLAB_FX_REFS to the fx-refs\n' +
   'directory that holds them.'

@@ -79,7 +79,7 @@ export class Match {
    * sheet's edge could not turn into a match half way. The grab went with the
    * rest of the gestures, and the latch stayed behind doing harm — it made
    * the sheet, the one place anyone aims a match, the one place a match would
-   * not light (Noor, 2026-09-13: "the sensitivity is bad").
+   * not light.
    */
   private blownOut = false
   /** What the breath read when this match lit — see {@link BLOW_RISE}. */

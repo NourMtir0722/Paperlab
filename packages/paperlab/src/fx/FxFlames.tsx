@@ -16,7 +16,7 @@ export interface FxFlamesProps {
   quality?: FxQualityTier
   /**
    * The air, world units a second — pass the particle pool's `wind`, which is
-   * read every frame. Flames lean away from it and shorten (§10.6).
+   * read every frame. Flames lean away from it and shorten.
    */
   wind?: readonly [number, number, number]
 }
@@ -25,8 +25,8 @@ export interface FxFlamesProps {
  * The flames of a burn: separate tongues of burning gas, standing just off
  * the char, rising straight up whatever the sheet is doing.
  *
- * `paperlab-fx-fire-spec.md` §6. Each tongue is a quad that turns to face the
- * camera about WORLD up — never the sheet's normal (§13.9) — so a flame on a
+ * Each tongue is a quad that turns to face the
+ * camera about WORLD up — never the sheet's normal — so a flame on a
  * sheet held flat still rises to the ceiling. The shader is upward-scrolling,
  * domain-warped noise inside a teardrop, coloured on the flame's own
  * blackbody ramp: a dim indigo root, a yellow-white core, orange edges and

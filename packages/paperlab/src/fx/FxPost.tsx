@@ -22,7 +22,7 @@ export interface FxPostProps {
   threshold?: number
   /**
    * The burning field, and where its sheet is — for the heat haze above its
-   * flames and the frame's warm grade as it grows (§7). Leave both out and
+   * flames and the frame's warm grade as it grows. Leave both out and
    * the pass is bloom and the tone curve alone.
    */
   field?: DamageField

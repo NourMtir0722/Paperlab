@@ -95,7 +95,7 @@ describe('the fire emitter', () => {
     //
     // This used to assert char at the spawn for both, and passed only because
     // a fire spreading six times too fast had charred a wide enough band that
-    // 19 mm up was still inside it. With the band at 5 mm (§5 wants 2–8) the
+    // 19 mm up was still inside it. With the band at 5 mm (a real one is 2–8) the
     // lift clears it, and the assertion was measuring the fire's SIZE while
     // claiming to measure where embers come from.
     const smoke = pool.spawns.filter((s) => s.name === 'smoke')
@@ -119,7 +119,7 @@ describe('the fire emitter', () => {
   })
 
   it('throws embers off the burn front, a light thread of smoke, and none when told none', () => {
-    // The default rates are Noor's tune (2026-09-13): the simulator's smoke
+    // The default rates are the lab's tune: the simulator's smoke
     // is the main smoke, and these puffs a light thread beside it. A rate of
     // 0 still has to mean none — the switch a sheet with clean air needs.
     expect(burning(2).pool.countOf('ember')).toBeGreaterThan(0)
