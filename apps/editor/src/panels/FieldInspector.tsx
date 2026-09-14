@@ -49,7 +49,7 @@ export function FieldInspector() {
       isSheet
         ? // The count is derived (rows × columns) and motion is disabled, so
           // both levers are gone — leave one line explaining why.
-          note('sheetNote', 'static sheet — rows × columns set the count; interaction states drive motion')
+          note('sheetNote', 'static sheet: rows × columns set the count, and interaction states drive motion')
         : num('papers', field.count, { min: 2, max: 80, step: 1 }, (v) => patchField({ count: v })),
     ]),
     ...(isSheet
@@ -116,7 +116,7 @@ export function FieldInspector() {
         note(
           'zonesNote',
           field.zones.length === 0
-            ? 'A target a paper can be dropped onto — give it a rectangle, and say which presets it accepts.'
+            ? 'A spot a paper can be dropped onto. Give it a rectangle, and say which presets it accepts.'
             : 'Each zone is a rectangle in the scene. `accept` filters which papers it will take.',
         ),
         button('Add a drop zone', () => addZone(), 'addZone'),

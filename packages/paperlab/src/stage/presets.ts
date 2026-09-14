@@ -229,7 +229,7 @@ export const stagePresets: Record<string, StagePreset> = {
   archive: {
     id: 'archive',
     label: 'Archive',
-    description: 'Narrow strips packed tight — a corridor of records you edge through.',
+    description: 'Narrow strips packed tight, a corridor of records you edge through.',
     stage: {
       path: walks.bend,
       // Far enough back that the figure reads as small; a `low` camera

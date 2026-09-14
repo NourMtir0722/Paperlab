@@ -104,7 +104,7 @@ const FACE_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 
 /** What to say when the setup step has not been run. */
-const MISSING_ASSETS = 'the tracker’s wasm is not in apps/editor/.hands — run `pnpm hands:setup`'
+const MISSING_ASSETS = 'the tracker’s wasm is not in apps/editor/.hands. Run `pnpm hands:setup`'
 
 async function assetsPresent(): Promise<boolean> {
   try {
@@ -959,7 +959,7 @@ function App() {
           <p className="rail-caption">
             {status === 'live'
               ? sawLighter
-                ? 'A flame in the frame — hold it to the paper.'
+                ? 'A flame in the frame. Hold it to the paper.'
                 : blowReady
                   ? 'Blow to put it out.'
                   : 'Loading the face model, for blowing it out…'
@@ -1011,7 +1011,7 @@ function App() {
         {sawLighter && (
           <div className="banner" role="status">
             <span className="dot" aria-hidden="true" />
-            Fire detected — the paper is catching
+            Fire detected. The paper is catching
           </div>
         )}
         <Feedback context={() => ({ page: 'hands' })} />
@@ -1023,7 +1023,9 @@ function App() {
           <h2>How to light it</h2>
           <ol className="how-to">
             <li>Start the camera.</li>
-            <li>Hold a real flame up to it — a lighter, a match. The sheet catches where the flame is.</li>
+            <li>
+              Hold a real flame up to it, like a lighter or a match. The sheet catches where the flame is.
+            </li>
             <li>No lighter? Pinch and hold still in the air: that is a match. Touch it to the paper.</li>
             <li>
               Blow at the camera to put it out. Blow hard and the whole burn goes out, leaving the edge to
@@ -1038,7 +1040,7 @@ function App() {
             <dt>Flame</dt>
             <dd>{sawLighter ? 'detected' : 'none'}</dd>
             <dt>Blowing</dt>
-            <dd>{status !== 'live' ? '—' : blowReady ? 'ready' : 'loading…'}</dd>
+            <dd>{status !== 'live' ? 'off' : blowReady ? 'ready' : 'loading…'}</dd>
             <dt>Sheet</dt>
             <dd>{burnt ? 'burnt' : 'untouched'}</dd>
           </dl>

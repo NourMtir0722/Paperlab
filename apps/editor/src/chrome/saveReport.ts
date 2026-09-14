@@ -27,7 +27,7 @@ export function reportSave(outcome: SaveOutcome): void {
   if (storage === 'session-only') {
     void confirmDialog({
       title: 'Saved, but not to disk',
-      message: `"${name}" is live and editable, but this browser's storage is full — it will not survive a reload. Download the .paper file to keep it.`,
+      message: `"${name}" is open and editable, but this browser's storage is full, so it will not survive a reload. Download the .paper file to keep it.`,
       confirmLabel: 'Download .paper',
     }).then((ok) => {
       if (ok) downloadPreset(name, config)
@@ -35,7 +35,7 @@ export function reportSave(outcome: SaveOutcome): void {
   } else if (storage === 'thumbnails-dropped') {
     // Not worth a dialog: nothing was lost but the pictures on the preset
     // list, and they are regenerated on the next save that fits.
-    toast(`Saved "${name}" — storage is nearly full, so preset thumbnails were dropped`, 'info')
+    toast(`Saved "${name}". Storage is nearly full, so preset thumbnails were dropped`, 'info')
   } else {
     toast(`Saved "${name}"`, 'success')
   }

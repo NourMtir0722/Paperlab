@@ -64,8 +64,7 @@ function PaperStatesBar() {
       <p className="states-bar-label">
         States
         <span className="states-bar-hint">
-          {' '}
-          — pick one, then edit; changes record as that state&rsquo;s diff on Rest.
+          : pick one, then edit it. Changes are saved as that state&rsquo;s differences from Rest.
         </span>
       </p>
       <div className="states-chips">
@@ -80,7 +79,7 @@ function PaperStatesBar() {
               onClick={() => setEditingState(name === 'rest' ? null : name)}
               title={
                 name === 'rest'
-                  ? 'The base — every other state is a diff on it'
+                  ? 'The base. Every other state is saved as changes to it'
                   : `Edit the ${label(name)} state (edits record as overrides)`
               }
             >
@@ -184,8 +183,7 @@ function FieldStatesBar() {
       <p className="states-bar-label">
         States
         <span className="states-bar-hint">
-          {' '}
-          — edits land on this slot only, unless you send them to the preset.
+          : edits apply to this slot only, unless you send them to the preset.
         </span>
       </p>
       <div className="states-chips">

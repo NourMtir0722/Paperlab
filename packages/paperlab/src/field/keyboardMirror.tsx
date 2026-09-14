@@ -122,9 +122,8 @@ export function FieldKeyboardMirror({
           {paperLabel(slot, i)}
           {carrying?.slot === i && (
             <span aria-live="polite">
-              {' '}
-              — carrying; zone {controller.current?.zoneIds()[carrying.zoneIndex] ?? 'none'}; Enter places,
-              Escape returns
+              , carrying. Zone {controller.current?.zoneIds()[carrying.zoneIndex] ?? 'none'}. Enter places it,
+              Escape puts it back.
             </span>
           )}
         </button>

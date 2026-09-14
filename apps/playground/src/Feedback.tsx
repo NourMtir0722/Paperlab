@@ -163,8 +163,8 @@ export function Feedback({ link }: { link: () => string | null }) {
           >
             {view === 'choose' && (
               <>
-                <h2>Tell us something</h2>
-                <p>It goes straight to the person who makes Paperlab. No account needed.</p>
+                <h2>Tell me something</h2>
+                <p>It goes straight to me, Noor. No account needed.</p>
                 <div className="feedback-choices">
                   {CHOICES.map((c, i) => (
                     <button
@@ -205,7 +205,7 @@ export function Feedback({ link }: { link: () => string | null }) {
             {view === 'thanks' && (
               <>
                 <h2>Thank you</h2>
-                <p>It has been sent, and every one is read.</p>
+                <p>Sent. I read every one.</p>
               </>
             )}
           </div>

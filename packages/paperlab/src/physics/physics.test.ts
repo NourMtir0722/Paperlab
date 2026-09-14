@@ -322,7 +322,7 @@ describe('physics schema', () => {
         behavior: { type: 'peel' },
         physics: { type: 'strip' },
       }),
-    ).toThrow(/exclusive/)
+    ).toThrow(/cannot be used together/)
     // Idle presets compose with behaviors just fine.
     expect(() => paperConfigSchema.parse({ behavior: { type: 'fly' }, physics: 'tumble' })).not.toThrow()
   })

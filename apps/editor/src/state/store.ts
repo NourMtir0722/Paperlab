@@ -544,7 +544,7 @@ export const useEditor = create<EditorState>((set, get) => ({
     const trimmed = name.trim()
     if (!trimmed) return { ok: false, error: 'Preset needs a name.' }
     if (isBuiltinPreset(trimmed)) {
-      return { ok: false, error: `"${trimmed}" is a built-in — pick another name.` }
+      return { ok: false, error: `"${trimmed}" is a built-in preset. Pick another name.` }
     }
     const named = paperConfigSchema.parse({ ...config, meta: { ...config.meta, name: trimmed } })
     const stored: StoredPreset = {

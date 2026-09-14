@@ -66,7 +66,7 @@ export function resolveDeformerStack(
       const issue = parsed.error.issues[0]
       throw new Error(
         `[paperlab] deformers[${i}] ("${instance.type}"): ${
-          issue ? `${issue.path.join('.') || 'options'} — ${issue.message}` : 'invalid options'
+          issue ? `${issue.path.join('.') || 'options'}: ${issue.message}` : 'invalid options'
         }`,
       )
     }

@@ -36,13 +36,13 @@ const ROUTES: { id: Surface; label: string; href: string; title: string }[] = [
     label: 'Hands',
     href: `${SITE}hands/`,
     title:
-      'Set fire to the paper with your webcam — hold a lighter up to it, or pinch and hold still to strike a match',
+      'Set fire to the paper with your webcam. Hold a lighter up to it, or pinch and hold still to strike a match',
   },
   {
     id: 'fx-lab',
     label: 'FX Lab',
     href: `${SITE}fx-lab/`,
-    title: 'Effects on paper and every knob behind them — tune one and copy it out as JSON',
+    title: 'Effects on paper, with every setting behind them. Tune one and copy it out as JSON',
   },
 ]
 

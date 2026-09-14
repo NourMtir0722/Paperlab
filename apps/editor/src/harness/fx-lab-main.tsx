@@ -273,7 +273,7 @@ const FLAME_ZONE_NAMES: { zone: keyof FireZones; title: string; note: string }[]
   {
     zone: 'tip',
     title: 'Tip',
-    note: 'Where soot cools and burns off — dimmer, redder, tearing into tongues.',
+    note: 'Where soot cools and burns off: dimmer, redder, tearing into tongues.',
   },
 ]
 const FLAME_CONTROLS: {
@@ -1148,7 +1148,7 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'heat',
     name: 'the ember line',
-    why: 'heat drawn ONLY as beads on the cut, in HDR — flicker and crawl on the burn clock, cool down the blackbody ramp',
+    why: 'heat drawn ONLY as beads on the cut, in HDR. They flicker and crawl on the burn clock and cool down the blackbody ramp',
   },
   {
     key: 'presence',
@@ -1158,27 +1158,27 @@ const BUILT: { key: keyof Layers; name: string; why: string }[] = [
   {
     key: 'fluid',
     name: 'fire simulator',
-    why: 'FxFireFluid — gas from the rim burns where it has oxygen, rises on its heat, torn by turbulence and vorticity, cooling, leaving smoke',
+    why: 'FxFireFluid: gas from the rim burns where it has oxygen, rises on its heat, is torn by turbulence and vorticity, cools, and leaves smoke',
   },
   {
     key: 'light',
     name: 'fire light + glow-through',
-    why: 'FxFireLight — ~1900 K at the rim, as bright as the front is long, flickering with the flames',
+    why: 'FxFireLight: ~1900 K at the rim, as bright as the front is long, flickering with the flames',
   },
   {
     key: 'match',
     name: 'the match',
-    why: 'FxMatchFlame — the flame that lights it, held for as long as the script holds it, on the burn clock so it photographs the same twice',
+    why: 'FxMatchFlame: the flame that lights it, held for as long as the script holds it, on the burn clock so it photographs the same twice',
   },
   {
     key: 'wisps',
     name: 'smoulder wisp',
-    why: 'FxWisps — a pale thread from a glowing bead once the flames are out, S-curving as it climbs',
+    why: 'FxWisps: a pale thread from a glowing bead once the flames are out, S-curving as it climbs',
   },
   {
     key: 'saturation',
     name: 'wet',
-    why: 'nothing in this script wets the sheet — the channel is here because the field carries it',
+    why: 'nothing in this script wets the sheet. The channel is here because the field carries it',
   },
   {
     key: 'embers',
@@ -1692,7 +1692,7 @@ function Lab() {
                     'bloom',
                     bloom,
                     (on) => post && setBloom(on),
-                    'Bloom — paper never blooms, embers do',
+                    'Bloom: paper never blooms, embers do',
                   ),
                 ],
                 'wide',
@@ -1752,7 +1752,7 @@ function Lab() {
         {savedState !== 'defaults' && (
           <p className="rail-notice">
             {savedState === 'stale'
-              ? 'A tune saved in this browser was set aside — the defaults have changed since it was saved. This is what the library ships.'
+              ? 'A tune saved in this browser was set aside because the defaults have changed since it was saved. This is what the library ships.'
               : 'Showing a tune saved in this browser, not the shipped defaults. The reset at the bottom of Tune goes back to them.'}
           </p>
         )}
@@ -1806,7 +1806,7 @@ function Lab() {
           onChange={(e) => jump(Number(e.target.value))}
         />
         <span className="transport-time">
-          {shown.toFixed(2)}s of {plan.duration.toFixed(1)}s · {near ? near.id : '—'}
+          {shown.toFixed(2)}s of {plan.duration.toFixed(1)}s{near ? ` · ${near.id}` : ''}
         </span>
         <div className="segmented">
           <button type="button" onClick={() => setSpeed(1)} aria-pressed={speed === 1}>
@@ -1875,7 +1875,7 @@ function LabExport({ settings }: { settings: LabSettings }) {
       window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, stamp: DEFAULTS_STAMP }))
       flash('save')
     } catch {
-      toast('This browser would not save it — copy it instead.', 'error')
+      toast('This browser would not save it. Copy it instead.', 'error')
     }
   }
 
@@ -1889,7 +1889,7 @@ function LabExport({ settings }: { settings: LabSettings }) {
           <p className="export-group">This tune</p>
           <button type="button" className="export-primary" onClick={copy}>
             <strong>Copy settings</strong>
-            <span>JSON — send it over and it becomes the default</span>
+            <span>as JSON. Send it to me and it can become the default</span>
             {done === 'copy' && <span className="copied-badge">Copied ✓</span>}
           </button>
           <div className="export-secondary">
@@ -1901,7 +1901,7 @@ function LabExport({ settings }: { settings: LabSettings }) {
           </div>
           {fallback && (
             <>
-              <p className="export-note">The clipboard is blocked here — copy it from the box.</p>
+              <p className="export-note">The clipboard is blocked here. Copy it from the box.</p>
               <textarea className="export-fallback" readOnly rows={8} value={fallback} />
             </>
           )}
@@ -1981,7 +1981,7 @@ function Tune({
         slider('ash', burn.ash, { min: 0, max: 3, step: 0.05 }, 'Ash off the cooling edge', (v) =>
           setBurn({ ash: v }),
         ),
-        toggle('smoke', burn.smoke, (smoke) => setBurn({ smoke }), 'Smoke — off keeps the background clean'),
+        toggle('smoke', burn.smoke, (smoke) => setBurn({ smoke }), 'Smoke (off keeps the background clean)'),
       ]),
       button('Reset burn', () => onChange({ ...settings, burn: DEFAULT_SETTINGS.burn })),
     ]),
@@ -2110,7 +2110,7 @@ function Tune({
                 'threshold',
                 settings.threshold,
                 { min: 1, max: 6, step: 0.05 },
-                'Bloom starts at (a correctness constant — below ~1.6 paper blooms)',
+                'Bloom starts at (a correctness constant: below ~1.6 paper blooms)',
                 (v) => onChange({ ...settings, threshold: v }),
               ),
             ]
@@ -2158,8 +2158,8 @@ function Tune({
     <>
       <div className="rail-body">
         <p className="rail-caption">
-          Every layer of the burn, live. When a combination looks right, Export copies it — send it over and
-          it becomes the default.
+          Every layer of the burn, live. When a combination looks right, Export copies it. Send it to me and
+          it can become the default.
         </p>
       </div>
       <Panel controls={controls} />
@@ -2178,7 +2178,7 @@ function Reference({ name }: { name: string }) {
   if (missing) {
     return (
       <p className="lab-missing">
-        <code>{name}</code> did not load. The reference stills live outside this repo — set{' '}
+        <code>{name}</code> did not load. The reference stills live outside this repo. Set{' '}
         <code>PAPERLAB_FX_REFS</code> to the <code>fx-refs</code> directory that holds them and restart the
         dev server.
       </p>

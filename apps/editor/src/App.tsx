@@ -143,7 +143,7 @@ export function App() {
     // An opened link that could not be stored is still worth warning about —
     // it is someone else's paper, and losing it means going back for the URL.
     if (outcome.storage === 'stored') {
-      toast(`Opened "${outcome.name}" — it's yours to edit now`, 'success')
+      toast(`Opened "${outcome.name}". It's yours to edit now`, 'success')
     } else {
       reportSave(outcome)
     }
@@ -168,7 +168,7 @@ export function App() {
           !v
             ? 'Preset needs a name.'
             : isBuiltinPreset(v)
-              ? `"${v}" is a built-in — pick another name.`
+              ? `"${v}" is a built-in preset. Pick another name.`
               : null,
       })
       if (!name) return
@@ -192,7 +192,7 @@ export function App() {
         title: 'Too big for a link',
         message:
           attempt.reason === 'uploaded-image'
-            ? 'This paper carries an uploaded image. A picture cannot travel in a URL, but the .paper file carries it — download that and send it instead.'
+            ? 'This paper has an uploaded image. A picture cannot travel in a link, but the .paper file can carry it. Download that and send it instead.'
             : `This paper needs about ${Math.round(attempt.length / 1000)}KB and a link holds ${Math.round(MAX_SHARE_LENGTH / 1000)}KB. Shorten the text, or download the .paper file and send that instead.`,
         confirmLabel: 'Download .paper',
       }).then((ok) => {
@@ -201,7 +201,7 @@ export function App() {
       return
     }
     void navigator.clipboard.writeText(attempt.url)
-    toast('Link copied — anyone who opens it gets an editable copy', 'success')
+    toast('Link copied. Anyone who opens it gets their own copy to edit', 'success')
   }
 
   /**
@@ -557,7 +557,7 @@ export function App() {
       ) : (
         <footer className="transport">
           <span className="transport-hint">
-            field mode — {field.count} papers, one draw call · GPU deformers
+            field mode · {field.count} papers, one draw call · GPU deformers
           </span>
         </footer>
       )}

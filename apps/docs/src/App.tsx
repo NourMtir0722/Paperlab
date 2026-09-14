@@ -91,7 +91,7 @@ export function App() {
         <footer>
           <p>
             Everything on this page is rendered by the same build of the library it documents, and the
-            catalogues are read from its registries — so if it is listed here, it exists.
+            catalogues are read from its registries. So if it is listed here, it exists.
           </p>
         </footer>
       </main>
@@ -156,8 +156,8 @@ export function Hero() {
             <code>&lt;PaperStage&gt;</code>
           </h4>
           <p>
-            Paper as architecture — banners along a walk you move through. Bind it to scroll and the page
-            walks the space.
+            Paper as architecture: banners along a walk you move through. Bind it to scroll and the page walks
+            the space.
           </p>
         </div>
       </div>
@@ -169,8 +169,8 @@ export function Hero() {
       </p>
 
       <p className="note">
-        Want to feel it rather than read it? <a href="../hands/">Set fire to the paper with your hands</a> —
-        hold a lighter up to the webcam and the sheet catches where the flame is, or pinch and hold still to
+        Want to feel it rather than read it? <a href="../hands/">Set fire to the paper with your hands</a>.
+        Hold a lighter up to the webcam and the sheet catches where the flame is, or pinch and hold still to
         strike a match, then blow it out. It needs a camera and it asks first; the video never leaves your
         machine. Every knob behind the burn is in <a href="../fx-lab/">the FX Lab</a>.
       </p>
@@ -185,27 +185,27 @@ function Pitfalls() {
       <p className="lede">Check these before debugging anything else.</p>
       <ol className="pitfalls">
         <li>
-          <strong>Blank canvas</strong> — the parent container has no height. <code>&lt;Paper&gt;</code> fills
+          <strong>Blank canvas.</strong> The parent container has no height. <code>&lt;Paper&gt;</code> fills
           its parent, and a parent of zero height gives you a canvas of zero height. This is the classic React
           Three Fiber bug and it is almost always this.
         </li>
         <li>
-          <strong>Text missing on the first frame</strong> — fonts load asynchronously. Paperlab waits for{' '}
+          <strong>Text missing on the first frame.</strong> Fonts load asynchronously. Paperlab waits for{' '}
           <code>document.fonts.ready</code> internally, so give it a beat before you screenshot it.
         </li>
         <li>
-          <strong>A zod error on cloth</strong> — <code>physics: 'cloth'</code> and <code>behavior</code>{' '}
+          <strong>A zod error on cloth.</strong> <code>physics: 'cloth'</code> and <code>behavior</code>{' '}
           together are rejected by design. Cloth owns the vertices; pick one.
         </li>
         <li>
-          <strong>Nothing moves</strong> — the visitor may have <code>prefers-reduced-motion: reduce</code>{' '}
+          <strong>Nothing moves.</strong> The visitor may have <code>prefers-reduced-motion: reduce</code>{' '}
           set, which freezes behaviors at their configured pose and disables physics and entrances. That is
           correct behaviour. Override per instance with <code>reducedMotion=&#123;false&#125;</code> only when
           you have a real reason.
         </li>
         <li>
-          <strong>No WebGL</strong> — a flat DOM fallback renders automatically. Don't build your own. There
-          is also a hidden DOM mirror of the content on every paper, which makes a cheap assertion target in
+          <strong>No WebGL.</strong> A flat DOM fallback renders automatically. Don't build your own. There is
+          also a hidden DOM mirror of the content on every paper, which makes a cheap assertion target in
           end-to-end tests.
         </li>
       </ol>

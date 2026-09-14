@@ -19,10 +19,16 @@ export interface ExportFrame {
 }
 
 export const EXPORT_FRAMES: readonly ExportFrame[] = [
-  { id: 'square', label: 'Square', hint: '1:1 — a post', width: 1600, height: 1600 },
-  { id: 'portrait', label: 'Portrait', hint: '4:5 — the tallest a feed allows', width: 1600, height: 2000 },
-  { id: 'story', label: 'Story', hint: '9:16 — full screen on a phone', width: 1080, height: 1920 },
-  { id: 'wide', label: 'Wide', hint: '16:9 — a slide, a README, a site hero', width: 1920, height: 1080 },
+  { id: 'square', label: 'Square', hint: '1:1, for a post', width: 1600, height: 1600 },
+  { id: 'portrait', label: 'Portrait', hint: '4:5, the tallest a feed allows', width: 1600, height: 2000 },
+  { id: 'story', label: 'Story', hint: '9:16, full screen on a phone', width: 1080, height: 1920 },
+  {
+    id: 'wide',
+    label: 'Wide',
+    hint: '16:9, for a slide, a README or a site hero',
+    width: 1920,
+    height: 1080,
+  },
 ]
 
 /**

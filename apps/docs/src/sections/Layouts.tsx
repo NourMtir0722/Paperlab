@@ -26,14 +26,14 @@ const NOTE: Record<string, string> = {
   fan: 'Held cards, splayed from one corner.',
   spread: 'Laid out flat, side by side, like prints on a table.',
   pile: 'Dropped in a stack, each sheet a little off true.',
-  rack: 'A magazine rack — overlapping, front-facing, leaning back.',
+  rack: 'A magazine rack: overlapping, front-facing, leaning back.',
   wall: 'A grid, hung. The gallery.',
   spill: 'Knocked over and scattered across the floor.',
   sweep: 'A long arc, as if fanned across a desk in one motion.',
   book: 'Bound at a spine, pages opening.',
-  accordion: 'Concertina-folded — one continuous strip zig-zagging.',
+  accordion: 'Concertina-folded: one continuous strip zig-zagging.',
   colonnade: 'Banners hung down an avenue. The one built to arrange along a walk.',
-  sheet: 'Rows and columns on a shared backing — a block of stamps.',
+  sheet: 'Rows and columns on a shared backing, like a block of stamps.',
 }
 
 export function Layouts() {
@@ -42,9 +42,9 @@ export function Layouts() {
       <h2>Layouts</h2>
       <p className="lede">
         <code>&lt;PaperField&gt;</code> renders many sheets in a single instanced draw call. The layout
-        decides where each one goes — and sets a per-sheet <em>bias</em>, so one draw call can still bend
-        every sheet differently. Layouts receive the field's sheet size, so the contact ones arrange by real
-        edges rather than guesses.
+        decides where each one goes, and sets a per-sheet <em>bias</em>, so one draw call can still bend every
+        sheet differently. Layouts receive the field's sheet size, so the contact ones arrange by real edges
+        rather than guesses.
       </p>
 
       <div className="grid pair">
@@ -82,7 +82,7 @@ export function Layouts() {
 />`}
       />
       <p className="note">
-        Don't hand-place a camera for a field — <code>&lt;PaperField&gt;</code> fits its own to whatever the
+        Don't hand-place a camera for a field. <code>&lt;PaperField&gt;</code> fits its own to whatever the
         layout posed.
       </p>
     </section>

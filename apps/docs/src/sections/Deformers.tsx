@@ -22,13 +22,13 @@ const SHOW: Record<string, Record<string, unknown>> = {
 }
 
 const NOTE: Record<string, string> = {
-  roll: 'Winds the sheet onto a cylinder from one edge, arc-length exact — a rolled receipt is genuinely the same length of paper.',
+  roll: 'Winds the sheet onto a cylinder from one edge, with exact arc length, so a rolled receipt is truly the same length of paper.',
   curl: 'Lifts one corner and curls it back over itself.',
   bend: 'A gentle arc about the sheet’s centre. What keeps a print from reading as a rectangle.',
   fold: 'A hinge across the sheet, with a rounded crease rather than a mathematical one.',
-  wave: 'Travelling ripple. The only time-driven deformer — a stack containing it re-deforms every frame.',
+  wave: 'Travelling ripple. The only deformer driven by time, so a stack containing it re-deforms every frame.',
   drape: 'Hanging folds gathered along a pinned edge, irregular by design. What makes a banner a banner.',
-  crumple: 'An irregular network of creases with flat facets between them — paper that has been handled.',
+  crumple: 'An irregular network of creases with flat facets between them, like paper that has been handled.',
 }
 
 export function Deformers() {
@@ -38,8 +38,8 @@ export function Deformers() {
       <p className="lede">
         Underneath every behavior is a stack of these: pure vertex functions, applied in order, each one
         taking a flat sheet position and returning a bent one. A behavior is a curated bundle of them with
-        human names on top. You can skip the behavior and write the stack yourself — that is the Advanced
-        fork, and editing it in the editor forks the behavior for real.
+        human names on top. You can skip the behavior and write the stack yourself. That is the Advanced fork,
+        and editing it in the editor forks the behavior for real.
       </p>
       <p className="note">
         Every one ships <strong>twice</strong>: a JS implementation that runs the hero path on the CPU, and a
@@ -89,7 +89,7 @@ export function Deformers() {
 />`}
       />
       <p className="note">
-        Order is the whole thing — each deformer reads the position the one before it produced. Crush the flat
+        Order is the whole thing: each deformer reads the position the one before it produced. Crush the flat
         sheet, then curl the crushed sheet; the other way round would crease a curved sheet as if it were
         still flat. A raw stack overrides the preset’s <code>behavior</code> entirely.
       </p>

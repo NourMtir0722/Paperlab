@@ -40,7 +40,7 @@ class ModelBoundary extends Component<{ fallback: ReactNode; children: ReactNode
   componentDidCatch(error: unknown) {
     // A missing or malformed model is the app's to fix, and silence would
     // leave it looking like `figure.model` had simply done nothing.
-    console.warn('[paperlab] figure.model failed to load — using the capsule figure.', error)
+    console.warn('[paperlab] figure.model failed to load. Using the capsule figure.', error)
   }
 
   render() {

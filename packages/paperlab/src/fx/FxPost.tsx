@@ -64,7 +64,7 @@ function warnOnce(cause?: unknown) {
   if (warned) return
   warned = true
   console.warn(
-    '[paperlab/fx] Rendering without FxPost — fire will not bloom.\n' +
+    '[paperlab/fx] Rendering without FxPost, so fire will not bloom.\n' +
       'It needs two optional peers:\n' +
       '  npm i @react-three/postprocessing postprocessing\n' +
       'Leave <FxPost> out to go without it deliberately and silence this.',

@@ -13,9 +13,9 @@ export function Presets() {
     <section id="presets">
       <h2>Presets</h2>
       <p className="lede">
-        A preset is a whole paper — sheet, stock, content, behavior, surface — serialized as one JSON object.
-        It is the unit you save, share and export, and it is what <code>preset="name"</code> resolves. Every
-        one below is rendering live.
+        A preset is a whole paper (sheet, stock, content, behavior, surface) serialized as one JSON object. It
+        is the unit you save, share and export, and it is what <code>preset="name"</code> resolves. Every one
+        below is rendering live.
       </p>
 
       <div className="grid">
@@ -44,7 +44,7 @@ export function Presets() {
 
       <p className="note">
         A <code>.paper</code> file somebody sends you <em>is</em> one of these objects. <code>preset</code>{' '}
-        takes a name or a config, so import the JSON and pass it straight through — never expand it back into
+        takes a name or a config, so import the JSON and pass it straight through. Never expand it back into
         individual props.
       </p>
       <Snippet
