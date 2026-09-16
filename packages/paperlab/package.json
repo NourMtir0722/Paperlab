@@ -64,19 +64,19 @@
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "three-custom-shader-material": "^6.4.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.4"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@react-three/fiber": "^9.7.0",
     "@react-three/postprocessing": "^3.1.1",
-    "@types/react": "^19.2.18",
-    "@types/three": "^0.185.4",
+    "@types/react": "^19.3.0",
+    "@types/three": "^0.186.0",
     "gsap": "^3.12.0",
-    "postprocessing": "^6.36.0",
+    "postprocessing": "^6.39.5",
     "publint": "^0.3.24",
-    "react": "^19.2.8",
-    "three": "^0.185.1",
+    "react": "^19.3.0",
+    "three": "^0.186.0",
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
     "vitest": "^5.0.0"
