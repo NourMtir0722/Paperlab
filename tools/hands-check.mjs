@@ -160,14 +160,20 @@ const problems = []
 /**
  * Every origin the page reached for that was not its own.
  *
- * Exactly one is allowed, and which one is the whole point. The model WEIGHTS
- * come from Google because Google publishes no licence for them and hosting
+ * Two are allowed: the site analytics below, and the model host, which is
+ * the point. The model WEIGHTS come from Google because Google publishes no licence for them and hosting
  * them here would be redistribution under terms nobody can read. The wasm does
  * NOT — it is executable code in a page holding a camera stream, and it is
  * Apache-2.0, so it is served from our own origin. Anything else at all,
  * including MediaPipe's own telemetry endpoint, is a failure.
  */
 const MODEL_HOST = 'https://storage.googleapis.com'
+/**
+ * Site analytics, on every page. It is a script in the head, not a
+ * part of the tracker, and it never sees the camera: the CSP lets it load
+ * and send its page views, and nothing else gets through.
+ */
+const ANALYTICS_HOST = 'https://datafa.st'
 const offsite = new Set()
 page.on('request', (request) => {
   const url = request.url()
@@ -771,10 +777,10 @@ try {
     `moved only ${burnMoved}`,
   )
   check(capture.length === 0, 'no synthetic-pointer errors on the page', capture[0] ?? '')
-  const strangers = [...offsite].filter((origin) => origin !== MODEL_HOST)
+  const strangers = [...offsite].filter((origin) => origin !== MODEL_HOST && origin !== ANALYTICS_HOST)
   check(
     strangers.length === 0,
-    'the page reaches no third-party origin but the model host',
+    'the page reaches no third-party origin but the model host and analytics',
     strangers.join(', '),
   )
   // Named separately because it is the one that was actually happening, and a
