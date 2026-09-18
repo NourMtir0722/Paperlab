@@ -79,7 +79,7 @@
     "three": "^0.186.0",
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.1"
   },
   "author": "Noor Mtir",
   "homepage": "https://paperlab.nawwara.studio",
