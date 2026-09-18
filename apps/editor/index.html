@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The address here can carry a shared scene, and a page's full address is
+      the referrer the next page reads, analytics included. Origin only.
+    -->
+    <meta name="referrer" content="origin" />
     <title>Paperlab</title>
     <style>
       html,
@@ -81,11 +86,37 @@
         }
       }
     </style>
+    <!--
+      DataFast reports the whole address, and a shared link carries its paper
+      in it (?p=), text someone typed included. So the paper comes out of
+      the address before the tracker reads it, and goes back in once the
+      tracker has run or failed to load. That is still before the app reads
+      it: deferred scripts run in document order, and the app comes after.
+      The campaign tags (ref, utm_*) have been read by then too, so they are
+      dropped rather than carried into a link someone copies.
+    -->
+    <script>
+      ;(() => {
+        var url = new URL(window.location.href)
+        var clean = new URL(url)
+        clean.searchParams.delete('p')
+        var after = new URL(url)
+        Array.from(after.searchParams.keys())
+          .filter((key) => /^(ref|source|via|utm_\w+)$/.test(key))
+          .forEach((key) => after.searchParams.delete(key))
+        if (clean.href !== url.href) window.history.replaceState(window.history.state, '', clean)
+        window.__afterAnalytics = () => {
+          if (window.location.href !== after.href) window.history.replaceState(window.history.state, '', after)
+        }
+      })()
+    </script>
     <script
       defer
       data-website-id="dfid_uU6pKnQTSOEqlp1IVWGQ4"
       data-domain="paperlab.nawwara.studio"
       src="https://datafa.st/js/script.js"
+      onload="__afterAnalytics()"
+      onerror="__afterAnalytics()"
     ></script>
   </head>
   <body>

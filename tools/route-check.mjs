@@ -27,10 +27,10 @@ if (!script) {
 }
 
 /** Runs the page's own script against a fake window and reports where it sent us. */
-function route({ search = '', hash = '', width = 1440, pointer = 'fine' }) {
+function route({ search = '', hash = '', width = 1440, pointer = 'fine', referrer = '' }) {
   let destination = null
   const window = {
-    location: { search, hash, replace: (url) => (destination = url) },
+    location: { search, hash, hostname: 'paperlab.nawwara.studio', replace: (url) => (destination = url) },
     matchMedia: (query) => ({
       matches: query.includes('min-width: 1024px')
         ? width >= 1024
@@ -39,7 +39,7 @@ function route({ search = '', hash = '', width = 1440, pointer = 'fine' }) {
           : false,
     }),
   }
-  new Function('window', script[1])(window)
+  new Function('window', 'document', script[1])(window, { referrer })
   return destination
 }
 
@@ -62,13 +62,25 @@ const cases = [
   ['a shared sculpt opens in the editor', { search: '?p=abc', width: 1440 }, '/editor/?p=abc'],
   ['the hash survives the hop', { search: '?s=xyz', hash: '#top', width: 1440 }, '/playground/?s=xyz#top'],
 
-  // A campaign tag is not a share link, so the device still decides.
-  ['utm does not look like a share', { search: '?utm_source=x', width: 1440 }, '/editor/'],
+  // A campaign tag is not a share link, so the device still decides. But it
+  // rides along: the analytics read it on the page this sends people to.
+  ['utm does not look like a share', { search: '?utm_source=x', width: 1440 }, '/editor/?utm_source=x'],
   [
     'utm on a phone still routes by device',
     { search: '?utm_source=x', width: 390, pointer: 'coarse' },
-    '/playground/',
+    '/playground/?utm_source=x',
   ],
+  ['anything else is left behind', { search: '?junk=1', width: 1440 }, '/editor/'],
+
+  // The redirect makes the root the referrer, so the real one is handed on.
+  ['the referrer is handed on', { referrer: 'https://t.co/abc', width: 1440 }, '/editor/?ref=t.co'],
+  [
+    'and joins a shared scene',
+    { search: SCENE, hash: '#top', referrer: 'https://t.co/abc', width: 1440 },
+    `/playground/${SCENE}&ref=t.co#top`,
+  ],
+  ['a campaign tag outranks it', { search: '?ref=hn', referrer: 'https://t.co/abc', width: 1440 }, '/editor/?ref=hn'],
+  ['the site itself is not a source', { referrer: 'https://paperlab.nawwara.studio/docs/', width: 1440 }, '/editor/'],
 ]
 
 let failed = 0
