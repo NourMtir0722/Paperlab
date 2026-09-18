@@ -138,9 +138,11 @@
           tags.set('ref', referrer)
         }
         if ([...tags.keys()].length) {
-          var query = new URLSearchParams(tail.split('#')[0])
-          tags.forEach((value, key) => query.set(key, value))
-          tail = '?' + query + (tail.includes('#') ? tail.slice(tail.indexOf('#')) : '')
+          const query = new URLSearchParams(tail.split('#')[0])
+          tags.forEach((value, key) => {
+            query.set(key, value)
+          })
+          tail = `?${query}${tail.includes('#') ? tail.slice(tail.indexOf('#')) : ''}`
         }
 
         // Replace, not assign: back should leave the site, not bounce here.

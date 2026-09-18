@@ -79,8 +79,16 @@ const cases = [
     { search: SCENE, hash: '#top', referrer: 'https://t.co/abc', width: 1440 },
     `/playground/${SCENE}&ref=t.co#top`,
   ],
-  ['a campaign tag outranks it', { search: '?ref=hn', referrer: 'https://t.co/abc', width: 1440 }, '/editor/?ref=hn'],
-  ['the site itself is not a source', { referrer: 'https://paperlab.nawwara.studio/docs/', width: 1440 }, '/editor/'],
+  [
+    'a campaign tag outranks it',
+    { search: '?ref=hn', referrer: 'https://t.co/abc', width: 1440 },
+    '/editor/?ref=hn',
+  ],
+  [
+    'the site itself is not a source',
+    { referrer: 'https://paperlab.nawwara.studio/docs/', width: 1440 },
+    '/editor/',
+  ],
 ]
 
 let failed = 0

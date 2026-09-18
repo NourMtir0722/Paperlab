@@ -125,7 +125,9 @@
         var after = new URL(url)
         Array.from(after.searchParams.keys())
           .filter((key) => /^(ref|source|via|utm_\w+)$/.test(key))
-          .forEach((key) => after.searchParams.delete(key))
+          .forEach((key) => {
+            after.searchParams.delete(key)
+          })
         if (clean.href !== url.href) window.history.replaceState(window.history.state, '', clean)
         window.__afterAnalytics = () => {
           if (window.location.href !== after.href) window.history.replaceState(window.history.state, '', after)
