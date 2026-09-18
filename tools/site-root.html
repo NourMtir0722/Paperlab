@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      The address here can carry a shared scene, and a page's full address is
+      the referrer the next page reads, analytics included. Origin only.
+    -->
+    <meta name="referrer" content="origin" />
     <title>Paperlab — physical paper as a React component</title>
     <meta name="description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
 
@@ -113,6 +118,31 @@
         } else {
           target = roomy && precise ? '/editor/' : '/playground/'
           tail = ''
+        }
+
+        // The analytics live on the page this sends people to, and a
+        // scripted redirect leaves THIS page as the referrer there, so every
+        // visit would read as coming from the site itself. The campaign tags
+        // are kept across the hop, and where there are none the real
+        // referrer is handed on as ?ref=, which DataFast reads as the source.
+        var from = new URLSearchParams(search)
+        var tags = new URLSearchParams()
+        from.forEach((value, key) => {
+          if (/^(ref|source|via|utm_\w+)$/.test(key)) tags.set(key, value)
+        })
+        var referrer = null
+        try {
+          referrer = document.referrer ? new URL(document.referrer).hostname : null
+        } catch (_) {}
+        if (referrer && referrer !== window.location.hostname && ![...tags.keys()].length) {
+          tags.set('ref', referrer)
+        }
+        if ([...tags.keys()].length) {
+          const query = new URLSearchParams(tail.split('#')[0])
+          tags.forEach((value, key) => {
+            query.set(key, value)
+          })
+          tail = `?${query}${tail.includes('#') ? tail.slice(tail.indexOf('#')) : ''}`
         }
 
         // Replace, not assign: back should leave the site, not bounce here.
