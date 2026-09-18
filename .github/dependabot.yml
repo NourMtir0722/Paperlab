@@ -19,6 +19,19 @@ updates:
           - minor
           - patch
     open-pull-requests-limit: 5
+    # React 19.3 is held back because @react-three/fiber 9.7.0 declares
+    # `react >=19 <19.3`, so a consumer on 19.3 gets ERESOLVE and cannot
+    # install paperlab at all (`test:consumer` catches it). Drop this ignore
+    # once fiber widens that range.
+    ignore:
+      - dependency-name: "react"
+        versions: [">=19.3.0"]
+      - dependency-name: "react-dom"
+        versions: [">=19.3.0"]
+      - dependency-name: "@types/react"
+        versions: [">=19.3.0"]
+      - dependency-name: "@types/react-dom"
+        versions: [">=19.3.0"]
 
   - package-ecosystem: github-actions
     directory: "/"
