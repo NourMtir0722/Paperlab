@@ -33,9 +33,9 @@
     "film": "node tools/fire-film.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
+    "@biomejs/biome": "^2.5.13",
     "@changesets/cli": "^3.0.2",
-    "knip": "^6.34.0",
+    "knip": "^6.35.1",
     "playwright": "1.63.0",
     "turbo": "^2.10.12"
   }

@@ -665,8 +665,6 @@ export const floorSchema = z.object({
   roughness: z.number().min(0).max(1).default(0.92),
 })
 
-export type FloorConfig = z.infer<typeof floorSchema>
-
 export const sceneSchema = z.object({
   lighting: z.enum(lightingNames).default('studio'),
   /** The ground under the sheet — see `floorSchema`. Off unless asked for. */
