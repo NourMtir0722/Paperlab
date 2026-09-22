@@ -70,7 +70,7 @@ const preset = getPreset(presetName)
 const papers = Array.from({ length: count }, () => ({ preset }))
 
 createRoot(document.getElementById('root')!).render(
-  <Canvas shadows camera={{ position: [0, 0.9, 6.4], fov: 45 }} dpr={1}>
+  <Canvas shadows="percentage" camera={{ position: [0, 0.9, 6.4], fov: 45 }} dpr={1}>
     <color attach="background" args={['#111014']} />
     <PaperLighting preset={preset.scene.lighting} floor={-2.4} scale={14} />
     <PaperFieldMesh

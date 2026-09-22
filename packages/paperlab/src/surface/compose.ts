@@ -17,6 +17,7 @@ import {
   translucencyUniforms,
   translucencyVertexChunk,
 } from './translucency'
+import { SKIN_GLSL } from '../mount/skin'
 
 /**
  * Surface effects are fragment-side chunks composed into ONE shader program
@@ -78,6 +79,18 @@ export interface SurfaceMaps {
    * always did: same chunks, same structure key, same alpha test.
    */
   hasDamage?: boolean
+  /**
+   * Cut to the content's alpha — `surface.dieCut`. Only meaningful with a
+   * front map, since the outline IS the front map's transparency.
+   */
+  dieCut?: boolean
+  /**
+   * The sheet is stuck to a skin with pores, and pressed into them: the
+   * mesh carries an `aAttach` attribute (1 stuck, 0 lifted) and its
+   * positions are in the host's space, so the shader reads the SAME pore
+   * field the object is drawn with — see `mount/skin.ts`.
+   */
+  press?: { amount: number; scale: number; depth: number } | null
 }
 
 const VERTEX = /* glsl */ `
@@ -86,6 +99,44 @@ ${TRANSLUCENCY_VARYINGS}
 void main() {
   vPaperUv = uv;
 ${translucencyVertexChunk({ model: 'modelMatrix', position: 'position', normal: 'normal' })}
+}
+`
+
+/** The vertex program for a pressed sheet: the same, plus where on the host it is and whether it is stuck. */
+const PRESS_VERTEX = VERTEX.replace(
+  'void main() {\n  vPaperUv = uv;',
+  'attribute float aAttach;\nvarying float vAttach;\nvarying vec3 vHostPos;\nvoid main() {\n  vPaperUv = uv;\n  vAttach = aAttach;\n  vHostPos = position;',
+)
+if (PRESS_VERTEX === VERTEX) throw new Error('compose: VERTEX changed shape — update PRESS_VERTEX')
+
+/**
+ * The die-cut, as a cutting chunk. The colour program already declares the
+ * front map; the shadow program does not, so it gets its own declaration.
+ */
+const DIECUT_FN = /* glsl */ `
+void plDieCut(inout vec4 color) {
+  color.a *= texture2D(uFrontMap, vPaperUv).a;
+}
+`
+const DIECUT_DEPTH_CHUNK = `uniform sampler2D uFrontMap;\n${DIECUT_FN}`
+
+/**
+ * The skin under the sticker, felt through it. Vinyl bridges the finest
+ * pits and sinks into the rest, so the relief is the skin's, shallower, and
+ * only where the sheet is still stuck down.
+ */
+const PRESS_CHUNK = /* glsl */ `
+varying float vAttach;
+varying vec3 vHostPos;
+uniform float uPress;
+uniform float uPoreScale;
+uniform float uPoreDepth;
+${SKIN_GLSL}
+void plPress() {
+  if (vAttach <= 0.001 || uPress <= 0.0) return;
+  // Subtracted: the paper's relief convention is the opposite sign of the
+  // skin's (see plSkinPerturb), and the pits have to be pits on both.
+  plHeight -= plSkinHeight(vHostPos, uPoreScale, uPoreDepth) * uPress * vAttach;
 }
 `
 
@@ -1091,6 +1142,19 @@ export function composeSurface(
     ...translucencyUniforms(surface.translucency ?? stock.translucency, lighting),
   }
   if (maps.hasFrontMap) uniforms.uFrontMap = { value: null }
+  const dieCut = Boolean(maps.dieCut && maps.hasFrontMap)
+  const press = maps.press ?? null
+  if (dieCut) {
+    chunks.push(DIECUT_FN)
+    calls.push('plDieCut(csm_DiffuseColor);')
+  }
+  if (press) {
+    chunks.push(PRESS_CHUNK)
+    calls.push('plPress();')
+    uniforms.uPress = { value: press.amount }
+    uniforms.uPoreScale = { value: press.scale }
+    uniforms.uPoreDepth = { value: press.depth }
+  }
   if (maps.hasBackMap) uniforms.uBackMap = { value: null }
 
   if (grain !== undefined || banding > 0) {
@@ -1187,6 +1251,10 @@ export function composeSurface(
     cutting.push(DAMAGE_CHUNK)
     cuts.push('plDamageCut(color, plDamageRead());')
   }
+  if (dieCut) {
+    cutting.push(DIECUT_DEPTH_CHUNK)
+    cuts.push('plDieCut(color);')
+  }
   const depth =
     cutting.length > 0
       ? {
@@ -1210,7 +1278,7 @@ void main() {
   // A burn has a shape too — blistered char, a lifted ash lip — and on an
   // untouched field its height is exactly zero, which `plPerturb` returns
   // unchanged, so attaching a field still costs a sheet no pixel.
-  const relief = grain !== undefined || creases.length > 0 || Boolean(maps.hasDamage)
+  const relief = grain !== undefined || creases.length > 0 || Boolean(maps.hasDamage) || Boolean(press)
 
   const frontExpr = maps.hasFrontMap ? 'texture2D(uFrontMap, vPaperUv).rgb' : 'uStockColor'
   // The back reads correctly when the sheet is flipped → mirror x. Adhesive
@@ -1257,13 +1325,15 @@ ${maps.hasDamage ? '  // The ember line — the only light a burn gives off from
       aging !== undefined ? 'a' : '',
       perforation ? 'p' : '',
       stock.adhesive ? 'A' : '',
+      dieCut ? 'x' : '',
+      press ? 'P' : '',
     ].join('')}:${maps.hasFrontMap ? 'F' : ''}${maps.hasBackMap ? 'B' : ''}${maps.hasDamage ? 'D' : ''}`,
-    vertexShader: VERTEX,
+    vertexShader: press ? PRESS_VERTEX : VERTEX,
     fragmentShader,
     uniforms,
     // Anything that removes paper needs fragments discarded rather than
     // blended — a hole has to cut the depth buffer and the shadow too.
-    alphaTest: deckle || perforation || maps.hasDamage ? 0.5 : 0,
+    alphaTest: deckle || perforation || maps.hasDamage || dieCut ? 0.5 : 0,
     depth,
   }
 }

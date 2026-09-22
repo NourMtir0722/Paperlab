@@ -213,7 +213,7 @@ function StageFrames() {
     <Canvas
       camera={{ position: [0, 1.7, 6], fov: 38, near: 0.05, far: 400 }}
       dpr={2}
-      shadows
+      shadows="percentage"
       gl={{ preserveDrawingBuffer: true }}
     >
       <color attach="background" args={['#0c0a0b']} />

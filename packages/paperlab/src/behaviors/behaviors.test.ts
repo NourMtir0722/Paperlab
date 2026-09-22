@@ -29,6 +29,7 @@ describe('behavior registry', () => {
       'crumple',
       'settle',
       'ribbon',
+      'sticker',
     ])
   })
 

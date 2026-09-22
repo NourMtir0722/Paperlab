@@ -42,10 +42,20 @@ export function shotsDir() {
  * and let the caller fail later, somewhere less informative.
  */
 export async function startApp(app, port, { timeoutMs = 30_000 } = {}) {
-  const server = spawn('pnpm', ['--filter', `@paperlab/${app}`, 'exec', 'vite', '--port', String(port)], {
-    stdio: 'pipe',
-    cwd: root,
-  })
+  // --strictPort, or the port is a suggestion. Vite takes the next free one
+  // when the asked-for port is held, and the wait below then polls the port it
+  // asked for, finds a LEFTOVER server from an earlier run answering there, and
+  // drives that instead. A harness silently pointed at stale code is worse than
+  // one that will not start: `pnpm test:parity` spent weeks reputed to hang on
+  // a laptop because of exactly this. Now Vite exits and the log says why.
+  const server = spawn(
+    'pnpm',
+    ['--filter', `@paperlab/${app}`, 'exec', 'vite', '--port', String(port), '--strictPort'],
+    {
+      stdio: 'pipe',
+      cwd: root,
+    },
+  )
 
   // Vite's own output is the only diagnostic when the server refuses to
   // start — a port already held, a config that does not parse — so keep it

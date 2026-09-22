@@ -12,6 +12,7 @@ import { flightOptionsSchema } from '../behaviors/flight'
 import { crumpleBehaviorOptionsSchema } from '../behaviors/crumple'
 import { settleOptionsSchema } from '../behaviors/settle'
 import { ribbonOptionsSchema } from '../behaviors/ribbon'
+import { stickerOptionsSchema } from '../behaviors/sticker'
 
 /**
  * The zod schema is the single source of truth: it validates the public API,
@@ -351,9 +352,26 @@ export const surfaceSchema = z.object({
         .default({}),
     })
     .optional(),
+  /**
+   * Cut to the shape of the picture: the sheet keeps only what the content
+   * covers, plus a margin of backing round it — a die-cut sticker.
+   *
+   * The outline comes from the content's own transparency, so a logo on a
+   * transparent ground is a logo-shaped sticker, and a photograph (which has
+   * none) is a rectangle with a border. The margin is the white vinyl a
+   * sticker is cut with, in world units so it is the same width on a small
+   * sticker as on a big one.
+   */
+  dieCut: z
+    .object({
+      margin: z.number().min(0).max(0.2).default(0.022),
+      color: z.string().default('#ffffff').describe('color'),
+    })
+    .optional(),
 })
 
 export type SurfaceConfig = z.infer<typeof surfaceSchema>
+export type DieCutConfig = NonNullable<SurfaceConfig['dieCut']>
 export type SurfaceConfigInput = z.input<typeof surfaceSchema>
 export type PaperEdge = (typeof paperEdges)[number]
 
@@ -431,6 +449,7 @@ export const behaviorConfigSchema = z.discriminatedUnion('type', [
   crumpleBehaviorOptionsSchema.extend({ type: z.literal('crumple') }),
   settleOptionsSchema.extend({ type: z.literal('settle') }),
   ribbonOptionsSchema.extend({ type: z.literal('ribbon') }),
+  stickerOptionsSchema.extend({ type: z.literal('sticker') }),
 ])
 
 export type BehaviorConfig = z.infer<typeof behaviorConfigSchema>
@@ -661,7 +680,7 @@ export const floorSchema = z.object({
    * cannot land through the thing its shadow is on.
    */
   y: z.number().min(-4).max(0).default(-1.05),
-  /** How rough it is, 0 mirror to 1 chalk. Slate, by default. */
+  /** How rough it is, 0 mirror to 1 chalk. Slate, by default. At 1 it has no highlight at all. */
   roughness: z.number().min(0).max(1).default(0.92),
 })
 
@@ -708,6 +727,88 @@ export type SceneConfig = z.infer<typeof sceneSchema>
 export type SceneConfigInput = z.input<typeof sceneSchema>
 export type LightingName = (typeof lightingNames)[number]
 export type FilmName = (typeof filmNames)[number]
+
+// ── Mount ────────────────────────────────────────────────────────────────────
+
+/** Where on the object something is stuck: around, up, and turned. */
+const placement = {
+  /** Degrees around the object's long axis, 0 facing the camera. */
+  azimuth: z.number().min(-180).max(180).default(0),
+  /** Degrees above the object's middle. */
+  elevation: z.number().min(-85).max(85).default(0),
+  /** Degrees turned about its own centre. */
+  roll: z.number().min(-180).max(180).default(0),
+}
+
+/**
+ * Another sticker already on the object — scenery for the one that peels.
+ *
+ * Stuck down for good: they wrap, take the skin's texture and cast nothing,
+ * and they are there so the sticker you peel is one of a collection rather
+ * than alone on a bare object.
+ */
+export const mountStickerSchema = z.object({
+  /** An image with a transparent ground — a URL or an uploaded data URL. */
+  src: z.string().default(''),
+  width: z.number().min(0.05).max(3).default(0.4),
+  height: z.number().min(0.05).max(3).default(0.4),
+  ...placement,
+  /** The white vinyl round the art. */
+  margin: z.number().min(0).max(0.2).default(0.02),
+})
+
+export type MountStickerConfig = z.infer<typeof mountStickerSchema>
+
+export const mountObjectNames = ['lemon', 'model'] as const
+
+/**
+ * The thing the sheet is stuck to.
+ *
+ * Without one, a sheet floats in space — which is what paper does in every
+ * other preset. With one, the sheet is a sticker: laid onto the object's
+ * surface along geodesics so it hugs the curve, pressed into its texture
+ * while it is stuck, and every behavior worked out flat is carried onto the
+ * curve (`mount/wrap.ts`). A peel on a lemon is a peel on a table, wrapped.
+ *
+ * `lemon` is built, not loaded: the library ships no assets and fetches
+ * none. `model` is any glTF binary you host or upload, normalised to `size`.
+ */
+export const mountSchema = z.object({
+  object: z.enum(mountObjectNames).default('lemon'),
+  /** A .glb URL or data URL, when `object` is `model`. */
+  model: z.string().default(''),
+  /** The object's longest dimension, world units. */
+  size: z.number().min(0.2).max(10).default(1.7),
+  /** Degrees the object leans, about the axis toward the camera. */
+  tilt: z.number().min(-90).max(90).default(-12),
+  /** Degrees it is turned about its own long axis. */
+  spin: z.number().min(-180).max(180).default(0),
+  /** The peel's colour. Lemon only. */
+  color: z.string().default('#e8c62e').describe('color'),
+  /** How pitted the skin is. Lemon only. */
+  pores: z.number().min(0).max(1).default(0.65),
+  /** Where the sheet is stuck. */
+  ...placement,
+  elevation: z.number().min(-85).max(85).default(6),
+  roll: z.number().min(-180).max(180).default(-8),
+  /** How much of the surface shows up through the sheet while it is pressed down. */
+  press: z.number().min(0).max(1).default(0.22),
+  /**
+   * What the sheet leaves behind: the skin under it cleaner and glossier, and
+   * a trace of adhesive. The proof it was stuck.
+   */
+  reveal: z.number().min(0).max(1).default(0.7),
+  /**
+   * How hard the glue on the collection fights when you peel one by hand,
+   * 0..1 — the same stick-slip the `sticker` behavior's `tack` is.
+   */
+  tack: z.number().min(0).max(1).default(0.55),
+  /** The rest of the collection, stuck down round it — every one of them peelable. */
+  stickers: z.array(mountStickerSchema).max(16).default([]),
+})
+
+export type MountConfig = z.infer<typeof mountSchema>
+export type MountConfigInput = z.input<typeof mountSchema>
 
 // ── Interaction states ───────────────────────────────────────────────────────
 
@@ -795,6 +896,8 @@ export const paperConfigSchema = z
     onTwos: z.boolean().default(false),
     /** Interaction state machine — overrides-on-base diffs. */
     states: paperStatesSchema.optional(),
+    /** What the sheet is stuck to. Absent, it floats — see `mountSchema`. */
+    mount: mountSchema.optional(),
   })
   .superRefine((config, ctx) => {
     // Cloth HOSTS a shape: the sim writes the vertices, and the deformer
@@ -819,6 +922,16 @@ export const paperConfigSchema = z
         path: ['physics'],
         message:
           "the strip simulation and behavior/deformers cannot be used together. The roll owns the vertices, and its rows are chain nodes rather than the sheet's own grid (pick Shape OR Strip)",
+      })
+    }
+    // A sheet stuck to something is not also a simulation: both would claim
+    // the vertices, and the mount's claim is that the sheet is ON the object.
+    if (config.mount && typeof config.physics === 'object') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['mount'],
+        message:
+          'a mounted sheet cannot also be a cloth or strip simulation. It is stuck to the object (pick Mount OR a simulation)',
       })
     }
     // State overrides must stay serializable schema paths: merging them over

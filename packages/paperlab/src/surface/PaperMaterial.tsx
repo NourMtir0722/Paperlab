@@ -33,6 +33,8 @@ export interface PaperMaterialProps {
   creases?: CreaseShading[]
   /** Char, wet, heat and missing paper over the sheet's UV. See `DamageSource`. */
   damage?: DamageSource | null
+  /** Pressed into a pitted skin — see `SurfaceMaps.press`. The mesh must carry `aAttach`. */
+  press?: { amount: number; scale: number; depth: number } | null
 }
 
 /**
@@ -52,6 +54,7 @@ export function PaperMaterial({
   lighting = 'studio',
   creases,
   damage,
+  press,
 }: PaperMaterialProps) {
   const rig = useLightRig(lighting)
   const damageTextures = useDamageTexture(damage, sheet)
@@ -63,6 +66,8 @@ export function PaperMaterial({
       hasFrontMap: Boolean(texture),
       hasBackMap: Boolean(backTexture),
       hasDamage: Boolean(damageTextures),
+      dieCut: Boolean(surface.dieCut),
+      press: press ?? null,
     },
     sheet,
     rig,

@@ -70,6 +70,7 @@ const STRENGTH: Record<string, Record<string, unknown>> = {
   wave: { amplitude: 0.09, wavelength: 0.4, speed: 0.9, angle: 75 },
   drape: { amplitude: 0.3, folds: 6, falloff: 1.2, irregular: 0.5, gather: 0.6 },
   crumple: { amount: 0.75, scale: 3, pull: 0.4, seed: 2 },
+  lift: { angle: 135, front: 0.5, radius: 0.06, flap: 170, tension: 0.4 },
 }
 
 /** Build the sheet the way `<PaperMesh>` does, then deform it. */

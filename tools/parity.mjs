@@ -10,14 +10,31 @@ import { startApp } from './harness.mjs'
 const PORT = 5199
 const { base, stop } = await startApp('editor', PORT)
 
-// CI runners have no GPU; force software WebGL via SwiftShader.
+// Software WebGL via SwiftShader, everywhere. CI runners have no GPU, and
+// headless Chromium on a laptop often has none it will use either: without
+// these the harness page never finishes and the gate times out with nothing
+// to say, which is why it was reputed to be unrunnable locally. Forcing one
+// rasterizer also means a laptop and CI compare the same numbers.
 const browser = await chromium.launch({
-  args: process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 })
 try {
   const page = await browser.newPage()
   await page.goto(`${base}/parity.html`, { waitUntil: 'networkidle' })
-  await page.waitForFunction(() => window.__PARITY__ !== undefined, { timeout: 30_000 })
+  // The options go in the THIRD argument. waitForFunction takes (fn, arg,
+  // options), so an options object in the second slot is passed to the page as
+  // the function's argument and every setting in it is silently ignored — the
+  // old call read as a 30s default that no edit here could change.
+  //
+  // Poll on a timer rather than on animation frames, because the harness page
+  // runs its own render loop and starves a raf-polled wait: the results sat in
+  // the page while the wait timed out around them, which is why this gate has
+  // been unrunnable on a laptop. Software WebGL is slow, so the ceiling is
+  // generous.
+  await page.waitForFunction(() => window.__PARITY__ !== undefined, undefined, {
+    timeout: 120_000,
+    polling: 500,
+  })
   const parity = await page.evaluate(() => window.__PARITY__)
 
   if (parity.error) {

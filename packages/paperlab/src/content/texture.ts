@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { useEffect, useState } from 'react'
-import type { BackContentConfig, ContentConfig, SheetConfig } from '../config/schema'
+import type { BackContentConfig, ContentConfig, DieCutConfig, SheetConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
 import { paintReceipt } from './receipt'
 import { paintCard } from './card'
@@ -14,6 +14,8 @@ import { ensureFont, wrapLines } from './type'
  */
 const LONG_EDGE = 1024
 const DPR = 2
+/** How wide a die-cut margin is on the canvas the dilation is stamped on — see `paintDieCut`. */
+const DILATE_PX = 20
 
 export function contentCanvasSize(sheet: SheetConfig): [number, number] {
   const long = Math.max(sheet.width, sheet.height)
@@ -85,6 +87,88 @@ function paintText(
 }
 
 /**
+ * A die-cut sticker's face: the content on NO ground, then a margin of
+ * backing grown out from its silhouette and laid under it.
+ *
+ * The margin is a dilation, drawn as the silhouette stamped round a few rings
+ * of offsets — a canvas has no morphology operator, and a blur-and-threshold
+ * would round the inside corners of lettering that a real die keeps sharp.
+ *
+ * The stamping is done SMALL, with the margin about `DILATE_PX` wide, and the
+ * grown silhouette is scaled up under the art. The stamp count grows with the
+ * square of the margin in pixels, and at full resolution a small sticker's
+ * margin is a couple of hundred of them: the peeling-sticker preset spent
+ * 143,000 full-canvas draws on its margins before it could show a frame. The
+ * outline is only as sharp as the small canvas, which is well under a screen
+ * pixel at any size a sticker is drawn.
+ *
+ * The transparent ground is not quite empty: it carries the margin colour at
+ * the lowest alpha a canvas stores. A texel at alpha 0 has lost its colour
+ * (canvas pixels are premultiplied), so filtering across the cut line would
+ * mix in black and draw a dark hairline round every sticker. At 1/255 the
+ * colour survives and the edge filters to the margin, as it should.
+ */
+function paintDieCut(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  cut: DieCutConfig,
+  sheet: SheetConfig,
+  paintArt: (art: CanvasRenderingContext2D, x: number, y: number, aw: number, ah: number) => void,
+) {
+  const perUnit = Math.max(w, h) / Math.max(sheet.width, sheet.height)
+  const margin = cut.margin * perUnit
+  // Inset by the margin (and a pixel) so the backing is never clipped by the canvas.
+  const inset = margin + 2
+  const art = document.createElement('canvas')
+  art.width = w
+  art.height = h
+  const actx = art.getContext('2d')!
+  paintArt(actx, inset, inset, w - inset * 2, h - inset * 2)
+
+  ctx.save()
+  ctx.globalAlpha = 1 / 255
+  ctx.fillStyle = cut.color
+  ctx.fillRect(0, 0, w, h)
+  ctx.restore()
+
+  if (margin > 0.5) {
+    const k = Math.min(1, DILATE_PX / margin)
+    const sw = Math.max(1, Math.ceil(w * k))
+    const sh = Math.max(1, Math.ceil(h * k))
+    const small = margin * k
+    const silhouette = document.createElement('canvas')
+    silhouette.width = sw
+    silhouette.height = sh
+    const sctx = silhouette.getContext('2d')!
+    sctx.drawImage(art, 0, 0, sw, sh)
+    sctx.globalCompositeOperation = 'source-in'
+    sctx.fillStyle = cut.color
+    sctx.fillRect(0, 0, sw, sh)
+    const grown = document.createElement('canvas')
+    grown.width = sw
+    grown.height = sh
+    const gctx = grown.getContext('2d')!
+    gctx.drawImage(silhouette, 0, 0)
+    const rings = Math.max(2, Math.ceil(small / 3))
+    for (let r = 1; r <= rings; r++) {
+      const radius = (small * r) / rings
+      const steps = Math.max(12, Math.ceil(radius * 1.2))
+      for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2
+        gctx.drawImage(silhouette, Math.cos(a) * radius, Math.sin(a) * radius)
+      }
+    }
+    ctx.save()
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(grown, 0, 0, w, h)
+    ctx.restore()
+  }
+  ctx.drawImage(art, 0, 0)
+}
+
+/**
  * Render content to a canvas. Synchronous — image content needs a decoded
  * HTMLImageElement passed in (the hook below handles loading).
  */
@@ -93,12 +177,39 @@ export function renderContentToCanvas(
   sheet: SheetConfig,
   stock: Stock,
   image?: HTMLImageElement,
+  dieCut?: DieCutConfig,
+  /** Fraction of the usual resolution. Everything is painted at the usual size and scaled, so text keeps its measure. */
+  scale = 1,
 ): HTMLCanvasElement {
   const [w, h] = contentCanvasSize(sheet)
+  const pw = Math.max(1, Math.round(w * scale))
+  const ph = Math.max(1, Math.round(h * scale))
   const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
+  canvas.width = pw
+  canvas.height = ph
   const ctx = canvas.getContext('2d')!
+  if (dieCut) {
+    // No ground: the sticker is only what the content covers, plus its margin.
+    paintDieCut(ctx, pw, ph, dieCut, sheet, (art, x, y, aw, ah) => {
+      art.save()
+      art.translate(x, y)
+      art.scale(pw / w, ph / h)
+      aw *= w / pw
+      ah *= h / ph
+      if (content.type === 'image' && image && content.src) paintImage(art, aw, ah, image, 'contain')
+      if (content.type === 'text') paintText(art, aw, ah, content, stock)
+      if (content.type === 'card') paintCard(art, aw, ah, content, stock, DPR)
+      if (content.type === 'receipt') paintReceipt(art, aw, ah, content, stock)
+      // Blank, or an image still loading: a plain sticker of stock.
+      if (content.type === 'blank' || (content.type === 'image' && !(image && content.src))) {
+        art.fillStyle = stock.color
+        art.fillRect(0, 0, aw, ah)
+      }
+      art.restore()
+    })
+    return canvas
+  }
+  ctx.scale(pw / w, ph / h)
   paintBackground(ctx, w, h, stock)
   // Under everything the sheet carries, and over the stock. A wash is a
   // ground: the letter is written on it, not beside it.
@@ -126,9 +237,20 @@ export function useContentTexture(
   content: ContentConfig | BackContentConfig | undefined,
   sheet: SheetConfig,
   stock: Stock,
+  /** Paint it as a die-cut sticker face — see `paintDieCut`. */
+  dieCut?: DieCutConfig,
+  /** Fraction of the usual resolution, for a sheet drawn much smaller than its canvas — see `renderContentToCanvas`. */
+  scale = 1,
 ): THREE.CanvasTexture | null {
   const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null)
-  const key = JSON.stringify({ content: content ?? null, w: sheet.width, h: sheet.height, stock: stock.id })
+  const key = JSON.stringify({
+    content: content ?? null,
+    w: sheet.width,
+    h: sheet.height,
+    stock: stock.id,
+    cut: dieCut ?? null,
+    scale,
+  })
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: key serializes the content, sheet and stock the canvas draws from.
   useEffect(() => {
@@ -149,10 +271,10 @@ export function useContentTexture(
     if (content.type === 'image' && content.src) {
       const img = new Image()
       img.crossOrigin = 'anonymous'
-      img.onload = () => commit(renderContentToCanvas(content, sheet, stock, img))
+      img.onload = () => commit(renderContentToCanvas(content, sheet, stock, img, dieCut, scale))
       // A URL that never loads must not leave the sheet textureless — it
       // still has stock, and bare stock is the honest picture of "no image".
-      img.onerror = () => commit(renderContentToCanvas(content, sheet, stock))
+      img.onerror = () => commit(renderContentToCanvas(content, sheet, stock, undefined, dieCut, scale))
       img.src = content.src
     } else if (content.type === 'text' || content.type === 'card') {
       // Ask for the face BY NAME. `document.fonts.ready` alone only waits for
@@ -161,12 +283,14 @@ export function useContentTexture(
       // with no DOM element using it, `ready` resolves at once and the sheet
       // paints in the fallback.
       void ensureFont(content.font, content.size * DPR).then(() =>
-        commit(renderContentToCanvas(content, sheet, stock)),
+        commit(renderContentToCanvas(content, sheet, stock, undefined, dieCut, scale)),
       )
     } else if (content.type === 'receipt') {
-      document.fonts.ready.then(() => commit(renderContentToCanvas(content, sheet, stock)))
+      document.fonts.ready.then(() =>
+        commit(renderContentToCanvas(content, sheet, stock, undefined, dieCut, scale)),
+      )
     } else {
-      commit(renderContentToCanvas(content, sheet, stock))
+      commit(renderContentToCanvas(content, sheet, stock, undefined, dieCut, scale))
     }
 
     return () => {

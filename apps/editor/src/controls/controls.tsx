@@ -205,6 +205,7 @@ function SelectControl({ control }: { control: Of<'select'> }) {
         value={control.value}
         options={control.options}
         onChange={control.onChange}
+        unavailable={control.unavailable}
       />
     </div>
   )

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { CANVAS_SHADOWS } from '../scene/shadows'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
@@ -658,7 +659,7 @@ export function PaperStage({ children, className, style, ...sceneProps }: PaperS
   return (
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       <Canvas
-        shadows
+        shadows={CANVAS_SHADOWS}
         dpr={[1, dpr]}
         camera={{ fov: 38, near: 0.05, far: 400 }}
         onCreated={({ scene }) => {

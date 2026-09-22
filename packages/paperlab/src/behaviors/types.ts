@@ -40,6 +40,25 @@ export interface Behavior<O = AnyOptions> {
   transform?(o: O, t: number, pose: AeroPose, sheet: SheetDims): void
   handles?: HandleSpec<O>[]
   /**
+   * A point past which a drag stops steering and the rest plays by itself.
+   *
+   * Some motions end in something a hand cannot scrub: a sticker's last edge
+   * letting go is a snap, and a snap dragged slowly is not a snap. When a
+   * handle drag carries the progress param past `from`, the drag lets go of
+   * it and the progress runs to `to` over `duration` seconds.
+   */
+  commit?: { from: number; to: number; duration: number }
+  /**
+   * How far through flying away these options have the sheet, 0..1. At 1
+   * it is gone.
+   *
+   * A flight happens in the world, on the air, and a deformer works in the
+   * sheet's own space, so it cannot be part of the stack. Only a sheet
+   * stuck to something has something to fly off, and the mount applies it
+   * (`MountRig.fly`); everywhere else this is never read.
+   */
+  fly?(o: O): number
+  /**
    * The two or three options that ARE this behavior — the ones someone
    * reaches for first, in the order they'd reach for them.
    *

@@ -111,7 +111,7 @@ const content = { type: 'text' as const, text: 'An untouched field\ndraws nothin
 function ShadowScene() {
   return (
     <Canvas
-      shadows
+      shadows="percentage"
       dpr={1}
       camera={{ position: [0, 3.4, 3.0], fov: 42 }}
       onCreated={({ camera }) => camera.lookAt(0, -1.0, -0.6)}

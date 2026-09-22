@@ -24,7 +24,7 @@ describe('the sheet height control', () => {
         `${name} is taller than the height slider can represent`,
       ).toBeLessThanOrEqual(sheetHeightMax(config))
       expect(config.sheet.height, `${name} is shorter than the height slider's floor`).toBeGreaterThanOrEqual(
-        0.2,
+        0.1,
       )
     }
   })

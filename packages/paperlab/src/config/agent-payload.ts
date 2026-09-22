@@ -32,6 +32,10 @@ const BEHAVIOR_PHRASES: Record<string, (o: Record<string, unknown>) => string> =
     (o as { relax: number }).relax > 0.7
       ? 'lying where it landed, flat but for one corner the stiffness kept'
       : 'just come to rest, still holding a little of the shape it fell in',
+  sticker: (o) =>
+    (o.progress as number) >= 0.86
+      ? 'peeled clean off and flying away to one side, curled from what it was stuck to'
+      : `half peeled from its ${String(o.corner ?? 'bottom-right').replace('-', ' ')} corner in a tight curl, the glue still holding at the front`,
   carry: () => 'drooping from a pinched corner, fluttering as if being carried',
   flight: (o) =>
     o.path === 'loop' ? 'tumbling through a seamless airborne loop' : 'tumbling across the scene on the wind',
