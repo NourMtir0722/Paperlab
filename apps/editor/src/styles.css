@@ -2629,20 +2629,24 @@ button.pill:disabled {
 /* Built in public: the rail's foot, in every mode. Docked, so it comes
    forward by a tint step and never by a shadow (rule 2). */
 .built-in-public {
+  /* Pinned to the foot of a rail that scrolls, so it is whole on a laptop
+     rather than half of it past the bottom edge. The rail's own ground sits
+     under the tint step, or the list would read through it. */
+  position: sticky;
+  bottom: -14px;
+  z-index: 1;
+  flex: 0 0 auto;
   margin-top: auto;
-  padding: 12px;
+  padding: 10px;
   border-radius: var(--r-md);
-  background: var(--lift);
-}
-
-.left .built-in-public h2 {
-  margin: 0 0 10px;
+  background: linear-gradient(var(--lift), var(--lift)), var(--l1);
+  box-shadow: 0 -14px 14px -8px var(--l1);
 }
 
 .built-in-public dl {
   display: grid;
   gap: 6px;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
 }
 
 .built-in-public dl div {
@@ -2698,7 +2702,7 @@ button.pill:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   color: var(--ink-2);
   font-size: 13px;
   text-decoration: none;
@@ -2726,4 +2730,22 @@ button.pill:disabled {
   text-decoration: underline;
   text-decoration-color: var(--ink-faint);
   text-underline-offset: 3px;
+}
+
+/* Short screens: the sentence is the one part of the card that is prose, so
+   it is the one part that goes. A laptop keeps who, how many, and both links. */
+@media (max-height: 900px) {
+  .built-in-public p {
+    display: none;
+  }
+}
+
+@media (max-height: 760px) {
+  .built-in-public .maker small {
+    display: none;
+  }
+
+  .built-in-public dd {
+    font-size: 10px;
+  }
 }
