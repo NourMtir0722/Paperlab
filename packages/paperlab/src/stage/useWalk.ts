@@ -263,7 +263,7 @@ export function useWalk({
     if (drifting && !reduced) {
       // Wrapped, not extrapolated. An open walk used to run past its own end
       // for as long as the tab was open, which is a camera stationed in the
-      // dark past the last banner — the playground had to keep its own clock
+      // dark past the last banner — the caller had to keep its own clock
       // and its own `% 1` to avoid it.
       const perSecond = path.length > 0 ? (figureSpeed * motion.speed) / path.length : 0
       walk.current = (((walk.current + perSecond * dt) % 1) + 1) % 1

@@ -27,8 +27,8 @@ const SECTIONS = [
 ] as const
 
 /**
- * The feedback form (Tally), by id — the same one the editor and the
- * playground open, and held to it by the editor's `feedbackForm.test.ts`.
+ * The feedback form (Tally), by id — the same one the editor opens, and
+ * held to it by the editor's `feedbackForm.test.ts`.
  * Here it is two plain links out, each saying which it is; an empty id hides
  * them.
  */
@@ -58,7 +58,6 @@ export function App() {
           ))}
         </ul>
         <div className="rail-links">
-          <a href="../">Playground</a>
           <a href="../editor/">Editor</a>
           <a href="../hands/">Hands</a>
           <a href="../fx-lab/">FX Lab</a>

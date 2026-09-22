@@ -2007,6 +2007,37 @@ button.export:hover {
   margin-bottom: 18px;
 }
 
+/* The maker line, the same one the rail card and the site root carry. Bigger
+   here: on a phone this card is the whole page, not a footnote in a rail. */
+.small-screen-maker {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  color: var(--ink-2);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.small-screen-maker img {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.small-screen-maker strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.small-screen-maker small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-body);
+  font-size: 13px;
+}
+
 .small-screen-card h1 {
   font-size: clamp(24px, 7vw, 32px);
   line-height: 1.15;

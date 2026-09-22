@@ -215,9 +215,7 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 ## The apps
 
-Three sites ship alongside the library, all built on its public API only.
-
-**[The playground](https://paperlab.nawwara.studio/playground/)** — one input, one scene, shareable by link. Type a sentence and it builds you a room out of it. Built for a phone.
+Two sites ship alongside the library, both built on its public API only. [paperlab.nawwara.studio](https://paperlab.nawwara.studio/) opens the editor.
 
 **[The editor](https://paperlab.nawwara.studio/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. One switch along the top moves between five surfaces that all wear that same frame — **Paper · Field · Stage · Hands · FX Lab** — and the top-right holds a single button, **Export**.
 
@@ -227,7 +225,7 @@ The inspector is generated from the zod schema, so it can never drift from the A
 
 ![The editor in field mode, fourteen cards arranged in a ring with the layout panel open](https://paperlab.nawwara.studio/media/editor-field.jpg)
 
-Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export** ends the session wherever you are going next: a share link, an image framed for a post, a story or a slide, the component or its JSON for your codebase, or **Copy for AI** for a coding agent. It wants a real screen: under about 900px it says so and points you at the playground.
+Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export** ends the session wherever you are going next: a share link, an image framed for a post, a story or a slide, the component or its JSON for your codebase, or **Copy for AI** for a coding agent. It wants a real screen: under about 900px it says so rather than handing you half a tool.
 
 - **[FX Lab](https://paperlab.nawwara.studio/fx-lab/)** — every knob behind the burn, around the sheet it is burning: the flame's zones, the fluid, the bloom, the light it throws, the ash lip and the char, how fast it eats and how much of the sheet it takes. The library's defaults are a tune made here. Scrub the burn, turn something, and **Export** copies the tune out as JSON to pass to `<Paper>`.
 - **[Hands](https://paperlab.nawwara.studio/hands/)** — set fire to the paper with a real flame. Hold a lighter up to the camera and the sheet catches where the flame is; with no lighter, pinch and hold still and you are holding a match; with no camera, there is a button. The page draws your hand as it tracks it and boxes the flame when it finds one, and once a flame touches the paper the fire runs from there until the whole sheet has burnt. Blow to put it out. It burns the way the FX Lab burns, from the same defaults, and the page is a hundred percent public API — `packages/paperlab` doesn't know it exists.
@@ -250,7 +248,6 @@ pnpm dev            # the editor at localhost:5173
 |---|---|
 | [`packages/paperlab`](https://github.com/NourMtir0722/Paperlab/blob/main/packages/paperlab/) | the npm library — the only published artifact |
 | [`apps/editor`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/editor/) | the editor — Paper, Field and Stage, plus Hands (`/hands`) and the FX Lab (`/fx-lab`), each built from the same app in a pass of its own |
-| [`apps/playground`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/playground/) | the playground — one input, one scene, shareable by link |
 | [`apps/docs`](https://github.com/NourMtir0722/Paperlab/blob/main/apps/docs/) | the reference site, with every behavior running live |
 | [`tools/`](https://github.com/NourMtir0722/Paperlab/blob/main/tools/) | browser harnesses — parity, perf, screenshots, the fire's checks, the README's motion |
 | [`AGENTS.md`](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md) · [`docs/llms.txt`](https://github.com/NourMtir0722/Paperlab/blob/main/docs/llms.txt) | the agent-readable API reference |

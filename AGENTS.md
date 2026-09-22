@@ -51,7 +51,7 @@ import { PaperField } from 'paperlab'
 
 `<PaperStage>` builds a *space* out of paper: banners hung along a walk, with
 a figure walking down it. It is the one mode where the paper is the room
-rather than the object, and it is what the playground is built on.
+rather than the object.
 
 ```tsx
 import { PaperStage } from 'paperlab/stage'
@@ -587,13 +587,12 @@ Run the dev server and look at the canvas: `describeConfig(config)` (exported) g
 
 ## Working in this repo
 
-pnpm + Turborepo. `packages/paperlab` is the library; `apps/` holds three Vite apps that consume it **through its public API only** — if an app needs a private hook, the API is wrong.
+pnpm + Turborepo. `packages/paperlab` is the library; `apps/` holds two Vite apps that consume it **through its public API only** — if an app needs a private hook, the API is wrong.
 
 | | |
 |---|---|
 | `packages/paperlab` | the library. Folders are domains: `core` (sheet + tessellation), `deformers`, `behaviors`, `field`, `stage`, `surface`, `scene`, `content`, `physics`, `states`, `config`, `a11y` |
 | `apps/editor` | every knob in the schema, the preset library, and the export. Also hosts the browser harnesses on their own HTML entry points (see below) |
-| `apps/playground` | one input, one scene, a link. The launch surface |
 | `apps/docs` | the documentation site, every behavior running live |
 | `tools/` | Node scripts that boot one of those apps headless and measure or photograph it |
 
@@ -616,9 +615,9 @@ pnpm knip           # dead code and unused exports
 | `pnpm test:share` | the editor | sculpt → copy a link → open it in a browser that has never seen the paper. **CI gate** |
 | `pnpm test:dropdown` | the editor | every option list is reachable — including the ones below the fold. **CI gate** |
 | `pnpm test:hands` | `/hands` | the three ways to light the paper really light it — a held match, a flame in the camera's frame (and never a steady lamp), the panel's button — plus the blow that puts it out, and that the page talks to nobody. Runs `pnpm hands:setup` for you. **Own workflow**, not the `ci` gate — see below |
-| `pnpm test:route` | `tools/site-root.html` | the site root sends desktops to the editor and everything else to the playground, and its nav names every route `pages.yml` deploys. **CI gate** |
+| `pnpm test:route` | `tools/site-root.html` | the site root sends anything with a mouse to the editor, shows a phone a card instead of redirecting it, never picks by CSS width, and its nav names every route `pages.yml` deploys. **CI gate** |
 | `pnpm perf` / `perf:field` | `stage.html` / `field.html` | frame cost. `--gpu` for the platform GPU, `--soft` for the SwiftShader floor |
-| `pnpm shot` / `shot:ui` / `shot:play` / `shot:light` | stage, editor, playground, one rig | PNGs into `.shots/` |
+| `pnpm shot` / `shot:ui` / `shot:light` | stage, editor, one rig | PNGs into `.shots/` |
 | `pnpm media` | `media.html` | the README's GIFs and MP4s, stepped frame-exact |
 
 **`/hands` is a real page on the site, and it is linked like one.** The

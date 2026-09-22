@@ -2,7 +2,7 @@
  * Where the sibling apps are, from wherever this one is mounted.
  *
  * The editor is served at `/editor/` in production and at `/` in dev, and the
- * routes beside it — `/playground/`, `/docs/`, `/hands/`, `/fx-lab/` — are siblings of
+ * routes beside it — `/docs/`, `/hands/`, `/fx-lab/`, `/lab-notes/` — are siblings of
  * whichever it is. Deriving that from Vite's own base is what makes one href
  * correct in both places without a build-time branch or an absolute URL that
  * would break every local dev server and every preview deploy.

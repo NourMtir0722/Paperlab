@@ -7,9 +7,6 @@
     "packages/paperlab": {
       "project": "src/**"
     },
-    "apps/playground": {
-      "project": "src/**"
-    },
     "apps/docs": {
       "project": "src/**"
     },

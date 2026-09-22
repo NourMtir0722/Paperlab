@@ -8,7 +8,7 @@
  * out of the page and run the real thing against fake locations.
  *
  * Then the other direction: every route `pages.yml` deploys has to be named
- * in the signpost's nav, because the redirect only knows about two of them
+ * in the signpost's nav, because the redirect only knows about the editor
  * and a route nothing links to is a route nobody has.
  *
  * Runs in CI as `pnpm test:route`.
@@ -27,49 +27,51 @@ if (!script) {
 }
 
 /** Runs the page's own script against a fake window and reports where it sent us. */
-function route({ search = '', hash = '', width = 1440, pointer = 'fine', referrer = '' }) {
+function route({ search = '', hash = '', mouse = true, referrer = '' }) {
   let destination = null
   const window = {
     location: { search, hash, hostname: 'paperlab.nawwara.studio', replace: (url) => (destination = url) },
-    matchMedia: (query) => ({
-      matches: query.includes('min-width: 1024px')
-        ? width >= 1024
-        : query.includes('pointer: fine')
-          ? pointer === 'fine'
-          : false,
-    }),
+    // Only one query is asked now, and it is asked by name rather than by
+    // substring: `(any-pointer: fine)` contains `pointer: fine`, so a loose
+    // matcher answers both with the same value and the test stops testing.
+    matchMedia: (query) => {
+      if (query !== '(any-pointer: fine)') throw new Error(`unexpected media query: ${query}`)
+      return { matches: mouse }
+    },
   }
   new Function('window', 'document', script[1])(window, { referrer })
   return destination
 }
 
-const SCENE = '?s=eyJwIjoibmF2ZSJ9'
+const SCULPT = '?p=eyJwIjoicmVjZWlwdC11bnJvbGwifQ'
 
 const cases = [
-  // The whole point: the editor has no mobile layout, the playground does.
-  ['desktop lands in the editor', { width: 1440, pointer: 'fine' }, '/editor/'],
-  ['phone lands in the playground', { width: 390, pointer: 'coarse' }, '/playground/'],
-  ['touch tablet is not a desktop', { width: 1024, pointer: 'coarse' }, '/playground/'],
-  ['a narrow window is not either', { width: 900, pointer: 'fine' }, '/playground/'],
+  // The whole point of the change: there is one app, and everything with a
+  // pointer lands in it. No second destination to leak traffic into.
+  ['a laptop lands in the editor', { mouse: true }, '/editor/'],
 
-  // A shared link named its destination on purpose; the guess must not win.
-  ['a shared scene opens on desktop', { search: SCENE, width: 1440 }, `/playground/${SCENE}`],
-  [
-    'a shared scene opens on a phone',
-    { search: SCENE, width: 390, pointer: 'coarse' },
-    `/playground/${SCENE}`,
-  ],
-  ['a shared sculpt opens in the editor', { search: '?p=abc', width: 1440 }, '/editor/?p=abc'],
-  ['the hash survives the hop', { search: '?s=xyz', hash: '#top', width: 1440 }, '/playground/?s=xyz#top'],
+  // A phone is not sent anywhere: the card on the root IS the page for it,
+  // and it costs nothing to load. `null` is the script declining to move.
+  ['a phone stays on the signpost', { mouse: false }, null],
+  ['a tablet stays on the signpost', { mouse: false }, null],
 
-  // Nothing else in the address rides along. Campaign tags were carried
-  // for an analytics tool that read them; Cloudflare's does not.
-  ['utm does not look like a share', { search: '?utm_source=x', width: 1440 }, '/editor/'],
-  ['anything else is left behind', { search: '?junk=1', width: 1440 }, '/editor/'],
+  // Except when a link named the editor itself. Someone sent this exact
+  // thing on purpose, from whatever they were holding.
+  ['a shared sculpt opens in the editor', { search: SCULPT, mouse: true }, `/editor/${SCULPT}`],
+  ['a shared sculpt opens on a phone too', { search: SCULPT, mouse: false }, `/editor/${SCULPT}`],
+  ['the hash survives the hop', { search: '?p=abc', hash: '#top', mouse: true }, '/editor/?p=abc#top'],
+
+  // Nothing else in the address rides along. Campaign tags were carried for
+  // an analytics tool that read them; Cloudflare's does not.
+  ['utm does not look like a share', { search: '?utm_source=x', mouse: true }, '/editor/'],
+  ['anything else is left behind', { search: '?junk=1', mouse: true }, '/editor/'],
+  // A dead playground share is not a share any more. It loses its scene,
+  // which is the cost of removing the route, and it still lands somewhere.
+  ['a dead playground link still lands', { search: '?s=eyJwIjoibmF2ZSJ9', mouse: true }, '/editor/'],
 
   // And no referrer is invented: the page sets no-referrer, so the one it
   // came in with goes nowhere.
-  ['the referrer is not handed on', { referrer: 'https://t.co/abc', width: 1440 }, '/editor/'],
+  ['the referrer is not handed on', { referrer: 'https://t.co/abc', mouse: true }, '/editor/'],
 ]
 
 let failed = 0
@@ -78,11 +80,45 @@ for (const [name, input, expected] of cases) {
   const ok = got === expected
   if (!ok) failed++
   console.log(
-    `${ok ? '  ok  ' : '  FAIL'} ${name.padEnd(36)} → ${got}${ok ? '' : `   (expected ${expected})`}`,
+    `${ok ? '  ok  ' : '  FAIL'} ${name.padEnd(36)} → ${got ?? 'stays put'}${
+      ok ? '' : `   (expected ${expected ?? 'stays put'})`
+    }`,
   )
 }
 
 console.log(failed ? `\n${failed} of ${cases.length} routes wrong` : `\nall ${cases.length} routes correct`)
+
+// ── The device question is not a width ─────────────────────────────────────
+//
+// This is the bug that cost the playground its route. The root used to ask
+// `(min-width: 1024px)`, which is a CSS width: a laptop at 125% zoom reports
+// 1024 and at 150% reports 853, so zooming in on a real desktop machine sent
+// it to the phone app. Nobody notices, because it looks like a choice.
+//
+// A case in the table above cannot catch a regression to that — it would
+// just be another row saying "editor". So assert on the QUESTION instead:
+// the script is handed a matchMedia that records what it is asked, and any
+// width in there fails. The matcher in `route()` above is stricter still
+// and throws, which is what keeps this honest while both exist.
+const asked = []
+new Function('window', 'document', script[1])(
+  {
+    location: { search: '', hash: '', replace: () => {} },
+    matchMedia: (query) => {
+      asked.push(query)
+      return { matches: true }
+    },
+  },
+  { referrer: '' },
+)
+const widths = asked.filter((q) => /width/i.test(q))
+if (widths.length) {
+  console.error(`\n  FAIL the root picks by width again: ${widths.join(', ')}`)
+  console.error('       a laptop at 125% zoom is narrower than 1024px and is still a laptop')
+  failed++
+} else {
+  console.log(`  ok   the root asks about the pointer, not the width (${asked.join(', ') || 'nothing'})`)
+}
 
 // ── Every deployed route is reachable from the signpost ────────────────────
 //

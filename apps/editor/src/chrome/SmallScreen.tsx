@@ -16,14 +16,17 @@ import { SITE } from './site'
  * and a visitor who taps "Editor" and gets a half-drawn tool that scrolls
  * sideways learns something wrong about the library.
  *
- * Three things it has to do, in this order:
+ * It used to send them to the playground, which was a real answer while
+ * there was a playground: one input, one scene, good on a phone. That route
+ * is gone — it was built for testing and it was quietly collecting most of
+ * the site's traffic — so the card is now the same one the site root shows a
+ * phone, and it does three things in this order:
  *
- * 1. **Send them somewhere that works.** The playground is the front door,
- *    it is one input and one scene, and it is genuinely good on a phone.
- *    Telling someone to come back later without giving them anything to do
- *    now is how you lose them.
- * 2. **Say what the editor is**, so the thing they are being asked to come
- *    back for sounds worth it.
+ * 1. **Say the tool wants a laptop**, plainly, as the first thing. Nobody is
+ *    being sent somewhere worse in the hope they do not notice.
+ * 2. **Give them something that is worth a phone**: who makes this, what is
+ *    coming, and how to put a tool in the build. All three read fine on a
+ *    small screen, which the editor does not.
  * 3. **Let them in anyway.** A hard wall is a lie about capability — the
  *    editor does run, it is just cramped — and someone on a tablet, or
  *    someone who simply wants to look, should not be stopped by a
@@ -44,18 +47,25 @@ export function SmallScreen() {
         <p className="small-screen-kicker">
           Paperlab <span className="beta">beta</span>
         </p>
-        <h1>The editor wants a bigger screen.</h1>
+        <a className="small-screen-maker" href="https://x.com/noormtir" target="_blank" rel="noreferrer">
+          <img src={`${import.meta.env.BASE_URL}noor.jpg`} alt="" width={40} height={40} />
+          <span>
+            <strong>I'm @noormtir</strong>
+            <small>I made paperlab</small>
+          </span>
+        </a>
+        <h1>paperlab is made for a laptop.</h1>
         <p>
           It is a canvas tool, with presets on the left, settings on the right, and a sheet in the middle you
           shape by dragging a handle on the paper. That does not fit on a phone, and I would rather say so
           than pretend it does.
         </p>
-        <a className="small-screen-go" href={SITE}>
-          Open the playground instead →
+        <a className="small-screen-go" href={`${SITE}lab-notes/#sponsor`}>
+          Sponsor paperlab →
         </a>
         <p className="small-screen-note">
-          One input, one scene, and it works properly on this screen. Type anything and the room is built out
-          of it.
+          paperlab grows one piece at a time, and I build it in public. See what is next, or put your tool in
+          the build.
         </p>
         <div className="small-screen-links">
           <a href={`${SITE}docs/`}>Read the docs</a>

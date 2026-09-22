@@ -13,7 +13,6 @@
     "test:parity": "node tools/parity.mjs",
     "shot": "node tools/stage-shot.mjs",
     "shot:ui": "node tools/editor-shot.mjs",
-    "shot:play": "node tools/playground-shot.mjs",
     "perf": "node tools/stage-perf.mjs",
     "perf:field": "node tools/field-perf.mjs",
     "media": "node tools/media.mjs",

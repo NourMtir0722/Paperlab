@@ -13,40 +13,50 @@
       direct. Cloudflare has no ?ref= to hand the real one on with.
     -->
     <meta name="referrer" content="no-referrer" />
-    <title>Paperlab — physical paper as a React component</title>
+    <title>Paperlab, physical paper as a React component</title>
     <meta name="description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
 
     <!--
-      The site root is a signpost, not a page. The editor is a three-rail
-      desktop tool with no mobile layout, and the playground is built for a
-      phone — so sending everyone to the same one strands half of them. This
-      picks by device instead, and the crawler that never runs the script
-      still reads the card below.
+      The site root sends anything with a mouse straight to the editor, and
+      shows the card below to everything else.
+
+      There used to be a second destination. The root picked by device and
+      sent every phone, every tablet and every window under 1024px to
+      /playground/, which is how a demo built for testing ended up with most
+      of the site's traffic and how a laptop at 125% zoom ended up there too:
+      `(min-width: 1024px)` is a CSS width, so zooming in or narrowing the
+      window failed the test on a machine that plainly has a screen. The
+      playground is gone, the editor is the front door, and the question is
+      now `(any-pointer: fine)` — is there a mouse or a trackpad on this
+      thing — which zoom cannot change.
+
+      A phone is not redirected at all. The editor is a three-rail canvas
+      tool that does not fit on a 390px screen, and making a phone download
+      a WebGL app in order to be told so is worse than telling it here, for
+      free, before anything loads.
 
       Assembled into the site by .github/workflows/pages.yml. The apps
-      themselves live at /editor/, /playground/, /docs/, /hands/ and
-      /fx-lab/.
+      themselves live at /editor/, /docs/, /hands/ and /fx-lab/.
 
       /hands is never a redirect TARGET and never should be: it asks for a
       camera and fetches two model files before it does anything, which is
       not what an unsuspecting visitor to the root asked for. It is a place
-      you choose to go, so it is a link here and in the reference's rail —
-      and, because the redirect below fires before paint, the rail is the one
-      real people see. `pnpm test:route` asserts every route the workflow
-      deploys is named in the nav below, which is what this page missed: the
-      page shipped, and nothing on the site pointed at it.
+      you choose to go, so it is a link here and in the reference's rail.
+      `pnpm test:route` asserts every route the workflow deploys is named in
+      the nav below, which is what this page missed once: the page shipped,
+      and nothing on the site pointed at it.
     -->
     <meta property="og:url" content="https://paperlab.nawwara.studio/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Paperlab" />
-    <meta property="og:title" content="Paperlab — physical paper as a React component" />
+    <meta property="og:title" content="Paperlab, physical paper as a React component" />
     <meta property="og:description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
     <meta property="og:image" content="https://paperlab.nawwara.studio/media/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Paperlab — physical paper as a React component" />
+    <meta name="twitter:title" content="Paperlab, physical paper as a React component" />
     <meta name="twitter:description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
     <meta name="twitter:image" content="https://paperlab.nawwara.studio/media/og.png" />
 
@@ -59,88 +69,166 @@
         background: #0b0b0b;
         color: #f4f2ee;
         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        -webkit-text-size-adjust: 100%;
       }
-      /* Only ever seen without JS: with it, the redirect fires first. */
+      /* On a laptop this is never seen: the redirect fires before paint. On a
+         phone it is the page. */
       main {
         display: flex;
         flex-direction: column;
-        gap: 1.25rem;
-        align-items: center;
+        align-items: flex-start;
         justify-content: center;
         min-height: 100vh;
-        padding: 2rem;
-        text-align: center;
+        max-width: 32rem;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+      }
+      .kicker {
+        margin: 0 0 1.5rem;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #78756f;
+      }
+      .beta {
+        margin-left: 0.4em;
+        padding: 0.15em 0.5em;
+        border-radius: 999px;
+        background: #1c1c1a;
+        color: #a8a29b;
+        font-size: 0.85em;
+        letter-spacing: 0.08em;
+      }
+      .maker {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        color: #d7d3cc;
+        font-size: 0.9375rem;
+        text-decoration: none;
+      }
+      .maker img {
+        flex: none;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .maker strong {
+        display: block;
+        color: #f4f2ee;
+        font-weight: 600;
+      }
+      .maker small {
+        display: block;
+        margin-top: 0.1rem;
+        color: #a8a29b;
+        font-size: 0.8125rem;
       }
       h1 {
-        margin: 0;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.24em;
-        text-transform: uppercase;
+        margin: 0 0 0.875rem;
+        font-size: clamp(1.5rem, 7vw, 2rem);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
       }
       p {
         margin: 0;
-        max-width: 32rem;
-        line-height: 1.5;
+        line-height: 1.6;
         color: #a8a29b;
+      }
+      .lede {
+        margin-bottom: 1.5rem;
+      }
+      .go {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.95rem 1.125rem;
+        border-radius: 10px;
+        background: #f4f2ee;
+        color: #0b0b0b;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        text-align: center;
+        text-decoration: none;
+      }
+      .note {
+        margin-top: 0.75rem;
+        font-size: 0.875rem;
       }
       nav {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.75rem;
-        justify-content: center;
+        gap: 0.625rem 1.375rem;
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid #2a2a28;
       }
-      a {
-        padding: 0.6rem 1.1rem;
-        border: 1px solid #2a2a28;
-        border-radius: 999px;
+      nav a {
+        padding: 0.4rem 0;
+        color: #a8a29b;
+        font-size: 0.875rem;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      nav a:hover {
         color: #f4f2ee;
-        font-size: 0.9rem;
-        text-decoration: none;
-      }
-      a:hover {
-        border-color: #56544f;
       }
     </style>
     <script>
-      // Runs before paint, so nobody sees the fallback flash past.
+      // Runs before paint, so nobody sees the card flash past on a laptop.
       ;(() => {
         var search = window.location.search
-        var tail = search + window.location.hash
-        var target = null
-        // The editor needs room and a real cursor. Anything else gets the
-        // playground, which was built for a phone in the first place.
-        var roomy = window.matchMedia('(min-width: 1024px)').matches
-        var precise = window.matchMedia('(pointer: fine)').matches
 
-        // A shared link names its own destination: ?s= is a playground scene,
-        // ?p= is an editor sculpt. Honour that over the device guess —
-        // someone sent this exact thing on purpose.
-        if (/[?&]s=/.test(search)) {
-          target = '/playground/'
-        } else if (/[?&]p=/.test(search)) {
-          target = '/editor/'
-        } else {
-          target = roomy && precise ? '/editor/' : '/playground/'
-          tail = ''
-        }
+        // A shared sculpt names the editor on purpose, from any device, and
+        // carries its payload with it. Nothing else in the address rides
+        // along: campaign tags were for an analytics tool that read them,
+        // and Cloudflare's does not.
+        var shared = /[?&]p=/.test(search)
 
+        // Is there a mouse or a trackpad on this thing? That is the whole
+        // question, and it is the one a CSS width cannot answer: a laptop at
+        // 125% zoom reports well under 1024px and is still a laptop. A phone
+        // and a tablet have no fine pointer; a touchscreen laptop has both,
+        // and `any-pointer` says yes to it. Without matchMedia at all, take
+        // the tool — a browser that old has bigger problems than a layout.
+        var mouse = !window.matchMedia || window.matchMedia('(any-pointer: fine)').matches
+
+        if (!mouse && !shared) return
+
+        var tail = shared ? `${search}${window.location.hash}` : ''
         // Replace, not assign: back should leave the site, not bounce here.
-        window.location.replace(target + tail)
+        window.location.replace(`/editor/${tail}`)
       })()
     </script>
   </head>
   <body>
     <main>
-      <h1>Paperlab</h1>
-      <p>Physical, realistic paper as a React component — real 3D geometry that peels, unrolls, folds and hangs.</p>
+      <p class="kicker">Paperlab <span class="beta">beta</span></p>
+      <a class="maker" href="https://x.com/noormtir" target="_blank" rel="noreferrer">
+        <img src="/noor.jpg" alt="" width="40" height="40" />
+        <span>
+          <strong>I'm @noormtir</strong>
+          <small>I made paperlab</small>
+        </span>
+      </a>
+      <h1>paperlab is made for a laptop.</h1>
+      <p class="lede">
+        It is a canvas tool: presets down one side, settings down the other, and a sheet in the middle you
+        shape by dragging a handle on the paper. Open it on a laptop or a desktop and it is all there. I
+        would rather tell you that here than hand you half of it on a phone.
+      </p>
+      <a class="go" href="/lab-notes/#sponsor">Sponsor paperlab <span aria-hidden="true">&rarr;</span></a>
+      <p class="note">
+        paperlab grows one piece at a time, and I build it in public. See what is next, or put your tool in
+        the build.
+      </p>
       <nav>
-        <a href="/editor/">The editor <span aria-hidden="true">→</span></a>
-        <a href="/playground/">The playground <span aria-hidden="true">→</span></a>
-        <a href="/docs/">The reference <span aria-hidden="true">→</span></a>
-        <a href="/hands/">Your hands <span aria-hidden="true">→</span></a>
-        <a href="/fx-lab/">The FX lab <span aria-hidden="true">→</span></a>
-        <a href="/lab-notes/">Roadmap and sponsoring <span aria-hidden="true">→</span></a>
+        <a href="/editor/">The editor</a>
+        <a href="/docs/">The reference</a>
+        <a href="/hands/">Your hands</a>
+        <a href="/fx-lab/">The FX lab</a>
+        <a href="/lab-notes/">Roadmap and sponsoring</a>
       </nav>
     </main>
   </body>
