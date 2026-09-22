@@ -33,8 +33,8 @@ export function shotsDir() {
 /**
  * Boot one of the apps and wait until it actually answers.
  *
- * `app` is the workspace name without the scope — 'editor', 'playground',
- * 'docs'. Returns the base URL and a `stop()`, and registers `stop` on
+ * `app` is the workspace name without the scope — 'editor' or 'docs'.
+ * Returns the base URL and a `stop()`, and registers `stop` on
  * process exit so an aborted run does not leave a server holding the port.
  *
  * Throws with the port in the message if the server never comes up, which is

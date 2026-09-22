@@ -50,15 +50,15 @@ describe('isSubmitted', () => {
 })
 
 /**
- * The playground and the docs share no code with the editor, so each holds
- * its own copy of the form id — and a copy is the thing that drifts.
+ * The docs share no code with the editor, so they hold their own copy of the
+ * form id — and a copy is the thing that drifts.
  */
-describe('the form id is one decision, in three apps', () => {
+describe('the form id is one decision, in two apps', () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
   const id = (file: string) =>
     readFileSync(resolve(root, file), 'utf8').match(/FEEDBACK_FORM\b[^=]*=\s*'([^']*)'/)?.[1] ?? null
 
-  for (const file of ['apps/playground/src/Feedback.tsx', 'apps/docs/src/App.tsx']) {
+  for (const file of ['apps/docs/src/App.tsx']) {
     it(`${file} opens the same form as the editor`, () => {
       expect(id(file)).toBe(FEEDBACK_FORM)
     })

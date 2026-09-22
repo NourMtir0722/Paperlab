@@ -20,8 +20,8 @@
  *
  * The form needs hidden fields by those four names to receive them.
  *
- * The id is copied into the playground and the docs, which share no code with
- * this app; `feedbackForm.test.ts` fails if the copies drift.
+ * The id is copied into the docs, which shares no code with this app;
+ * `feedbackForm.test.ts` fails if the copies drift.
  */
 
 export type FeedbackKind = 'problem' | 'idea'

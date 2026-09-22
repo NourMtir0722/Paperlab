@@ -1,9 +1,14 @@
 name: Deploy site
 
 # A 3D library nobody can try is a screenshot, so the site is the demo.
-# The root is a signpost that picks by device — the editor is a three-rail
-# desktop tool with no mobile layout, the playground was built for a phone —
-# and the apps sit at /editor, /playground and /docs behind it.
+# The editor IS the demo: the root sends anything with a mouse straight to it,
+# and shows a phone a card saying the tool wants a laptop rather than making
+# it download a WebGL app to find that out. The rest sit behind it at /docs,
+# /hands, /fx-lab and /lab-notes.
+#
+# There was a /playground too, a one-input demo the root sent every phone,
+# tablet and narrow window to. It was built for testing and it ended up
+# collecting most of the site's traffic, so the route is gone.
 #
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
 # No secrets, no third-party account: the OIDC token below is issued by
@@ -72,11 +77,6 @@ jobs:
       - name: Build the library
         run: pnpm --filter paperlab build
 
-      - name: Build the playground (/playground)
-        run: pnpm --filter @paperlab/playground exec vite build
-        env:
-          PAPERLAB_BASE: ${{ env.BASE }}playground/
-
       - name: Vendor the hand tracker's wasm (/hands)
         run: pnpm hands:setup
 
@@ -109,14 +109,16 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir -p site
-          # The root picks a destination by device; the apps sit behind it.
+          # The root sends a mouse to the editor and shows everything else a
+          # card. The card carries the same photo the editor's rail does, so
+          # it is copied up here rather than pointed at /editor/ — the root
+          # should not break because another app moved its assets.
           cp tools/site-root.html site/index.html
-          mkdir -p site/playground
-          cp -r apps/playground/dist/* site/playground/
+          cp apps/editor/public/noor.jpg site/noor.jpg
           mkdir -p site/editor
           cp -r apps/editor/dist/* site/editor/
           # A route of its own rather than a page under /editor — it is its
-          # own thing, like the playground and the docs.
+          # own thing, like the docs.
           mkdir -p site/hands
           cp apps/editor/dist-hands/hands/index.html site/hands/index.html
           cp -r apps/editor/dist-hands/hands/tracker site/hands/tracker

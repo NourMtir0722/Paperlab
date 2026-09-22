@@ -24,11 +24,7 @@ import { describe, expect, it } from 'vitest'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const read = (file: string) => readFileSync(resolve(root, file), 'utf8')
 
-const SHEETS = [
-  'apps/editor/src/styles.css',
-  'apps/playground/src/styles.css',
-  'apps/docs/src/styles.css',
-] as const
+const SHEETS = ['apps/editor/src/styles.css', 'apps/docs/src/styles.css'] as const
 
 const START = ':root {'
 const END = '/* ── END SHARED TOKEN BLOCK'
@@ -60,10 +56,9 @@ const channels = (hex: string): [number, number, number] => {
 }
 const spread = (rgb: [number, number, number]) => Math.max(...rgb) - Math.min(...rgb)
 
-describe('the token block is one block, in three places', () => {
-  it('is byte-identical across the three apps', () => {
-    const [editor, playground, docs] = SHEETS.map((f) => tokenBlock(read(f)))
-    expect(playground, 'apps/playground/src/styles.css has drifted').toBe(editor)
+describe('the token block is one block, in two places', () => {
+  it('is byte-identical across both apps', () => {
+    const [editor, docs] = SHEETS.map((f) => tokenBlock(read(f)))
     expect(docs, 'apps/docs/src/styles.css has drifted').toBe(editor)
   })
 
@@ -198,16 +193,15 @@ describe('amendment 3 — the accent is the grab point', () => {
 })
 
 /**
- * The three boot shells paint before any stylesheet exists, so they cannot
- * read a custom property and have to inline the ramp. That makes them a third
- * copy of the palette, and the first one a visitor actually sees — the old
- * shell was still painting the previous scheme for the first few hundred
+ * The boot shells paint before any stylesheet exists, so they cannot read a
+ * custom property and have to inline the ramp. That makes them another copy
+ * of the palette, and the first one a visitor actually sees — the old shell
+ * was still painting the previous scheme for the first few hundred
  * milliseconds after the rest of the app had moved on.
  */
 describe('the first paint agrees with the app it precedes', () => {
   const SHELLS = {
     'apps/editor/index.html': 'l0',
-    'apps/playground/index.html': 'room-stage',
     'apps/docs/index.html': 'l0',
   } as const
 

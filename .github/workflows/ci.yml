@@ -132,10 +132,12 @@ jobs:
       - name: Share loop gate
         run: pnpm test:share
 
-      # The site root decides, in a script inside an HTML file, which app
-      # every visitor sees — the editor has no mobile layout, so guessing
-      # wrong strands a phone on a three-rail desktop tool. Nothing else in
-      # the pipeline type-checks or renders that file, so check it directly.
+      # The site root decides, in a script inside an HTML file, what every
+      # visitor sees. It used to guess between two apps by CSS width, which
+      # sent a laptop at 125% zoom to the phone demo; it now asks whether
+      # there is a pointer at all, and the gate fails if a width creeps back
+      # in. Nothing else in the pipeline type-checks or renders that file, so
+      # check it directly.
       - name: Root routing gate
         run: pnpm test:route
 

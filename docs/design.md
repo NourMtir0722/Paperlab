@@ -1,11 +1,11 @@
 # The look — Paperlab's design language
 
-> The single source of truth for what the three apps look like. The token
-> block below is **duplicated verbatim** into `apps/editor/src/styles.css`,
-> `apps/playground/src/styles.css` and `apps/docs/src/styles.css`, and
-> `apps/docs/src/designSystem.test.ts` fails if the three copies drift apart or
-> if any rule on this page is broken. Change the language here first, then in
-> the three stylesheets, and let the test tell you which one you missed.
+> The single source of truth for what the apps look like. The token block
+> below is **duplicated verbatim** into `apps/editor/src/styles.css` and
+> `apps/docs/src/styles.css`, and `apps/docs/src/designSystem.test.ts` fails if
+> the copies drift apart or if any rule on this page is broken. Change the
+> language here first, then in both stylesheets, and let the test tell you
+> which one you missed.
 >
 > Adopted 2026-08-23. Direction: **Graphite Showroom**, with the three
 > amendments below.
@@ -37,12 +37,12 @@ adaptation.
 
 | register | what it is | where it lives |
 | --- | --- | --- |
-| **showroom** | sparse, one object per screen, enormous negative space, a single display sentence | `apps/playground`, the `apps/docs` landing |
+| **showroom** | sparse, one object per screen, enormous negative space, a single display sentence | the `apps/docs` landing, the site root |
 | **machine** | dense, tight rhythm, many small labels, real working data — density IS the proof of capability | `apps/editor`, the `apps/docs` catalogue |
 
 The showroom stays sparse *so that* the machine can be dense. Neither layer
 borrows the other's density. A display sentence in the editor is a banner; a
-parameter table on the playground is a settings screen.
+parameter table on the docs landing is a settings screen.
 
 ---
 
@@ -166,10 +166,8 @@ the modal scrim, which is a different job. A third one is how this style turns
 into every other translucent editor, so the test fails on it.
 
 In the editor the list is `.view-cluster, .viewport-guide, .guide-toggle,
-.feedback-tab`. In
-the playground — where the whole app is chrome floating over a live scene — it
-is `.wordmark, button, textarea`. The docs have no glass at all, because
-nothing on that page floats over anything.
+.feedback-tab`. The docs have no glass at all, because nothing on that page
+floats over anything.
 
 Every glass surface degrades to opaque `--l3` under
 `prefers-reduced-transparency: reduce`.

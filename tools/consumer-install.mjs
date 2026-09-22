@@ -66,13 +66,7 @@ const pass = (message) => console.log(`  ✓ ${message}`)
  * resolves, and pulling a newer peer than the repo has ever built against
  * turns that question into a different one.
  */
-const TREES = [
-  pkgDir,
-  join(root, 'apps/editor'),
-  join(root, 'apps/playground'),
-  join(root, 'apps/docs'),
-  root,
-]
+const TREES = [pkgDir, join(root, 'apps/editor'), join(root, 'apps/docs'), root]
 
 function workspaceVersion(name) {
   // pnpm installs per workspace package and hoists a little to the root, so a

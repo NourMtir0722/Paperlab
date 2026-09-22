@@ -30,7 +30,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-const APPS = ['playground', 'editor', 'docs']
+const APPS = ['editor', 'docs']
 
 describe('the first paint is in the document', () => {
   for (const app of APPS) {

@@ -218,7 +218,7 @@ function StageFrames() {
     >
       <color attach="background" args={['#0c0a0b']} />
       <PaperStageScene
-        // The same rig the editor and the playground show. The README's own
+        // The same rig the editor shows. The README's own
         // hero was recorded off the capsule fallback, so the one picture most
         // people ever see of stage mode was the thing that renders when you
         // have NOT supplied a model.
