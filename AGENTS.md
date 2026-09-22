@@ -397,6 +397,34 @@ overrides ride on the slot: `papers: [{ preset, states: { states: { hover:
 | `crumple` | progress, coarseness, ball, seed | a sheet crushed in a fist — an irregular network of creases |
 | `ribbon` | pool, curl, drape | a strip hung the full drop of a room, pooling where it lands. The one behavior that reads its sheet: the pool begins a fraction above the BOTTOM edge, not at the centre |
 | `settle` | relax, lift, corner, slack | a sheet that has landed and relaxed. The pose AFTER `fall`, and everything in it is static — a settled sheet that ripples is one nobody believes |
+| `sticker` | progress, corner, skew, tack, radius, flap | a sticker coming off. A tight bend at the peel front, then a straight flap (not a page curl rolled forever). `tack` is stick-slip: the front lags the pull, then jumps, and the last edge clings before it snaps free past progress 0.86, on its own clock when dragged. Pure in progress, so scrubbing and yoyo replay it exactly |
+
+### Mount: a sheet stuck to something
+
+`mount` puts the sheet ON an object. The sheet is laid onto the surface along geodesics (a spine through its centre, ribs out from it: the way hands smooth a sticker down), so it hugs a doubly-curved surface with its lengths kept. Every behavior still works out flat, and the mount carries the answer onto the curve. A peel on a lemon is a peel on a table, wrapped.
+
+```tsx
+<Paper preset="peeling-sticker" interactive />   // click any sticker and pull
+
+<Paper
+  stock="sticker"
+  content={{ type: 'image', src: '/my-logo.svg', fit: 'contain' }}
+  surface={{ dieCut: { margin: 0.015 } }}      // cut to the art's own alpha, with a vinyl margin
+  behavior={{ type: 'sticker', progress: 0.4, tack: 0.6 }}
+  mount={{ object: 'model', model: '/bottle.glb', azimuth: 20, elevation: 10 }}
+/>
+```
+
+- `object`: `'lemon'` is BUILT, not loaded (procedural body and a pitted skin shader), so the preset ships no asset. `'model'` takes a .glb URL or data URL, normalised to `size`; a missing or failed model falls back to the lemon rather than leaving the sheet stuck to nothing.
+- Placement is `azimuth`/`elevation`/`roll` in the object's own space, which leans by `tilt` and turns by `spin`. `stickers` is a list of other stickers already stuck down (static decor, same wrap and press).
+- `press` is how much of the skin shows up through the sheet while it is stuck (same pore field, same point, so the pits line up). `reveal` is the patch it leaves: paler, glossier, pits half filled, a trace of glue.
+- Stuck paper is SHELL-mapped (height along the normal where it lies). Lifted paper is placed RIGIDLY in the surface frame at the point of the peel front it left from, so a flap goes straight like vinyl instead of bending round the fruit at height. Glue strands span the gap at the front while `tension` holds.
+- EVERY sticker peels. The main one is the sheet itself (its behavior, its timeline, its own drag handle relative to where its corner already is); the `stickers` list are peeled by hand, each with its own state: pull direction is peel direction, `mount.tack` is their glue, and past the last edge they let go on their own. That peel state is the viewer's, never the config's.
+- Once free, a sticker FLIES AWAY: past progress 0.8 of `sticker` (0.7 lets go, 0.8 takes off). It springs off along its own normal to clear the object, then the air carries it out to the side it was already on (a sticker on the left leaves left, so it never crosses back through the object), rising, fluttering and turning over, and at 1 it is out of the shot and no longer drawn or hit. Rigid and in the world, and pure in progress, so scrubbing flies it back and sticks it down. It used to fall to the floor, and a pile of rigid curved stickers landing in one spot intersected each other. Click the object and every hand-peeled sticker that has flown comes back.
+- An uploaded model is read as DRAWN: vertices go through `getVertexPosition` (skin and morph targets), because a rigged model's buffer holds its bind pose. Normals are welded across UV seams (`weldedNormals`) except where back-to-back faces would cancel. The lay-up walker keeps to the side of the surface it started on (a thin wing's far face points the other way) and carries on flat past an open edge instead of piling the rest of the row onto it. `azimuth`/`elevation` name a real RAY from the model's centre (its outermost crossing); the old nearest-point-to-far-away put every sticker on whatever stuck out furthest. And a walked lay-up that does not hold together over the sticker (rows a hand apart where it straddles a joint, the shredded-fan look) is replaced by a PROJECTED one: dropped from the tangent plane onto the surface like a decal, smoothed but never pushed under it, so it bridges creases and overhangs gaps. Stated limit: a sticker cannot know about a texture's alpha, so on a model whose outline is painted (a butterfly's wing on a quad) it can sit over the transparent part.
+- Hero path only, and exclusive with the cloth and strip simulations (schema-enforced: both would claim the vertices).
+
+`stickerArt(name)` returns the bundled sticker art as a data URL (real marks from AI and design tools, as examples, each on a die-cut shape).
 
 ### Memory — the paper keeps what you do to it
 
@@ -530,7 +558,7 @@ it when the paper never reaches the ground. Use `strip` for the pile.
 
 ### Presets
 
-Built-ins: `receipt-unroll`, `letter-fold`, `washed-letter`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`, `crumpled-note`, `settled-sheet`, `paper-ribbon`, `paper-roll`, `toilet-roll`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
+Built-ins: `receipt-unroll`, `letter-fold`, `washed-letter`, `vintage-note`, `hero-peel`, `page-flip`, `hanging-poster`, `pinned-sheet`, `flying-note`, `blank-sheet`, `photo-print`, `typed-note`, `postage-stamp`, `crumpled-note`, `settled-sheet`, `paper-ribbon`, `paper-roll`, `toilet-roll`, `peeling-sticker`. A preset is a `.paper` JSON object validated by `paperConfigSchema`; `getPreset(name)`, `parsePreset(json)`, `serializePreset(config)`, `diffConfig(config)` (non-default values only).
 
 **If the user hands you a `.paper` file** (they made it in the editor, or someone sent it to them), it is already a preset object — import the JSON and pass it straight through. Do NOT translate it into individual props; the whole point of the format is that it round-trips.
 

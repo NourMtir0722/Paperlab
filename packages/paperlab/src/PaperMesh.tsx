@@ -11,6 +11,7 @@ import type {
   ContentConfigInput,
   DeformerInstanceConfigInput,
   MemoryConfigInput,
+  MountConfigInput,
   PaperConfig,
   PaperConfigInput,
   PhysicsConfigInput,
@@ -46,6 +47,9 @@ import { usePrefersReducedMotion } from './a11y'
 import { quantizeProgress, quantizeTime } from './motion/onTwos'
 import { usePaperStates } from './states/usePaperStates'
 import type { PaperStateMachine, StateEvent } from './states/machine'
+import { MountScene, hide, useMountHost } from './mount/Mount'
+import { MountRig } from './mount/rig'
+import { buildWrap } from './mount/wrap'
 
 export interface PaperMeshProps {
   /** Built-in preset name, or a (partial) preset object. Props below override it. */
@@ -73,6 +77,11 @@ export interface PaperMeshProps {
   /** Scene-level presentation that travels with the paper (lighting). */
   scene?: SceneConfigInput
   physics?: PhysicsConfigInput | 'cloth'
+  /**
+   * What the sheet is stuck to — a lemon, or any model. The sheet hugs its
+   * surface, takes its texture, and every behavior is carried onto the curve.
+   */
+  mount?: MountConfigInput
   onTwos?: boolean
   /** Show draggable behavior handles; cloth sheets become grabbable. */
   interactive?: boolean
@@ -198,6 +207,7 @@ function configInputs(props: PaperMeshProps): unknown[] {
     props.memory ?? null,
     props.scene ?? null,
     props.physics ?? null,
+    props.mount ?? null,
     props.onTwos ?? null,
   ]
 }
@@ -231,6 +241,7 @@ export function resolveConfig(props: PaperMeshProps): PaperConfig {
   if (props.memory) overrides.memory = { ...base.memory, ...props.memory }
   if (props.scene) overrides.scene = { ...base.scene, ...props.scene }
   if (props.physics) overrides.physics = props.physics
+  if (props.mount) overrides.mount = props.mount
   if (props.onTwos !== undefined) overrides.onTwos = props.onTwos
   return paperConfigSchema.parse(mergeConfig(base as PaperConfigInput, overrides))
 }
@@ -248,6 +259,7 @@ const planeNormal = new THREE.Vector3()
 const anchorScratch = new THREE.Vector3()
 const worldScratch = new THREE.Vector3()
 const quatScratch = new THREE.Quaternion()
+const DEG = Math.PI / 180
 
 /**
  * The atom: one sheet of paper, hero-mode CPU path. The cloth sim solves the
@@ -298,6 +310,9 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const playingRef = useRef(false)
   const tweenRef = useRef<gsap.core.Tween | null>(null)
   const draggingRef = useRef<string | null>(null)
+  /** Where the first handle is in the sheet's flat space this frame, and a sheet-grab's offset from it. */
+  const handleFlat = useRef({ x: 0, y: 0 })
+  const dragOffset = useRef({ x: 0, y: 0 })
 
   const configRef = useRef(config)
   configRef.current = config
@@ -337,6 +352,9 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
    * the shape path is whether a sim is present and which one.
    */
   const physicsKey = typeof config.physics === 'object' ? config.physics.type : config.physics
+
+  /** Stuck to something. The schema keeps a mounted sheet off the simulations. */
+  const mounted = Boolean(config.mount)
 
   /**
    * The crease LINES, without their depths.
@@ -450,7 +468,16 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       const nodes = stripNodeCount(config.sheet.height, strip.perforation)
       return new THREE.PlaneGeometry(config.sheet.width, config.sheet.height, 1, nodes - 1)
     }
-    if (!isCloth) return createSheetGeometry(config.sheet, minSegments, autoSegments)
+    if (!isCloth) {
+      const sheet = createSheetGeometry(config.sheet, minSegments, autoSegments)
+      // How stuck each vertex is, for the press shading — written every
+      // frame by the mount rig, and fully stuck until it is.
+      if (mounted) {
+        const count = sheet.attributes.position!.count
+        sheet.setAttribute('aAttach', new THREE.BufferAttribute(new Float32Array(count).fill(1), 1))
+      }
+      return sheet
+    }
     // Cloth: explicit capped grid so sim particles == mesh vertices. Square,
     // because the sim's constraints are laid out on a square lattice.
     //
@@ -469,6 +496,7 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     isCloth,
     isStrip,
     isStrip ? (config.physics as StripConfig).perforation : 0,
+    mounted,
   ])
 
   // Imperatively-created geometry is ours to free — R3F only auto-disposes
@@ -530,7 +558,47 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   const coupling = useMemo(() => (sim ? new DamageCoupling(sim) : null), [sim])
 
   const stock = getStock(config.stock)
-  const texture = useContentTexture(config.content, config.sheet, stock)
+  const texture = useContentTexture(config.content, config.sheet, stock, config.surface.dieCut)
+
+  // The object it is stuck to, and the sheet laid onto it. The lay-up reaches
+  // well past the sheet's own edges: a flap peeled back flat lies beyond the
+  // far edge, and a released sheet springs further still.
+  const mount = config.mount
+  const host = useMountHost(mount)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the placement and the sheet's size, not on every mount field.
+  const rig = useMemo(() => {
+    if (!mount || !host) return null
+    const { width, height } = config.sheet
+    const reach = Math.max(width, height) * 1.25
+    const wrap = buildWrap(
+      host.surface,
+      { azimuth: mount.azimuth, elevation: mount.elevation, roll: mount.roll },
+      width / 2 + reach,
+      height / 2 + reach,
+      61,
+      [width / 2, height / 2],
+    )
+    return new MountRig(wrap, config.sheet)
+  }, [host, mount?.azimuth, mount?.elevation, mount?.roll, config.sheet.width, config.sheet.height])
+  useEffect(() => {
+    dirtyRef.current = true
+    return () => rig?.dispose()
+  }, [rig])
+  const mountPress = mount?.press
+  const press = useMemo(
+    () =>
+      mountPress !== undefined && host?.skin
+        ? { amount: mountPress, scale: host.skin.scale, depth: host.skin.depth }
+        : null,
+    // Not `mount`: it is a new object after every config parse, and this is
+    // handed to a dozen materials.
+    [mountPress, host],
+  )
+  const hostRef = useRef<THREE.Group>(null)
+  const hostRotation = useMemo(
+    () => new THREE.Euler(0, (mount?.spin ?? 0) * DEG, (mount?.tilt ?? 0) * DEG, 'ZYX'),
+    [mount?.spin, mount?.tilt],
+  )
   const backTexture = useContentTexture(config.content.back, config.sheet, stock)
 
   // Per-frame config: when a state machine is live it OWNS the animated numeric
@@ -767,22 +835,65 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
       // actually the paper being folded.
       if (raw && creases.observe(raw, setAmount)) props.onCrease?.(creases.creases)
 
-      const stack = withMemory(raw, cfg, creases.creases)
+      // A mounted sheet has to be laid onto its object even when nothing
+      // deforms it, so an empty stack still runs there.
+      const stack = withMemory(raw, cfg, creases.creases) ?? (rig ? [] : null)
       if (!stack) return false
       dirtyRef.current = false
 
       const ctx = { t: now, sheet: cfg.sheet }
       applyDeformerStack(geometry, base, stack, ctx)
+      if (rig) {
+        // Worked out flat, then carried onto the object — see `mount/wrap.ts`.
+        const position = geometry.attributes.position as THREE.BufferAttribute
+        const attach = geometry.attributes.aAttach as THREE.BufferAttribute | undefined
+        // The peel first: the shell reads where its front is to hinge the flap.
+        rig.update(stack, ctx)
+        rig.shell(
+          position.array as Float32Array,
+          base,
+          (attach?.array as Float32Array) ?? null,
+          position.count,
+        )
+        // Free, and flying away: in the world, so it needs to know how the
+        // object leans. Once it is out of the shot it is not drawn at all.
+        const flyOptions = behavior?.fly ? effectiveOptions(now) : null
+        const fly = flyOptions && behavior?.fly ? behavior.fly(flyOptions) : 0
+        if (fly > 0 && hostRef.current) {
+          hostRef.current.updateWorldMatrix(true, false)
+          const columns = (geometry.parameters as { widthSegments: number }).widthSegments + 1
+          rig.fly(
+            position.array as Float32Array,
+            position.count,
+            columns,
+            fly,
+            hostRef.current.matrixWorld,
+            0,
+          )
+        }
+        if (meshRef.current) hide(meshRef.current, fly >= 0.999)
+        if (attach) attach.needsUpdate = true
+        computeSheetNormals(geometry)
+        geometry.computeBoundingSphere()
+      }
 
       if (props.interactive && behavior?.handles) {
         const o = effectiveOptions(now)
         behavior.handles.forEach((h, i) => {
           const mesh = handleRefs.current[i]
-          if (!mesh || !o) return
+          // A mounted sheet draws no handle — the sticker itself is what you
+          // take hold of — but a grab still needs to know where the first
+          // one is, so it is worked out either way.
+          if ((!mesh && !(rig && i === 0)) || !o) return
           const [u, v] = h.anchor(o, cfg.sheet)
           anchorScratch.set((u - 0.5) * cfg.sheet.width, (v - 0.5) * cfg.sheet.height, 0)
           displacePoint(anchorScratch, u, v, stack, ctx)
-          mesh.position.copy(anchorScratch)
+          if (i === 0) {
+            handleFlat.current.x = anchorScratch.x
+            handleFlat.current.y = anchorScratch.y
+          }
+          if (rig) rig.place((u - 0.5) * cfg.sheet.width, (v - 0.5) * cfg.sheet.height, anchorScratch)
+          mesh?.position.copy(anchorScratch)
         })
       }
       return true
@@ -827,6 +938,20 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   })
 
   const localDragPoint = (e: ThreeEvent<PointerEvent>): { x: number; y: number } | null => {
+    const hostGroup = hostRef.current
+    if (rig && hostGroup) {
+      // On an object the sheet's plane is the tangent plane where it is
+      // stuck; the drag is read there, in the sheet's own x and y.
+      const wrap = rig.wrap
+      hostGroup.updateWorldMatrix(true, false)
+      planeNormal.copy(wrap.normal).transformDirection(hostGroup.matrixWorld)
+      dragPoint.copy(wrap.origin).applyMatrix4(hostGroup.matrixWorld)
+      dragPlane.setFromNormalAndCoplanarPoint(planeNormal, dragPoint)
+      const hit = e.ray.intersectPlane(dragPlane, dragPoint)
+      if (!hit) return null
+      hostGroup.worldToLocal(hit).sub(wrap.origin)
+      return { x: hit.dot(wrap.axisX), y: hit.dot(wrap.axisY) }
+    }
     const group = groupRef.current
     if (!group) return null
     planeNormal.set(0, 0, 1).applyQuaternion(group.getWorldQuaternion(quatScratch))
@@ -843,10 +968,31 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
     const local = localDragPoint(e)
     const o = effectiveOptions(0)
     if (!handleSpec || !local || !o) return
+    local.x += dragOffset.current.x
+    local.y += dragOffset.current.y
     Object.assign(overridesRef.current, handleSpec.drag(local, o, configRef.current.sheet))
     dirtyRef.current = true
     const p = overridesRef.current[behavior.progressParam]
     if (typeof p === 'number') props.onProgress?.(p)
+    // Past the point a hand can steer, the rest plays on its own.
+    const commit = behavior.commit
+    if (commit && typeof p === 'number' && p >= commit.from) {
+      draggingRef.current = null
+      if (controls) controls.enabled = true
+      const param = behavior.progressParam
+      const state = { p }
+      gsap.to(state, {
+        p: commit.to,
+        duration: commit.duration,
+        ease: 'none',
+        onUpdate: () => {
+          overridesRef.current[param] = state.p
+          dirtyRef.current = true
+          props.onProgress?.(state.p)
+        },
+        onComplete: () => props.onBehaviorChange?.({ ...overridesRef.current }),
+      })
+    }
   }
 
   // Cloth grab: pick the particle under the pointer, then drag it on a
@@ -950,86 +1096,143 @@ export const PaperMesh = forwardRef<PaperHandle, PaperMeshProps>(function PaperM
   // are driven by the field's carry controller through `sendState`.
   const sendState = (event: StateEvent) => machineRef.current?.send(event)
 
+  /**
+   * On an object, the sheet itself is the handle: take hold of the sticker
+   * anywhere and pull. The drag is RELATIVE — it carries the corner from
+   * where it already is by however far the hand moves — so taking hold of the
+   * middle does not snap the peel to wherever the middle is.
+   */
+  const grabsSheet = Boolean(mounted && props.interactive && behavior?.handles?.length)
+  const sheetDown = (e: ThreeEvent<PointerEvent>) => {
+    const spec = behavior?.handles?.[0]
+    const local = localDragPoint(e)
+    if (!spec || !local) return
+    e.stopPropagation()
+    dragOffset.current.x = handleFlat.current.x - local.x
+    dragOffset.current.y = handleFlat.current.y - local.y
+    draggingRef.current = spec.id
+    pause()
+    if (controls) controls.enabled = false
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+  }
+  const handleUp = (e: ThreeEvent<PointerEvent>) => {
+    if (!draggingRef.current) return
+    draggingRef.current = null
+    if (controls) controls.enabled = true
+    ;(e.target as Element).releasePointerCapture(e.pointerId)
+    props.onBehaviorChange?.({ ...overridesRef.current })
+  }
+
+  const sheetMesh = (
+    <mesh
+      ref={meshRef}
+      // A mounted sheet waits for its object rather than floating flat for a frame.
+      visible={!mounted || Boolean(rig)}
+      geometry={geometry}
+      castShadow
+      receiveShadow
+      frustumCulled={false}
+      onPointerOver={statesLive ? () => sendState('enter') : undefined}
+      onPointerOut={statesLive ? () => sendState('leave') : undefined}
+      onPointerDown={
+        isCloth || isStrip || statesLive || grabsSheet
+          ? (e) => {
+              if (isCloth) clothDown(e)
+              if (isStrip) stripDown(e)
+              if (grabsSheet) sheetDown(e)
+              if (statesLive) sendState('down')
+            }
+          : undefined
+      }
+      onPointerMove={isCloth ? clothMove : isStrip ? stripMove : grabsSheet ? onHandleDrag : undefined}
+      onPointerUp={
+        isCloth || isStrip || statesLive || grabsSheet
+          ? (e) => {
+              if (isCloth) clothUp(e)
+              if (isStrip) stripUp(e)
+              if (grabsSheet) handleUp(e)
+              if (statesLive) sendState('up')
+            }
+          : undefined
+      }
+    >
+      <PaperMaterial
+        stock={stock}
+        texture={texture}
+        backTexture={backTexture}
+        surface={config.surface}
+        thickness={config.sheet.thickness}
+        sheet={config.sheet}
+        lighting={config.scene.lighting}
+        creases={shadedCreases}
+        damage={props.damage}
+        press={press}
+      />
+    </mesh>
+  )
+
+  const handles =
+    props.interactive &&
+    // Any simulation, not cloth alone: a sim owns the vertices, so there
+    // is no deformer stack for a handle to drive. Harmless as `!isCloth`
+    // only because the schema makes a sim and a behavior exclusive — the
+    // intent is what is written here.
+    !simKind &&
+    // On an object the sheet is its own handle — see `grabsSheet`.
+    !mounted &&
+    behavior?.handles?.map((h, i) => (
+      <mesh
+        key={h.id}
+        // Marked as chrome so a renderer that is producing a PICTURE can
+        // leave it out. The handle is an editing affordance, and it is
+        // drawn with `depthTest: false` precisely so it sits on top of
+        // the sheet — which makes it the most prominent thing in any
+        // frame captured for export. The editor's capture rig reads this.
+        userData={{ paperlabChrome: true }}
+        ref={(m) => {
+          handleRefs.current[i] = m
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          dragOffset.current.x = 0
+          dragOffset.current.y = 0
+          draggingRef.current = h.id
+          pause()
+          if (controls) controls.enabled = false
+          ;(e.target as Element).setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={onHandleDrag}
+        onPointerUp={handleUp}
+      >
+        <sphereGeometry args={[0.035, 16, 16]} />
+        <meshBasicMaterial color="#4f7cff" depthTest={false} transparent opacity={0.9} />
+      </mesh>
+    ))
+
+  if (mount && host) {
+    return (
+      <group ref={groupRef} position={props.position} rotation={baseRotation}>
+        {/* Host space: the object, the sheet laid on it, and its handles, leaning together. */}
+        <group ref={hostRef} rotation={hostRotation}>
+          <MountScene
+            mount={mount}
+            host={host}
+            rig={rig}
+            cut={config.surface.dieCut ? texture : null}
+            press={press}
+            interactive={Boolean(props.interactive)}
+          />
+          {sheetMesh}
+          {handles}
+        </group>
+      </group>
+    )
+  }
+
   return (
     <group ref={groupRef} position={props.position} rotation={baseRotation}>
-      <mesh
-        ref={meshRef}
-        geometry={geometry}
-        castShadow
-        receiveShadow
-        frustumCulled={false}
-        onPointerOver={statesLive ? () => sendState('enter') : undefined}
-        onPointerOut={statesLive ? () => sendState('leave') : undefined}
-        onPointerDown={
-          isCloth || isStrip || statesLive
-            ? (e) => {
-                if (isCloth) clothDown(e)
-                if (isStrip) stripDown(e)
-                if (statesLive) sendState('down')
-              }
-            : undefined
-        }
-        onPointerMove={isCloth ? clothMove : isStrip ? stripMove : undefined}
-        onPointerUp={
-          isCloth || isStrip || statesLive
-            ? (e) => {
-                if (isCloth) clothUp(e)
-                if (isStrip) stripUp(e)
-                if (statesLive) sendState('up')
-              }
-            : undefined
-        }
-      >
-        <PaperMaterial
-          stock={stock}
-          texture={texture}
-          backTexture={backTexture}
-          surface={config.surface}
-          thickness={config.sheet.thickness}
-          sheet={config.sheet}
-          lighting={config.scene.lighting}
-          creases={shadedCreases}
-          damage={props.damage}
-        />
-      </mesh>
-      {props.interactive &&
-        // Any simulation, not cloth alone: a sim owns the vertices, so there
-        // is no deformer stack for a handle to drive. Harmless as `!isCloth`
-        // only because the schema makes a sim and a behavior exclusive — the
-        // intent is what is written here.
-        !simKind &&
-        behavior?.handles?.map((h, i) => (
-          <mesh
-            key={h.id}
-            // Marked as chrome so a renderer that is producing a PICTURE can
-            // leave it out. The handle is an editing affordance, and it is
-            // drawn with `depthTest: false` precisely so it sits on top of
-            // the sheet — which makes it the most prominent thing in any
-            // frame captured for export. The editor's capture rig reads this.
-            userData={{ paperlabChrome: true }}
-            ref={(m) => {
-              handleRefs.current[i] = m
-            }}
-            onPointerDown={(e) => {
-              e.stopPropagation()
-              draggingRef.current = h.id
-              pause()
-              if (controls) controls.enabled = false
-              ;(e.target as Element).setPointerCapture(e.pointerId)
-            }}
-            onPointerMove={onHandleDrag}
-            onPointerUp={(e) => {
-              if (!draggingRef.current) return
-              draggingRef.current = null
-              if (controls) controls.enabled = true
-              ;(e.target as Element).releasePointerCapture(e.pointerId)
-              props.onBehaviorChange?.({ ...overridesRef.current })
-            }}
-          >
-            <sphereGeometry args={[0.035, 16, 16]} />
-            <meshBasicMaterial color="#4f7cff" depthTest={false} transparent opacity={0.9} />
-          </mesh>
-        ))}
+      {sheetMesh}
+      {handles}
     </group>
   )
 })

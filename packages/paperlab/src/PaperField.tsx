@@ -23,6 +23,7 @@ import { DEFAULT_SHEET, getLayout } from './field/layouts'
 import { useStable } from './core/stable'
 import type { SheetLayoutOptions } from './field/sheetGrid'
 import { fitCamera, resolveLayoutOptions } from './field/framing'
+import { CANVAS_SHADOWS } from './scene/shadows'
 
 // The field system lives in field/*; this module is the public composition,
 // so it forwards only what the public API names. The rest of field/* is
@@ -325,7 +326,7 @@ export const PaperField = forwardRef<THREE.Group, PaperFieldProps>(function Pape
   return (
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       <DropZoneContext.Provider value={registry}>
-        <Canvas shadows camera={{ position: [0, 0.6, 5.2], fov: 45 }} dpr={[1, 2]}>
+        <Canvas shadows={CANVAS_SHADOWS} camera={{ position: [0, 0.6, 5.2], fov: 45 }} dpr={[1, 2]}>
           <FitCamera {...meshProps} />
           <PaperBackdrop backdrop={rig.backdrop} />
           {/* The floor and footprint a gallery of sheets needs — a lone sheet

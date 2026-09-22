@@ -26,6 +26,8 @@ export type Control =
       label: string
       value: string
       options: string[]
+      /** The note beside an option that is listed but cannot be picked yet. */
+      unavailable?: (option: string) => string | null
       emphasis?: Emphasis
       onChange: (v: string) => void
     }
@@ -127,7 +129,8 @@ export const select = (
   options: string[],
   onChange: (v: string) => void,
   label?: string,
-): Control => ({ kind: 'select', key, label: label ?? key, value, options, onChange })
+  unavailable?: (option: string) => string | null,
+): Control => ({ kind: 'select', key, label: label ?? key, value, options, onChange, unavailable })
 
 export const toggle = (
   key: string,

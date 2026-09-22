@@ -57,6 +57,35 @@ export const parityCases: ParityCase[] = [
     t: 0,
   },
   {
+    name: 'lift: part-way, rolled back flat',
+    stack: [
+      { type: 'lift', options: { angle: 145, front: 0.45, radius: 0.05, flap: 180, tension: 0, release: 0 } },
+    ],
+    sheet: { width: 0.8, height: 0.5 },
+    t: 0,
+  },
+  {
+    // Past the arc into the straight run, with the glue holding: the fillet
+    // on the stuck side and the tightened bend both have to agree.
+    name: 'lift: held flap under tension',
+    stack: [
+      {
+        type: 'lift',
+        options: { angle: -30, front: 0.7, radius: 0.08, flap: 120, tension: 0.8, release: 0 },
+      },
+    ],
+    sheet: { width: 1, height: 1.4 },
+    t: 0,
+  },
+  {
+    name: 'lift: released and springing away',
+    stack: [
+      { type: 'lift', options: { angle: 90, front: 1, radius: 0.04, flap: 168, tension: 0, release: 0.6 } },
+    ],
+    sheet: { width: 0.6, height: 0.6 },
+    t: 0,
+  },
+  {
     name: 'bend: positive arc at an angle',
     stack: [{ type: 'bend', options: { curvature: 1.2, angle: 33 } }],
     sheet: { width: 1, height: 1.4 },

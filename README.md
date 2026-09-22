@@ -98,7 +98,7 @@ registries — `pnpm media`, `pnpm shot:catalogue`, `pnpm sheet`. No mockups.
 
 ### Behaviors — 12
 
-- **Behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`, `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`: human-named params ("tightness", not "cylinderRadius") over a stack of pure geometry deformers. Each behavior nominates the two or three params that *are* it, so tools can lead with those. Draggable handles when `interactive`.
+- **Behaviors** — `peel`, `unroll`, `flip`, `letter-fold`, `hang`, `fly`, `fall`, `carry`, `flight`, `crumple`, `settle`, `ribbon`, `sticker`: human-named params ("tightness", not "cylinderRadius") over a stack of pure geometry deformers. Each behavior nominates the two or three params that *are* it, so tools can lead with those. Draggable handles when `interactive`.
 
 Underneath them are seven **deformers** — `roll`, `curl`, `bend`, `fold`, `wave`, `drape`, `crumple` — each a pure vertex mapping written twice: a JS implementation for the CPU/hero path and a GLSL twin for the GPU/field path. A 37-case golden-vector gate holds the two identical, and a separate test asserts each one actually draws a surface. All arc-length preserving, because paper does not stretch.
 
@@ -180,7 +180,7 @@ And it is navigable rather than a video. It drifts on its own until you touch it
 - **A floor** — `scene.floor` puts dark, matte ground under the paper. The contact shadow, a simulated sheet and anything the paper lets go of all meet at the same height, so a falling piece lands on the thing casting its shadow instead of through it.
 - **Interaction states** — a preset can carry `states`: overrides-on-base diffs keyed `rest` / `hover` / `pressed` / `picked` / `placed`, with the triggers built in. Drag a stamp past its threshold and it tears off its sheet (the perforation edges facing its neighbours flip to torn), release it over a `<DropZone>` and it settles, release it anywhere else and it flutters home. The whole flow is reachable from the keyboard: focus a paper, Enter picks, arrows move between zones, Enter places, Escape returns it.
 - **Hardware that holds the paper up** — thread to the ceiling or a rod across the top edge, gripped by a clip or a peg. A hung thing that shows what holds it stops reading as a rectangle that happens to float.
-- **Presets** — 18 paper presets and 6 stage presets, and everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
+- **Presets** — 19 paper presets and 6 stage presets, and everything serializes to `.paper` JSON validated by a zod schema. Diffable, forkable, shareable.
 - **Agent-first export** — the editor's **Copy for AI** produces a self-contained brief you paste into a coding agent: install line, inlined component, placement contract, and a verification step the agent can self-check. See [AGENTS.md](AGENTS.md) and [docs/llms.txt](docs/llms.txt).
 - **Accessible by default** — `prefers-reduced-motion` freezes behaviors at their pose and disables physics, entrances and the fire's simulations, a hidden DOM mirror carries the content for screen readers and find-in-page, and a flat DOM fallback renders when WebGL isn't available.
 

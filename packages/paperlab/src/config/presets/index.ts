@@ -1,4 +1,5 @@
 import { paperConfigSchema, type PaperConfig, type PaperConfigInput } from '../schema'
+import { stickerArt } from '../../mount/stickerArt'
 
 /**
  * Built-in `.paper` presets. A preset is the serialized closure of one Paper —
@@ -6,6 +7,68 @@ import { paperConfigSchema, type PaperConfig, type PaperConfigInput } from '../s
  * objects, validated on access.
  */
 const builtins: Record<string, PaperConfigInput> = {
+  /**
+   * A sticker peeling off a lemon — the one preset where the paper is stuck
+   * to something.
+   *
+   * Everything that sells it is about the lemon, not the sticker. The sticker
+   * is laid onto the fruit along geodesics so it hugs the curve instead of
+   * sitting on it like a card; it is pressed into the skin, so the pores come
+   * up through the vinyl; the glue fights at the front before it lets go; and
+   * the skin it leaves is paler and glossier than the skin round it. The
+   * lemon is built rather than scanned, so the preset ships no asset and
+   * fetches nothing. The stickers are real marks, as examples: swap any of
+   * them for your own art.
+   *
+   * Lit raking, black behind: the grazing key is what makes the skin and
+   * the peel read as relief.
+   */
+  'peeling-sticker': {
+    meta: { name: 'Peeling sticker', tags: ['sticker', 'peel', 'mount', 'hero'] },
+    sheet: { width: 0.43, height: 0.172, thickness: 0.06 },
+    stock: 'sticker',
+    content: { type: 'image', src: stickerArt('paper'), fit: 'contain', alt: 'A Paper sticker' },
+    behavior: { type: 'sticker', progress: 0.42, corner: 'top-left', tack: 0.6, radius: 0.03, flap: 150 },
+    surface: { dieCut: { margin: 0.012 } },
+    mount: {
+      object: 'lemon',
+      size: 1.05,
+      pores: 0.5,
+      tilt: -14,
+      azimuth: 0,
+      elevation: 4,
+      roll: -8,
+      stickers: [
+        { src: stickerArt('stripe'), width: 0.167, height: 0.167, azimuth: -34, elevation: 34, roll: 12 },
+        { src: stickerArt('openai'), width: 0.186, height: 0.18, azimuth: 16, elevation: 38, roll: 14 },
+        { src: stickerArt('quiver'), width: 0.347, height: 0.112, azimuth: 22, elevation: -30, roll: -16 },
+        { src: stickerArt('higgsfield'), width: 0.167, height: 0.167, azimuth: 58, elevation: 18, roll: 10 },
+        { src: stickerArt('anthropic'), width: 0.186, height: 0.174, azimuth: -56, elevation: -6, roll: -12 },
+        { src: stickerArt('perplexity'), width: 0.174, height: 0.174, azimuth: -22, elevation: -46, roll: 6 },
+        {
+          src: stickerArt('huggingface'),
+          width: 0.161,
+          height: 0.161,
+          azimuth: 70,
+          elevation: -22,
+          roll: -8,
+        },
+        { src: stickerArt('figma'), width: 0.136, height: 0.136, azimuth: -80, elevation: 30, roll: -10 },
+        { src: stickerArt('vercel'), width: 0.124, height: 0.124, azimuth: 44, elevation: 44, roll: 0 },
+        { src: stickerArt('linear'), width: 0.174, height: 0.112, azimuth: -88, elevation: -34, roll: 20 },
+        { src: stickerArt('cursor'), width: 0.136, height: 0.136, azimuth: 95, elevation: 42, roll: 8 },
+      ],
+    },
+    scene: {
+      // Raking: a hard key skimming across the fruit from the side, which is
+      // the one light that turns the pores and the lifting edge into relief.
+      lighting: 'raking',
+      backdrop: { color: '#000000', fade: 0, blur: 0 },
+      // A stop brighter, and a little room light, so the side away from the
+      // key falls into shadow without falling into nothing.
+      light: { exposure: 1.25, studio: 0.6 },
+    },
+  },
   'receipt-unroll': {
     meta: { name: 'Receipt unroll', tags: ['receipt', 'unroll', 'hero'] },
     sheet: { width: 1, height: 2.6 },

@@ -3,6 +3,7 @@ import {
   clothConfigSchema,
   contentSchema,
   memorySchema,
+  mountSchema,
   paperConfigSchema,
   sceneSchema,
   sheetSchema,
@@ -95,6 +96,12 @@ export function diffConfig(config: PaperConfig): PaperConfigInput {
   // the editor showed them and nothing that left the editor carried them.
   const scene = diffAgainst(config.scene as never, sceneSchema.parse({}) as never)
   if (Object.keys(scene).length > 0) out.scene = scene
+  // The object it is stuck to. `object` is kept even at its default, so a
+  // diffed mount still says what it is mounted ON rather than relying on a
+  // default a reader cannot see.
+  if (config.mount) {
+    out.mount = diffAgainst(config.mount as never, mountSchema.parse({}) as never, ['object'])
+  }
   if (config.onTwos) out.onTwos = true
   // States are already diffs on the base — emit them whole.
   if (config.states) out.states = config.states
@@ -135,8 +142,14 @@ export function withoutUploads<T>(value: T): { value: T; replaced: number } {
     if (typeof node === 'string') {
       if (!node.startsWith('data:')) return node
       replaced++
-      const extension = node.startsWith('data:image/png') ? 'png' : 'jpg'
-      return `/paperlab-image-${replaced}.${extension}`
+      const extension = node.startsWith('data:image/png')
+        ? 'png'
+        : node.startsWith('data:image/svg')
+          ? 'svg'
+          : node.startsWith('data:model/') || node.startsWith('data:application/octet-stream')
+            ? 'glb'
+            : 'jpg'
+      return `/paperlab-${extension === 'glb' ? 'model' : 'image'}-${replaced}.${extension}`
     }
     if (Array.isArray(node)) return node.map(walk)
     if (node && typeof node === 'object') {

@@ -40,6 +40,7 @@ import { pickImageAsDataUrl } from '../chrome/pickImage'
 import { lightControls } from './lightControls'
 import { memoryControls } from './memoryControls'
 import { backdropControls } from './backdropControls'
+import { mountControls, stickerControls } from './mountControls'
 
 /**
  * Inspector of the selection: a tree of `Control` descriptors rendered by the
@@ -90,13 +91,38 @@ export function Inspector() {
         ? [folder('More', moreFields, { collapsed: true, key: 'behavior-more' })]
         : moreFields),
     ]),
+    // On an object, the stickers are what people came to change: their own
+    // object, their own art, as many as they like. Open, and right under the
+    // peel, rather than folded away in Mount.
+    ...(config.mount
+      ? [
+          folder(
+            'Stickers',
+            stickerControls(
+              config.mount,
+              (next, opts) => patchConfig({ mount: next } as never, opts),
+              (src) =>
+                patchConfig(
+                  {
+                    content: { type: 'image', src, fit: 'contain' },
+                    surface: {
+                      ...config.surface,
+                      dieCut: config.surface.dieCut ?? { margin: 0.015, color: '#ffffff' },
+                    },
+                  } as never,
+                  { external: true },
+                ),
+            ),
+          ),
+        ]
+      : []),
     folder(
       'Sheet',
       [
-        num('width', config.sheet.width, { min: 0.2, max: 4, step: 0.05 }, (v) =>
+        num('width', config.sheet.width, { min: 0.1, max: 4, step: 0.01 }, (v) =>
           patchConfig({ sheet: { width: v } }),
         ),
-        num('height', config.sheet.height, { min: 0.2, max: sheetHeightMax(config), step: 0.05 }, (v) =>
+        num('height', config.sheet.height, { min: 0.1, max: sheetHeightMax(config), step: 0.01 }, (v) =>
           patchConfig({ sheet: { height: v } }),
         ),
       ],
@@ -117,6 +143,13 @@ export function Inspector() {
       memoryControls(config.memory, config.stock, config.sheet, (patch) =>
         patchConfig({ memory: patch as never }),
       ),
+      { collapsed: true },
+    ),
+    // What the sheet is stuck to. Beside Physics because it is the other
+    // answer to "what holds this paper": a simulation, or an object.
+    folder(
+      'Mount',
+      mountControls(config.mount, (next, opts) => patchConfig({ mount: next } as never, opts)),
       { collapsed: true },
     ),
     folder('Physics', physicsControls(config.physics, setPhysics, patchSim), { collapsed: true }),
@@ -308,6 +341,21 @@ function surfaceControls(
       ),
       num('perfSpacing', perf.spacing, { min: 0.01, max: 0.5, step: 0.005, label: 'spacing' }, (v) =>
         setSurface({ perforation: { ...perf, spacing: v } }),
+      ),
+    )
+  }
+
+  // Cut to the picture's own outline, with a margin of backing — a sticker.
+  controls.push(
+    toggle('dieCut', Boolean(surface.dieCut), (v) =>
+      setSurface({ dieCut: v ? { margin: 0.02, color: '#ffffff' } : undefined }),
+    ),
+  )
+  if (surface.dieCut) {
+    const cut = surface.dieCut
+    controls.push(
+      num('dieCutMargin', cut.margin, { min: 0, max: 0.2, step: 0.001, label: 'margin' }, (v) =>
+        setSurface({ dieCut: { ...cut, margin: v } }),
       ),
     )
   }

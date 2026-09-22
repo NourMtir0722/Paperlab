@@ -5,6 +5,7 @@ import { PaperFallback, PaperMirror, supportsWebGL } from './a11y'
 import { PaperLighting } from './scene/PaperLighting'
 import { PaperBackdrop } from './scene/backdrop'
 import { ReleaseContextOnUnmount } from './scene/release'
+import { CANVAS_SHADOWS } from './scene/shadows'
 
 export interface PaperProps extends PaperMeshProps {
   /** Extra children rendered inside the canvas (lights are provided). */
@@ -34,7 +35,7 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
   return (
     <div className={className} style={{ width: '100%', height: '100%', ...style }}>
       {webgl ? (
-        <Canvas shadows camera={{ position: [0, 0.35, 2.4], fov: 40 }} dpr={[1, 2]}>
+        <Canvas shadows={CANVAS_SHADOWS} camera={{ position: [0, 0.35, 2.4], fov: 40 }} dpr={[1, 2]}>
           <PaperBackdrop backdrop={config.scene.backdrop} />
           <PaperLighting
             preset={config.scene.lighting}
@@ -55,10 +56,17 @@ export const Paper = forwardRef<PaperHandle, PaperProps>(function Paper(
             // fire's light pools on, and what the paper it cuts loose lands on.
             <mesh rotation-x={-Math.PI / 2} position={[0, config.scene.floor.y, 0]} receiveShadow>
               <planeGeometry args={[40, 40]} />
-              <meshStandardMaterial
-                color={config.scene.floor.color}
-                roughness={config.scene.floor.roughness}
-              />
+              {config.scene.floor.roughness >= 1 ? (
+                // Chalk: all the way matte, no highlight at all. A standard material,
+                // even at full roughness, turns into a mirror of the key at a grazing
+                // angle, which drew a bright band across a black set.
+                <meshLambertMaterial color={config.scene.floor.color} />
+              ) : (
+                <meshStandardMaterial
+                  color={config.scene.floor.color}
+                  roughness={config.scene.floor.roughness}
+                />
+              )}
             </mesh>
           )}
           <PaperMesh ref={ref} {...meshProps} />

@@ -7,6 +7,7 @@ import { fold } from './fold'
 import { wave } from './wave'
 import { drape } from './drape'
 import { crumple } from './crumple'
+import { lift } from './lift'
 
 const registry = new Map<string, Deformer<AnyOptions>>()
 
@@ -34,6 +35,7 @@ registerDeformer(fold)
 registerDeformer(wave)
 registerDeformer(drape)
 registerDeformer(crumple)
+registerDeformer(lift)
 
 /**
  * Resolve a raw `deformers` stack — the Advanced fork of a behavior — into

@@ -12,6 +12,7 @@ import { flight } from './flight'
 import { crumpleBehavior } from './crumple'
 import { settle } from './settle'
 import { ribbon } from './ribbon'
+import { sticker } from './sticker'
 
 const registry = new Map<string, Behavior<AnyOptions>>()
 
@@ -44,3 +45,4 @@ registerBehavior(flight)
 registerBehavior(crumpleBehavior)
 registerBehavior(settle)
 registerBehavior(ribbon)
+registerBehavior(sticker)

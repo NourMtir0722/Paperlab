@@ -40,7 +40,7 @@ import { MODE_PARAM, ModeTabs } from './chrome/ModeTabs'
 import { Feedback } from './chrome/Feedback'
 import { BuiltInPublic } from './chrome/BuiltInPublic'
 import { Brand } from './chrome/Brand'
-import { comingSoonNote } from './state/comingSoon'
+import { comingSoonNote, withOpenObject } from './state/comingSoon'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
 import { MAX_SHARE_LENGTH, SHARE_PARAM, paperShareUrl, readPaperShare } from './state/paperShare'
 import { DEMO_CARDS } from './state/demoAssets'
@@ -282,7 +282,9 @@ export function App() {
   })
 
   // State-editing mode shows the state applied; preview runs the live machine.
-  const paperCanvasConfig = editingState && !statePreview ? resolveStateConfig(config, editingState) : config
+  const paperCanvasConfig = withOpenObject(
+    editingState && !statePreview ? resolveStateConfig(config, editingState) : config,
+  )
 
   return (
     <div className="app">
@@ -399,7 +401,7 @@ export function App() {
       <main className="viewport">
         <Canvas
           key={mode}
-          shadows
+          shadows="percentage"
           camera={
             mode === 'paper'
               ? { position: [0, 0.35, 2.9], fov: 40 }
@@ -428,9 +430,28 @@ export function App() {
               // own scene now, the same one the export carries.
               preset={mode === 'paper' ? config.scene.lighting : fieldScene.lighting}
               light={mode === 'paper' ? config.scene.light : fieldScene.light}
-              floor={mode === 'paper' ? -1.5 : -2.4}
+              floor={mode === 'paper' ? (config.scene.floor.enabled ? config.scene.floor.y : -1.5) : -2.4}
               scale={mode === 'paper' ? 10 : 14}
             />
+          )}
+          {mode === 'paper' && config.scene.floor.enabled && (
+            // The floor a preset asks for, the same one `<Paper>` draws — a
+            // peeled sticker lands on it, and an export without it would show
+            // a picture the editor never did.
+            <mesh rotation-x={-Math.PI / 2} position={[0, config.scene.floor.y, 0]} receiveShadow>
+              <planeGeometry args={[40, 40]} />
+              {config.scene.floor.roughness >= 1 ? (
+                // Chalk: all the way matte, no highlight at all. A standard material,
+                // even at full roughness, turns into a mirror of the key at a grazing
+                // angle, which drew a bright band across a black set.
+                <meshLambertMaterial color={config.scene.floor.color} />
+              ) : (
+                <meshStandardMaterial
+                  color={config.scene.floor.color}
+                  roughness={config.scene.floor.roughness}
+                />
+              )}
+            </mesh>
           )}
           {mode === 'stage' ? (
             <PaperStageScene

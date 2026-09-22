@@ -32,6 +32,7 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
   // "like cloth" describes the wrong gesture entirely.
   const simType = useEditor((s) => (typeof s.config.physics === 'object' ? s.config.physics.type : null))
   const patchConfig = useEditor((s) => s.patchConfig)
+  const mounted = useEditor((s) => Boolean(s.config.mount))
 
   // Name the actual gesture instead of a generic "drag the handle" line.
   const behavior = behaviorType ? getBehavior(behaviorType) : null
@@ -44,11 +45,14 @@ export function Transport({ paperRef, scrubRef, resetKey }: TransportProps) {
           // a scroll position it differentiates. Point at the control that does
           // move it, and at the pull, which is the thing worth discovering.
           'Strip simulation: drag `scroll` in the Physics panel to feed out paper, or grab the sheet and pull.'
-        : !behavior
-          ? 'No behavior yet. Pick one in the Behavior panel to bring this paper to life.'
-          : hasHandles
-            ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'}, or press Space to autoplay.`
-            : `Space plays/pauses the ${behavior.label.toLowerCase()} · drag the timeline below to pose it by hand.`
+        : mounted
+          ? // On an object there is no blue handle: every sticker is its own.
+            'Click any sticker and pull to peel it. Pull it past the edge and it flies away. Click the object to bring them back. Space plays the main one.'
+          : !behavior
+            ? 'No behavior yet. Pick one in the Behavior panel to bring this paper to life.'
+            : hasHandles
+              ? `Drag the blue handle on the paper ${GESTURE[behavior.id] ?? 'to shape it'}, or press Space to autoplay.`
+              : `Space plays/pauses the ${behavior.label.toLowerCase()} · drag the timeline below to pose it by hand.`
   const [playing, setPlaying] = useState(true)
   const scrubbingRef = useRef(false)
 

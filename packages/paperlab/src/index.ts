@@ -52,6 +52,9 @@ export {
   washSchema,
   creaseSchema,
   memorySchema,
+  mountSchema,
+  mountStickerSchema,
+  mountObjectNames,
   paperEdges,
   coreStateNames,
   type PaperConfig,
@@ -72,6 +75,10 @@ export {
   type CreaseConfigInput,
   type MemoryConfig,
   type MemoryConfigInput,
+  type MountConfig,
+  type MountConfigInput,
+  type MountStickerConfig,
+  type DieCutConfig,
   type PaperEdge,
   type PhysicsConfig,
   type PhysicsConfigInput,
@@ -91,6 +98,10 @@ export {
 } from './config/schema'
 
 export { sheetLayoutSchema, type SheetLayoutOptions } from './field/sheetGrid'
+
+// ── Mount: a sheet stuck to something ───────────────────────────────────────
+
+export { stickerArt, STICKER_ART, type StickerArtName } from './mount/stickerArt'
 
 // ── Presets, and the file format ────────────────────────────────────────────
 
