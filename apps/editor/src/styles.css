@@ -562,10 +562,19 @@ button.export:hover {
 
 .left {
   grid-area: left;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   background: var(--l1);
   border-right: 1px solid var(--hair);
   padding: 14px;
   overflow-y: auto;
+}
+
+/* The mode's own content. A block of its own so the rail's flex column does
+   not change how its headings and lists space themselves. */
+.left-body {
+  flex: 0 0 auto;
 }
 
 .left h2 {
@@ -2615,4 +2624,106 @@ button.pill:disabled {
     flex-wrap: wrap;
     padding-block: 8px;
   }
+}
+
+/* Built in public: the rail's foot, in every mode. Docked, so it comes
+   forward by a tint step and never by a shadow (rule 2). */
+.built-in-public {
+  margin-top: auto;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--lift);
+}
+
+.left .built-in-public h2 {
+  margin: 0 0 10px;
+}
+
+.built-in-public dl {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.built-in-public dl div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.built-in-public dt {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.built-in-public dd {
+  margin: 0;
+  color: var(--ink-body);
+  font-size: 11px;
+}
+
+.built-in-public p {
+  margin: 0 0 10px;
+  color: var(--ink-body);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.built-in-public-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.built-in-public-links a {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--lift-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  text-decoration: none;
+  transition:
+    background var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.built-in-public-links a:hover {
+  background: var(--lift-3);
+  color: var(--ink);
+}
+
+.built-in-public .maker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.built-in-public .maker img {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.built-in-public .maker strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.built-in-public .maker small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-body);
+  font-size: 11px;
+}
+
+.built-in-public .maker:hover strong {
+  text-decoration: underline;
+  text-decoration-color: var(--ink-faint);
+  text-underline-offset: 3px;
 }

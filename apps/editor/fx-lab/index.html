@@ -34,12 +34,22 @@
          wide the rails happened to render. */
       .lab.bare .stage { position: fixed; inset: 0; background: #000; }
     </style>
-    <script
-      defer
-      data-website-id="dfid_uU6pKnQTSOEqlp1IVWGQ4"
-      data-domain="paperlab.nawwara.studio"
-      src="https://datafa.st/js/script.js"
-    ></script>
+    <!--
+      Cloudflare Web Analytics: free, cookieless, and it never logs the query
+      string, so a shared scene in the address (?p=, ?s=) never reaches it.
+      The token is public by design: it only lets this page REPORT visits.
+      Loaded on the real site only. Anywhere else (a dev server, a preview, a
+      harness) the report is refused, which is a console error the browser
+      gates fail on, and a local visit is not a visitor anyway.
+    -->
+    <script>
+      if (window.location.hostname === 'paperlab.nawwara.studio') {
+        const beacon = document.createElement('script')
+        beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js'
+        beacon.dataset.cfBeacon = '{"token": "eb1e736495f549028366e8c05959c856"}'
+        document.head.append(beacon)
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

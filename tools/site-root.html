@@ -4,10 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!--
-      The address here can carry a shared scene, and a page's full address is
-      the referrer the next page reads, analytics included. Origin only.
+      No referrer at all from this page. Its address can carry a shared scene,
+      and the visitor counter (Cloudflare Web Analytics) on the page this
+      sends people to counts a visit only when the referrer is NOT this site.
+      A redirect that named the root as the referrer would turn every arrival
+      into a second page of a visit that, as far as the counter knows, never
+      started. The cost is the source: an arrival through the root reads as
+      direct. Cloudflare has no ?ref= to hand the real one on with.
     -->
-    <meta name="referrer" content="origin" />
+    <meta name="referrer" content="no-referrer" />
     <title>Paperlab — physical paper as a React component</title>
     <meta name="description" content="Real 3D paper that peels, unrolls, folds and hangs. A React component, not a CSS trick and not a video." />
 
@@ -120,31 +125,6 @@
           tail = ''
         }
 
-        // The analytics live on the page this sends people to, and a
-        // scripted redirect leaves THIS page as the referrer there, so every
-        // visit would read as coming from the site itself. The campaign tags
-        // are kept across the hop, and where there are none the real
-        // referrer is handed on as ?ref=, which DataFast reads as the source.
-        var from = new URLSearchParams(search)
-        var tags = new URLSearchParams()
-        from.forEach((value, key) => {
-          if (/^(ref|source|via|utm_\w+)$/.test(key)) tags.set(key, value)
-        })
-        var referrer = null
-        try {
-          referrer = document.referrer ? new URL(document.referrer).hostname : null
-        } catch (_) {}
-        if (referrer && referrer !== window.location.hostname && ![...tags.keys()].length) {
-          tags.set('ref', referrer)
-        }
-        if ([...tags.keys()].length) {
-          const query = new URLSearchParams(tail.split('#')[0])
-          tags.forEach((value, key) => {
-            query.set(key, value)
-          })
-          tail = `?${query}${tail.includes('#') ? tail.slice(tail.indexOf('#')) : ''}`
-        }
-
         // Replace, not assign: back should leave the site, not bounce here.
         window.location.replace(target + tail)
       })()
@@ -160,6 +140,7 @@
         <a href="/docs/">The reference <span aria-hidden="true">→</span></a>
         <a href="/hands/">Your hands <span aria-hidden="true">→</span></a>
         <a href="/fx-lab/">The FX lab <span aria-hidden="true">→</span></a>
+        <a href="/lab-notes/">Roadmap and sponsoring <span aria-hidden="true">→</span></a>
       </nav>
     </main>
   </body>

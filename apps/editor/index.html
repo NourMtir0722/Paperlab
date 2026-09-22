@@ -87,39 +87,21 @@
       }
     </style>
     <!--
-      DataFast reports the whole address, and a shared link carries its paper
-      in it (?p=), text someone typed included. So the paper comes out of
-      the address before the tracker reads it, and goes back in once the
-      tracker has run or failed to load. That is still before the app reads
-      it: deferred scripts run in document order, and the app comes after.
-      The campaign tags (ref, utm_*) have been read by then too, so they are
-      dropped rather than carried into a link someone copies.
+      Cloudflare Web Analytics: free, cookieless, and it never logs the query
+      string, so a shared scene in the address (?p=, ?s=) never reaches it.
+      The token is public by design: it only lets this page REPORT visits.
+      Loaded on the real site only. Anywhere else (a dev server, a preview, a
+      harness) the report is refused, which is a console error the browser
+      gates fail on, and a local visit is not a visitor anyway.
     -->
     <script>
-      ;(() => {
-        var url = new URL(window.location.href)
-        var clean = new URL(url)
-        clean.searchParams.delete('p')
-        var after = new URL(url)
-        Array.from(after.searchParams.keys())
-          .filter((key) => /^(ref|source|via|utm_\w+)$/.test(key))
-          .forEach((key) => {
-            after.searchParams.delete(key)
-          })
-        if (clean.href !== url.href) window.history.replaceState(window.history.state, '', clean)
-        window.__afterAnalytics = () => {
-          if (window.location.href !== after.href) window.history.replaceState(window.history.state, '', after)
-        }
-      })()
+      if (window.location.hostname === 'paperlab.nawwara.studio') {
+        const beacon = document.createElement('script')
+        beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js'
+        beacon.dataset.cfBeacon = '{"token": "eb1e736495f549028366e8c05959c856"}'
+        document.head.append(beacon)
+      }
     </script>
-    <script
-      defer
-      data-website-id="dfid_uU6pKnQTSOEqlp1IVWGQ4"
-      data-domain="paperlab.nawwara.studio"
-      src="https://datafa.st/js/script.js"
-      onload="__afterAnalytics()"
-      onerror="__afterAnalytics()"
-    ></script>
   </head>
   <body>
     <!--

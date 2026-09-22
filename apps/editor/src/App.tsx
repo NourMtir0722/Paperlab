@@ -38,6 +38,7 @@ import { CaptureRig, type CaptureHandle } from './chrome/CaptureRig'
 import { SmallScreen } from './chrome/SmallScreen'
 import { MODE_PARAM, ModeTabs } from './chrome/ModeTabs'
 import { Feedback } from './chrome/Feedback'
+import { BuiltInPublic } from './chrome/BuiltInPublic'
 import { Brand } from './chrome/Brand'
 import { comingSoonNote } from './state/comingSoon'
 import { captureThumbnail, downloadPreset } from './state/userPresets'
@@ -329,67 +330,70 @@ export function App() {
       </header>
 
       <aside className="left">
-        {mode === 'paper' ? (
-          <PresetPanel onSave={savePresetAs} />
-        ) : mode === 'stage' ? (
-          <>
-            <h2>Stages</h2>
-            <ul className="stage-presets">
-              {listStagePresets().map((id) => {
-                const preset = getStagePreset(id)
-                return (
-                  <li key={id}>
+        <div className="left-body">
+          {mode === 'paper' ? (
+            <PresetPanel onSave={savePresetAs} />
+          ) : mode === 'stage' ? (
+            <>
+              <h2>Stages</h2>
+              <ul className="stage-presets">
+                {listStagePresets().map((id) => {
+                  const preset = getStagePreset(id)
+                  return (
+                    <li key={id}>
+                      <button
+                        type="button"
+                        className={`stage-preset${stage.preset === id ? ' selected' : ''}`}
+                        onClick={() => loadStagePreset(id)}
+                      >
+                        <strong>{preset.label}</strong>
+                        <span>{preset.description}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          ) : (
+            <>
+              <h2>Papers</h2>
+              <ul className="slots">
+                {field.slots.map((name, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a slot IS its index — selection, edits and preset writes all address a paper by slot number.
+                  <li key={i} className={`slot-row${selectedSlot === i ? ' selected' : ''}`}>
                     <button
                       type="button"
-                      className={`stage-preset${stage.preset === id ? ' selected' : ''}`}
-                      onClick={() => loadStagePreset(id)}
+                      className="slot-select"
+                      aria-pressed={selectedSlot === i}
+                      aria-label={`Select paper ${i + 1}`}
+                      onClick={() => setSelectedSlot(selectedSlot === i ? null : i)}
                     >
-                      <strong>{preset.label}</strong>
-                      <span>{preset.description}</span>
+                      <span className="slot-index">{i + 1}</span>
+                    </button>
+                    <Select
+                      className="slot-preset"
+                      label={`Paper ${i + 1} preset`}
+                      value={name}
+                      options={listPresets()}
+                      onChange={(next) => setSlotPreset(i, next)}
+                      unavailable={comingSoonNote}
+                    />
+                    <button
+                      type="button"
+                      className="slot-edit"
+                      title={`Edit ${name}`}
+                      aria-label={`Edit ${name}`}
+                      onClick={() => editFieldPaper(name)}
+                    >
+                      ✎
                     </button>
                   </li>
-                )
-              })}
-            </ul>
-          </>
-        ) : (
-          <>
-            <h2>Papers</h2>
-            <ul className="slots">
-              {field.slots.map((name, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a slot IS its index — selection, edits and preset writes all address a paper by slot number.
-                <li key={i} className={`slot-row${selectedSlot === i ? ' selected' : ''}`}>
-                  <button
-                    type="button"
-                    className="slot-select"
-                    aria-pressed={selectedSlot === i}
-                    aria-label={`Select paper ${i + 1}`}
-                    onClick={() => setSelectedSlot(selectedSlot === i ? null : i)}
-                  >
-                    <span className="slot-index">{i + 1}</span>
-                  </button>
-                  <Select
-                    className="slot-preset"
-                    label={`Paper ${i + 1} preset`}
-                    value={name}
-                    options={listPresets()}
-                    onChange={(next) => setSlotPreset(i, next)}
-                    unavailable={comingSoonNote}
-                  />
-                  <button
-                    type="button"
-                    className="slot-edit"
-                    title={`Edit ${name}`}
-                    aria-label={`Edit ${name}`}
-                    onClick={() => editFieldPaper(name)}
-                  >
-                    ✎
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+        <BuiltInPublic />
       </aside>
 
       <main className="viewport">

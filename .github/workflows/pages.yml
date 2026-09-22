@@ -25,6 +25,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Once a day, so the public numbers (tools/site-stats.mjs) stay current
+  # when nothing is being pushed.
+  schedule:
+    - cron: '17 5 * * *'
 
 concurrency:
   group: pages
@@ -49,7 +53,9 @@ jobs:
     # is lost by not running here; what this job adds is the PAPERLAB_BASE
     # subpath wiring and the site assembly, and neither is exercisable
     # without somewhere to put the result.
-    if: github.event.repository.has_pages || github.event_name == 'workflow_dispatch'
+    # A scheduled run carries no repository in its payload, so has_pages reads
+    # as false there; it is let through by name, like a manual run.
+    if: github.event.repository.has_pages || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -121,6 +127,10 @@ jobs:
           cp -r apps/editor/dist-fxlab/assets site/fx-lab/assets
           mkdir -p site/docs
           cp -r apps/docs/dist/* site/docs/
+          # The roadmap and the sponsoring note. A plain page with nothing to
+          # build, so it is copied as written.
+          mkdir -p site/lab-notes
+          cp apps/editor/lab-notes/index.html site/lab-notes/index.html
           # Pages serves 404.html for unknown paths; point it at the root
           # signpost so a stale shared link still lands on something.
           cp site/index.html site/404.html
@@ -133,6 +143,17 @@ jobs:
           # .nojekyll keeps Pages from eating asset dirs that start with _.
           touch site/.nojekyll
 
+      - name: Public numbers (/stats.json)
+        # Visits (Cloudflare Web Analytics) and npm downloads, for the
+        # editor's rail card and /lab-notes. The Cloudflare token stays here,
+        # in the deploy: the pages only ever see the totals. A source that
+        # fails is left out and never fails the deploy.
+        run: node tools/site-stats.mjs --out site/stats.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_SITE_TAG: ${{ secrets.CLOUDFLARE_SITE_TAG }}
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
@@ -142,7 +163,9 @@ jobs:
     # Deliberately NOT `|| workflow_dispatch` like build is: deploying is the
     # half that cannot work without Pages, so a manual run builds and
     # assembles the site and stops there rather than 404ing again.
-    if: github.event.repository.has_pages
+    # The schedule is let through for the reason given on build: its payload
+    # has no repository to read has_pages from.
+    if: github.event.repository.has_pages || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

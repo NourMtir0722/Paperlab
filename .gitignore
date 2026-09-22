@@ -24,3 +24,6 @@ docs/media/*.mp4
 # `public/` either — Vite copies that into every build whether the page using
 # it was built or not.
 apps/editor/.hands/
+
+# Local copies of the site numbers, for previewing the rail card and lab notes.
+apps/*/public/stats.json
