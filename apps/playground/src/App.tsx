@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PaperStage, buildStageAgentPayload, getStagePreset, listStagePresets } from 'paperlab/stage'
 import { MAX_TEXT_LENGTH, readStageShare, stageShareUrl, type StageShare } from './share'
+import { BuiltInPublic } from './BuiltInPublic'
 import { Feedback } from './Feedback'
 
 /**
@@ -219,6 +220,8 @@ export function App() {
             />
           </div>
         </div>
+
+        <BuiltInPublic />
       </footer>
 
       {/* The scene being looked at travels with a report, so it reopens exactly. */}

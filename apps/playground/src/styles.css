@@ -502,3 +502,69 @@ textarea {
   justify-content: flex-end;
   margin-top: 14px;
 }
+
+/* ── Built in public ───────────────────────────────────────────────────────
+   One row under the controls: who makes it, its public number, and the two
+   halves of /lab-notes/. The editor has a rail to give this a card in; here
+   the scene is the whole screen, so it is a line. It carries its own ground
+   for the reason the wordmark does — the hall behind it is usually bright. */
+.built-in-public {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 12px;
+  color: var(--ink-body);
+}
+
+.bip-maker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
+  color: var(--ink-body);
+  text-decoration: none;
+}
+
+.bip-maker img {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.bip-maker strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.bip-maker:hover {
+  background: var(--lift-3);
+}
+
+.bip-stat {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.bip-stat b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.bip-link {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--glass-fill);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.bip-link:hover {
+  background: var(--lift-3);
+}
