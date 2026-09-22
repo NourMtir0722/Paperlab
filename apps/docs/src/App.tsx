@@ -62,6 +62,8 @@ export function App() {
           <a href="../editor/">Editor</a>
           <a href="../hands/">Hands</a>
           <a href="../fx-lab/">FX Lab</a>
+          <a href="../lab-notes/#roadmap">Roadmap</a>
+          <a href="../lab-notes/#sponsor">Sponsor paperlab</a>
           <a href="https://github.com/NourMtir0722/Paperlab">GitHub</a>
           {FEEDBACK_FORM && (
             <>

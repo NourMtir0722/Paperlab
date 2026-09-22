@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>paperlab · roadmap and sponsoring</title>
+    <meta name="description" content="What paperlab has shipped, what I'm building now, what comes next, and how to put your tool in the build." />
+    <meta name="theme-color" content="#08090a" />
+    <meta property="og:title" content="paperlab · roadmap and sponsoring" />
+    <meta property="og:description" content="Real 3D paper for the web, built in public. See where it is, and sponsor it." />
+    <meta property="og:image" content="https://paperlab.nawwara.studio/media/og.png" />
+    <!--
+      The roadmap and the sponsoring note, as one landing page in either order.
+
+      The editor's rail card has two buttons, Roadmap and Sponsor paperlab,
+      and whichever one someone presses, they should still meet the other.
+      Both land here: /lab-notes/#roadmap puts the roadmap first and the
+      sponsoring section after it, /lab-notes/#sponsor the other way round,
+      and the line between the two names what comes next. Without script the
+      roadmap comes first, which is the page as written.
+
+      To move the roadmap on, change an item's data-state (done, now, next)
+      and move it into the matching phase. The phase counts, the progress
+      track and the step numbers are all read from the list by the script at
+      the bottom, so nothing else needs touching.
+
+      A plain page with nothing to build: pages.yml copies it into the site as
+      it is. Vite serves it in dev from this directory, like /hands. It reads
+      the numbers from /stats.json (tools/site-stats.mjs) and hides any it
+      cannot get. The photo is inline so the page asks no third party for it.
+      The colours are the shared token values from docs/design.md: one white
+      at stepped opacities, depth by tint, and the white pill as the one
+      primary action on the page.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+        --l0: #08090a;
+        --l1: #0b0c0d;
+        --l3: #141517;
+        --ink: rgba(255, 255, 255, 0.95);
+        --ink-2: rgba(255, 255, 255, 0.75);
+        --ink-body: rgba(255, 255, 255, 0.55);
+        --ink-meta: rgba(255, 255, 255, 0.35);
+        --ink-faint: rgba(255, 255, 255, 0.2);
+        --lift: rgba(255, 255, 255, 0.04);
+        --lift-2: rgba(255, 255, 255, 0.07);
+        --lift-3: rgba(255, 255, 255, 0.11);
+        --hair: rgba(255, 255, 255, 0.07);
+        --hair-2: rgba(255, 255, 255, 0.1);
+        --pill: #f4f4f4;
+        --paper: #f3f1ec;
+        --font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+        --wide: 1120px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--l0);
+        color: var(--ink);
+        font-family: var(--font);
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+      }
+      .wrap {
+        max-width: var(--wide);
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      /* ── The bar ─────────────────────────────────────────────────────── */
+      .bar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--l0);
+        border-bottom: 1px solid var(--hair);
+      }
+      .bar .wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 60px;
+      }
+      .brand {
+        margin-right: auto;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .brand span {
+        color: var(--ink-meta);
+        font-weight: 400;
+      }
+      .bar nav {
+        display: flex;
+        gap: 4px;
+      }
+      .bar nav a {
+        padding: 7px 12px;
+        border-radius: 999px;
+        color: var(--ink-body);
+        font-size: 13px;
+        text-decoration: none;
+        transition: background 120ms var(--ease), color 120ms var(--ease);
+      }
+      .bar nav a:hover,
+      .bar nav a[aria-current="true"] {
+        background: var(--lift-2);
+        color: var(--ink);
+      }
+      .bar .open {
+        margin-left: 8px;
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: var(--lift-2);
+        color: var(--ink-2);
+        font-size: 13px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .bar .open:hover {
+        background: var(--lift-3);
+        color: var(--ink);
+      }
+
+      /* ── Shared type ─────────────────────────────────────────────────── */
+      #notes {
+        display: flex;
+        flex-direction: column;
+      }
+      .part {
+        padding: 88px 0 96px;
+        scroll-margin-top: 60px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 20px;
+        color: var(--ink-body);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--paper);
+      }
+      h1 {
+        margin: 0;
+        max-width: 16ch;
+        font-size: clamp(38px, 6.4vw, 72px);
+        font-weight: 650;
+        letter-spacing: -0.035em;
+        line-height: 1.02;
+      }
+      .lede {
+        margin: 24px 0 0;
+        max-width: 56ch;
+        color: var(--ink-body);
+        font-size: 18px;
+        line-height: 1.6;
+      }
+
+      /* ── Roadmap: the three phases, at a glance ──────────────────────── */
+      .phases {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 64px 0 0;
+      }
+      .phase {
+        position: relative;
+        padding: 22px 22px 24px;
+        border-radius: 16px;
+        background: var(--lift);
+        text-decoration: none;
+        transition: background 160ms var(--ease);
+      }
+      .phase:hover {
+        background: var(--lift-2);
+      }
+      .phase[data-state="now"] {
+        background: var(--lift-3);
+      }
+      .phase-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 36px;
+      }
+      .phase-name {
+        color: var(--ink-2);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .phase[data-state="next"] .phase-name {
+        color: var(--ink-body);
+      }
+      .phase-count {
+        display: block;
+        font-size: 44px;
+        font-weight: 650;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      .phase[data-state="next"] .phase-count {
+        color: var(--ink-body);
+      }
+      .phase-what {
+        display: block;
+        margin-top: 8px;
+        color: var(--ink-body);
+        font-size: 13px;
+      }
+      .here {
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--pill);
+        color: #0b0b0b;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+      }
+      /* The track: one bar under the three phases, full up to where I am. */
+      .track {
+        position: relative;
+        height: 4px;
+        margin: 20px 0 0;
+        border-radius: 4px;
+        background: var(--lift-2);
+        overflow: hidden;
+      }
+      .track span {
+        position: absolute;
+        inset: 0 auto 0 0;
+        border-radius: 4px;
+        background: var(--paper);
+      }
+      .track-legend {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+        color: var(--ink-meta);
+        font-size: 12px;
+      }
+
+      /* ── Roadmap: every step ─────────────────────────────────────────── */
+      .steps {
+        margin: 88px 0 0;
+      }
+      .group {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 40px;
+        padding: 40px 0;
+        border-top: 1px solid var(--hair);
+      }
+      .group-head {
+        position: sticky;
+        top: 92px;
+        align-self: start;
+      }
+      .group-head h2 {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: -0.02em;
+      }
+      .group-head p {
+        margin: 8px 0 0;
+        color: var(--ink-body);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .tag {
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--lift-2);
+        color: var(--ink-2);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .group-head .tag {
+        display: inline-block;
+        margin-top: 14px;
+      }
+      .group[data-state="now"] .tag {
+        background: var(--pill);
+        color: #0b0b0b;
+      }
+      .group ol {
+        position: relative;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      /* The line the steps hang from, like a stepper: solid where it is done. */
+      .group ol::before {
+        content: "";
+        position: absolute;
+        top: 20px;
+        bottom: 20px;
+        left: 19px;
+        width: 2px;
+        background: var(--hair-2);
+      }
+      .group[data-state="done"] ol::before {
+        background: var(--ink-faint);
+      }
+      .group li {
+        position: relative;
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 18px;
+        padding: 12px 0;
+      }
+      .group[data-state="now"] li {
+        margin: 6px 0;
+        padding: 18px;
+        border-radius: 14px;
+        background: var(--lift-2);
+      }
+      .group[data-state="now"] ol::before {
+        left: 37px;
+      }
+      .mark {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--l3);
+        color: var(--ink);
+        font-size: 14px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      [data-state="done"] .mark {
+        background: var(--paper);
+        color: #0b0b0b;
+      }
+      [data-state="done"] .mark svg {
+        width: 16px;
+        height: 16px;
+      }
+      /* In progress: a dashed ring with a live dot. The dot breathes by
+         opacity, the one kind of motion this site allows itself. */
+      [data-state="now"] .mark {
+        background: transparent;
+      }
+      [data-state="now"] .mark::before {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 2px dashed var(--ink-2);
+        border-radius: 50%;
+      }
+      [data-state="now"] .mark::after {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--paper);
+        animation: breathe 1.8s var(--ease) infinite alternate;
+      }
+      @keyframes breathe {
+        from {
+          opacity: 0.35;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      [data-state="next"] .mark {
+        color: var(--ink-body);
+        box-shadow: inset 0 0 0 1px var(--hair-2);
+      }
+      .step h3 {
+        margin: 9px 0 6px;
+        font-size: 17px;
+        letter-spacing: -0.01em;
+      }
+      .step p {
+        margin: 0;
+        max-width: 58ch;
+        color: var(--ink-body);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      [data-state="next"] .step {
+        color: var(--ink-2);
+      }
+
+      /* ── Between the two parts ───────────────────────────────────────── */
+      .between {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: var(--ink-meta);
+        font-size: 13px;
+        text-decoration: none;
+      }
+      .between::before,
+      .between::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--hair-2);
+      }
+      .between span {
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: var(--lift);
+        color: var(--ink-2);
+      }
+
+      /* ── Sponsor ─────────────────────────────────────────────────────────
+         A Swiss sheet: one grid, hairline rules, big numbers, flush left.
+         Motion is opacity only (docs/design.md rule 6): the blocks fade in
+         as they arrive and the numbers count up once. */
+      .s-head {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        column-gap: 24px;
+        row-gap: 32px;
+        padding-top: 20px;
+        border-top: 1px solid var(--hair-2);
+      }
+      .s-index {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: var(--ink-meta);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .s-title {
+        grid-column: 1 / 11;
+        max-width: none;
+        font-size: clamp(44px, 8.4vw, 112px);
+        font-weight: 650;
+        letter-spacing: -0.045em;
+        line-height: 0.96;
+      }
+      .s-lede {
+        grid-column: 7 / 13;
+        margin: 8px 0 0;
+        color: var(--ink-body);
+        font-size: 18px;
+        line-height: 1.6;
+      }
+      .s-go {
+        grid-column: 7 / 13;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px 24px;
+        margin: 0;
+      }
+      .s-more {
+        color: var(--ink-2);
+        font-size: 14px;
+        text-decoration: underline;
+        text-decoration-color: var(--ink-faint);
+        text-underline-offset: 4px;
+      }
+      .s-more:hover {
+        color: var(--ink);
+        text-decoration-color: var(--ink-meta);
+      }
+      #offer,
+      #close {
+        scroll-margin-top: 92px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 24px;
+        margin: 96px 0 0;
+      }
+      .stats[hidden] {
+        display: none;
+      }
+      .stats > div {
+        padding-top: 16px;
+        border-top: 1px solid var(--hair-2);
+      }
+      .stats dd {
+        margin: 0 0 20px;
+        color: var(--ink-meta);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .stats dt {
+        font-size: clamp(48px, 7vw, 88px);
+        font-weight: 650;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      .offer {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        column-gap: 24px;
+        margin: 120px 0 0;
+      }
+      .offer-head {
+        grid-column: 1 / 5;
+        align-self: start;
+        position: sticky;
+        top: 92px;
+      }
+      .offer-head h2,
+      .close-copy h2 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+      .offer-head p {
+        margin: 10px 0 0;
+        color: var(--ink-body);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+      .offer-list {
+        grid-column: 5 / 13;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border-bottom: 1px solid var(--hair-2);
+      }
+      .offer-list li {
+        display: grid;
+        grid-template-columns: 64px 1fr 1.3fr;
+        gap: 24px;
+        align-items: baseline;
+        padding: 28px 16px;
+        border-top: 1px solid var(--hair-2);
+        transition: background 160ms var(--ease);
+      }
+      .offer-list li:hover {
+        background: var(--lift);
+      }
+      .offer-n {
+        color: var(--ink-meta);
+        font-size: 14px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        transition: color 160ms var(--ease);
+      }
+      .offer-list li:hover .offer-n {
+        color: var(--ink);
+      }
+      .offer-list h3 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: -0.015em;
+      }
+      .offer-list p {
+        margin: 0;
+        color: var(--ink-body);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      .close {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 40px 48px;
+        align-items: end;
+        margin: 120px 0 0;
+        padding: 48px;
+        border-radius: 20px;
+        background: var(--lift-2);
+      }
+      .close-copy h2 {
+        font-size: clamp(32px, 4.4vw, 52px);
+        letter-spacing: -0.035em;
+        line-height: 1.02;
+      }
+      .close-copy p {
+        margin: 14px 0 0;
+        max-width: 44ch;
+        color: var(--ink-body);
+        font-size: 17px;
+        line-height: 1.55;
+      }
+      .close-act {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        min-width: 260px;
+      }
+      .write {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 17px 28px;
+        border-radius: 999px;
+        background: var(--pill);
+        color: #0b0b0b;
+        font-size: 16px;
+        font-weight: 650;
+        text-decoration: none;
+        transition: background 120ms var(--ease);
+      }
+      .write:hover {
+        background: #ffffff;
+      }
+      .copy {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 20px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--lift-2);
+        color: var(--ink-2);
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 120ms var(--ease), color 120ms var(--ease);
+      }
+      .copy:hover {
+        background: var(--lift-3);
+        color: var(--ink);
+      }
+      .copy-say {
+        color: var(--ink-meta);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        transition: opacity 160ms var(--ease);
+      }
+      .copy[data-done] .copy-say {
+        color: var(--ink);
+      }
+      .close .maker {
+        grid-column: 1 / -1;
+        padding-top: 28px;
+        border-top: 1px solid var(--hair-2);
+      }
+      .maker {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--ink-2);
+        font-size: 14px;
+        text-decoration: none;
+      }
+      .maker img {
+        flex: none;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .maker strong {
+        color: var(--ink);
+      }
+      .maker small {
+        display: block;
+        margin-top: 2px;
+        color: var(--ink-meta);
+        font-size: 13px;
+      }
+      .maker:hover strong,
+      .maker-x:hover strong {
+        text-decoration: underline;
+        text-decoration-color: var(--ink-meta);
+        text-underline-offset: 3px;
+      }
+      .maker-x {
+        text-decoration: none;
+      }
+      .maker-site {
+        margin-left: auto;
+        color: var(--ink-2);
+        font-size: 13px;
+        text-decoration: underline;
+        text-decoration-color: var(--ink-faint);
+        text-underline-offset: 3px;
+      }
+      .maker-site:hover {
+        color: var(--ink);
+        text-decoration-color: var(--ink-meta);
+      }
+      /* Arrival: set only by the script, so without it everything shows. */
+      .reveal [data-reveal] {
+        opacity: 0;
+        transition: opacity 700ms var(--ease);
+        transition-delay: var(--d, 0ms);
+      }
+      .reveal [data-reveal].in {
+        opacity: 1;
+      }
+
+      footer {
+        border-top: 1px solid var(--hair);
+      }
+      .foot-legal {
+        margin: 0 auto;
+        padding-bottom: 40px;
+        color: var(--ink-meta);
+        font-size: 12px;
+      }
+      .foot-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding-top: 32px;
+        padding-bottom: 20px;
+      }
+      .foot-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        color: var(--ink-body);
+        font-size: 13px;
+      }
+      .foot-link {
+        text-decoration: none;
+      }
+      .foot-link:hover {
+        color: var(--ink);
+      }
+
+      /* ── Narrow screens ──────────────────────────────────────────────── */
+      @media (max-width: 860px) {
+        .part {
+          padding: 56px 0 64px;
+        }
+        .phases {
+          grid-template-columns: 1fr;
+        }
+        .s-title,
+        .s-lede,
+        .s-go,
+        .offer-head,
+        .offer-list {
+          grid-column: 1 / -1;
+        }
+        .offer {
+          row-gap: 28px;
+          margin-top: 88px;
+        }
+        .offer-head {
+          position: static;
+        }
+        .offer-list li {
+          grid-template-columns: 40px 1fr;
+          gap: 8px 16px;
+          padding: 22px 0;
+        }
+        .offer-list li:hover {
+          background: none;
+        }
+        .offer-list p {
+          grid-column: 2;
+        }
+        .stats {
+          margin-top: 64px;
+        }
+        .close {
+          grid-template-columns: 1fr;
+          margin-top: 88px;
+          padding: 28px 22px;
+        }
+        .close-act {
+          min-width: 0;
+        }
+        .maker-site {
+          display: none;
+        }
+        .phase-top {
+          margin-bottom: 20px;
+        }
+        .group {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .group-head {
+          position: static;
+        }
+        .bar nav a[data-wide] {
+          display: none;
+        }
+      }
+      @media (max-width: 520px) {
+        .bar .open {
+          display: none;
+        }
+        .brand span {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        [data-state="now"] .mark::after {
+          animation: none;
+        }
+      }
+    </style>
+    <!--
+      Cloudflare Web Analytics: free, cookieless, and it never logs the query
+      string, so a shared scene in the address (?p=, ?s=) never reaches it.
+      The token is public by design: it only lets this page REPORT visits.
+      Loaded on the real site only. Anywhere else (a dev server, a preview, a
+      harness) the report is refused, which is a console error the browser
+      gates fail on, and a local visit is not a visitor anyway.
+    -->
+    <script>
+      if (window.location.hostname === 'paperlab.nawwara.studio') {
+        const beacon = document.createElement('script')
+        beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js'
+        beacon.dataset.cfBeacon = '{"token": "eb1e736495f549028366e8c05959c856"}'
+        document.head.append(beacon)
+      }
+    </script>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="wrap">
+        <a class="brand" href="../">paperlab <span>· built in public</span></a>
+        <nav aria-label="This page">
+          <a href="#roadmap">Roadmap</a>
+          <a href="#sponsor">Sponsor</a>
+        </nav>
+        <a class="open" href="../editor/">Open the editor</a>
+      </div>
+    </header>
+
+    <main id="notes">
+      <section id="roadmap" class="part">
+        <div class="wrap">
+          <p class="eyebrow">Roadmap</p>
+          <h1>Where paperlab is, and where it's going.</h1>
+          <p class="lede">
+            paperlab is built in public, one piece at a time. Here's what's done, what I'm working on now, and
+            what comes next.
+          </p>
+
+          <div class="phases">
+            <a class="phase" data-state="done" href="#phase-done">
+              <span class="phase-top"><span class="phase-name">Done</span><span class="tag">Shipped</span></span>
+              <span class="phase-count" data-count="done">4</span>
+              <span class="phase-what">pieces live on the site</span>
+            </a>
+            <a class="phase" data-state="now" href="#phase-now">
+              <span class="phase-top"><span class="phase-name">On my desk</span><span class="here">You are here</span></span>
+              <span class="phase-count" data-count="now">3</span>
+              <span class="phase-what">in progress right now</span>
+            </a>
+            <a class="phase" data-state="next" href="#phase-next">
+              <span class="phase-top"><span class="phase-name">Next</span><span class="tag">Planned</span></span>
+              <span class="phase-count" data-count="next">5</span>
+              <span class="phase-what">coming after that</span>
+            </a>
+          </div>
+          <div class="track" aria-hidden="true"><span style="width: 50%"></span></div>
+          <div class="track-legend" aria-hidden="true">
+            <span>Started</span><span>Today</span><span>What's next</span>
+          </div>
+
+          <div class="steps">
+            <div class="group" id="phase-done" data-state="done">
+              <div class="group-head">
+                <h2>Done</h2>
+                <p>Live on the site today. Go and play with any of them.</p>
+                <span class="tag">Shipped</span>
+              </div>
+              <ol>
+                <li data-state="done">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>Paper physics</h3>
+                    <p>Paper that moves, bends and falls like the real thing.</p>
+                  </div>
+                </li>
+                <li data-state="done">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>/hands</h3>
+                    <p>
+                      Hold a lighter up to your camera, or pinch your fingers like a match, and the paper catches
+                      fire. Blow at your screen to put it out.
+                    </p>
+                  </div>
+                </li>
+                <li data-state="done">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>FX Lab</h3>
+                    <p>Tune the fire yourself and find your own burn.</p>
+                  </div>
+                </li>
+                <li data-state="done">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>Report button</h3>
+                    <p>Tell me when something breaks, or ask for the effect you want next.</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <div class="group" id="phase-now" data-state="now">
+              <div class="group-head">
+                <h2>On my desk</h2>
+                <p>What I'm building right now.</p>
+                <span class="tag">You are here</span>
+              </div>
+              <ol>
+                <li data-state="now">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>The paperlab brand</h3>
+                    <p>Logo, colors, type and brand guidelines.</p>
+                  </div>
+                </li>
+                <li data-state="now">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>The design system</h3>
+                    <p>The pieces the whole site is built from.</p>
+                  </div>
+                </li>
+                <li data-state="now">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>The website</h3>
+                    <p>A real home for paperlab, with docs and a blog.</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <div class="group" id="phase-next" data-state="next">
+              <div class="group-head">
+                <h2>Next</h2>
+                <p>Coming after that, in this order.</p>
+                <span class="tag">Planned</span>
+              </div>
+              <ol>
+                <li data-state="next">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>Water</h3>
+                    <p>The next effect after fire.</p>
+                  </div>
+                </li>
+                <li data-state="next">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>Scroll effects</h3>
+                    <p>Paper that moves as you scroll.</p>
+                  </div>
+                </li>
+                <li data-state="next">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>Hero sections</h3>
+                    <p>Ready-made paper heroes you can drop into your site.</p>
+                  </div>
+                </li>
+                <li data-state="next">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>More components</h3>
+                    <p>More paper UI for the web.</p>
+                  </div>
+                </li>
+                <li data-state="next">
+                  <span class="mark"></span>
+                  <div class="step">
+                    <h3>Paper sounds</h3>
+                    <p>The sound of paper: a rustle when it turns, a crinkle when it crumples, a rip when it tears.</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="wrap"><a class="between" href="#sponsor"><span>Next: sponsor paperlab ↓</span></a></div>
+
+      <section id="sponsor" class="part">
+        <div class="wrap">
+          <header class="s-head">
+            <p class="s-index" data-reveal>Sponsor paperlab</p>
+            <h1 class="s-title" data-reveal>Put your tool in the build.</h1>
+            <p class="s-lede" data-reveal>
+              paperlab started as a small experiment, and now a lot of people play with it. I build it in public,
+              with real tools. Sponsor it, and your tool becomes part of how I build.
+            </p>
+            <p class="s-go" data-reveal>
+              <a class="write" href="#close">Sponsor paperlab <span aria-hidden="true">↓</span></a>
+              <a class="s-more" href="#offer">See what your tool gets</a>
+            </p>
+          </header>
+
+          <dl class="stats" hidden></dl>
+
+          <div class="offer" id="offer">
+            <div class="offer-head" data-reveal>
+              <h2>What your tool gets</h2>
+              <p>Three places people will see it, all of them real.</p>
+            </div>
+            <ol class="offer-list">
+              <li data-reveal>
+                <span class="offer-n">01</span>
+                <h3>In the workflow</h3>
+                <p>Your tool becomes part of how I build paperlab, for real, not as a logo on the side.</p>
+              </li>
+              <li data-reveal>
+                <span class="offer-n">02</span>
+                <h3>Credited on the site</h3>
+                <p>I credit it clearly on paperlab, where the people using it can see it.</p>
+              </li>
+              <li data-reveal>
+                <span class="offer-n">03</span>
+                <h3>In my videos</h3>
+                <p>I show it in the videos I share while I'm building.</p>
+              </li>
+            </ol>
+          </div>
+
+          <div class="close" id="close" data-reveal>
+            <div class="close-copy">
+              <h2>Tell me about your tool.</h2>
+              <p>One email is enough. Tell me what it does, and I'll tell you where it fits in the build.</p>
+            </div>
+            <div class="close-act">
+              <a
+                class="write"
+                href="mailto:noor@nawwara.studio?subject=Sponsoring%20paperlab&amp;body=Hi%20Noor%2C%0A%0AMy%20tool%3A%20%0AWhat%20it%20does%3A%20%0AA%20link%3A%20%0A"
+                >Write to me <span aria-hidden="true">→</span></a
+              >
+              <button class="copy" type="button" data-copy="noor@nawwara.studio">
+                <span class="copy-addr">noor@nawwara.studio</span>
+                <span class="copy-say" aria-live="polite">Copy</span>
+              </button>
+            </div>
+            <div class="maker">
+              <img src="data:image/jpeg;base64,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" alt="" width="44" height="44" />
+              <span>
+                I'm <a class="maker-x" href="https://x.com/noormtir" target="_blank" rel="noreferrer"><strong>@noormtir</strong> ↗</a>
+                <small>I build products in public and share the workflow.</small>
+              </span>
+              <a class="maker-site" href="https://noormtir.com" target="_blank" rel="noreferrer">noormtir.com ↗</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="wrap"><a class="between" href="#roadmap"><span>Next: the roadmap ↓</span></a></div>
+    </main>
+
+    <footer>
+      <div class="wrap foot-row">
+        <a class="maker" href="https://x.com/noormtir" target="_blank" rel="noreferrer">
+          <img src="data:image/jpeg;base64,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" alt="" width="32" height="32" />
+          <span>Made by <strong>@noormtir</strong> ↗</span>
+        </a>
+        <nav class="foot-nav" aria-label="Elsewhere">
+          <a class="foot-link" href="../editor/">Editor</a>
+          <a class="foot-link" href="../playground/">Playground</a>
+          <a class="foot-link" href="../docs/">Docs</a>
+          <a class="foot-link" href="https://github.com/NourMtir0722/Paperlab">GitHub</a>
+          <a class="foot-link" href="mailto:noor@nawwara.studio">noor@nawwara.studio</a>
+        </nav>
+      </div>
+      <p class="wrap foot-legal">© 2026 Nawwara Studio LLC. All rights reserved.</p>
+    </footer>
+
+    <script>
+      ;(() => {
+        const notes = document.getElementById('notes')
+        const roadmap = document.getElementById('roadmap')
+        const sponsor = document.getElementById('sponsor')
+        const [toSponsor, toRoadmap] = notes.querySelectorAll('.between')
+
+        // Whichever was asked for comes first, the other follows it, and the
+        // line between them always points at the one still below.
+        const order = () => {
+          const sponsorFirst = window.location.hash === '#sponsor'
+          const parts = sponsorFirst
+            ? [sponsor, toRoadmap.parentElement, roadmap]
+            : [roadmap, toSponsor.parentElement, sponsor]
+          for (const part of parts) notes.append(part)
+          ;(sponsorFirst ? toSponsor : toRoadmap).parentElement.remove()
+          for (const link of document.querySelectorAll('.bar nav a')) {
+            link.setAttribute('aria-current', String(link.hash === (sponsorFirst ? '#sponsor' : '#roadmap')))
+          }
+          window.scrollTo(0, 0)
+        }
+        const detached = [toSponsor.parentElement, toRoadmap.parentElement]
+        const reorder = () => {
+          for (const piece of detached) if (!piece.isConnected) notes.append(piece)
+          order()
+        }
+        order()
+        window.addEventListener('hashchange', () => {
+          if (window.location.hash === '#sponsor' || window.location.hash === '#roadmap') reorder()
+        })
+
+        // The roadmap reads its own list: counts, track and step numbers.
+        const items = [...document.querySelectorAll('.group li')]
+        const tally = { done: 0, now: 0, next: 0 }
+        let n = 0
+        for (const item of items) {
+          const state = item.dataset.state
+          tally[state] = (tally[state] ?? 0) + 1
+          const mark = item.querySelector('.mark')
+          if (state === 'done') {
+            mark.innerHTML =
+              '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>'
+            mark.setAttribute('aria-label', 'Done')
+          } else if (state === 'next') {
+            n += 1
+            mark.textContent = String(n)
+            mark.setAttribute('aria-label', `Next, number ${n}`)
+          } else {
+            mark.setAttribute('aria-label', 'In progress')
+          }
+        }
+        for (const el of document.querySelectorAll('[data-count]')) el.textContent = String(tally[el.dataset.count])
+        // Done counts in full, and the pieces on my desk count as half done.
+        const total = tally.done + tally.now + tally.next
+        if (total) {
+          document.querySelector('.track span').style.width = `${((tally.done + tally.now / 2) / total) * 100}%`
+        }
+
+        // Arrival. Each block fades in once as it comes into view, and a number
+        // counts up to itself. Opacity only, and none of it with reduced motion.
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const countUp = (dt) => {
+          const to = Number(dt.dataset.to)
+          if (!Number.isFinite(to)) return
+          const start = performance.now()
+          const tick = (now) => {
+            const t = Math.min(1, (now - start) / 1100)
+            dt.textContent = Math.round(to * (1 - (1 - t) ** 3)).toLocaleString('en-US')
+            if (t < 1) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }
+        const seen = still
+          ? null
+          : new IntersectionObserver(
+              (entries) => {
+                for (const entry of entries) {
+                  if (!entry.isIntersecting) continue
+                  entry.target.classList.add('in')
+                  for (const dt of entry.target.querySelectorAll('dt[data-to]')) countUp(dt)
+                  seen.unobserve(entry.target)
+                }
+              },
+              { rootMargin: '0px 0px -8% 0px' },
+            )
+        const watch = (els) => {
+          if (!seen) return
+          ;[...els].forEach((el, i) => {
+            if (el.closest('.offer-list, .stats')) el.style.setProperty('--d', `${(i % 4) * 90}ms`)
+            seen.observe(el)
+          })
+        }
+        if (seen) {
+          document.documentElement.classList.add('reveal')
+          watch(document.querySelectorAll('[data-reveal]'))
+        }
+
+        // The numbers, from the site root. Any that are missing stay hidden.
+        const count = (value) =>
+          typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('en-US') : null
+        const visitsLabel = (visits) => {
+          if (visits.days >= 30) return 'visits in the last 30 days'
+          const since = new Date(`${visits.from}T00:00:00Z`).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC',
+          })
+          return `visits since ${since}`
+        }
+        fetch('../stats.json')
+          .then((res) => (res.ok ? res.json() : null))
+          .then((stats) => {
+            if (!stats) return
+            const rows = []
+            const visits = count(stats.visits?.count)
+            if (visits && typeof stats.visits.from === 'string') rows.push([visits, visitsLabel(stats.visits), stats.visits.count])
+            const downloads = count(stats.downloads)
+            if (downloads) rows.push([downloads, 'npm downloads', stats.downloads])
+            if (!rows.length) return
+            const list = document.querySelector('.stats')
+            for (const [value, label, raw] of rows) {
+              const item = document.createElement('div')
+              const dt = document.createElement('dt')
+              const dd = document.createElement('dd')
+              dt.textContent = value
+              dt.dataset.to = String(raw)
+              dd.textContent = label
+              item.dataset.reveal = ''
+              item.append(dd, dt)
+              list.append(item)
+            }
+            list.hidden = false
+            watch(list.querySelectorAll('[data-reveal]'))
+          })
+          .catch(() => {})
+
+        // Copy the address, for anyone whose mail client is not the default.
+        for (const button of document.querySelectorAll('[data-copy]')) {
+          const say = button.querySelector('.copy-say')
+          button.addEventListener('click', () => {
+            navigator.clipboard
+              ?.writeText(button.dataset.copy)
+              .then(() => {
+                say.textContent = 'Copied'
+                button.dataset.done = ''
+                setTimeout(() => {
+                  say.textContent = 'Copy'
+                  delete button.dataset.done
+                }, 1800)
+              })
+              .catch(() => {})
+          })
+        }
+      })()
+    </script>
+  </body>
+</html>

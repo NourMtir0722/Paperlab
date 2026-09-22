@@ -62,33 +62,14 @@ const cases = [
   ['a shared sculpt opens in the editor', { search: '?p=abc', width: 1440 }, '/editor/?p=abc'],
   ['the hash survives the hop', { search: '?s=xyz', hash: '#top', width: 1440 }, '/playground/?s=xyz#top'],
 
-  // A campaign tag is not a share link, so the device still decides. But it
-  // rides along: the analytics read it on the page this sends people to.
-  ['utm does not look like a share', { search: '?utm_source=x', width: 1440 }, '/editor/?utm_source=x'],
-  [
-    'utm on a phone still routes by device',
-    { search: '?utm_source=x', width: 390, pointer: 'coarse' },
-    '/playground/?utm_source=x',
-  ],
+  // Nothing else in the address rides along. Campaign tags were carried
+  // for an analytics tool that read them; Cloudflare's does not.
+  ['utm does not look like a share', { search: '?utm_source=x', width: 1440 }, '/editor/'],
   ['anything else is left behind', { search: '?junk=1', width: 1440 }, '/editor/'],
 
-  // The redirect makes the root the referrer, so the real one is handed on.
-  ['the referrer is handed on', { referrer: 'https://t.co/abc', width: 1440 }, '/editor/?ref=t.co'],
-  [
-    'and joins a shared scene',
-    { search: SCENE, hash: '#top', referrer: 'https://t.co/abc', width: 1440 },
-    `/playground/${SCENE}&ref=t.co#top`,
-  ],
-  [
-    'a campaign tag outranks it',
-    { search: '?ref=hn', referrer: 'https://t.co/abc', width: 1440 },
-    '/editor/?ref=hn',
-  ],
-  [
-    'the site itself is not a source',
-    { referrer: 'https://paperlab.nawwara.studio/docs/', width: 1440 },
-    '/editor/',
-  ],
+  // And no referrer is invented: the page sets no-referrer, so the one it
+  // came in with goes nowhere.
+  ['the referrer is not handed on', { referrer: 'https://t.co/abc', width: 1440 }, '/editor/'],
 ]
 
 let failed = 0

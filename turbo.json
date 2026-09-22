@@ -2,7 +2,14 @@
   "$schema": "https://turbo.build/schema.json",
   // Where the fire references live (see tools/fx-refs.mjs). Pass-through, not
   // hashed: it changes which stills a dev page shows, never what a task builds.
-  "globalPassThroughEnv": ["PAPERLAB_FX_REFS"],
+  "globalPassThroughEnv": [
+    "PAPERLAB_FX_REFS",
+    // The site's public numbers (tools/site-stats.mjs). The deploy runs that
+    // script with node directly; they are named here so the linter knows them.
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_SITE_TAG"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

@@ -169,11 +169,12 @@ const problems = []
  */
 const MODEL_HOST = 'https://storage.googleapis.com'
 /**
- * Site analytics, on every page. It is a script in the head, not a
- * part of the tracker, and it never sees the camera: the CSP lets it load
- * and send its page views, and nothing else gets through.
+ * Site analytics (Cloudflare Web Analytics), on every page. It is a script in
+ * the head, not a part of the tracker, and it never sees the camera: the CSP
+ * lets it load from the one host and send its page views to the other, and
+ * nothing else gets through.
  */
-const ANALYTICS_HOST = 'https://datafa.st'
+const ANALYTICS_HOSTS = new Set(['https://static.cloudflareinsights.com', 'https://cloudflareinsights.com'])
 const offsite = new Set()
 page.on('request', (request) => {
   const url = request.url()
@@ -777,7 +778,7 @@ try {
     `moved only ${burnMoved}`,
   )
   check(capture.length === 0, 'no synthetic-pointer errors on the page', capture[0] ?? '')
-  const strangers = [...offsite].filter((origin) => origin !== MODEL_HOST && origin !== ANALYTICS_HOST)
+  const strangers = [...offsite].filter((origin) => origin !== MODEL_HOST && !ANALYTICS_HOSTS.has(origin))
   check(
     strangers.length === 0,
     'the page reaches no third-party origin but the model host and analytics',
