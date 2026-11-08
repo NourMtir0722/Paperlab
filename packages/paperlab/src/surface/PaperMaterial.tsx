@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { useEffect, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import CustomShaderMaterial from 'three-custom-shader-material'
 import type { LightingName, SurfaceConfig } from '../config/schema'
 import type { Stock } from '../core/stock'
@@ -57,6 +57,10 @@ export function PaperMaterial({
   press,
 }: PaperMaterialProps) {
   const rig = useLightRig(lighting)
+  // Uniforms change in effects, after React's commit, which R3F never sees: a canvas that draws only
+  // on demand (`frameloop="demand"`) has to be asked for the frame that shows them, or a face that
+  // arrives once the sheet is still stays unseen (drawn black) until something else moves.
+  const invalidate = useThree((s) => s.invalidate)
   const damageTextures = useDamageTexture(damage, sheet)
   const composed = composeSurface(
     surface,
@@ -78,6 +82,7 @@ export function PaperMaterial({
   // biome-ignore lint/correctness/useExhaustiveDependencies: Uniform objects are bound per shader program — rebinding on value change would drop the binding every frame.
   const bound = useMemo(() => composed.uniforms, [composed.structureKey])
   useEffect(() => {
+    let changed = false
     for (const [key, uniform] of Object.entries(composed.uniforms)) {
       if (
         !bound[key] ||
@@ -92,18 +97,23 @@ export function PaperMaterial({
         continue
       }
       if (bound[key].value instanceof THREE.Color && uniform.value instanceof THREE.Color) {
+        if ((bound[key].value as THREE.Color).equals(uniform.value)) continue
         ;(bound[key].value as THREE.Color).copy(uniform.value)
       } else {
+        if (bound[key].value === uniform.value) continue
         bound[key].value = uniform.value
       }
+      changed = true
     }
+    if (changed) invalidate()
   })
   useEffect(() => {
     if (bound.uFrontMap) bound.uFrontMap.value = texture
     if (bound.uBackMap) bound.uBackMap.value = backTexture ?? null
     if (bound.uDamage) bound.uDamage.value = damageTextures?.damage ?? null
     if (bound.uDamageEdge) bound.uDamageEdge.value = damageTextures?.edge ?? null
-  }, [bound, texture, backTexture, damageTextures])
+    invalidate()
+  }, [bound, texture, backTexture, damageTextures, invalidate])
   // The fray follows the quality tier, which can change at any moment, so it
   // is read off the source each frame rather than baked into the program.
   useFrame((state) => {
