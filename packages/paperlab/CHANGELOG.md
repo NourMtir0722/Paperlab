@@ -1,5 +1,15 @@
 # paperlab
 
+## 0.9.0
+
+### Minor Changes
+
+- 82ec475: Stick a sheet to something and peel it off. `mount` lays a sheet onto an object along geodesics, so it hugs a curved surface. The object can be the built-in lemon (procedural, no asset) or any `.glb` you host. A new `sticker` behavior peels it with a tight bend at the front and a straight flap, adhesive that catches and lets go (`tack`), a clean snap free, and a flight away off the side of the shot. `surface.dieCut` cuts a sheet to its art's own outline with a margin of backing. Every sticker on the object can be clicked and peeled by hand, and clicking the object brings back the ones that flew away. An uploaded `.glb` is read in the pose it is drawn in, and stickers laid on thin or open parts of it overhang cleanly instead of crumpling. The new `peeling-sticker` preset, first in the list, puts it all together under raking light: real brand marks as example stickers (`stickerArt`), pores pressed through the vinyl, and a glossier patch of skin left where the sticker was.
+
+### Patch Changes
+
+- 1afdc77: A sheet in a canvas that draws only on demand (`frameloop="demand"`) now shows its face as soon as the picture loads. The material hands new textures and values to the shader after React's commit, where React Three Fiber doesn't see them, so a face that arrived once nothing else was moving stayed unseen, drawn black, until something asked for another frame. The material now asks for that frame itself, and only when something it draws has changed.
+
 ## 0.8.1
 
 ### Patch Changes
