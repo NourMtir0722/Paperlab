@@ -33,7 +33,7 @@ import { writeFileSync } from 'node:fs'
 
 const WINDOW_DAYS = 30
 const PACKAGE = 'paperlab'
-const HOST = 'paperlab.nawwara.studio'
+const HOST = 'free.paperlab.pro'
 
 const argOut = process.argv.indexOf('--out')
 const out = argOut > 0 ? process.argv[argOut + 1] : 'stats.json'

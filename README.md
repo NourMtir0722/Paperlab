@@ -8,7 +8,7 @@
 
 A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints — and a sheet that burns. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [with your hands](https://paperlab.nawwara.studio/hands/) (webcam)  ·  [the FX Lab](https://paperlab.nawwara.studio/fx-lab/)  ·  [for coding agents](AGENTS.md)
+**[Try it →](https://free.paperlab.pro/)**  ·  [the editor](https://free.paperlab.pro/editor/) (desktop)  ·  [the reference](https://free.paperlab.pro/docs/)  ·  [with your hands](https://free.paperlab.pro/hands/) (webcam)  ·  [the FX Lab](https://free.paperlab.pro/fx-lab/)  ·  [for coding agents](AGENTS.md)
 
 | | |
 |---|---|
@@ -131,7 +131,7 @@ What *causes* the damage lives in `paperlab/fx`:
 - **`FxFireLight`** — the burn is a light source. It lights the sheet, glows through it, and through `DamageSource.firelight` the room it burns in dims around it.
 - **The rest of a fire** — embers, smoke and ash (`FxParticles`), a match held in a hand (`FxMatchFlame`), the thread of smoke from a smouldering bead (`FxWisps`), the embers left after the flames (`Afterglow`), and the bloom and heat haze (`FxPost`).
 
-Every default is a tune made in the [FX Lab](https://paperlab.nawwara.studio/fx-lab/), and every one of them is an option you can set. See [AGENTS.md](AGENTS.md) for the wiring.
+Every default is a tune made in the [FX Lab](https://free.paperlab.pro/fx-lab/), and every one of them is an option you can set. See [AGENTS.md](AGENTS.md) for the wiring.
 
 ### Layouts — 12
 
@@ -190,7 +190,7 @@ The zod schema in `config/schema.ts` is the single source of truth: it validates
 
 A paper is data — a `.paper` JSON object validated by a zod schema — so it travels without asking anyone's permission. **You do not need to fork this repo to share one.**
 
-**Sending one.** Sculpt a paper in the [editor](https://paperlab.nawwara.studio/editor/) and pick **Export → Copy share link**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
+**Sending one.** Sculpt a paper in the [editor](https://free.paperlab.pro/editor/) and pick **Export → Copy share link**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
 
 **Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins.
 
@@ -215,9 +215,9 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 ## The apps
 
-Two sites ship alongside the library, both built on its public API only. [paperlab.nawwara.studio](https://paperlab.nawwara.studio/) opens the editor.
+Two sites ship alongside the library, both built on its public API only. [free.paperlab.pro](https://free.paperlab.pro/) opens the editor.
 
-**[The editor](https://paperlab.nawwara.studio/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. One switch along the top moves between five surfaces that all wear that same frame — **Paper · Field · Stage · Hands · FX Lab** — and the top-right holds a single button, **Export**.
+**[The editor](https://free.paperlab.pro/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. One switch along the top moves between five surfaces that all wear that same frame — **Paper · Field · Stage · Hands · FX Lab** — and the top-right holds a single button, **Export**.
 
 ![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](docs/media/editor.jpg)
 
@@ -227,12 +227,12 @@ The inspector is generated from the zod schema, so it can never drift from the A
 
 Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export** ends the session wherever you are going next: a share link, an image framed for a post, a story or a slide, the component or its JSON for your codebase, or **Copy for AI** for a coding agent. It wants a real screen: under about 900px it says so rather than handing you half a tool.
 
-- **[FX Lab](https://paperlab.nawwara.studio/fx-lab/)** — every knob behind the burn, around the sheet it is burning: the flame's zones, the fluid, the bloom, the light it throws, the ash lip and the char, how fast it eats and how much of the sheet it takes. The library's defaults are a tune made here. Scrub the burn, turn something, and **Export** copies the tune out as JSON to pass to `<Paper>`.
-- **[Hands](https://paperlab.nawwara.studio/hands/)** — set fire to the paper with a real flame. Hold a lighter up to the camera and the sheet catches where the flame is; with no lighter, pinch and hold still and you are holding a match; with no camera, there is a button. The page draws your hand as it tracks it and boxes the flame when it finds one, and once a flame touches the paper the fire runs from there until the whole sheet has burnt. Blow to put it out. It burns the way the FX Lab burns, from the same defaults, and the page is a hundred percent public API — `packages/paperlab` doesn't know it exists.
+- **[FX Lab](https://free.paperlab.pro/fx-lab/)** — every knob behind the burn, around the sheet it is burning: the flame's zones, the fluid, the bloom, the light it throws, the ash lip and the char, how fast it eats and how much of the sheet it takes. The library's defaults are a tune made here. Scrub the burn, turn something, and **Export** copies the tune out as JSON to pass to `<Paper>`.
+- **[Hands](https://free.paperlab.pro/hands/)** — set fire to the paper with a real flame. Hold a lighter up to the camera and the sheet catches where the flame is; with no lighter, pinch and hold still and you are holding a match; with no camera, there is a button. The page draws your hand as it tracks it and boxes the flame when it finds one, and once a flame touches the paper the fire runs from there until the whole sheet has burnt. Blow to put it out. It burns the way the FX Lab burns, from the same defaults, and the page is a hundred percent public API — `packages/paperlab` doesn't know it exists.
 
 The flame detector is arithmetic over the camera's pixels, not a model: a flame is bright, warm in the order red-green-blue, and never still, and the last of those three is what keeps a desk lamp from lighting your paper. The hand tracking is [MediaPipe](https://ai.google.dev/edge/mediapipe) (`@mediapipe/tasks-vision`, Apache-2.0) and it runs entirely in your browser: the models download from Google once, and after that no video and no measurement taken from it leaves the device. There is no server to send it to, and a `connect-src` CSP on the page makes that enforceable rather than a promise — including against MediaPipe's own usage telemetry, which the page blocks. Needs a camera, and asks before it takes one.
 
-**[The reference](https://paperlab.nawwara.studio/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
+**[The reference](https://free.paperlab.pro/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
 ## Development
 
