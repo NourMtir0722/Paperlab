@@ -30,7 +30,7 @@ if (!script) {
 function route({ search = '', hash = '', mouse = true, referrer = '' }) {
   let destination = null
   const window = {
-    location: { search, hash, hostname: 'paperlab.nawwara.studio', replace: (url) => (destination = url) },
+    location: { search, hash, hostname: 'free.paperlab.pro', replace: (url) => (destination = url) },
     // Only one query is asked now, and it is asked by name rather than by
     // substring: `(any-pointer: fine)` contains `pointer: fine`, so a loose
     // matcher answers both with the same value and the test stops testing.

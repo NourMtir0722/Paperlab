@@ -14,7 +14,7 @@ name: Deploy site
 # No secrets, no third-party account: the OIDC token below is issued by
 # GitHub to this workflow.
 #
-# Live at https://paperlab.nawwara.studio/ — a custom domain, so the URL
+# Live at https://free.paperlab.pro/ — a custom domain, so the URL
 # survives a GitHub username change. The CNAME file below is what keeps it:
 # this deploys via Actions rather than from a branch, and without a CNAME in
 # the artifact each deploy clears the custom domain and takes the site down.
@@ -47,7 +47,7 @@ permissions:
 env:
   # Site root. On the custom domain the site is the apex, not a subpath.
   BASE: /
-  DOMAIN: paperlab.nawwara.studio
+  DOMAIN: free.paperlab.pro
 
 jobs:
   build:

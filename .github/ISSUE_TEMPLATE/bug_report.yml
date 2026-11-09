@@ -28,7 +28,7 @@ body:
         The fastest possible report. Sculpt it in the editor, hit **Share**, and
         paste the link — it carries the whole config, so it reproduces exactly.
         A `.paper` JSON blob or the `<Paper …>` props work too.
-      placeholder: https://paperlab.nawwara.studio/editor/?p=...
+      placeholder: https://free.paperlab.pro/editor/?p=...
     validations:
       required: true
 

@@ -21,7 +21,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // the GitHub username in it — so renaming the account would break every image
 // on every release already sitting on npm. The domain outlives the username.
 // The workflow copies docs/media to /media on the site to make these resolve.
-const MEDIA = 'https://paperlab.nawwara.studio/media'
+const MEDIA = 'https://free.paperlab.pro/media'
 const BLOB = 'https://github.com/NourMtir0722/Paperlab/blob/main'
 
 const source = readFileSync(resolve(root, 'README.md'), 'utf8')

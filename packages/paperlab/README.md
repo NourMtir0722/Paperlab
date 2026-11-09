@@ -8,12 +8,12 @@
 
 A hero image that peels, a receipt that unrolls, a letter that folds, a poster rippling in wind, a gallery ring of prints — and a sheet that burns. A sheet is real 3D geometry, not a CSS trick and not a video — content is a texture on a mesh that genuinely bends, so text and imagery curl with perfect continuity.
 
-**[Try it →](https://paperlab.nawwara.studio/)**  ·  [the editor](https://paperlab.nawwara.studio/editor/) (desktop)  ·  [the reference](https://paperlab.nawwara.studio/docs/)  ·  [with your hands](https://paperlab.nawwara.studio/hands/) (webcam)  ·  [the FX Lab](https://paperlab.nawwara.studio/fx-lab/)  ·  [for coding agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
+**[Try it →](https://free.paperlab.pro/)**  ·  [the editor](https://free.paperlab.pro/editor/) (desktop)  ·  [the reference](https://free.paperlab.pro/docs/)  ·  [with your hands](https://free.paperlab.pro/hands/) (webcam)  ·  [the FX Lab](https://free.paperlab.pro/fx-lab/)  ·  [for coding agents](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md)
 
 | | |
 |---|---|
-| ![A thermal receipt unrolling from a paper roll](https://paperlab.nawwara.studio/media/receipt-unroll.gif) | ![A gloss card with its corner peeling up off the page](https://paperlab.nawwara.studio/media/hero-peel.gif) |
-| ![A letter folding itself into thirds](https://paperlab.nawwara.studio/media/letter-fold.gif) | ![A page turning on its spine](https://paperlab.nawwara.studio/media/page-flip.gif) |
+| ![A thermal receipt unrolling from a paper roll](https://free.paperlab.pro/media/receipt-unroll.gif) | ![A gloss card with its corner peeling up off the page](https://free.paperlab.pro/media/hero-peel.gif) |
+| ![A letter folding itself into thirds](https://free.paperlab.pro/media/letter-fold.gif) | ![A page turning on its spine](https://free.paperlab.pro/media/page-flip.gif) |
 
 Every frame above is real geometry — no video, no sprite sheet.
 
@@ -104,7 +104,7 @@ Underneath them are seven **deformers** — `roll`, `curl`, `bend`, `fold`, `wav
 
 ### Stocks — 7
 
-![The same letter on all seven paper stocks, side by side](https://paperlab.nawwara.studio/media/stocks.jpg)
+![The same letter on all seven paper stocks, side by side](https://free.paperlab.pro/media/stocks.jpg)
 
 One sheet of words, seven papers. Stock is not a colour swap: thermal takes on banding, newsprint takes grain, vellum goes translucent and lets the light through it. On top of stock sit composable surface effects — grain, torn deckle edges, crease lines, perforation, aging — as shader chunks. Alpha-affecting effects use `alphaTest` rather than blending, so shadows stay correct.
 
@@ -131,23 +131,23 @@ What *causes* the damage lives in `paperlab/fx`:
 - **`FxFireLight`** — the burn is a light source. It lights the sheet, glows through it, and through `DamageSource.firelight` the room it burns in dims around it.
 - **The rest of a fire** — embers, smoke and ash (`FxParticles`), a match held in a hand (`FxMatchFlame`), the thread of smoke from a smouldering bead (`FxWisps`), the embers left after the flames (`Afterglow`), and the bloom and heat haze (`FxPost`).
 
-Every default is a tune made in the [FX Lab](https://paperlab.nawwara.studio/fx-lab/), and every one of them is an option you can set. See [AGENTS.md](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md) for the wiring.
+Every default is a tune made in the [FX Lab](https://free.paperlab.pro/fx-lab/), and every one of them is an option you can set. See [AGENTS.md](https://github.com/NourMtir0722/Paperlab/blob/main/AGENTS.md) for the wiring.
 
 ### Layouts — 12
 
-![All twelve field layouts rendered side by side](https://paperlab.nawwara.studio/media/layouts.jpg)
+![All twelve field layouts rendered side by side](https://free.paperlab.pro/media/layouts.jpg)
 
 Every layout names somewhere paper actually sits: `book` (pages splayed from a spine — `split: 0` makes it a swatch deck), `accordion` (one continuous concertina strip), `fan` (a hand of cards), `spread` (a stack slid sideways), `pile` (a heap on a desk), `rack` (prints stood in a row, leaning back), `wall` (a pinned studio wall), `spill` (a dropped stack mid-air), `colonnade` (banners along a walk, for stage mode), `ring`, `sheet`, and `sweep` — a specimen chart of one sheet at ten stages of the same curl.
 
 Each pose also carries a **bias**: how strongly that one sheet takes the deformation. So the top of a pile curls while the sheets pressed underneath lie flat — in the same draw call. A whole field is **one instanced draw call** with the deformers running on the GPU, and the camera frames itself from the layout's own poses, so a wide `wall` and a deep `ring` both land without hand-tuning.
 
-![Twelve cards standing in a ring, each with its corner peeling, rotating slowly](https://paperlab.nawwara.studio/media/field-ring.gif)
+![Twelve cards standing in a ring, each with its corner peeling, rotating slowly](https://free.paperlab.pro/media/field-ring.gif)
 
 Twelve sheets, twelve peeled corners, **one draw call** — the deformers run on the GPU and the text curls with the mesh.
 
 ### Lighting — 8 rigs
 
-![The same letter under all eight lighting rigs](https://paperlab.nawwara.studio/media/lighting.jpg)
+![The same letter under all eight lighting rigs](https://free.paperlab.pro/media/lighting.jpg)
 
 A rig is the starting point, not the ceiling. `light={{ exposure, film, key, color, direction, height, ambient, studio, haze }}` moves the lamp in the terms a person would say it in — degrees around the room, degrees above the horizon — and **studio** is the room itself as an environment map, which is what gives paper directional fill and something for its sheen to reflect. `window` and `leaves` carry a gobo; `lightbox` puts the source behind the sheet and lets you read it through the paper.
 
@@ -155,7 +155,7 @@ Overrides serialize *as* overrides, so a shared scene carries the two sliders yo
 
 ### Stage — paper as architecture
 
-![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](https://paperlab.nawwara.studio/media/stage-nave.gif)
+![Printed banners hung down both sides of a colonnade, lit from an opening at the far end](https://free.paperlab.pro/media/stage-nave.gif)
 
 Banners hung the height of a room along a walk you travel, with light coming through the paper from an opening at the far end. `<PaperStage text="…" />` builds the whole space out of a sentence, and binding `progress` to scroll makes the page scroll the walk.
 
@@ -163,13 +163,13 @@ The room is real — a ceiling, poured floor slabs, columns with base plates, an
 
 **Six rooms ship**, and they are not variations on a theme — the walk changes shape, the paper changes proportion, the light changes where it comes from:
 
-![The six stage presets — nave, procession, cloister, threshold, ribbon and archive](https://paperlab.nawwara.studio/media/stages.jpg)
+![The six stage presets — nave, procession, cloister, threshold, ribbon and archive](https://free.paperlab.pro/media/stages.jpg)
 
 Every one of those is built from the same two things: sheets of paper, and words printed on them. No imagery, no textures from anywhere else.
 
 **Four camera shots** frame any of them, each reading the same walk as the arrangement and the light, so they cannot drift apart:
 
-![The four stage camera shots — follow, lead, low and wide](https://paperlab.nawwara.studio/media/camera.jpg)
+![The four stage camera shots — follow, lead, low and wide](https://free.paperlab.pro/media/camera.jpg)
 
 And it is navigable rather than a video. It drifts on its own until you touch it, then drag it (with inertia), wheel it, step banner to banner with the arrow keys, or click the paper you want to stand in front of. The stops come from the layout, so a step lands *on* a banner. `motion={{ capture: false }}` for a stage inside a scrolling page, so it never eats a reader's scroll. Quality adapts to the machine on its own across four tiers.
 
@@ -190,7 +190,7 @@ The zod schema in `config/schema.ts` is the single source of truth: it validates
 
 A paper is data — a `.paper` JSON object validated by a zod schema — so it travels without asking anyone's permission. **You do not need to fork this repo to share one.**
 
-**Sending one.** Sculpt a paper in the [editor](https://paperlab.nawwara.studio/editor/) and pick **Export → Copy share link**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
+**Sending one.** Sculpt a paper in the [editor](https://free.paperlab.pro/editor/) and pick **Export → Copy share link**: you get a link with the whole paper packed into it. Anyone who opens that link lands in their own editor with your paper loaded and *editable* — a fork, not a read-only view. (Uploaded images are too big for a URL; use the ⬇ download and send the `.paper` file instead.)
 
 **Receiving one.** Open the link, or drag a `.paper` file onto the preset panel. Either way it lands in your library next to the built-ins.
 
@@ -215,24 +215,24 @@ That's the whole loop: **make → send → remix → ship.** If you'd rather you
 
 ## The apps
 
-Two sites ship alongside the library, both built on its public API only. [paperlab.nawwara.studio](https://paperlab.nawwara.studio/) opens the editor.
+Two sites ship alongside the library, both built on its public API only. [free.paperlab.pro](https://free.paperlab.pro/) opens the editor.
 
-**[The editor](https://paperlab.nawwara.studio/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. One switch along the top moves between five surfaces that all wear that same frame — **Paper · Field · Stage · Hands · FX Lab** — and the top-right holds a single button, **Export**.
+**[The editor](https://free.paperlab.pro/editor/)** — a three-rail canvas tool: presets on the left, sculpt on canvas, inspector on the right, transport at the bottom (space = play/pause), undo and redo on ⌘Z. One switch along the top moves between five surfaces that all wear that same frame — **Paper · Field · Stage · Hands · FX Lab** — and the top-right holds a single button, **Export**.
 
-![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](https://paperlab.nawwara.studio/media/editor.jpg)
+![The Paperlab editor in paper mode, showing a thermal receipt on the canvas with the inspector open](https://free.paperlab.pro/media/editor.jpg)
 
 The inspector is generated from the zod schema, so it can never drift from the API. Each behavior nominates the two or three params that *are* it — `unroll` opens on progress and tightness, and folds sheet, stock, content, surface, physics and scene away behind their own headings. Labels drag to scrub: full range in ~300px, shift for a 4× finer pass, click the readout to type an exact value.
 
-![The editor in field mode, fourteen cards arranged in a ring with the layout panel open](https://paperlab.nawwara.studio/media/editor-field.jpg)
+![The editor in field mode, fourteen cards arranged in a ring with the layout panel open](https://free.paperlab.pro/media/editor-field.jpg)
 
 Field mode composes galleries against the same panel — swap the layout, watch fourteen papers rearrange in one draw call. **Export** ends the session wherever you are going next: a share link, an image framed for a post, a story or a slide, the component or its JSON for your codebase, or **Copy for AI** for a coding agent. It wants a real screen: under about 900px it says so rather than handing you half a tool.
 
-- **[FX Lab](https://paperlab.nawwara.studio/fx-lab/)** — every knob behind the burn, around the sheet it is burning: the flame's zones, the fluid, the bloom, the light it throws, the ash lip and the char, how fast it eats and how much of the sheet it takes. The library's defaults are a tune made here. Scrub the burn, turn something, and **Export** copies the tune out as JSON to pass to `<Paper>`.
-- **[Hands](https://paperlab.nawwara.studio/hands/)** — set fire to the paper with a real flame. Hold a lighter up to the camera and the sheet catches where the flame is; with no lighter, pinch and hold still and you are holding a match; with no camera, there is a button. The page draws your hand as it tracks it and boxes the flame when it finds one, and once a flame touches the paper the fire runs from there until the whole sheet has burnt. Blow to put it out. It burns the way the FX Lab burns, from the same defaults, and the page is a hundred percent public API — `packages/paperlab` doesn't know it exists.
+- **[FX Lab](https://free.paperlab.pro/fx-lab/)** — every knob behind the burn, around the sheet it is burning: the flame's zones, the fluid, the bloom, the light it throws, the ash lip and the char, how fast it eats and how much of the sheet it takes. The library's defaults are a tune made here. Scrub the burn, turn something, and **Export** copies the tune out as JSON to pass to `<Paper>`.
+- **[Hands](https://free.paperlab.pro/hands/)** — set fire to the paper with a real flame. Hold a lighter up to the camera and the sheet catches where the flame is; with no lighter, pinch and hold still and you are holding a match; with no camera, there is a button. The page draws your hand as it tracks it and boxes the flame when it finds one, and once a flame touches the paper the fire runs from there until the whole sheet has burnt. Blow to put it out. It burns the way the FX Lab burns, from the same defaults, and the page is a hundred percent public API — `packages/paperlab` doesn't know it exists.
 
 The flame detector is arithmetic over the camera's pixels, not a model: a flame is bright, warm in the order red-green-blue, and never still, and the last of those three is what keeps a desk lamp from lighting your paper. The hand tracking is [MediaPipe](https://ai.google.dev/edge/mediapipe) (`@mediapipe/tasks-vision`, Apache-2.0) and it runs entirely in your browser: the models download from Google once, and after that no video and no measurement taken from it leaves the device. There is no server to send it to, and a `connect-src` CSP on the page makes that enforceable rather than a promise — including against MediaPipe's own usage telemetry, which the page blocks. Needs a camera, and asks before it takes one.
 
-**[The reference](https://paperlab.nawwara.studio/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
+**[The reference](https://free.paperlab.pro/docs/)** — the whole catalogue with every behavior, deformer, layout, stock and surface rendering live. The catalogue is generated from the registries, so it cannot advertise something the library doesn't have.
 
 ## Development
 
