@@ -323,10 +323,10 @@ export function FieldGroup({
       receiveShadow
       // Only raycastable when somebody is listening: hit-testing an instanced
       // mesh is per-instance work on every pointer move, and this is the mode
-      // that puts hundreds of instances on screen at once. Spread rather than
-      // `raycast={undefined}`, which does not mean "leave the default" — it
-      // assigns undefined over the method three is about to call.
-      {...(onSelect ? {} : { raycast: NO_RAYCAST })}
+      // that puts hundreds of instances on screen at once. Always a function:
+      // removing the prop later (onSelect arriving after a pause) makes R3F
+      // "reset" it to 0, because InstancedMesh's constructor takes arguments.
+      raycast={onSelect ? THREE.InstancedMesh.prototype.raycast : NO_RAYCAST}
       onClick={
         onSelect &&
         ((event) => {

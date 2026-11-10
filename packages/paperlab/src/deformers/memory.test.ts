@@ -136,8 +136,8 @@ describe('CreaseTracker', () => {
 
     const deepest = (t: CreaseTracker) => Math.max(...t.creases.map((c) => Math.abs(c.depth)))
     expect(deepest(kraft)).toBeGreaterThan(deepest(vellum) * 3)
-    // The bottom flap closes to 165°; kraft keeps 0.85 × MAX_SET of it.
-    expect(deepest(kraft)).toBeCloseTo(165 * getStock('kraft').takesSet * MAX_SET, 5)
+    // The bottom flap closes to 179°; kraft keeps 0.85 × MAX_SET of it.
+    expect(deepest(kraft)).toBeCloseTo(179 * getStock('kraft').takesSet * MAX_SET, 5)
   })
 
   it('leaves perfectly elastic paper uncreased', () => {
@@ -148,13 +148,14 @@ describe('CreaseTracker', () => {
 
   it('does not crease a fold that never closes far enough', () => {
     const tracker = new CreaseTracker()
-    // A third of the way in, the bottom flap is only at ~69° — a bend.
+    // A third of the way in, the bottom flap is at ~109° (it folds alone until 0.46).
     play(tracker, letterFold, { crease: 0.3 }, 0, 0.33, 1)
     const deepest = tracker.creases.map((c) => Math.abs(c.depth))
     expect(deepest.every((d) => d > 0)).toBe(true)
-    // ...but stop below the growth threshold and there is nothing at all.
+    // ...but stop below the growth threshold and there is nothing at all
+    // (at 0.12 the bottom flap is at ~40°, under CREASE_MIN_GROWTH's 45°).
     const shy = new CreaseTracker()
-    play(shy, letterFold, { crease: 0.3 }, 0, 0.2, 1)
+    play(shy, letterFold, { crease: 0.3 }, 0, 0.12, 1)
     expect(shy.creases).toEqual([])
   })
 
