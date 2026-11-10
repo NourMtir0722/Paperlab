@@ -55,16 +55,16 @@
   },
   "peerDependencies": {
     "@react-three/fiber": ">=9",
-    "gsap": ">=3.12",
-    "react": ">=19",
-    "three": ">=0.162",
     "@react-three/postprocessing": ">=3",
-    "postprocessing": ">=6.36"
+    "gsap": ">=3.12",
+    "postprocessing": ">=6.36",
+    "react": ">=19",
+    "three": ">=0.162"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "three-custom-shader-material": "^6.4.0",
-    "zod": "^4.6.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
@@ -79,7 +79,7 @@
     "three": "^0.186.0",
     "tsup": "^8.3.0",
     "typescript": "^5.7.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.1.0"
   },
   "author": "Noor Mtir",
   "homepage": "https://free.paperlab.pro",
